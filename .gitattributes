@@ -1,0 +1,4 @@
+# Git hooks and shell scripts must keep LF line endings on every platform:
+# with core.autocrlf=true (Git for Windows default) a CRLF checkout breaks sh.
+.githooks/* text eol=lf
+*.sh text eol=lf

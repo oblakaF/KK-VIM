@@ -219,17 +219,30 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# --- Scientific library: original publications stay local (decision D-021) ---
+# --- Scientific publications and archives stay local (decision D-021) ---
 # Project policy: original publications are never committed to git, whatever
 # their licence. Indexes, bibliographic data (.md, .csv, .txt) and self-written
 # literature reviews are tracked. See docs/DECISIONS.md (D-021) and
 # references/INDEX.md, section 6. Do not add exceptions without a new decision.
-references/**/*.[pP][dD][fF]
-references/**/*.[dD][jJ][vV][uU]
-references/**/*.[dD][jJ][vV]
-references/**/*.[dD][oO][cC]
-references/**/*.[dD][oO][cC][xX]
-references/**/*.[eE][pP][uU][bB]
-references/**/*.[rR][aA][rR]
-references/**/*.[zZ][iI][pP]
-references/**/*.7[zZ]
+# The patterns apply anywhere in the repository, not only in references/.
+# Images (PNG, JPG, ...) are deliberately NOT ignored globally: the project may
+# need its own figures. Page images and scans belong in scratch/ (see below).
+# The versioned pre-commit hook (.githooks/pre-commit) rejects the same files
+# even when they are force-added (git add -f).
+*.[pP][dD][fF]
+*.[dD][jJ][vV][uU]
+*.[dD][jJ][vV]
+*.[dD][oO][cC]
+*.[dD][oO][cC][xX]
+*.[eE][pP][uU][bB]
+*.[rR][aA][rR]
+*.[zZ][iI][pP]
+*.7[zZ]
+*.[tT][aA][rR]
+*.[gG][zZ]
+*.[tT][gG][zZ]
+*.[bB][zZ]2
+*.[xX][zZ]
+
+# --- Scratch: temporary page images, scans and working files (never committed) ---
+scratch/

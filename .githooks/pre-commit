@@ -1,0 +1,58 @@
+#!/bin/sh
+# KK-VIM pre-commit hook.
+#
+# Rejects a commit when the staged files include scientific publications
+# (PDF, DjVu, DOC, DOCX, EPUB), archives, or anything inside a scratch/ directory.
+# The index is checked directly, so force-added files (git add -f) are caught too.
+# Files are matched by extension and by content signature (first bytes), so a
+# renamed PDF or archive is also rejected. See D-021 and AGENTS.md, section 3.
+#
+# Install once per clone:  git config core.hooksPath .githooks
+# Self-test:               sh .githooks/test-pre-commit.sh
+#
+# Limitation: a local hook can be bypassed (git commit --no-verify, or the hook
+# is not installed in a clone). It prevents accidental additions; it is not an
+# absolute guarantee.
+
+files=$(git -c core.quotepath=off diff --cached --name-only --diff-filter=ACMRT) || exit 1
+[ -z "$files" ] && exit 0
+
+set -f
+old_ifs=$IFS
+IFS='
+'
+blocked=0
+for f in $files; do
+    reason=
+    lower=$(printf '%s' "$f" | tr 'A-Z' 'a-z')
+    case "$lower" in
+        scratch/*|*/scratch/*)
+            reason="file inside scratch/" ;;
+        *.pdf|*.djvu|*.djv|*.doc|*.docx|*.epub|*.rar|*.zip|*.7z|*.tar|*.gz|*.tgz|*.bz2|*.xz)
+            reason="publication or archive extension" ;;
+    esac
+    if [ -z "$reason" ]; then
+        magic=$(git cat-file blob ":$f" 2>/dev/null | head -c 8 | od -An -tx1 | tr -d ' \n')
+        case "$magic" in
+            255044462d*)          reason="PDF content" ;;
+            41542654464f524d*)    reason="DjVu content" ;;
+            d0cf11e0a1b11ae1*)    reason="DOC (OLE2) content" ;;
+            504b0304*|504b0506*)  reason="ZIP-based content (DOCX, ZIP, ...)" ;;
+            526172211a07*)        reason="RAR content" ;;
+            377abcaf271c*)        reason="7z content" ;;
+            1f8b*)                reason="gzip content" ;;
+        esac
+    fi
+    if [ -n "$reason" ]; then
+        echo "pre-commit: REJECTED  $f  ($reason)" >&2
+        blocked=1
+    fi
+done
+IFS=$old_ifs
+
+if [ "$blocked" -ne 0 ]; then
+    echo "pre-commit: publications, archives and scratch/ files must not be committed (D-021)." >&2
+    echo "pre-commit: unstage them with: git rm --cached -- <file>" >&2
+    exit 1
+fi
+exit 0
