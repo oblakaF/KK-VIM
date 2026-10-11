@@ -218,3 +218,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Scientific library: original publications stay local (decision D-021) ---
+# Project policy: original publications are never committed to git, whatever
+# their licence. Indexes, bibliographic data (.md, .csv, .txt) and self-written
+# literature reviews are tracked. See docs/DECISIONS.md (D-021) and
+# references/INDEX.md, section 6. Do not add exceptions without a new decision.
+references/**/*.[pP][dD][fF]
+references/**/*.[dD][jJ][vV][uU]
+references/**/*.[dD][jJ][vV]
+references/**/*.[dD][oO][cC]
+references/**/*.[dD][oO][cC][xX]
+references/**/*.[eE][pP][uU][bB]
+references/**/*.[rR][aA][rR]
+references/**/*.[zZ][iI][pP]
+references/**/*.7[zZ]
