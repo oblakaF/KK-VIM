@@ -112,15 +112,38 @@ def first_halfstep(a: float, D: float, q: float, n_x: int, n_y: int) -> FirstHal
     )
 
 
-def node_value(result: FirstHalfStepResult, x_fraction, y_fraction) -> float:
-    """Field value at (x_fraction * a, y_fraction * a) if that point is a grid node.
+def field_node_value(grid_x: Grid1D, grid_y: Grid1D, field: np.ndarray, x_fraction, y_fraction) -> float:
+    """Value of the given field at (x_fraction * a, y_fraction * a) if that point is a grid node.
 
     Fractions are rational numbers: Fraction, int or a string such as "1/2". A point
     that is not a node raises NotANodeError; no nearest node and no interpolation.
     """
-    i = _node_index(x_fraction, result.grid_x.n)
-    j = _node_index(y_fraction, result.grid_y.n)
-    return float(result.w1[i, j])
+    if field.shape != (grid_x.n + 1, grid_y.n + 1):
+        raise ValueError(f"field shape {field.shape} does not match the grids ({grid_x.n + 1}, {grid_y.n + 1})")
+    i = _node_index(x_fraction, grid_x.n)
+    j = _node_index(y_fraction, grid_y.n)
+    return float(field[i, j])
+
+
+def node_value(result, x_fraction, y_fraction) -> float:
+    """Node value of the field of exactly this half-step result.
+
+    FirstHalfStepResult -> w1; SecondHalfStepResult -> w2; HalfStepRecord (kkvim.iteration)
+    -> its own field w(s). Any other type raises TypeError; the type is checked
+    explicitly, never guessed from attributes.
+    """
+    from kkvim.iteration import HalfStepRecord
+    from kkvim.second_halfstep import SecondHalfStepResult
+
+    if type(result) is FirstHalfStepResult:
+        field = result.w1
+    elif type(result) is SecondHalfStepResult:
+        field = result.w2
+    elif type(result) is HalfStepRecord:
+        field = result.field()
+    else:
+        raise TypeError(f"unsupported half-step result type {type(result).__name__}")
+    return field_node_value(result.grid_x, result.grid_y, field, x_fraction, y_fraction)
 
 
 def normalization_factor(f: np.ndarray) -> float:

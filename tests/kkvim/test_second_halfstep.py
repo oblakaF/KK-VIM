@@ -145,6 +145,14 @@ def test_a5g_scale_invariance_of_second_halfstep():
     assert np.max(np.abs(w2_alt - r.w2)) / np.max(np.abs(r.w2)) <= A5G_TOL
 
 
+@pytest.mark.parametrize("n_x, n_y", [(20, 20), (20, 40)])
+def test_node_value_returns_w2_not_w1(n_x, n_y):
+    first, r = both(n_x=n_x, n_y=n_y)
+    assert fh.node_value(r, "1/2", "1/2") == r.w2[n_x // 2, n_y // 2]
+    assert fh.node_value(r, "1/2", "1/2") != r.w1[n_x // 2, n_y // 2]
+    assert fh.node_value(first, "1/2", "1/2") == first.w1[n_x // 2, n_y // 2]
+
+
 # Errors -----------------------------------------------------------------------------
 
 

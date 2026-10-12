@@ -167,6 +167,16 @@ def test_center_is_not_a_node_for_odd_n(n_x, n_y):
     assert str(info.value) == NOT_A_NODE_MESSAGE
 
 
+def test_field_node_value_takes_explicit_field():
+    r = first_halfstep(1.0, 1.0, 1.0, 20, 30)
+    other = np.arange(21 * 31, dtype=float).reshape(21, 31)
+    assert fh.field_node_value(r.grid_x, r.grid_y, other, "1/2", "1/3") == other[10, 10]
+    with pytest.raises(ValueError):
+        fh.field_node_value(r.grid_x, r.grid_y, other.T, "1/2", "1/2")
+    with pytest.raises(TypeError):
+        node_value(object(), "1/2", "1/2")
+
+
 def test_node_coordinates_must_be_rational():
     r = first_halfstep(1.0, 1.0, 1.0, 20, 20)
     with pytest.raises(TypeError):
