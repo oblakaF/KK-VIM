@@ -118,7 +118,7 @@ R-6–R-8 внесены в карточку; решение владельца 
 | `pyproject.toml`, `uv.lock`, `src/kkvim/`, `tests/`, `.github/workflows/ci.yml` | программный каркас и CI (D-028); GitHub CI — PASS (run 38211631402) |
 | `docs/SOURCE_MAP.md` (редакция 2) и рецензии: `SOURCE_MAP.review.md`, `SOURCE_MAP.recheck.md` | ACCEPTED (R1-T3A, шаг 1, 2026-10-12); неблокирующие R-1–R-3 открыты (R-2, R-3 — учесть в MATH_SPEC.md) |
 | `docs/MATH_SPEC.md` и рецензии: `MATH_SPEC.independent-review.md`, `MATH_SPEC.recheck.md` | часть A — ACCEPTED 2026-10-12 (D-031; `MATH_SPEC.md` — `5098c64c5eacee73a6ee7e81a6815e9fe69854b6`, `MATH_SPEC.recheck.md` — `1dbb149dacc9694247b6f57dc73add9f148e9be5`); часть B — NOT_STARTED; Р-2–Р-9 открыты |
-| `docs/NUMERICAL_SPEC.md` | не создан (R2; следующий этап) |
+| `docs/NUMERICAL_SPEC.md` | DRAFT (2026-10-12, Literature), передан на независимую рецензию; программирование R2 не разрешено |
 
 Унаследованные обзоры, протоколы, индексы и указатели удалены 2026-10-11 (D-026).
 
@@ -213,8 +213,8 @@ D-026); идентификатор не переиспользуется (INDEX.
 
 ## Текущая задача
 
-**Следующий этап — `docs/NUMERICAL_SPEC.md` для R2 (G3.1, G4): PLANNED, не начат; документ не создан.** Начинается по заданию
-владельца. Опора — принятые `docs/MATH_SPEC.md`, часть A (D-031), `docs/SOURCE_MAP.md`, `docs/NAVIER_REFERENCE_SPEC.md`;
+**Следующий этап — `docs/NUMERICAL_SPEC.md` для R2 (G3.1, G4): DRAFT, передан на независимую рецензию.** Рецензия и утверждение —
+по заданию владельца. Опора — принятые `docs/MATH_SPEC.md`, часть A (D-031), `docs/SOURCE_MAP.md`, `docs/NAVIER_REFERENCE_SPEC.md`;
 вопросы Q-009–Q-012 и дискретная часть Q-021. Программирование R2 не разрешено. R1 в целом остаётся IN_PROGRESS;
 часть B MATH_SPEC.md — NOT_STARTED (до R4).
 
