@@ -30,8 +30,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-# Add "src/kkvim_reference" here when that package is created (D-028).
-packages = ["src/kkvim"]
+packages = ["src/kkvim", "src/kkvim_reference"]
 
 [tool.pytest.ini_options]
 minversion = "8.4"
