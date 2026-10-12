@@ -1,0 +1,14 @@
+{
+  "field.w.title": "Прогиб w(x, y)",
+  "axis.x": "x, m",
+  "axis.y": "y, m",
+  "colorbar.w": "w, mm",
+  "section.x.title": "Сечение при y = {y} m",
+  "section.y.title": "Сечение при x = {x} m",
+  "conv.title": "Сходимость итераций",
+  "axis.iteration": "Итерация k",
+  "axis.residual": "Невязка (предварительно)",
+  "legend.kkvim": "КК-ВИМ, N = {N}",
+  "annot.extremum": "Экстремум по узлам: {value} mm",
+  "mark.test_data": "ТЕСТОВЫЕ ДАННЫЕ · TEST DATA"
+}
