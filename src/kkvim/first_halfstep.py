@@ -67,6 +67,8 @@ class FirstHalfStepResult:
     w1: np.ndarray  # field, shape (n_x + 1, n_y + 1), axis 0 = x, axis 1 = y
     coefficients: HalfStepCoefficients  # A_h, B_h, C_h, F_h of X0 on grid_x
     solver_diagnostics: SolveDiagnostics
+    D: float  # validated bending stiffness, reused by the next half-step
+    q: float  # validated load, reused by the next half-step
     s: int = 1
     k: int = 0
 
@@ -90,7 +92,7 @@ def first_halfstep(a: float, D: float, q: float, n_x: int, n_y: int) -> FirstHal
     step = solve_halfstep(grid_x, x0, grid_y, q, D)
 
     y1_raw = step.raw
-    c = _normalization_factor(grid_y, y1_raw)
+    c = normalization_factor(y1_raw)
     y1_normalized = y1_raw / c
     x1_scaled = x0 * c
     w1 = np.outer(grid_x.with_boundary(x1_scaled), grid_y.with_boundary(y1_normalized))
@@ -105,6 +107,8 @@ def first_halfstep(a: float, D: float, q: float, n_x: int, n_y: int) -> FirstHal
         w1=w1,
         coefficients=step.coefficients,
         solver_diagnostics=step.solver_diagnostics,
+        D=D,
+        q=float(q),
     )
 
 
@@ -119,8 +123,11 @@ def node_value(result: FirstHalfStepResult, x_fraction, y_fraction) -> float:
     return float(result.w1[i, j])
 
 
-def _normalization_factor(grid: Grid1D, f: np.ndarray) -> float:
-    """c = sigma * max |f|, sigma = sign <f, 1> (I-4); errors instead of division by zero."""
+def normalization_factor(f: np.ndarray) -> float:
+    """c = sigma * max |f|, sigma = sign <f, 1> (I-4); errors instead of division by zero.
+
+    Shared by all half-steps (NUMERICAL_SPEC.md, 9.1).
+    """
     total = float(np.sum(f))
     peak = float(np.max(np.abs(f)))
     if not (math.isfinite(total) and math.isfinite(peak)):

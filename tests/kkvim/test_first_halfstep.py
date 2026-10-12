@@ -222,6 +222,21 @@ def test_normalization_errors(monkeypatch):
         assert info.value.code == code
 
 
+def test_result_keeps_validated_d_and_q():
+    r = first_halfstep(1.0, 3, -2, 20, 20)
+    assert r.D == 3.0 and isinstance(r.D, float)
+    assert r.q == -2.0 and isinstance(r.q, float)
+
+
+def test_shared_normalization_factor():
+    assert fh.normalization_factor(np.array([0.5, -2.0, 3.0])) == 3.0
+    assert fh.normalization_factor(np.array([-0.5, -2.0, 1.0])) == -2.0
+    for values, code in (([1.0, -1.0], ERROR_DEGENERATE), ([0.0, 0.0], ERROR_DEGENERATE), ([np.inf, 1.0], ERROR_NONFINITE)):
+        with pytest.raises(HalfStepError) as info:
+            fh.normalization_factor(np.array(values))
+        assert info.value.code == code
+
+
 # Invalid input --------------------------------------------------------------------
 
 
