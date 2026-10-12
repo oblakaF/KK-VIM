@@ -13,7 +13,7 @@ name = "kkvim"
 version = "0.0.0"
 description = "Plate analysis by the Kirichenko-Krysko variational iteration method"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.15"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
