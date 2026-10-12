@@ -129,8 +129,12 @@ class SineHalfStep:
     def value(self, xi):
         """Truncated series f_M(xi) for 0 <= xi <= ell (math.fsum).
 
-        The argument m pi xi / ell is reduced exactly modulo 2 pi through
-        t = fmod(m xi / ell, 2), so no large arguments reach sin.
+        The argument m pi xi / ell is reduced modulo 2 pi through
+        t = fmod(m * (xi / ell), 2), so no large arguments reach sin. fmod
+        itself is exact, but xi / ell and m * (xi / ell) are rounded, so the
+        reduced argument carries an absolute error of order pi m u (u - unit
+        roundoff). Exact integer reduction is available only at grid nodes
+        (``nodal_values``).
         """
         _check_finite("xi", xi)
         if not 0.0 <= xi <= self.ell:
