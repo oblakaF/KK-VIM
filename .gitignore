@@ -246,3 +246,7 @@ __marimo__/
 
 # --- Scratch: temporary page images, scans and working files (never committed) ---
 scratch/
+
+# --- Private local registry of unpublished materials (never committed) ---
+# Kept as a safeguard: unpublished materials are not used in KK-VIM (D-027).
+/references/private/
