@@ -10,8 +10,13 @@ Contents:
   square SSSS plate, uniform load, N = 1 (MATH_SPEC.md, В-29, В-30);
 - ``kkvim_reference.sine_halfstep`` - sine-series solution of one 1D
   half-step D(A f'''' - 2B f'' + C f) = F with f = f'' = 0 at both ends and
-  its analytic truncation bound (NUMERICAL_SPEC.md, 15.1, 15.4).
+  its analytic truncation bound (NUMERICAL_SPEC.md, 15.1, 15.4);
+- ``kkvim_reference.parseval_recursion`` - semi-analytic KK-VIM sequence
+  s = 1, 2, 3 (square SSSS, uniform load, N = 1): coefficients G1, G2, G3 by
+  Parseval, sine series of every half-step, fields w1, w2, w3 at grid nodes,
+  choice of M from analytic tails and error accumulation
+  (NUMERICAL_SPEC.md, 15.2-15.5, 15.7).
 
-The recursion over half-steps (NUMERICAL_SPEC.md, 15.2-15.5) and the Navier
-reference (section 16) are not implemented yet.
+Half-steps s >= 4 and the Navier reference (section 16) are not implemented
+yet.
 """
