@@ -1,0 +1,39 @@
+# KK-VIM project metadata and tooling (D-028).
+#
+# Minimum versions of numpy and scipy are the first releases that publish
+# wheels for both CPython 3.13 and 3.14 on win_amd64 and manylinux x86_64
+# (checked on PyPI, 2026-10-12). Exact resolved versions are pinned in uv.lock.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kkvim"
+version = "0.0.0"
+description = "Plate analysis by the Kirichenko-Krysko variational iteration method"
+readme = "README.md"
+requires-python = ">=3.13"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "numpy>=2.3.2",
+    "scipy>=1.16.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+]
+
+[tool.hatch.build.targets.wheel]
+# Add "src/kkvim_reference" here when that package is created (D-028).
+packages = ["src/kkvim"]
+
+[tool.pytest.ini_options]
+minversion = "8.4"
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--import-mode=importlib"]

@@ -1,0 +1,89 @@
+# KK-VIM continuous integration (D-028).
+#
+# Infrastructure checks only: no solver exists yet (docs/STATUS.md), so there are
+# no long numerical tests. Supported Python versions: 3.13 (main) and 3.14.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: Pytest (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.13", "3.14"]
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+      UV_PYTHON_DOWNLOADS: never
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.0"
+
+      - name: Check that uv.lock is up to date
+        run: uv lock --check
+
+      - name: Install the package and locked dependencies
+        run: uv sync --locked
+
+      - name: Show environment
+        run: uv run --no-sync python -c "import sys, numpy, scipy, pytest; print(sys.version); print('numpy', numpy.__version__, 'scipy', scipy.__version__, 'pytest', pytest.__version__)"
+
+      # Runs without PYTHONPATH: kkvim must be importable as an installed package.
+      - name: Run tests
+        run: uv run --no-sync python -m pytest -v
+
+      - name: Check package independence (kkvim <-> kkvim_reference)
+        run: uv run --no-sync python -m pytest -v -rs tests/test_package_independence.py
+
+  repo-guard:
+    name: Pre-commit hook self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run hook self-test
+        shell: bash
+        run: |
+          set -o pipefail
+          sh .githooks/test-pre-commit.sh | tee hook-test.log
+
+      # Guards against a self-test that passes vacuously: it must still exercise
+      # rejection of publications, archives and scratch/ files, plus the
+      # control cases that an ordinary file is accepted.
+      - name: Check self-test coverage
+        shell: bash
+        run: |
+          set -e
+          for desc in \
+            "force-added PDF in references/" \
+            "PDF content under a .txt name" \
+            "DjVu file" \
+            "DOC file" \
+            "DOCX file" \
+            "ZIP archive" \
+            "7z archive" \
+            "file in scratch/" \
+            "file in nested scratch/"
+          do
+            grep -qxF "PASS  reject  $desc" hook-test.log \
+              || { echo "missing rejection case: $desc"; exit 1; }
+          done
+          grep -qxF "PASS  accept  plain Markdown document" hook-test.log \
+            || { echo "missing acceptance control case"; exit 1; }
+          grep -qxF "pre-commit self-test: ALL PASSED" hook-test.log
