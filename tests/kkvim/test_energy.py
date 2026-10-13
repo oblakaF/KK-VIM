@@ -258,6 +258,38 @@ def test_positive_energy_is_degenerate():
     assert info.value.code == ERROR_DEGENERATE
 
 
+@pytest.mark.parametrize("which", ["previous", "current"])
+def test_pair_rejects_nonnegative_energy_of_either_field(which):
+    history = run_halfsteps(1.0, 1.0, 1.0, 20, 20, 3)
+    r1, r2, r3 = history.records
+    # Flip the factor that is not the fixed factor of the next half-step: the pair stays
+    # valid (w(s-1) in M_s), but the flipped field works against the load, Pi_h > 0.
+    if which == "previous":
+        pair = (dataclasses.replace(r2, y=-r2.y), r3)
+    else:
+        pair = (r2, dataclasses.replace(r3, y=-r3.y))
+    with pytest.raises(EnergyError) as info:
+        check_pair(*pair)
+    assert info.value.code == ERROR_DEGENERATE
+
+
+@pytest.mark.parametrize("call", [1, 2])
+def test_pair_rejects_exactly_zero_energy(monkeypatch, call):
+    r1, r2 = run_halfsteps(1.0, 1.0, 1.0, 20, 20, 2).records
+    original = en.discrete_energy
+    calls = []
+
+    def zero_energy(grid_x, grid_y, w, D, q):
+        calls.append(1)
+        value = original(grid_x, grid_y, w, D, q)
+        return dataclasses.replace(value, pi=0.0) if len(calls) == call else value
+
+    monkeypatch.setattr(en, "discrete_energy", zero_energy)
+    with pytest.raises(EnergyError) as info:  # Pi_h >= 0, not only > 0 (11.3)
+        check_pair(r1, r2)
+    assert info.value.code == ERROR_DEGENERATE
+
+
 def test_nonfinite_record_is_not_masked():
     first = as_record(first_halfstep(1.0, 1.0, 1.0, 20, 20))
     current = next_halfstep(first)

@@ -42,9 +42,9 @@ def test_next_halfstep_reproduces_second_halfstep():
     np.testing.assert_allclose(actual.raw, expected.x2_raw, rtol=1e-14, atol=0)
     np.testing.assert_allclose(actual.x, expected.x2_normalized, rtol=1e-14, atol=0)
     np.testing.assert_allclose(actual.y, expected.y2_scaled, rtol=1e-14, atol=0)
-    assert actual.c == pytest.approx(expected.c2, rel=1e-14)
+    assert actual.c == pytest.approx(expected.c2, rel=1e-14, abs=0)
     for name in "ABCF":
-        assert getattr(actual.coefficients, name) == pytest.approx(getattr(expected.coefficients, name), rel=1e-14)
+        assert getattr(actual.coefficients, name) == pytest.approx(getattr(expected.coefficients, name), rel=1e-14, abs=0)
     assert actual.solver_diagnostics.refinements == expected.solver_diagnostics.refinements
     assert actual.solver_diagnostics.eta == pytest.approx(expected.solver_diagnostics.eta, rel=1e-6, abs=1e-20)
 
