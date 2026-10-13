@@ -68,8 +68,32 @@ with the conservative remainder bound of section 16 [ЧВ-22]: terms
 
 J_M, I_M, Pi_M are values of the truncated series, not the exact limits.
 
-Only the R2 setting (square, SSSS, q = const, linear plate) is implemented:
-no rectangle b != a (R3), no M_xy, no shear forces, no P-12 (Levy cross-check).
+Rectangle a x b (R3; D-036, Р-1, Р-5; R3_NUMERICAL_SPEC_DRAFT.md, 4.1-4.3),
+class NavierRectangle. The same printed formula (131) for a x b, written with
+r = b / a and the reference length a (MATH_SPEC.md, 2.5; Р-3):
+
+    w   = (16 q a^4 / (pi^6 D)) sum s_m(x) s_n(y) / (m n (m^2 + n^2/r^2)^2),
+    M_x = (16 q a^2 / pi^4) sum (m^2 + nu n^2/r^2) s_m(x) s_n(y) / (m n (m^2 + n^2/r^2)^2),
+    M_y = (16 q a^2 / pi^4) sum (nu m^2 + n^2/r^2) s_m(x) s_n(y) / (m n (m^2 + n^2/r^2)^2),
+
+with s_m(x) = sin(m pi x / a), s_n(y) = sin(n pi y / b), 0 <= x <= a,
+0 <= y <= b. Only 0.2 <= r <= 5 (Р-1); outside, ERROR_INPUT (ValueError):
+the level M_R3 = 2559 and the bounds are not qualified there (4.3). The ratio
+is checked exactly on the given floats (integer arithmetic), without a tolerance.
+Strict truncation bounds (ЧВ-R2, ЧВ-R2a; confirmed by the independent review
+of the R3 draft, 4.2), dimensionless:
+
+    |w - w_M| <= (16 / pi^6) lambda_3 r^2 / (8 M^2)   (= 0.0021881 r^2 / M^2),
+    J_M = (64 / pi^8) r sum 1 / (m^2 n^2 (m^2 + n^2/r^2)^2)  in q a^6 / D,
+    0 <= J - J_M <= r^3 / (18 pi^4 M^3).
+
+For r = 1 these are the square bounds above. The refined bounds and the
+moment bounds are not derived for r != 1 (Q-027); the moments of the
+rectangle are computed but not qualified as a quantitative reference
+(D-034, item 3; D-036). No tolerance delta_w(r) is introduced (Р-5): the
+levels of the practical control are reported without an acceptance rule.
+
+Not implemented: M_xy, shear forces, P-12 (Levy cross-check).
 """
 
 import math
@@ -81,15 +105,25 @@ __all__ = [
     "DELTA_M",
     "DELTA_W",
     "M_R2",
+    "M_R3",
     "NAVIER_LEVELS",
+    "NAVIER_LEVELS_R3",
+    "R3_RATIO_MAX",
+    "R3_RATIO_MIN",
     "SUMMATIONS",
     "NavierConvergence",
     "NavierIntegral",
     "NavierPlate",
+    "NavierRectangle",
+    "NavierRectangleConvergence",
+    "NavierRectangleResult",
     "NavierResult",
     "deflection_integral_coef",
+    "deflection_integral_coef_rect",
     "deflection_integral_tail_bound",
+    "deflection_integral_tail_bound_rect",
     "deflection_tail_bound",
+    "deflection_tail_bound_rect",
     "deflection_tail_bound_refined",
     "diagnostic_levels",
     "flexural_rigidity",
@@ -104,6 +138,15 @@ U = 2.0**-53
 NAVIER_LEVELS = (1, 3, 9, 19, 39, 79, 159, 319, 639, 1279)
 # Base level of R2 by the conservative bound 8.2 (NUMERICAL_SPEC.md, section 16).
 M_R2 = 1279
+# Level of the rectangle (R3): D-036, Р-5; R3_NUMERICAL_SPEC_DRAFT.md, 4.3. It
+# continues the sequence 8.1 (2 * 1279 + 1) and is valid only for 0.2 <= r <= 5.
+M_R3 = 2559
+NAVIER_LEVELS_R3 = NAVIER_LEVELS + (M_R3,)
+# Approved range of r = b / a (D-036, Р-1): 1/5 <= r <= 5, compared exactly in
+# integers through float.as_integer_ratio (no tolerance).
+R3_RATIO_MIN = 0.2
+R3_RATIO_MAX = 5.0
+_R3_LIMIT = 5
 # Accuracy of the reference (NAVIER_REFERENCE_SPEC.md, 8.6): w in q a^4 / D,
 # moments in q a^2.
 DELTA_W = 4.06e-9
@@ -119,6 +162,8 @@ LAMBDA3 = 7.0 * ZETA3 / 8.0
 # at most K terms per diagonal, 2K - 1 diagonals). At arbitrary points the
 # rounded argument m x / a adds 2 pi (m + n) u |c_mn|. Margin 2.
 TERM_ROUNDINGS = 20
+# Rectangle: n^2 / r^2 adds r^2 and one quotient.
+TERM_ROUNDINGS_RECT = TERM_ROUNDINGS + 2
 ROUNDING_MARGIN = 2.0
 SUMMATIONS = ("separable", "diagonal")
 # Points evaluated together (memory of the sine tables: chunk * K floats).
@@ -232,6 +277,75 @@ def deflection_integral_tail_bound(M):
 # Rounding of J_M relative to J_M: one rounding per term (exact integer
 # denominator), fsum, the constant 64 / pi^8 (about 4 roundings): 6 u, margin 2.
 ROUND_INTEGRAL = 12 * U
+# Rectangle: per term r^2, n^2 / r^2, the sum, its square, the product with the
+# exact m^2 n^2 and the quotient (6 roundings), fsum, 64 / pi^8 and the factor r
+# (5): 12 u, margin 2.
+ROUND_INTEGRAL_RECT = 24 * U
+
+
+def _in_range_exact(num, den):
+    """1/5 <= num/den <= 5 for positive finite floats, exactly (integer arithmetic)."""
+    p, q = num.as_integer_ratio()
+    s, t = den.as_integer_ratio()
+    # num/den = (p t) / (q s) with positive integers
+    left, right = p * t, q * s
+    return right <= _R3_LIMIT * left and left <= _R3_LIMIT * right
+
+
+def _ratio(a, b):
+    """r = b / a after the exact range check 0.2 <= b / a <= 5 (D-036, Р-1)."""
+    if not _in_range_exact(float(b), float(a)):
+        raise ValueError(
+            f"ERROR_INPUT: b / a = {b / a!r} is outside the approved range 0.2 <= b/a <= 5 of R3 "
+            f"(D-036, Р-1); the Navier level M = {M_R3} is not qualified there"
+        )
+    return b / a
+
+
+def _check_ratio(r):
+    _check_positive("r", r)
+    if not _in_range_exact(float(r), 1.0):
+        raise ValueError(f"ERROR_INPUT: r = {r!r} is outside the approved range 0.2 <= r <= 5 (D-036, Р-1)")
+
+
+def deflection_tail_bound_rect(M, r):
+    """Strict bound ЧВ-R2 of |w - w_M| in q a^4 / D, uniform in (x, y), 0.2 <= r <= 5.
+
+    (16 / pi^6) lambda_3 r^2 / (8 M^2) = 0.0021881 r^2 / M^2 (R3_NUMERICAL_SPEC_DRAFT.md,
+    4.2-4.3); equals deflection_tail_bound(M) at r = 1.
+    """
+    _check_odd_index(M)
+    _check_ratio(r)
+    return 16.0 / math.pi**6 * LAMBDA3 * r * r / (8.0 * M * M)
+
+
+def deflection_integral_coef_rect(M, r):
+    """J_M(r) = (64 / pi^8) r sum_{m,n odd <= M} 1 / (m^2 n^2 (m^2 + n^2/r^2)^2), in q a^6 / D.
+
+    MATH_SPEC.md, В-27, item 6, for a x b (R3_NUMERICAL_SPEC_DRAFT.md, 4.1). The
+    terms are positive; the sum is taken by math.fsum. At r = 1 the exact
+    integer form deflection_integral_coef is used.
+    """
+    _check_odd_index(M)
+    _check_ratio(r)
+    if r == 1.0:
+        return deflection_integral_coef(M)
+    return _integral_coef_general(M, r)
+
+
+def _integral_coef_general(M, r):
+    k = _odd(M).astype(float)
+    m2 = (k * k)[:, None]
+    n2 = (k * k)[None, :]
+    terms = 1.0 / ((m2 * n2) * (m2 + n2 / (r * r)) ** 2)
+    return 64.0 / math.pi**8 * r * math.fsum(terms.ravel().tolist())
+
+
+def deflection_integral_tail_bound_rect(M, r):
+    """Strict bound ЧВ-R2a: 0 <= J - J_M <= r^3 / (18 pi^4 M^3), in q a^6 / D."""
+    _check_odd_index(M)
+    _check_ratio(r)
+    return r**3 / (18.0 * math.pi**4 * float(M) ** 3)
 
 
 def diagnostic_levels(M):
@@ -267,13 +381,17 @@ def _odd(M):
     return np.arange(1, M + 1, 2, dtype=np.int64)
 
 
-def _coefficients(M, nu):
-    """Dimensionless coefficient matrices (w, M_x, M_y) for odd m (rows), n (columns)."""
+def _coefficients(M, nu, r=1.0):
+    """Dimensionless coefficient matrices (w, M_x, M_y) for odd m (rows), n (columns).
+
+    r = b / a; n^2 stands for n^2 / r^2 (reference length a). For r = 1 the
+    operations are those of the square (R2) unchanged.
+    """
     k = _odd(M).astype(float)
     m = k[:, None]
     n = k[None, :]
     m2 = m * m
-    n2 = n * n
+    n2 = n * n if r == 1.0 else n * n / (r * r)
     den = m * n * (m2 + n2) ** 2
     cw = (16.0 / math.pi**6) / den
     cx = (16.0 / math.pi**4) * (m2 + nu * n2) / den
@@ -321,12 +439,12 @@ def _sum_diagonal(Sx, Sy, c):
     return out
 
 
-def _rounding_bound(c, M, summation, at_nodes):
+def _rounding_bound(c, M, summation, at_nodes, term_roundings=TERM_ROUNDINGS):
     """First-order rounding bound of one series, dimensionless, uniform in (x, y)."""
     K = (M + 1) // 2
     summing = (2 if summation == "separable" else 3) * K
     abs_c = np.abs(c)
-    bound = (summing + TERM_ROUNDINGS) * U * float(abs_c.sum())
+    bound = (summing + term_roundings) * U * float(abs_c.sum())
     if not at_nodes:
         k = _odd(M).astype(float)
         bound += 2.0 * math.pi * U * float((abs_c * (k[:, None] + k[None, :])).sum())
@@ -334,7 +452,7 @@ def _rounding_bound(c, M, summation, at_nodes):
 
 
 @dataclass(frozen=True)
-class NavierConvergence:
+class _LevelValues:
     """Values on the levels of the practical control (8.4), dimensionless.
 
     levels -- the levels M_0 < M_1 < ... (diagnostic_levels of the final M);
@@ -368,6 +486,15 @@ class NavierConvergence:
         with np.errstate(divide="ignore", invalid="ignore"):
             return deltas[:-1] / deltas[1:]
 
+
+@dataclass(frozen=True)
+class NavierConvergence(_LevelValues):
+    """Values on the levels of the practical control (8.4) of the square, with its acceptance rule.
+
+    levels -- the levels M_0 < M_1 < ... (diagnostic_levels of the final M);
+    w, mx, my -- arrays (len(levels), ...) of w D/(q a^4), M_x/(q a^2), M_y/(q a^2).
+    """
+
     def accepted_w(self):
         """8.4, items 3-4 for w, per point (strict bound 8.2 of the final level)."""
         return practical_control(self.delta_w, DELTA_W, deflection_tail_bound(self.levels[-1]))
@@ -379,6 +506,16 @@ class NavierConvergence:
     def accepted_my(self):
         """8.4, item 3 for M_y, per point."""
         return practical_control(self.delta_my, DELTA_M)
+
+
+@dataclass(frozen=True)
+class NavierRectangleConvergence(_LevelValues):
+    """Values on the levels of the practical control for the rectangle (diagnostics only).
+
+    Same fields and increments Delta_j as NavierConvergence (w in q a^4 / D,
+    moments in q a^2), but without an acceptance rule: a tolerance delta_w(r)
+    is not introduced for r != 1 (D-036, Р-5).
+    """
 
 
 @dataclass(frozen=True)
@@ -484,6 +621,63 @@ def _check_count(name, value):
         raise ValueError(f"{name} must be a positive integer, got {value!r}")
 
 
+def _values_at_points(x, y, a, b, M, coeffs, levels, summation, b_name):
+    """Series values (3, len(levels), *shape) at points of [0, a] x [0, b].
+
+    Sines of each chunk of points are tabulated once for all levels (memory
+    _POINT_CHUNK * K floats per table); edge points are exact zeros.
+    """
+    x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
+    for name, values, length, length_name in (("x", x, a, "a"), ("y", y, b, b_name)):
+        if not np.all(np.isfinite(values)) or not np.all((values >= 0.0) & (values <= length)):
+            raise ValueError(f"{name} must lie in the closed interval [0, {length_name}] = [0, {length!r}]")
+    shape = x.shape
+    xf = x.ravel()
+    yf = y.ravel()
+    edge = (xf == 0.0) | (xf == a) | (yf == 0.0) | (yf == b)
+    values = np.zeros((3, len(levels), xf.size))
+    for start in range(0, xf.size, _POINT_CHUNK):
+        part = slice(start, start + _POINT_CHUNK)
+        Sx = _point_sines(xf[part] / a, M)
+        Sy = _point_sines(yf[part] / b, M)
+        for li, level in enumerate(levels):
+            K = (level + 1) // 2
+            for qi, c in enumerate(coeffs):
+                if summation == "separable":
+                    v = _sum_separable(Sx[:, :K], Sy[:, :K], c[:K, :K], tensor=False)
+                else:
+                    v = _sum_diagonal(Sx[:, :K], Sy[:, :K], c[:K, :K])
+                values[qi, li, part] = v
+    values[:, :, edge] = 0.0
+    return x, y, values.reshape((3, len(levels)) + shape)
+
+
+def _values_at_nodes(nx, ny, M, coeffs, levels, summation):
+    """Series values (3, len(levels), nx + 1, ny + 1) at nodes i/nx, j/ny of the unit grid.
+
+    Separable order: S_x C S_y^T (matrix products); diagonal order: pairs of
+    nodes, meant for small grids. Boundary nodes are exact zeros.
+    """
+    Sx = _node_sines(nx, M)
+    Sy = _node_sines(ny, M)
+    if summation == "diagonal":
+        ii, jj = np.meshgrid(np.arange(nx + 1), np.arange(ny + 1), indexing="ij")
+        Sx_pairs = Sx[ii.ravel()]
+        Sy_pairs = Sy[jj.ravel()]
+    values = np.zeros((3, len(levels), nx + 1, ny + 1))
+    for li, level in enumerate(levels):
+        K = (level + 1) // 2
+        for qi, c in enumerate(coeffs):
+            if summation == "separable":
+                v = _sum_separable(Sx[:, :K], Sy[:, :K], c[:K, :K], tensor=True)
+            else:
+                v = _sum_diagonal(Sx_pairs[:, :K], Sy_pairs[:, :K], c[:K, :K]).reshape(nx + 1, ny + 1)
+            values[qi, li] = v
+    values[:, :, [0, nx], :] = 0.0
+    values[:, :, :, [0, ny]] = 0.0
+    return values
+
+
 @dataclass(frozen=True)
 class NavierIntegral:
     """Integral of the truncated deflection series and the energy at level M.
@@ -511,8 +705,8 @@ class NavierPlate:
     """Square SSSS plate under uniform load: a = b > 0, q, D > 0, nu in (-1, 1).
 
     b may be given for the contract of NAVIER_REFERENCE_SPEC.md, section 9,
-    but must equal a: the rectangle (R3) is not implemented. nu enters only
-    the moments. Units must be consistent (D-009).
+    but must equal a: this is the R2 class; the rectangle (R3) is
+    NavierRectangle. nu enters only the moments. Units must be consistent (D-009).
     """
 
     a: float
@@ -563,31 +757,9 @@ class NavierPlate:
         """
         M = _resolve_level(M, w_tol)
         _check_summation(summation)
-        x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
-        for name, values in (("x", x), ("y", y)):
-            if not np.all(np.isfinite(values)) or not np.all((values >= 0.0) & (values <= self.a)):
-                raise ValueError(f"{name} must lie in the closed interval [0, a] = [0, {self.a!r}]")
-        shape = x.shape
-        xf = x.ravel()
-        yf = y.ravel()
-        edge = (xf == 0.0) | (xf == self.a) | (yf == 0.0) | (yf == self.a)
         levels = diagnostic_levels(M) if diagnostics else (M,)
         coeffs = _coefficients(M, self.nu)
-        values = np.zeros((3, len(levels), xf.size))
-        for start in range(0, xf.size, _POINT_CHUNK):
-            part = slice(start, start + _POINT_CHUNK)
-            Sx = _point_sines(xf[part] / self.a, M)
-            Sy = _point_sines(yf[part] / self.a, M)
-            for li, level in enumerate(levels):
-                K = (level + 1) // 2
-                for qi, c in enumerate(coeffs):
-                    if summation == "separable":
-                        v = _sum_separable(Sx[:, :K], Sy[:, :K], c[:K, :K], tensor=False)
-                    else:
-                        v = _sum_diagonal(Sx[:, :K], Sy[:, :K], c[:K, :K])
-                    values[qi, li, part] = v
-        values[:, :, edge] = 0.0
-        values = values.reshape((3, len(levels)) + shape)
+        x, y, values = _values_at_points(x, y, self.a, self.a, M, coeffs, levels, summation, "a")
         return self._result(x, y, M, summation, False, coeffs, levels, values, diagnostics)
 
     def at_nodes(self, nx, ny, *, M=None, w_tol=None, summation="separable", diagnostics=True):
@@ -603,23 +775,7 @@ class NavierPlate:
         _check_summation(summation)
         levels = diagnostic_levels(M) if diagnostics else (M,)
         coeffs = _coefficients(M, self.nu)
-        Sx = _node_sines(nx, M)
-        Sy = _node_sines(ny, M)
-        if summation == "diagonal":
-            ii, jj = np.meshgrid(np.arange(nx + 1), np.arange(ny + 1), indexing="ij")
-            Sx_pairs = Sx[ii.ravel()]
-            Sy_pairs = Sy[jj.ravel()]
-        values = np.zeros((3, len(levels), nx + 1, ny + 1))
-        for li, level in enumerate(levels):
-            K = (level + 1) // 2
-            for qi, c in enumerate(coeffs):
-                if summation == "separable":
-                    v = _sum_separable(Sx[:, :K], Sy[:, :K], c[:K, :K], tensor=True)
-                else:
-                    v = _sum_diagonal(Sx_pairs[:, :K], Sy_pairs[:, :K], c[:K, :K]).reshape(nx + 1, ny + 1)
-                values[qi, li] = v
-        values[:, :, [0, nx], :] = 0.0
-        values[:, :, :, [0, ny]] = 0.0
+        values = _values_at_nodes(nx, ny, M, coeffs, levels, summation)
         x = self.a * np.arange(nx + 1) / nx
         y = self.a * np.arange(ny + 1) / ny
         return self._result(x, y, M, summation, True, coeffs, levels, values, diagnostics)
@@ -630,6 +786,194 @@ class NavierPlate:
             NavierConvergence(levels=levels, w=values[0], mx=values[1], my=values[2]) if diagnostics else None
         )
         return NavierResult(
+            plate=self,
+            x=x,
+            y=y,
+            M=M,
+            summation=summation,
+            at_nodes=at_nodes,
+            w_coef=values[0, -1],
+            mx_coef=values[1, -1],
+            my_coef=values[2, -1],
+            rounding_w=rounding[0],
+            rounding_mx=rounding[1],
+            rounding_my=rounding[2],
+            convergence=convergence,
+        )
+
+
+@dataclass(frozen=True)
+class NavierRectangleResult:
+    """Navier reference for the rectangle at points or grid nodes (R3).
+
+    Same fields as NavierResult; x in [0, a], y in [0, b]. Dimensionless values
+    refer to the reference length a: w D/(q a^4), M_x/(q a^2), M_y/(q a^2)
+    (MATH_SPEC.md, 2.5; Р-3). convergence -- values on the levels (diagnostics,
+    without an acceptance rule) or None.
+    """
+
+    plate: "NavierRectangle"
+    x: np.ndarray
+    y: np.ndarray
+    M: int
+    summation: str
+    at_nodes: bool
+    w_coef: np.ndarray
+    mx_coef: np.ndarray
+    my_coef: np.ndarray
+    rounding_w: float
+    rounding_mx: float
+    rounding_my: float
+    convergence: NavierRectangleConvergence | None
+
+    @property
+    def w_scale(self):
+        """q a^4 / D."""
+        return self.plate.q * self.plate.a**4 / self.plate.D
+
+    @property
+    def moment_scale(self):
+        """q a^2."""
+        return self.plate.q * self.plate.a**2
+
+    @property
+    def w(self):
+        """Deflection w (units of the input, D-009)."""
+        return self.w_scale * self.w_coef
+
+    @property
+    def Mx(self):
+        """Bending moment M_x (computed, not qualified for R3: D-034, item 3; Q-027)."""
+        return self.moment_scale * self.mx_coef
+
+    @property
+    def My(self):
+        """Bending moment M_y (computed, not qualified for R3: D-034, item 3; Q-027)."""
+        return self.moment_scale * self.my_coef
+
+    @property
+    def w_tail_bound_coef(self):
+        """Strict truncation bound ЧВ-R2 of w, in q a^4 / D: 0.0021881 r^2 / M^2."""
+        return deflection_tail_bound_rect(self.M, self.plate.r)
+
+    @property
+    def w_tail_bound(self):
+        """Strict truncation bound ЧВ-R2 of w, physical: |q| a^4 / D times the coefficient."""
+        return abs(self.w_scale) * self.w_tail_bound_coef
+
+    @property
+    def w_error_bound_coef(self):
+        """Truncation bound ЧВ-R2 plus the rounding bound of w, in q a^4 / D."""
+        return self.w_tail_bound_coef + self.rounding_w
+
+
+@dataclass(frozen=True)
+class NavierRectangle:
+    """Rectangular SSSS plate a x b under uniform load (R3; D-036).
+
+    a, b > 0 with 0.2 <= r = b / a <= 5 (checked exactly; otherwise
+    ERROR_INPUT, ValueError); q; D > 0; nu in (-1, 1) enters only the moments.
+    The default level is M_R3 = 2559 (Р-5); any odd M may be given explicitly
+    (lower levels for checks and diagnostics). The square a = b gives the
+    values of NavierPlate. Units must be consistent (D-009).
+    """
+
+    a: float
+    b: float
+    q: float
+    D: float
+    nu: float
+
+    def __post_init__(self):
+        _check_positive("a", self.a)
+        _check_positive("b", self.b)
+        _check_finite("q", self.q)
+        _check_positive("D", self.D)
+        _check_nu(self.nu)
+        _ratio(self.a, self.b)
+
+    @classmethod
+    def from_material(cls, *, a, b, q, E, thickness, nu):
+        """Plate with D = E t^3 / (12 (1 - nu^2)) [L-107, eq. (3), p. 16]."""
+        return cls(a=a, b=b, q=q, D=flexural_rigidity(E, thickness, nu), nu=nu)
+
+    @property
+    def r(self):
+        """r = b / a (reference length a, Р-3)."""
+        return self.b / self.a
+
+    def swapped(self):
+        """The plate b x a (axes exchanged, ЧВ-R1): w_{a x b}(x, y) = w_{b x a}(y, x)."""
+        return NavierRectangle(a=self.b, b=self.a, q=self.q, D=self.D, nu=self.nu)
+
+    def _level(self, M):
+        if M is None:
+            return M_R3
+        _check_odd_index(M)
+        return M
+
+    def deflection_integral(self, *, M=None):
+        """J_M, I_M, Pi_M and the bound ЧВ-R2a at level M (default M_R3 = 2559).
+
+        J_M in q a^6 / D; I_M = (q a^6 / D) J_M approximates the integral of w
+        over the plate a x b; Pi_M = -q I_M / 2 (MATH_SPEC.md, В-23, В-27).
+        """
+        M = self._level(M)
+        r = self.r
+        J = deflection_integral_coef_rect(M, r)
+        bound = deflection_integral_tail_bound_rect(M, r)
+        scale = self.q * self.a**6 / self.D
+        I = scale * J
+        return NavierIntegral(
+            M=M,
+            J_M=J,
+            I_M=I,
+            Pi_M=-0.5 * self.q * I,
+            J_tail_bound=bound,
+            I_tail_bound=abs(scale) * bound,
+            Pi_tail_bound=0.5 * abs(self.q * scale) * bound,
+            rounding_J=(ROUND_INTEGRAL if r == 1.0 else ROUND_INTEGRAL_RECT) * J,
+        )
+
+    def at_points(self, x, y, *, M=None, summation="separable", diagnostics=True):
+        """w, M_x, M_y at the points (x, y), 0 <= x <= a, 0 <= y <= b (arrays broadcast).
+
+        Vectorised in chunks of points; the sines are tabulated once per chunk.
+        Default M = M_R3 = 2559.
+        """
+        M = self._level(M)
+        _check_summation(summation)
+        levels = diagnostic_levels(M) if diagnostics else (M,)
+        coeffs = _coefficients(M, self.nu, self.r)
+        x, y, values = _values_at_points(x, y, self.a, self.b, M, coeffs, levels, summation, "b")
+        return self._result(x, y, M, summation, False, coeffs, levels, values, diagnostics)
+
+    def at_nodes(self, nx, ny, *, M=None, summation="separable", diagnostics=True):
+        """w, M_x, M_y at the nodes x_i = i a / nx, y_j = j b / ny; fields indexed [i, j].
+
+        Separable order S_x C S_y^T with exact integer reduction of the sines
+        (И-11); the diagonal order is meant for small grids. Default M = 2559.
+        """
+        _check_count("nx", nx)
+        _check_count("ny", ny)
+        M = self._level(M)
+        _check_summation(summation)
+        levels = diagnostic_levels(M) if diagnostics else (M,)
+        coeffs = _coefficients(M, self.nu, self.r)
+        values = _values_at_nodes(nx, ny, M, coeffs, levels, summation)
+        x = self.a * np.arange(nx + 1) / nx
+        y = self.b * np.arange(ny + 1) / ny
+        return self._result(x, y, M, summation, True, coeffs, levels, values, diagnostics)
+
+    def _result(self, x, y, M, summation, at_nodes, coeffs, levels, values, diagnostics):
+        roundings = TERM_ROUNDINGS if self.r == 1.0 else TERM_ROUNDINGS_RECT
+        rounding = [_rounding_bound(c, M, summation, at_nodes, roundings) for c in coeffs]
+        convergence = (
+            NavierRectangleConvergence(levels=levels, w=values[0], mx=values[1], my=values[2])
+            if diagnostics
+            else None
+        )
+        return NavierRectangleResult(
             plate=self,
             x=x,
             y=y,
