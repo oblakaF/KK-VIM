@@ -20,7 +20,7 @@
 |---|---|
 | Исходная реализация Reference | `9a4241675038116e359a401e3d49b3c172d71569` (ветка `r3/reference-navier-rect`): `src/kkvim_reference/navier.py`, `tests/reference/test_navier_rect.py` (116 тестов), `docs/R3_NAVIER_REFERENCE.md` |
 | Поправка 4u (QA) | `5090e2629587136c33c07de806627875a7f23054` |
-| Независимые тесты QA и этот отчёт | коммит на ветке `qa/r3-reference-navier-rect` (после `5090e26`) |
+| Независимые тесты QA и этот отчёт | `934e277`, исправление сравнения отражений `afe1f34` и эта запись (ветка `qa/r3-reference-navier-rect`) |
 | База | `main` `3ab83ab` (D-036 ПРИНЯТО) |
 
 Работа выполнена в отдельном worktree QA. Каталоги Reference, Literature и Auditor не использовались.
