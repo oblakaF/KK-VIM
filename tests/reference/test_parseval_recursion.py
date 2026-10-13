@@ -548,7 +548,8 @@ def test_module_does_not_import_kkvim_or_grids():
             names += [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             names.append(node.module)
-    assert set(names) == {"math", "dataclasses", "numpy", "kkvim_reference.sine_halfstep"}
+    # D-038 adds one pure, reference-internal helper.
+    assert set(names) == {"math", "dataclasses", "numpy", "kkvim_reference.sine_halfstep", "kkvim_reference._r3_range"}
     assert "Grid1D" not in source
 
 

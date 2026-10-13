@@ -302,7 +302,14 @@ def test_p10_navier_imports_only_math_dataclasses_numpy():
         elif isinstance(node, ast.Call):
             name = getattr(node.func, "attr", getattr(node.func, "id", None))
             assert name not in ("import_module", "__import__")
-    assert modules <= {"math", "dataclasses", "numpy"}
+    assert modules <= {"math", "dataclasses", "numpy", "kkvim_reference"}
+    # D-038 adds only a pure, reference-internal ratio gate; not solver imports.
+    internal = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("kkvim_reference.")
+    }
+    assert internal == {"kkvim_reference._r3_range"}
     assert "kkvim" not in modules
 
 
