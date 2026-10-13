@@ -72,10 +72,30 @@ the computed G, so the two forms differ only by rounding (truncation does
 not enter their difference). Pi_s is the energy of the truncated sequence;
 its distance to the exact sequence is bounded by the transferred errors.
 
-Area of validity: only the R2 setting (square SSSS, q = const, N = 1). The
-accuracy target 1e-12 (15.7) is guaranteed by the budget for s <= 3 only;
-for s > 3 the budget is reported as computed. Not a solution of the 2D plate
-problem, and a stabilisation of w_s in s is not a proof of a limit.
+Rectangle a x b (R3; D-036, D-030; R3_NUMERICAL_SPEC_DRAFT.md, 2, 3.1, 6.4).
+With b given (0.2 <= r = b/a <= 5), X0 = sin(pi x/a) on (0, a) as before and the
+half-steps alternate in length:
+
+    ell_s = b for odd s (Y-half-step, multiplier Y^s on (0, b)),
+    ell_s = a for even s (X-half-step, multiplier X^s on (0, a)).
+
+Half-step s is solved on ell_s with G_s; G_{s+1} are the Parseval sums of the
+multiplier of half-step s on its own physical length ell_s (G1 from X0 on a,
+G2 from Y1 on b, G3 from X2 on a, ...; MATH_SPEC.md, 4.2-4.4). The tails of
+15.4 and the rule И-12 are applied with ell_s; M is chosen automatically and
+is unrelated to the Navier level 2559. Fields at x_i = i a/n_x, y_j = j b/n_y;
+the energy uses A, B, C, I of X on (0, a) and of Y on (0, b). b = None (the
+default) or b = a is the square of R2 with bitwise the same operations.
+The ratio is checked exactly on the given floats, without a tolerance; the
+representation tolerance 4u of D-037 is decided for the Navier reference only
+and is not applied here. The second start (by y) is the plate b x a started
+by x (ЧВ-R1, swapped()).
+
+Area of validity: square SSSS (R2) and rectangle SSSS with 0.2 <= b/a <= 5
+(R3, not yet independently qualified), q = const, N = 1. The accuracy target
+1e-12 (15.7) is guaranteed by the budget for s <= 3 of the square only; for
+other s and r the budget is reported as computed. Not a solution of the 2D
+plate problem, and a stabilisation of w_s in s is not a proof of a limit.
 """
 
 import math
@@ -83,10 +103,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from kkvim_reference._r3_range import check_r3_ratio
 from kkvim_reference.sine_halfstep import SineHalfStep, _sin_pi_ratio
 
 __all__ = [
     "EPS_TAIL",
+    "R3_RATIO_MAX",
+    "R3_RATIO_MIN",
     "S_DEFAULT",
     "Coefficients",
     "HalfStepBudget",
@@ -140,6 +163,16 @@ def _check_positive(name, value):
 def _check_count(name, value):
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError(f"{name} must be a positive integer, got {value!r}")
+
+
+# Approved range of r = b / a for R3 (D-036, Р-1), compared exactly.
+R3_RATIO_MIN = 0.2
+R3_RATIO_MAX = 5.0
+
+
+def _check_r3_ratio(a, b):
+    """Shared D-038 aspect-ratio check on the original float lengths."""
+    check_r3_ratio(a, b)
 
 
 @dataclass(frozen=True)
@@ -374,17 +407,22 @@ class HalfStepEnergy:
 
 
 class ParsevalRecursion:
-    """KK-VIM sequence s = 1..s_max for the square SSSS plate.
+    """KK-VIM sequence s = 1..s_max for the square or rectangular SSSS plate.
 
-    a -- side of the square, D -- flexural rigidity, q -- uniform load (q != 0),
-    s_max -- number of half-steps, any positive integer (default 3),
-    x0_scale -- scale of X0 = x0_scale * sin(pi x/a); the fields do not
-    depend on it (MATH_SPEC.md, В-13); m_scale -- diagnostic multiplier of the
-    truncation level (practical control 15.5), 1 for the rule И-12.
+    a -- side along x (X0 = sin(pi x/a), D-030), b -- side along y (default
+    None: b = a, the square of R2; otherwise 0.2 <= b/a <= 5, R3), D --
+    flexural rigidity, q -- uniform load (q != 0), s_max -- number of
+    half-steps, any positive integer (default 3), x0_scale -- scale of
+    X0 = x0_scale * sin(pi x/a); the fields do not depend on it (MATH_SPEC.md,
+    В-13); m_scale -- diagnostic multiplier of the truncation level (practical
+    control 15.5), 1 for the rule И-12.
     """
 
-    def __init__(self, *, a, q, D, s_max=S_DEFAULT, x0_scale=1.0, eps=EPS_TAIL, m_scale=1):
+    def __init__(self, *, a, q, D, s_max=S_DEFAULT, x0_scale=1.0, eps=EPS_TAIL, m_scale=1, b=None):
         _check_positive("a", a)
+        if b is not None:
+            _check_positive("b", b)
+            _check_r3_ratio(a, b)
         _check_positive("D", D)
         _check_finite("q", q)
         _check_finite("x0_scale", x0_scale)
@@ -394,6 +432,7 @@ class ParsevalRecursion:
         _check_count("m_scale", m_scale)
         _check_positive("eps", eps)
         self.a = float(a)
+        self.b = self.a if b is None else float(b)
         self.q = float(q)
         self.D = float(D)
         self.x0_scale = float(x0_scale)
@@ -415,7 +454,8 @@ class ParsevalRecursion:
             record = self._halfstep(s, G, rho, rho_first_order, multiplier_errors)
             records.append(record)
             b = record.budget
-            G = parseval_coefficients(record.step.coefficients(), ell=self.a, q=self.q)
+            # the multiplier of half-step s lives on its own length ell_s
+            G = parseval_coefficients(record.step.coefficients(), ell=self.length(s), q=self.q)
             if not (G.is_finite() and G.A > 0):
                 raise FloatingPointError(f"half-step {s}: non-finite or degenerate next coefficients {G!r}")
             parseval.append(G)
@@ -436,8 +476,29 @@ class ParsevalRecursion:
         self._integrals = tuple(integrals)
         self._integral_errors = tuple(integral_errors)
 
+    def length(self, s):
+        """ell_s: b for odd s (Y-half-step), a for even s (X-half-step); s >= 1."""
+        return self.b if s % 2 else self.a
+
+    @property
+    def r(self):
+        """r = b / a."""
+        return self.b / self.a
+
+    def swapped(self):
+        """The plate b x a started by x with the same data (ЧВ-R1).
+
+        Equivalent to the start by y on a x b: w_{a x b, start y}^(s)(x, y) =
+        w_{b x a, start x}^(s)(y, x) for every s; its fields at nodes are the
+        transposed fields of the grid (n_y, n_x).
+        """
+        return ParsevalRecursion(
+            a=self.b, b=self.a, q=self.q, D=self.D, s_max=self.s_max, x0_scale=self.x0_scale,
+            eps=self.eps, m_scale=self.m_scale,
+        )
+
     def _halfstep(self, s, G, rho, rho_first_order, multiplier_errors):
-        ell = self.a
+        ell = self.length(s)
         if not (G.is_finite() and G.A > 0 and G.B >= 0 and G.C >= 0 and G.F != 0):
             raise FloatingPointError(f"half-step {s}: non-finite or degenerate coefficients {G!r}")
         try:
@@ -525,7 +586,7 @@ class ParsevalRecursion:
         return self._records[index - 1].step.nodal_values(n)
 
     def field_on_grid(self, s, nx, ny, *, i=None, j=None):
-        """w_s at the nodes x_i = i a/nx, y_j = j a/ny of a tensor grid.
+        """w_s at the nodes x_i = i a/nx, y_j = j b/ny of a tensor grid (b = a for the square).
 
         Returns an array W with W[p, r] = w_s(x_{i[p]}, y_{j[r]}); by default
         all nodes i = 0..nx, j = 0..ny. Arguments of sin are reduced in
@@ -541,8 +602,38 @@ class ParsevalRecursion:
         y_values = self._multiplier_nodal(_y_index(s), ny)
         return np.outer([x_values[p] for p in i], [y_values[r] for r in j])
 
+    def field_at_points(self, s, x, y):
+        """w_s at arbitrary points 0 <= x <= a, 0 <= y <= b (arrays broadcast together).
+
+        Pointwise sums f(xi) = sum c_m sin(m pi xi / ell) of the multipliers
+        (SineHalfStep.value) and X0 = x0_scale sin(pi x/a); every term vanishes
+        on the edges x = 0, a and y = 0, b, so the values there are exact
+        zeros. Away from the nodes the argument m (xi / ell) is rounded: the
+        error of a multiplier value is about pi u sum m |c_m| on top of the
+        nodal rounding (sine_halfstep, value()); exact integer reduction exists
+        only at grid nodes (field_on_grid).
+        """
+        self._check_s(s)
+        x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
+        for name, values, length, label in (("x", x, self.a, "a"), ("y", y, self.b, "b")):
+            if not np.all(np.isfinite(values)) or not np.all((values >= 0.0) & (values <= length)):
+                raise ValueError(f"{name} must lie in the closed interval [0, {label}] = [0, {length!r}]")
+        xs, ys = x.ravel(), y.ravel()
+        fx = self._multiplier_at(_x_index(s), xs, self.a)
+        fy = self._multiplier_at(_y_index(s), ys, self.b)
+        w = fx * fy
+        w[(xs == 0.0) | (xs == self.a) | (ys == 0.0) | (ys == self.b)] = 0.0
+        return w.reshape(x.shape)
+
+    def _multiplier_at(self, index, xi, length):
+        if index == 0:
+            t = np.fmod(xi / length, 2.0)
+            return self.x0_scale * np.sin(math.pi * np.minimum(t, 1.0 - t))
+        step = self._records[index - 1].step
+        return np.array([step.value(float(v)) for v in xi])
+
     def centre_value(self, s):
-        """w_s(a/2, a/2): the node i = j = 1 of the grid nx = ny = 2."""
+        """w_s(a/2, b/2): the node i = j = 1 of the grid nx = ny = 2."""
         return float(self.field_on_grid(s, 2, 2, i=[1], j=[1])[0, 0])
 
     def field_change(self, s, nx, ny):
@@ -582,7 +673,8 @@ class ParsevalRecursion:
             size = max(len(new), len(old))
             new = new + [0.0] * (size - len(new))
             old = old + [0.0] * (size - len(old))
-            d = parseval_coefficients([p - r for p, r in zip(new, old)], ell=self.a, q=self.q)
+            # both versions of the changed multiplier live on ell_s
+            d = parseval_coefficients([p - r for p, r in zip(new, old)], ell=self.length(s), q=self.q)
             P = self._parseval[s - 1]
             change_norm2 = self.D * math.fsum((P.C * d.A, 2.0 * P.B * d.B, P.A * d.C))
             change_rel = math.sqrt(change_norm2 / norm2)

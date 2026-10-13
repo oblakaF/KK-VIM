@@ -104,6 +104,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from kkvim_reference._r3_range import check_r3_ratio
+
 __all__ = [
     "DELTA_M",
     "DELTA_W",
@@ -145,14 +147,9 @@ M_R2 = 1279
 # continues the sequence 8.1 (2 * 1279 + 1) and is valid only for 0.2 <= r <= 5.
 M_R3 = 2559
 NAVIER_LEVELS_R3 = NAVIER_LEVELS + (M_R3,)
-# Approved range of r = b / a (D-036, Р-1): 1/5 <= r <= 5, compared exactly in
-# integers through float.as_integer_ratio with the representation tolerance 4u of
-# the input numbers (owner's decision of 2026-10-14): 0.2 (1 - 4u) <= r <= 5 (1 + 4u).
+# Scientific range (D-036); shared D-038 gate uses symmetric 4u representation tolerance.
 R3_RATIO_MIN = 0.2
 R3_RATIO_MAX = 5.0
-_R3_LIMIT = 5
-_R3_TOL_UNITS = 4  # tolerance in units of u = 2^-53
-_U_INV = 2**53
 # Accuracy of the reference (NAVIER_REFERENCE_SPEC.md, 8.6): w in q a^4 / D,
 # moments in q a^2.
 DELTA_W = 4.06e-9
@@ -289,34 +286,16 @@ ROUND_INTEGRAL = 12 * U
 ROUND_INTEGRAL_RECT = 24 * U
 
 
-def _in_range_exact(num, den):
-    """0.2 (1 - 4u) <= num/den <= 5 (1 + 4u) for positive finite floats, exactly (integer arithmetic)."""
-    p, q = num.as_integer_ratio()
-    s, t = den.as_integer_ratio()
-    # num/den = (p t) / (q s) with positive integers
-    left, right = p * t, q * s
-    lower = _R3_LIMIT * _U_INV * left >= (_U_INV - _R3_TOL_UNITS) * right
-    upper = _U_INV * left <= _R3_LIMIT * (_U_INV + _R3_TOL_UNITS) * right
-    return lower and upper
-
-
 def _ratio(a, b):
-    """r = b / a after the exact range check 0.2 (1 - 4u) <= b / a <= 5 (1 + 4u) (D-036, Р-1)."""
-    if not _in_range_exact(float(b), float(a)):
-        raise ValueError(
-            f"ERROR_INPUT: b / a = {b / a!r} is outside the approved range 0.2 <= b/a <= 5 of R3 "
-            f"(D-036, Р-1; representation tolerance 4u); the Navier level M = {M_R3} is not qualified there"
-        )
+    """Validate the original lengths exactly (D-038), then return b/a."""
+    check_r3_ratio(a, b)
     return b / a
 
 
 def _check_ratio(r):
+    """Validate a standalone ratio without rounding its reciprocal."""
     _check_positive("r", r)
-    if not _in_range_exact(float(r), 1.0):
-        raise ValueError(
-            f"ERROR_INPUT: r = {r!r} is outside the approved range 0.2 <= r <= 5 "
-            f"(D-036, Р-1; representation tolerance 4u)"
-        )
+    check_r3_ratio(1.0, r)
 
 
 def deflection_tail_bound_rect(M, r):
@@ -898,7 +877,7 @@ class NavierRectangle:
     """Rectangular SSSS plate a x b under uniform load (R3; D-036).
 
     a, b > 0 with 0.2 <= r = b / a <= 5 (checked exactly with the representation
-    tolerance 4u: 0.2 (1 - 4u) <= b / a <= 5 (1 + 4u); otherwise ERROR_INPUT,
+    tolerance 4u (D-038): max(a, b) <= 5(1 + 4u) min(a, b); otherwise ERROR_INPUT,
     ValueError); q; D > 0; nu in (-1, 1) enters only the moments.
     The default level is M_R3 = 2559 (Р-5); any odd M may be given explicitly
     (lower levels for checks and diagnostics). The square a = b gives the
