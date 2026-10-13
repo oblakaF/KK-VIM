@@ -16,10 +16,19 @@ Tolerances, fixed before any comparison (not tuned to results):
   rounding_mx, rounding_my); two evaluations of the same truncated series must
   agree within the sum of their bounds;
 - RTOL_CLOSED = 16 U for closed forms of a few operations (4/pi^6, D, scales).
+- integral J_M (MATH_SPEC.md, В-27, item 6; NUMERICAL_SPEC.md, 16): against an
+  independent exact-rational sum (fractions.Fraction, M <= 19) and a sum by
+  columns of correctly rounded terms (M = 1279) within the module bound
+  rounding_J plus 4 U J; trapezoidal quadrature of the nodal field of the same
+  truncated series (M = 39, all m < 2n) on n = 20 ... 320: the error must
+  decrease with every doubling and the ratio of successive errors must lie in
+  [3.9, 4.1] (second order of the trapezoidal rule for the smooth truncated
+  series; convergence is checked, not equality on a finite grid).
 """
 
 import ast
 import math
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +40,8 @@ from kkvim_reference.navier import (
     M_R2,
     NAVIER_LEVELS,
     NavierPlate,
+    deflection_integral_coef,
+    deflection_integral_tail_bound,
     deflection_tail_bound,
     deflection_tail_bound_refined,
     diagnostic_levels,
@@ -45,6 +56,7 @@ U = 2.0**-53
 RTOL_CLOSED = 16 * U
 TAU_TAB_W = 5e-6
 TAU_TAB_M = 5e-5
+ROUND_J = 12 * U  # rounding of J_M relative to J_M (module model)
 
 # L-107, p. 137 and table 8, p. 143 (b/a = 1.0): alpha; table 8 and table 6,
 # p. 139 (nu = 0.3): beta = beta_1.
@@ -565,3 +577,93 @@ def test_points_between_nodes_are_summed_directly(unit_plate):
         for n in (1, 3)
     )
     assert r.w_coef == pytest.approx(direct, rel=64 * U, abs=0)
+
+
+# --- integral of the deflection and energy (В-27, item 6; section 16) ----------
+
+
+def test_integral_single_term():
+    assert deflection_integral_coef(1) == pytest.approx(16 / math.pi**8, rel=RTOL_CLOSED, abs=0)
+
+
+@pytest.mark.parametrize("M", [1, 3, 9, 19])
+def test_integral_against_exact_rational_sum(M):
+    odd = range(1, M + 1, 2)
+    exact = sum(Fraction(1, m * m * n * n * (m * m + n * n) ** 2) for m in odd for n in odd)
+    J = deflection_integral_coef(M)
+    assert abs(J - 64 / math.pi**8 * float(exact)) <= (12 + 4) * U * J
+
+
+def test_integral_against_sum_by_columns():
+    # other order: math.fsum over n inside each column m, then fsum of columns
+    odd = range(1, M_R2 + 1, 2)
+    columns = [math.fsum(1 / (m * m * n * n * (m * m + n * n) ** 2) for n in odd) for m in odd]
+    other = 64 / math.pi**8 * math.fsum(columns)
+    r = NavierPlate(a=1.0, q=1.0, D=1.0, nu=0.3).deflection_integral()
+    assert r.M == M_R2
+    assert abs(r.J_M - other) <= r.rounding_J + 4 * U * other
+
+
+def test_integral_tail_bound():
+    assert deflection_integral_tail_bound(1) == pytest.approx(1 / (18 * math.pi**4), rel=RTOL_CLOSED, abs=0)
+    # the same number from the lambda_4 form of section 16
+    lam4 = math.pi**4 / 96
+    for M in NAVIER_LEVELS:
+        assert deflection_integral_tail_bound(M) == pytest.approx(
+            64 / math.pi**8 * (lam4 / 4) * 2 / (6 * M**3), rel=RTOL_CLOSED, abs=0
+        )
+    bounds = [deflection_integral_tail_bound(M) for M in NAVIER_LEVELS]
+    assert all(b2 < b1 for b1, b2 in zip(bounds, bounds[1:]))
+    assert deflection_integral_tail_bound(M_R2) == pytest.approx(2.726e-13, rel=1e-3)
+    # J_M grows with M (positive terms) and stays within the bound of the remainder
+    values = [deflection_integral_coef(M) for M in NAVIER_LEVELS]
+    assert all(j2 > j1 for j1, j2 in zip(values, values[1:]))
+    for M, J in zip(NAVIER_LEVELS, values):
+        assert 0 <= values[-1] - J <= deflection_integral_tail_bound(M) + 2 * ROUND_J * values[-1]
+
+
+
+def test_integral_and_energy_scaling():
+    unit = NavierPlate(a=1.0, q=1.0, D=1.0, nu=0.3).deflection_integral(M=79)
+    for a, q, D in ((2.9, 3.7, 0.013), (0.4, -250.0, 7.5e3)):
+        r = NavierPlate(a=a, q=q, D=D, nu=0.3).deflection_integral(M=79)
+        assert r.J_M == unit.J_M
+        assert r.I_M == pytest.approx(q * a**6 / D * unit.J_M, rel=RTOL_CLOSED, abs=0)
+        assert r.Pi_M == pytest.approx(-0.5 * q**2 * a**6 / D * unit.J_M, rel=RTOL_CLOSED, abs=0)
+        assert r.I_tail_bound == pytest.approx(abs(q) * a**6 / D * r.J_tail_bound, rel=RTOL_CLOSED, abs=0)
+        assert r.Pi_tail_bound == pytest.approx(0.5 * q**2 * a**6 / D * r.J_tail_bound, rel=RTOL_CLOSED, abs=0)
+
+
+@pytest.mark.parametrize("q", [1.0, -1.0, 3.2e4, -7.0e-3])
+def test_energy_negative_for_nonzero_load(q):
+    r = NavierPlate(a=1.3, q=q, D=2.0, nu=0.3).deflection_integral()
+    assert r.Pi_M < 0
+    assert (r.I_M > 0) == (q > 0)
+    assert r.Pi_tail_bound > 0 and r.I_tail_bound > 0
+
+
+def test_zero_load_integral_and_energy():
+    r = NavierPlate(a=1.0, q=0.0, D=1.0, nu=0.3).deflection_integral()
+    assert r.I_M == 0.0 and r.Pi_M == 0.0
+    assert r.I_tail_bound == 0.0 and r.Pi_tail_bound == 0.0
+    assert r.J_M > 0
+
+
+@pytest.mark.parametrize("M", [0, 2, -1, 3.0, True])
+def test_integral_invalid_level(M):
+    with pytest.raises(ValueError):
+        NavierPlate(a=1.0, q=1.0, D=1.0, nu=0.3).deflection_integral(M=M)
+
+
+def test_integral_against_trapezoidal_quadrature_of_nodal_field():
+    plate = NavierPlate(a=1.0, q=1.0, D=1.0, nu=0.3)
+    M = 39
+    J = plate.deflection_integral(M=M).J_M
+    errors = []
+    for n in (20, 40, 80, 160, 320):
+        g = plate.at_nodes(n, n, M=M, diagnostics=False)
+        # trapezoidal rule; edge nodes are exact zeros, so all weights are h^2
+        errors.append(abs(np.sum(g.w_coef) / n**2 - J))
+    assert all(e2 < e1 for e1, e2 in zip(errors, errors[1:]))
+    ratios = [e1 / e2 for e1, e2 in zip(errors, errors[1:])]
+    assert all(3.9 <= r <= 4.1 for r in ratios)

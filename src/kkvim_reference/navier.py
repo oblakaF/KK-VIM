@@ -54,6 +54,20 @@ only unless stated:
   Delta_j = |Q(M_j) - Q(M_{j-1})| over the levels, see NavierConvergence. Small
   increments do not prove a small remainder (8.4, limitations).
 
+Integral of the deflection and energy (MATH_SPEC.md, В-27, item 6;
+NUMERICAL_SPEC.md, section 16), square a = b, truncated at the same odd M:
+
+    J_M  = (64 / pi^8) sum_{m,n odd <= M} 1 / (m^2 n^2 (m^2 + n^2)^2),
+    I_M  = (q a^6 / D) J_M        (approximation of the integral of w over the plate),
+    Pi_M = -q I_M / 2             (approximation of Pi(omega_0) = -(q, omega_0) / 2),
+
+with the conservative remainder bound of section 16 [ЧВ-22]: terms
+<= 1 / (4 m^4 n^4), sum_{m > M odd} m^-4 <= 1 / (6 M^3), lambda_4 = pi^4 / 96, so
+
+    0 <= J - J_M <= (64 / pi^8) (lambda_4 / 4) 2 / (6 M^3) = 1 / (18 pi^4 M^3).
+
+J_M, I_M, Pi_M are values of the truncated series, not the exact limits.
+
 Only the R2 setting (square, SSSS, q = const, linear plate) is implemented:
 no rectangle b != a (R3), no M_xy, no shear forces, no P-12 (Levy cross-check).
 """
@@ -70,8 +84,11 @@ __all__ = [
     "NAVIER_LEVELS",
     "SUMMATIONS",
     "NavierConvergence",
+    "NavierIntegral",
     "NavierPlate",
     "NavierResult",
+    "deflection_integral_coef",
+    "deflection_integral_tail_bound",
     "deflection_tail_bound",
     "deflection_tail_bound_refined",
     "diagnostic_levels",
@@ -191,6 +208,30 @@ def select_level(w_tol):
         f"w_tol = {w_tol!r} is below the bound {deflection_tail_bound(NAVIER_LEVELS[-1]):.3e} "
         f"of the last level M = {NAVIER_LEVELS[-1]}; give M explicitly"
     )
+
+
+def deflection_integral_coef(M):
+    """J_M = (64 / pi^8) sum_{m,n odd <= M} 1 / (m^2 n^2 (m^2 + n^2)^2) (В-27, item 6).
+
+    Dimensionless integral of the truncated series (131) over the square, in
+    q a^6 / D. Every term 1 / den is formed from an exact integer den and
+    rounded once; the sum is taken by math.fsum.
+    """
+    _check_odd_index(M)
+    odd = range(1, M + 1, 2)
+    terms = [1.0 / (m * m * n * n * (m * m + n * n) ** 2) for m in odd for n in odd]
+    return 64.0 / math.pi**8 * math.fsum(terms)
+
+
+def deflection_integral_tail_bound(M):
+    """Conservative bound 0 <= J - J_M <= 1 / (18 pi^4 M^3), in q a^6 / D (section 16, ЧВ-22)."""
+    _check_odd_index(M)
+    return 1.0 / (18.0 * math.pi**4 * float(M) ** 3)
+
+
+# Rounding of J_M relative to J_M: one rounding per term (exact integer
+# denominator), fsum, the constant 64 / pi^8 (about 4 roundings): 6 u, margin 2.
+ROUND_INTEGRAL = 12 * U
 
 
 def diagnostic_levels(M):
@@ -444,6 +485,28 @@ def _check_count(name, value):
 
 
 @dataclass(frozen=True)
+class NavierIntegral:
+    """Integral of the truncated deflection series and the energy at level M.
+
+    J_M -- dimensionless integral (q a^6 / D); I_M = (q a^6 / D) J_M;
+    Pi_M = -q I_M / 2. All three are values of the series truncated at M,
+    approximations of the limits J, I, Pi(omega_0); their remainder bounds are
+    the separate fields J_tail_bound (section 16), I_tail_bound =
+    |q| a^6 / D J_tail_bound, Pi_tail_bound = q^2 a^6 / (2 D) J_tail_bound.
+    rounding_J -- first-order rounding bound of J_M (absolute, dimensionless).
+    """
+
+    M: int
+    J_M: float
+    I_M: float
+    Pi_M: float
+    J_tail_bound: float
+    I_tail_bound: float
+    Pi_tail_bound: float
+    rounding_J: float
+
+
+@dataclass(frozen=True)
 class NavierPlate:
     """Square SSSS plate under uniform load: a = b > 0, q, D > 0, nu in (-1, 1).
 
@@ -472,6 +535,24 @@ class NavierPlate:
     def from_material(cls, *, a, q, E, thickness, nu, b=None):
         """Plate with D = E t^3 / (12 (1 - nu^2)) [L-107, eq. (3), p. 16]."""
         return cls(a=a, q=q, D=flexural_rigidity(E, thickness, nu), nu=nu, b=b)
+
+    def deflection_integral(self, *, M=None):
+        """J_M, I_M, Pi_M and their remainder bounds at level M (default M_R2 = 1279)."""
+        M = M_R2 if M is None else M
+        J = deflection_integral_coef(M)
+        bound = deflection_integral_tail_bound(M)
+        scale = self.q * self.a**6 / self.D
+        I = scale * J
+        return NavierIntegral(
+            M=M,
+            J_M=J,
+            I_M=I,
+            Pi_M=-0.5 * self.q * I,
+            J_tail_bound=bound,
+            I_tail_bound=abs(scale) * bound,
+            Pi_tail_bound=0.5 * abs(self.q * scale) * bound,
+            rounding_J=ROUND_INTEGRAL * J,
+        )
 
     def at_points(self, x, y, *, M=None, w_tol=None, summation="separable", diagnostics=True):
         """w, M_x, M_y at the points (x, y) (arrays broadcast together).

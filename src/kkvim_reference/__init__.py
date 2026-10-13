@@ -19,8 +19,9 @@ Contents:
 - ``kkvim_reference.navier`` - independent Navier double sine series for the
   square SSSS plate under uniform load: w by [L-107, eq. (131), p. 129],
   M_x, M_y, truncation bounds and convergence levels at points and at all
-  nodes of the tensor grid (NAVIER_REFERENCE_SPEC.md; NUMERICAL_SPEC.md,
-  section 16, A-10a).
+  nodes of the tensor grid; truncated integral of the deflection J_M, I_M
+  and energy Pi_M with the remainder bound of section 16 (MATH_SPEC.md,
+  В-27; NAVIER_REFERENCE_SPEC.md; NUMERICAL_SPEC.md, section 16, A-10a).
 
 Half-steps s >= 4 and the Levy cross-check P-12 are not implemented yet.
 """
