@@ -12,10 +12,11 @@ Contents:
   half-step D(A f'''' - 2B f'' + C f) = F with f = f'' = 0 at both ends and
   its analytic truncation bound (NUMERICAL_SPEC.md, 15.1, 15.4);
 - ``kkvim_reference.parseval_recursion`` - semi-analytic KK-VIM sequence
-  s = 1, 2, 3 (square SSSS, uniform load, N = 1): coefficients G1, G2, G3 by
-  Parseval, sine series of every half-step, fields w1, w2, w3 at grid nodes,
-  choice of M from analytic tails and error accumulation
-  (NUMERICAL_SPEC.md, 15.2-15.5, 15.7);
+  s = 1, ..., s_max (square SSSS, uniform load, N = 1; default s_max = 3):
+  coefficients G_s by Parseval, sine series of every half-step, fields w_s at
+  grid nodes, choice of M from analytic tails, error accumulation, continuous
+  energy Pi_s and a diagnostic mode with enlarged M (NUMERICAL_SPEC.md,
+  15.2-15.5, 15.7, 17);
 - ``kkvim_reference.navier`` - independent Navier double sine series for the
   square SSSS plate under uniform load: w by [L-107, eq. (131), p. 129],
   M_x, M_y, truncation bounds and convergence levels at points and at all
@@ -23,5 +24,5 @@ Contents:
   and energy Pi_M with the remainder bound of section 16 (MATH_SPEC.md,
   В-27; NAVIER_REFERENCE_SPEC.md; NUMERICAL_SPEC.md, section 16, A-10a).
 
-Half-steps s >= 4 and the Levy cross-check P-12 are not implemented yet.
+The Levy cross-check P-12 is not implemented yet.
 """
