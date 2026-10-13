@@ -96,7 +96,7 @@ def s1_budget(step):
 
 def test_s1_m_from_tail_bound_and_budget():
     step = s1_step()
-    assert step.tail_constant == pytest.approx(16 / math.pi**6, rel=RTOL_COEFF)
+    assert step.tail_constant == pytest.approx(16 / math.pi**6, rel=RTOL_COEFF, abs=0)
     assert step.tail_bound <= TAIL_SHARE
     assert s1_budget(step) <= TOL_PROFILE / 10
 
@@ -189,6 +189,7 @@ def test_tail_bound_covers_truncation(M):
     assert short.tail_bound == pytest.approx(
         4 * abs(GEN["F"]) * GEN["ell"] ** 4 / (GEN["D"] * GEN["A"] * math.pi**5) / (8 * M**4),
         rel=RTOL_COEFF,
+        abs=0,
     )
     assert diff <= short.tail_bound + allowance
 
