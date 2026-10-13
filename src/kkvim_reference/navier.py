@@ -79,7 +79,10 @@ r = b / a and the reference length a (MATH_SPEC.md, 2.5; Р-3):
 with s_m(x) = sin(m pi x / a), s_n(y) = sin(n pi y / b), 0 <= x <= a,
 0 <= y <= b. Only 0.2 <= r <= 5 (Р-1); outside, ERROR_INPUT (ValueError):
 the level M_R3 = 2559 and the bounds are not qualified there (4.3). The ratio
-is checked exactly on the given floats (integer arithmetic), without a tolerance.
+of the given floats is checked exactly (integer arithmetic) with the
+representation tolerance of the input numbers decided by the owner on
+2026-10-14: 0.2 (1 - 4u) <= b/a <= 5 (1 + 4u), u = 2^-53 (e.g. a = 3,
+b = 0.6 is accepted). This is not an extension of the physical range of R3.
 Strict truncation bounds (ЧВ-R2, ЧВ-R2a; confirmed by the independent review
 of the R3 draft, 4.2), dimensionless:
 
@@ -143,10 +146,13 @@ M_R2 = 1279
 M_R3 = 2559
 NAVIER_LEVELS_R3 = NAVIER_LEVELS + (M_R3,)
 # Approved range of r = b / a (D-036, Р-1): 1/5 <= r <= 5, compared exactly in
-# integers through float.as_integer_ratio (no tolerance).
+# integers through float.as_integer_ratio with the representation tolerance 4u of
+# the input numbers (owner's decision of 2026-10-14): 0.2 (1 - 4u) <= r <= 5 (1 + 4u).
 R3_RATIO_MIN = 0.2
 R3_RATIO_MAX = 5.0
 _R3_LIMIT = 5
+_R3_TOL_UNITS = 4  # tolerance in units of u = 2^-53
+_U_INV = 2**53
 # Accuracy of the reference (NAVIER_REFERENCE_SPEC.md, 8.6): w in q a^4 / D,
 # moments in q a^2.
 DELTA_W = 4.06e-9
@@ -284,20 +290,22 @@ ROUND_INTEGRAL_RECT = 24 * U
 
 
 def _in_range_exact(num, den):
-    """1/5 <= num/den <= 5 for positive finite floats, exactly (integer arithmetic)."""
+    """0.2 (1 - 4u) <= num/den <= 5 (1 + 4u) for positive finite floats, exactly (integer arithmetic)."""
     p, q = num.as_integer_ratio()
     s, t = den.as_integer_ratio()
     # num/den = (p t) / (q s) with positive integers
     left, right = p * t, q * s
-    return right <= _R3_LIMIT * left and left <= _R3_LIMIT * right
+    lower = _R3_LIMIT * _U_INV * left >= (_U_INV - _R3_TOL_UNITS) * right
+    upper = _U_INV * left <= _R3_LIMIT * (_U_INV + _R3_TOL_UNITS) * right
+    return lower and upper
 
 
 def _ratio(a, b):
-    """r = b / a after the exact range check 0.2 <= b / a <= 5 (D-036, Р-1)."""
+    """r = b / a after the exact range check 0.2 (1 - 4u) <= b / a <= 5 (1 + 4u) (D-036, Р-1)."""
     if not _in_range_exact(float(b), float(a)):
         raise ValueError(
             f"ERROR_INPUT: b / a = {b / a!r} is outside the approved range 0.2 <= b/a <= 5 of R3 "
-            f"(D-036, Р-1); the Navier level M = {M_R3} is not qualified there"
+            f"(D-036, Р-1; representation tolerance 4u); the Navier level M = {M_R3} is not qualified there"
         )
     return b / a
 
@@ -305,7 +313,10 @@ def _ratio(a, b):
 def _check_ratio(r):
     _check_positive("r", r)
     if not _in_range_exact(float(r), 1.0):
-        raise ValueError(f"ERROR_INPUT: r = {r!r} is outside the approved range 0.2 <= r <= 5 (D-036, Р-1)")
+        raise ValueError(
+            f"ERROR_INPUT: r = {r!r} is outside the approved range 0.2 <= r <= 5 "
+            f"(D-036, Р-1; representation tolerance 4u)"
+        )
 
 
 def deflection_tail_bound_rect(M, r):
@@ -316,6 +327,13 @@ def deflection_tail_bound_rect(M, r):
     """
     _check_odd_index(M)
     _check_ratio(r)
+    return _tail_bound_rect(M, r)
+
+
+# The plate checks its exact ratio b / a once in the constructor; its methods pass the
+# rounded r = fl(b / a) to the unchecked forms below, so that the rounding of b / a
+# near the edge of the tolerance band cannot reject an accepted plate.
+def _tail_bound_rect(M, r):
     return 16.0 / math.pi**6 * LAMBDA3 * r * r / (8.0 * M * M)
 
 
@@ -328,6 +346,10 @@ def deflection_integral_coef_rect(M, r):
     """
     _check_odd_index(M)
     _check_ratio(r)
+    return _integral_coef_rect(M, r)
+
+
+def _integral_coef_rect(M, r):
     if r == 1.0:
         return deflection_integral_coef(M)
     return _integral_coef_general(M, r)
@@ -345,6 +367,10 @@ def deflection_integral_tail_bound_rect(M, r):
     """Strict bound ЧВ-R2a: 0 <= J - J_M <= r^3 / (18 pi^4 M^3), in q a^6 / D."""
     _check_odd_index(M)
     _check_ratio(r)
+    return _integral_tail_bound_rect(M, r)
+
+
+def _integral_tail_bound_rect(M, r):
     return r**3 / (18.0 * math.pi**4 * float(M) ** 3)
 
 
@@ -854,7 +880,7 @@ class NavierRectangleResult:
     @property
     def w_tail_bound_coef(self):
         """Strict truncation bound ЧВ-R2 of w, in q a^4 / D: 0.0021881 r^2 / M^2."""
-        return deflection_tail_bound_rect(self.M, self.plate.r)
+        return _tail_bound_rect(self.M, self.plate.r)
 
     @property
     def w_tail_bound(self):
@@ -871,8 +897,9 @@ class NavierRectangleResult:
 class NavierRectangle:
     """Rectangular SSSS plate a x b under uniform load (R3; D-036).
 
-    a, b > 0 with 0.2 <= r = b / a <= 5 (checked exactly; otherwise
-    ERROR_INPUT, ValueError); q; D > 0; nu in (-1, 1) enters only the moments.
+    a, b > 0 with 0.2 <= r = b / a <= 5 (checked exactly with the representation
+    tolerance 4u: 0.2 (1 - 4u) <= b / a <= 5 (1 + 4u); otherwise ERROR_INPUT,
+    ValueError); q; D > 0; nu in (-1, 1) enters only the moments.
     The default level is M_R3 = 2559 (Р-5); any odd M may be given explicitly
     (lower levels for checks and diagnostics). The square a = b gives the
     values of NavierPlate. Units must be consistent (D-009).
@@ -920,8 +947,8 @@ class NavierRectangle:
         """
         M = self._level(M)
         r = self.r
-        J = deflection_integral_coef_rect(M, r)
-        bound = deflection_integral_tail_bound_rect(M, r)
+        J = _integral_coef_rect(M, r)
+        bound = _integral_tail_bound_rect(M, r)
         scale = self.q * self.a**6 / self.D
         I = scale * J
         return NavierIntegral(

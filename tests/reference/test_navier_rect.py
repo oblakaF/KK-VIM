@@ -328,22 +328,97 @@ def test_integral_and_energy_axis_exchange(r):
 # --- input checks (ERROR_INPUT) ------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("a", "b"), [(1.0, 5.0), (5.0, 1.0), (1.0, 0.2), (2.0, 10.0), (3.0, 3.0)])
-def test_range_ends_accepted(a, b):
-    p = NavierRectangle(a=a, b=b, q=1.0, D=1.0, nu=NU)
-    assert 0.2 <= p.r <= 5.0
+# Representation tolerance of the input ratio (owner's decision of 2026-10-14):
+# 0.2 (1 - 4u) <= b/a <= 5 (1 + 4u), u = 2^-53, on the exact ratio of the given floats.
+RATIO_LOW = Fraction(1, 5) * (1 - 4 * Fraction(1, 2**53))
+RATIO_HIGH = 5 * (1 + 4 * Fraction(1, 2**53))
+
+
+def ulps(x, k):
+    """x moved by k ulps (k < 0 - downwards)."""
+    for _ in range(abs(k)):
+        x = math.nextafter(x, math.inf if k > 0 else 0.0)
+    return x
 
 
 @pytest.mark.parametrize(
     ("a", "b"),
-    [(1.0, 5.000000000000001), (1.0, 0.19999999999999998), (1.0, 0.19), (1.0, 5.01), (1.0, 10.0), (10.0, 1.0)],
+    [
+        (1.0, 5.0),
+        (5.0, 1.0),
+        (1.0, 0.2),
+        (2.0, 10.0),
+        (3.0, 3.0),
+        (3.0, 0.6),  # float 0.6 < 3/5: b/a = 1/5 (1 - u/3), within 4u
+        (0.6, 3.0),
+        (1.0, ulps(5.0, 1)),  # 5 (1 + 1.6 u)
+        (1.0, ulps(5.0, 2)),  # 5 (1 + 3.2 u)
+        (1.0, ulps(0.2, -1)),  # 0.2 (1 - 0.75 u)
+        (1.0, ulps(0.2, -3)),  # 0.2 (1 - 3.25 u)
+    ],
+)
+def test_range_ends_accepted(a, b):
+    p = NavierRectangle(a=a, b=b, q=1.0, D=1.0, nu=NU)
+    assert RATIO_LOW <= Fraction(b) / Fraction(a) <= RATIO_HIGH
+    assert 0.2 * (1 - 8 * U) <= p.r <= 5.0 * (1 + 8 * U)
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        (1.0, ulps(5.0, 3)),  # 5 (1 + 4.8 u): beyond 4u
+        (1.0, ulps(0.2, -4)),  # 0.2 (1 - 4.5 u): beyond 4u
+        (1.0, 0.19),
+        (1.0, 5.01),
+        (1.0, 10.0),
+        (10.0, 1.0),
+    ],
 )
 def test_ratio_outside_range_is_error_input(a, b):
     with pytest.raises(ValueError, match="ERROR_INPUT"):
         NavierRectangle(a=a, b=b, q=1.0, D=1.0, nu=NU)
 
 
-@pytest.mark.parametrize("r", [0.1, 5.5])
+@pytest.mark.parametrize("a", [1.0, 3.0, 0.7, 1.1, 9.7, 0.3])
+@pytest.mark.parametrize("target", [0.2, 5.0])
+def test_range_check_is_the_exact_4u_rule(a, target):
+    """Acceptance equals the exact rule for b within +-12 ulps of target * a; bounds use the same rule on r."""
+    for k in range(-12, 13):
+        b = ulps(target * a, k)
+        if RATIO_LOW <= Fraction(b) / Fraction(a) <= RATIO_HIGH:
+            NavierRectangle(a=a, b=b, q=1.0, D=1.0, nu=NU)
+        else:
+            with pytest.raises(ValueError, match="ERROR_INPUT"):
+                NavierRectangle(a=a, b=b, q=1.0, D=1.0, nu=NU)
+        r = ulps(target, k)
+        if RATIO_LOW <= Fraction(r) <= RATIO_HIGH:
+            deflection_tail_bound_rect(9, r)
+            deflection_integral_coef_rect(9, r)
+            deflection_integral_tail_bound_rect(9, r)
+        else:
+            for f in (deflection_tail_bound_rect, deflection_integral_coef_rect, deflection_integral_tail_bound_rect):
+                with pytest.raises(ValueError, match="ERROR_INPUT"):
+                    f(9, r)
+
+
+def test_accepted_plate_is_not_rejected_by_rounding_of_its_ratio():
+    """a = 0.7, b = 0.13999999999999993: exact b/a = 0.2 (1 - 3.93 u) is accepted, fl(b/a) = 0.2 (1 - 4.5 u).
+
+    The plate methods use the ratio checked in the constructor and must not reject it again.
+    """
+    a, b = 0.7, 0.13999999999999993
+    assert RATIO_LOW <= Fraction(b) / Fraction(a) and Fraction(b / a) < RATIO_LOW
+    p = NavierRectangle(a=a, b=b, q=1.0, D=1.0, nu=NU)
+    res = p.at_points(a / 2, b / 2, M=9)
+    assert res.w_tail_bound_coef > 0 and res.w_error_bound_coef > 0
+    g = p.deflection_integral(M=9)
+    assert g.J_M > 0 and g.J_tail_bound > 0
+    p.at_nodes(4, 4, M=9)
+    with pytest.raises(ValueError, match="ERROR_INPUT"):  # the public bound applies the rule to its own input r
+        deflection_tail_bound_rect(9, b / a)
+
+
+@pytest.mark.parametrize("r", [0.1, 5.5, ulps(5.0, 3), ulps(0.2, -4)])
 def test_bounds_outside_range_are_error_input(r):
     with pytest.raises(ValueError, match="ERROR_INPUT"):
         deflection_tail_bound_rect(2559, r)
