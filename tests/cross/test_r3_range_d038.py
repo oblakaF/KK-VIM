@@ -94,7 +94,13 @@ def test_accepted_borderline_plate_survives_swapped_and_internal_levy_paths(a, b
     bounds = levy_centre_bounds(a=a, b=b, q=1.0, D=1.0)
     assert math.isfinite(c) and c > 0
     assert bounds.truncation >= 0
-    assert math.isfinite(levy_centre_wbar(b / a))
+    # Direct callers supply only a rounded ratio; for an already-certified
+    # plate its rounded b/a can independently fall outside the 4u gate.
+    if in_r3_range(1.0, b / a):
+        assert math.isfinite(levy_centre_wbar(b / a))
+    else:
+        with pytest.raises(ValueError, match="ERROR_INPUT"):
+            levy_centre_wbar(b / a)
 
 
 @pytest.mark.parametrize(
