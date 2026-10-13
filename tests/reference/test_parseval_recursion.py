@@ -1,4 +1,4 @@
-"""Own tests of kkvim_reference.parseval_recursion (R2, semi-analytic sequence s <= 3).
+"""Own tests of kkvim_reference.parseval_recursion (R2, semi-analytic sequence).
 
 Recursion G1 -> Y1 -> G2 -> X2 -> G3 -> Y3 by sine series (ЧВ-17) and Parseval
 (ЧВ-18, ЧВ-19), choice of M (ЧВ-20, И-12) and error accumulation (ЧВ-21),
@@ -31,6 +31,24 @@ Tolerances, fixed before any comparison (not tuned to results):
 - target of the reference (15.7): field and invariant errors <= 1e-12 for s <= 3;
 - scale invariance: the sum of the two error bounds of the compared runs (both
   approximate the same exact fields).
+
+Late half-steps s = 4 ... 10 (sections 15.5, 15.7, 17), additionally:
+- the budget target 1e-12 is not required for s > 3; the budgets are checked
+  for validity, growth and honest reporting only;
+- PRACTICAL_CONTROL = 1e-13: practical control of section 15.5 (the whole
+  recursion repeated with M at least doubled on every half-step): relative
+  change of the centre, fields (n = 80, 160, 320), invariants and energy -
+  a diagnostic, not a proof of accuracy;
+- energy: Pi_s against Pi_full and Pi_s - Pi_{s-1} against -||w_s - w_{s-1}||^2/2
+  within ROUND_ENERGY (|Pi_s| + |Pi_{s-1}|) of the module (both identities are
+  exact for the computed truncated Galerkin sequence when M_s >= M_{s-2});
+  monotonicity of Pi_s within the same rounding allowance;
+- regression of the centre values s = 1 ... 4 against the 13-digit values of
+  NUMERICAL_SPEC.md, 15.7 [SCRATCH]: half a unit of the 13th digit, 5e-14,
+  plus the module field budget;
+- Pi_1 against an independent Gauss-Legendre integral of the Levy profile
+  within RTOL_QUAD; Pi_s >= Pi(omega_0) of the Navier reference (MATH_SPEC.md,
+  В-23, В-27) - a reference-to-reference check, no KK-VIM results.
 """
 
 import ast
@@ -42,11 +60,15 @@ import numpy as np
 import pytest
 
 from kkvim_reference.levy import levy_w1
+from kkvim_reference.navier import NavierPlate
 from kkvim_reference.parseval_recursion import (
     EPS_TAIL,
+    ROUND_ENERGY,
     ROUND_G1,
     ROUND_PARSEVAL,
     ROUND_VALUES,
+    ROUND_X0,
+    S_DEFAULT,
     Coefficients,
     ParsevalRecursion,
     first_coefficients,
@@ -63,6 +85,8 @@ RTOL_SCALAR = 256 * U
 TOL_LEVY_W1 = 1e-13
 RTOL_LEVY_W = 64 * U
 TARGET_15_7 = 1e-12
+PRACTICAL_CONTROL = 1e-13
+S_LATE = 10
 
 CASES = [
     {"a": 1.0, "q": 1.0, "D": 1.0},
@@ -395,11 +419,23 @@ def test_counters_s_and_k(unit):
 
 
 @pytest.mark.parametrize("bad", [0, 4, 2.0, True])
-def test_rejects_half_steps_outside_1_to_3(unit, bad):
+def test_default_recursion_rejects_half_steps_outside_1_to_3(unit, bad):
+    # the default s_max = 3 keeps the earlier contract
+    assert unit.s_max == S_DEFAULT == 3
     with pytest.raises(ValueError):
         unit.halfstep(bad)
+
+
+@pytest.mark.parametrize("bad", [0, -1, 2.0, True])
+def test_rejects_invalid_s_max(bad):
     with pytest.raises(ValueError):
         ParsevalRecursion(a=1.0, q=1.0, D=1.0, s_max=bad)
+
+
+@pytest.mark.parametrize("changes", [{"m_scale": 0}, {"m_scale": 1.5}, {"m_scale": True}, {"eps": 0.0}])
+def test_rejects_invalid_m_scale_and_eps(changes):
+    with pytest.raises(ValueError):
+        ParsevalRecursion(a=1.0, q=1.0, D=1.0, **changes)
 
 
 def test_s_max_limits_available_half_steps():
@@ -514,3 +550,223 @@ def test_module_does_not_import_kkvim_or_grids():
             names.append(node.module)
     assert set(names) == {"math", "dataclasses", "numpy", "kkvim_reference.sine_halfstep"}
     assert "Grid1D" not in source
+
+
+# --- 13. Late half-steps s = 4 ... 10 ---------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def late():
+    return ParsevalRecursion(a=1.0, q=1.0, D=1.0, s_max=S_LATE)
+
+
+@pytest.fixture(scope="module")
+def late_doubled():
+    return ParsevalRecursion(a=1.0, q=1.0, D=1.0, s_max=S_LATE, m_scale=2)
+
+
+def multiplier_nodal(rec, index, n):
+    if index == 0:
+        return [math.sin(math.pi * i / n) for i in range(n + 1)]
+    return rec.halfstep(index).step.nodal_values(n)
+
+
+def test_first_three_half_steps_unchanged_by_longer_run(unit, late):
+    for s in (1, 2, 3):
+        old, new = unit.halfstep(s), late.halfstep(s)
+        assert old.coefficients == new.coefficients
+        assert old.step == new.step
+        assert old.budget == new.budget
+        assert np.array_equal(unit.field_on_grid(s, 12, 9), late.field_on_grid(s, 12, 9))
+
+
+def test_centre_values_against_numerical_spec_15_7(late):
+    # NUMERICAL_SPEC.md, 15.7 [SCRATCH]: 13 significant digits for s = 1 ... 4.
+    printed = {1: 0.0041093468395, 2: 0.0040584722659, 3: 0.0040581830898, 4: 0.0040581806852}
+    for s, value in printed.items():
+        centre = late.centre_value(s)
+        assert abs(centre - value) <= 5e-14 + late.halfstep(s).budget.field_error * centre
+
+
+def test_late_counters_alternation_and_inputs(late):
+    a, q = late.a, late.q
+    for s in range(1, S_LATE + 1):
+        record = late.halfstep(s)
+        assert record.s == s and record.k == s // 2
+        assert record.variable == ("Y" if s % 2 else "X")
+        if s > 1:
+            previous = late.halfstep(s - 1).step.coefficients()
+            assert record.coefficients == parseval_coefficients(previous, ell=a, q=q)
+
+
+def test_late_fields_are_products_of_the_right_multipliers(late):
+    n = 12
+    for s in range(4, S_LATE + 1):
+        if s % 2:
+            expected = np.outer(multiplier_nodal(late, s - 1, n), multiplier_nodal(late, s, n))
+        else:
+            expected = np.outer(multiplier_nodal(late, s, n), multiplier_nodal(late, s - 1, n))
+        assert np.array_equal(late.field_on_grid(s, n, n), expected)
+    assert late.centre_value(7) == late.field_on_grid(7, 80, 80)[40, 40]
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_late_recursion_against_scalar_form(case):
+    rec = recursion(case, s_max=S_LATE)
+    for s in range(3, S_LATE):
+        G = rec.coefficients(s)
+        nxt = rec.coefficients(s + 1)
+        alt = scalar_recursion(G, D=case["D"], ell=case["a"], q=case["q"], M=rec.halfstep(s).budget.M)
+        for x, y in zip((nxt.A, nxt.B, nxt.C, nxt.F), (alt.A, alt.B, alt.C, alt.F)):
+            assert rel(x, y) <= RTOL_SCALAR
+
+
+@pytest.mark.parametrize("scale", [3.7, -2.5])
+def test_late_fields_and_invariants_do_not_depend_on_x0_scale(late, scale):
+    other = ParsevalRecursion(a=1.0, q=1.0, D=1.0, s_max=S_LATE, x0_scale=scale)
+    n = 16
+    for s in range(4, S_LATE + 1):
+        b, c = late.halfstep(s).budget, other.halfstep(s).budget
+        w, v = late.field_on_grid(s, n, n), other.field_on_grid(s, n, n)
+        assert np.max(np.abs(w - v)) <= (b.field_error + c.field_error) * np.max(np.abs(w))
+        for x, y in zip(late.coefficients(s).invariants(), other.coefficients(s).invariants()):
+            assert rel(y, x) <= b.invariant_error + c.invariant_error
+        e, f = late.energy(s), other.energy(s)
+        assert rel(f.energy, e.energy) <= e.error + f.error
+
+
+def test_late_fields_and_energy_scale_with_a_q_d(late):
+    case = CASES[1]
+    rec = recursion(case, s_max=S_LATE)
+    a, q, D = case["a"], case["q"], case["D"]
+    n = 10
+    for s in range(4, S_LATE + 1):
+        w = rec.field_on_grid(s, n, n)
+        ref = q * a**4 / D * late.field_on_grid(s, n, n)
+        tol = rec.halfstep(s).budget.field_error + late.halfstep(s).budget.field_error + 8 * U
+        assert np.max(np.abs(w - ref)) <= tol * np.max(np.abs(ref))
+        # Pi ~ q^2 a^6 / D, I ~ q a^6 / D
+        e, e1 = rec.energy(s), late.energy(s)
+        assert rel(e.energy, q * q * a**6 / D * e1.energy) <= e.error + e1.error + 8 * U
+        assert rel(e.integral, q * a**6 / D * e1.integral) <= e.error + e1.error + 8 * U
+
+
+def test_late_negative_load():
+    pos = ParsevalRecursion(a=1.0, q=1.3, D=1.0, s_max=S_LATE)
+    neg = ParsevalRecursion(a=1.0, q=-1.3, D=1.0, s_max=S_LATE)
+    for s in range(1, S_LATE + 1):
+        assert np.array_equal(neg.field_on_grid(s, 10, 10), -pos.field_on_grid(s, 10, 10))
+        assert neg.energy(s).integral == -pos.energy(s).integral
+        assert neg.energy(s).energy == pos.energy(s).energy < 0
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_two_forms_of_energy_agree(case):
+    rec = recursion(case, s_max=S_LATE)
+    for s in range(1, S_LATE + 1):
+        e = rec.energy(s)
+        assert e.rounding == ROUND_ENERGY
+        assert abs(e.energy_full - e.energy) <= ROUND_ENERGY * abs(e.energy)
+        assert e.energy_norm2 == pytest.approx(case["q"] * e.integral, rel=ROUND_ENERGY, abs=0)
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_energy_non_increasing_and_change_identity(case):
+    rec = recursion(case, s_max=S_LATE)
+    for s in range(2, S_LATE + 1):
+        e, p = rec.energy(s), rec.energy(s - 1)
+        allowance = ROUND_ENERGY * (abs(e.energy) + abs(p.energy))
+        # w_{s-1} lies in the truncated search space of half-step s when M_s >= M_{s-2}
+        older = rec.halfstep(s - 2).budget.M if s > 2 else 1
+        assert rec.halfstep(s).budget.M >= older
+        assert e.delta <= allowance
+        # exactly 0 once the float sequence repeats itself (a fixed point in rounding)
+        assert e.change_norm2 >= 0
+        assert abs(e.delta + 0.5 * e.change_norm2) <= allowance
+    assert rec.energy(1).delta is None and rec.energy(1).change_norm2 is None
+
+
+def test_energy_of_first_half_step_against_levy_integral():
+    a, q, D = 1.0, 1.0, 1.0
+    rec = ParsevalRecursion(a=a, q=q, D=D, s_max=1)
+    y0, _, _ = levy_derivatives(a, q, D)
+    expected = -0.5 * q * (2 * a / math.pi) * gauss_legendre(y0, a)
+    assert rel(rec.energy(1).energy, expected) <= RTOL_QUAD
+
+
+def test_energy_bounded_below_by_navier_energy(late):
+    # Pi(w_s) >= Pi(omega_0) = -q I / 2 (В-23, В-27); I <= I_M + bound for q > 0.
+    navier = NavierPlate(a=1.0, q=1.0, D=1.0, nu=0.3).deflection_integral()
+    exact_lower = -0.5 * (navier.I_M + navier.I_tail_bound + navier.rounding_J)
+    for s in range(1, S_LATE + 1):
+        e = late.energy(s)
+        assert e.energy * (1 - e.error) > exact_lower
+    # the N = 1 sequence keeps a positive energy gap (MATH_SPEC.md, 7.4)
+    assert late.energy(S_LATE).energy - exact_lower > 1e-4 * abs(exact_lower)
+
+
+def test_field_and_energy_changes_decrease_with_s(late):
+    changes = [late.field_change(s, 80, 80) for s in range(2, 8)]
+    assert all(c2 < c1 for c1, c2 in zip(changes, changes[1:]))
+    # above the rounding floor (about 1e-14) the changes decrease strictly
+    rel_changes = [late.energy(s).change_rel for s in range(2, 9)]
+    assert all(c2 < c1 for c1, c2 in zip(rel_changes, rel_changes[1:]))
+    with pytest.raises(ValueError):
+        late.field_change(1, 8, 8)
+
+
+def test_doubled_m_practical_control(late, late_doubled):
+    for s in range(1, S_LATE + 1):
+        b, d = late.halfstep(s).budget, late_doubled.halfstep(s).budget
+        assert b.M == b.M_rule and d.M == 2 * (d.M_rule + 1) - 1 >= 2 * b.M_rule
+        c1, c2 = late.centre_value(s), late_doubled.centre_value(s)
+        assert rel(c1, c2) <= PRACTICAL_CONTROL
+        for n in (80, 160, 320):
+            w1, w2 = late.field_on_grid(s, n, n), late_doubled.field_on_grid(s, n, n)
+            assert np.max(np.abs(w1 - w2)) <= PRACTICAL_CONTROL * np.max(np.abs(w1))
+        for x, y in zip(late.coefficients(s).invariants(), late_doubled.coefficients(s).invariants()):
+            assert rel(x, y) <= PRACTICAL_CONTROL
+        assert rel(late.energy(s).energy, late_doubled.energy(s).energy) <= PRACTICAL_CONTROL
+
+
+def test_late_budgets_reported_honestly(late):
+    budgets = [late.halfstep(s).budget for s in range(1, S_LATE + 1)]
+    assert all(b.valid for b in budgets)
+    errors = [b.input_error for b in budgets]
+    assert all(e2 > e1 for e1, e2 in zip(errors, errors[1:]))
+    for s, b in enumerate(budgets, start=1):
+        assert b.first_order_input_error * (1 - 1e-12) <= b.input_error
+        assert 0 < b.tail_function_rel <= EPS_TAIL
+        assert b.integral_error >= b.coefficient_error
+        assert late.energy(s).error >= b.integral_error
+    # the target 1e-12 of 15.7 holds by the budget for s <= 3, not claimed later
+    assert all(b.field_error <= TARGET_15_7 for b in budgets[:3])
+    assert budgets[-1].field_error > TARGET_15_7
+
+
+def test_budget_becomes_invalid_but_values_stay_finite():
+    rec = ParsevalRecursion(a=1.0, q=1.0, D=1.0, s_max=30)
+    flags = [rec.halfstep(s).budget.valid for s in range(1, 31)]
+    first_invalid = flags.index(False) + 1
+    assert all(flags[: first_invalid - 1]) and not any(flags[first_invalid - 1 :])
+    b = rec.halfstep(30).budget
+    assert b.field_error == b.multiplier_error == b.invariant_error == math.inf
+    assert rec.energy(30).error == math.inf
+    w = rec.field_on_grid(30, 8, 8)
+    assert np.all(np.isfinite(w))
+    assert math.isfinite(rec.energy(30).energy)
+
+
+def test_unreliable_series_raises_floating_point_error():
+    # q a^4 / D far below the normal range: the squared coefficients underflow
+    with pytest.raises(FloatingPointError):
+        ParsevalRecursion(a=1.0, q=1e-300, D=1e10, s_max=2)
+
+
+def test_integral_of_x0_is_closed_form(unit):
+    e = unit.energy(1)
+    y1 = unit.halfstep(1).step
+    lambdas = [(2 * j + 1) * math.pi for j in range(y1.n_terms)]
+    integral_y1 = 2 * math.fsum(c / lam for c, lam in zip(y1.coefficients(), lambdas))
+    assert rel(e.integral, (2 / math.pi) * integral_y1) <= 4 * U
+    assert unit.halfstep(1).budget.integral_error > 0 and ROUND_X0 > 0
