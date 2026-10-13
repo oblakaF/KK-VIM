@@ -51,10 +51,11 @@ The comparison with the Navier series (P-12) is not part of this module.
 """
 
 import math
-from fractions import Fraction
 from typing import NamedTuple
 
 import numpy as np
+
+from kkvim_reference._r3_range import check_r3_ratio
 
 __all__ = [
     "levy_x0",
@@ -139,12 +140,10 @@ def levy_w1(x, y, *, a, q, D):
 # Formulas, transformations and bounds: docs/R3_LEVY_REFERENCE_DRAFT.md.
 # ---------------------------------------------------------------------------
 
-# Approved range of b/a (D-036, Р-1). Checked exactly in rational arithmetic on
-# the given floats, max(a, b) <= 5 min(a, b); the representation band 4u of
-# D-037 is not carried over (R3_LEVY_REFERENCE_DRAFT.md, section 2.3).
+# Scientific range of b/a is D-036; all R3 references now use the
+# exact symmetric 4u representation gate of D-038.
 LEVY_RATIO_MIN = 0.2
 LEVY_RATIO_MAX = 5.0
-_RATIO_LIMIT = 5
 
 # Unit roundoff u = 2^-53 and the factor 4 / pi^5 of (139), (j), (140).
 _U = 2.0**-53
@@ -206,13 +205,11 @@ def _check_odd(M):
 
 
 def _check_ratio_l(r_L):
-    """1 <= r_L <= 5 exactly: r_L is the ratio in the frame of L-107."""
+    """Public r_L: 1 <= r_L <= 5(1+4u) in the short-side Levy frame."""
     _check_positive("r_L", r_L)
-    if not (r_L >= 1.0 and Fraction(r_L) <= _RATIO_LIMIT):
-        raise ValueError(
-            f"ERROR_INPUT: r_L = {r_L!r} must satisfy 1 <= r_L <= 5 "
-            "(frame of L-107 with the shorter side a_L; D-036, Р-1)"
-        )
+    if r_L < 1.0:
+        raise ValueError("ERROR_INPUT: r_L must be >= 1 (shorter side is a_L)")
+    check_r3_ratio(1.0, r_L)
     return float(r_L)
 
 
@@ -226,20 +223,16 @@ def _check_interval(name, values, length, side):
 def levy_orientation(a, b):
     """Frame of the Levy series for the plate a x b: a_L = min(a, b), b_L = max(a, b).
 
-    The range 0.2 <= b/a <= 5 (D-036, Р-1) is checked exactly on the given
-    floats, max(a, b) <= 5 min(a, b) in rational arithmetic; outside it
-    ``ValueError: ERROR_INPUT``. The check is symmetric under a <-> b.
+    The physical range is 0.2 <= b/a <= 5 (D-036, Р-1). Input floats use the
+    shared rational D-038 gate max(a, b) <= 5(1+4u)min(a, b);
+    outside it ``ValueError: ERROR_INPUT``. The gate is symmetric under a <-> b.
     """
     _check_positive("a", a)
     _check_positive("b", b)
     a, b = float(a), float(b)
     swapped = b < a
     a_L, b_L = (b, a) if swapped else (a, b)
-    if not Fraction(b_L) <= _RATIO_LIMIT * Fraction(a_L):
-        raise ValueError(
-            f"ERROR_INPUT: b / a = {b / a!r} is outside the approved range 0.2 <= b/a <= 5 of R3 "
-            "(D-036, Р-1; exact check without a representation band)"
-        )
+    check_r3_ratio(a, b)
     return LevyOrientation(a_L, b_L, b_L / a_L, swapped)
 
 
@@ -270,19 +263,21 @@ def levy_field_tail_bound(M):
     return _C5 / (8.0 * float(M) ** 4)
 
 
-def levy_centre_tail_bound(M, r_L):
-    """Strict bound of the tail m > M of the correction series of (140), in q a_L^4 / D.
-
-    (4 / pi^5) tau_{M+2} / (1 - exp(-pi r_L)), tau_m = m^-5 (alpha_m + 2)
-    exp(-alpha_m) (R3_LEVY_REFERENCE_DRAFT.md, 5.1). Only for the centre form
-    (140); it does not bound the field (139).
-    """
-    M = _check_odd(M)
-    r_L = _check_ratio_l(r_L)
+def _centre_tail_unchecked(M, r_L):
+    """Internal tail formula after validation of the original plate or r_L."""
     m = M + 2
     alpha = m * (math.pi * r_L / 2.0)
     tau = (alpha + 2.0) * math.exp(-alpha) / float(m) ** 5
     return _C5 * tau / -math.expm1(-math.pi * r_L)
+
+
+def levy_centre_tail_bound(M, r_L):
+    """Strict correction-tail bound of (140), in |q| a_L^4 / D (D-038).
+
+    To convert to the original |q| a^4 / D, multiply by (a_L/a)^4.
+    This bound is for the centre correction series, not the full field.
+    """
+    return _centre_tail_unchecked(_check_odd(M), _check_ratio_l(r_L))
 
 
 def levy_select_m_field(tol=LEVY_FIELD_TOL):
@@ -297,14 +292,17 @@ def levy_select_m_field(tol=LEVY_FIELD_TOL):
     return M
 
 
-def levy_select_m_centre(r_L, tol=LEVY_CENTRE_TOL):
-    """Smallest odd M with levy_centre_tail_bound(M, r_L) <= tol (tol in q a_L^4 / D)."""
-    _check_positive("tol", tol)
-    r_L = _check_ratio_l(r_L)
+def _select_m_centre_unchecked(r_L, tol):
     M = 1
-    while levy_centre_tail_bound(M, r_L) > tol:
+    while _centre_tail_unchecked(M, r_L) > tol:
         M += 2
     return M
+
+
+def levy_select_m_centre(r_L, tol=LEVY_CENTRE_TOL):
+    """Smallest odd M meeting the centre correction-tail target."""
+    _check_positive("tol", tol)
+    return _select_m_centre_unchecked(_check_ratio_l(r_L), tol)
 
 
 def _bracket(alpha, s):
@@ -321,11 +319,14 @@ def _bracket(alpha, s):
     All exponents are <= 0 (no overflow); T = 0 exactly at s = 0.
     """
     z = alpha * s
-    g = np.exp(-2.0 * alpha)
-    em = np.expm1(-z)
-    f = -em - 0.5 * z * np.exp(-z)
-    e = np.exp(-alpha * (2.0 - s))
-    return (f + e * (em + alpha * np.expm1(-2.0 * z) / (1.0 + g) + 0.5 * z)) / (1.0 + g)
+    # exp(-large) correctly underflows to zero; external NumPy seterr(all="raise")
+    # must not turn this harmless limiting behaviour into an exception.
+    with np.errstate(under="ignore"):
+        g = np.exp(-2.0 * alpha)
+        em = np.expm1(-z)
+        f = -em - 0.5 * z * np.exp(-z)
+        e = np.exp(-alpha * (2.0 - s))
+        return (f + e * (em + alpha * np.expm1(-2.0 * z) / (1.0 + g) + 0.5 * z)) / (1.0 + g)
 
 
 def _p_coef(alpha):
@@ -464,7 +465,7 @@ def levy_centre_140(*, a, b, q, D, M=None):
     """Deflection at the centre (a/2, b/2) by (140); M = None - levy_select_m_centre(r_L)."""
     orient = levy_orientation(a, b)
     _check_load(q, D)
-    M = levy_select_m_centre(orient.r_L) if M is None else _check_odd(M)
+    M = _select_m_centre_unchecked(orient.r_L, LEVY_CENTRE_TOL) if M is None else _check_odd(M)
     return _centre_140(orient.r_L, M) * (q * orient.a_L**4 / D)
 
 
@@ -482,8 +483,8 @@ def levy_centre_bounds(*, a, b, q, D, M=None, form="140"):
     orient = levy_orientation(a, b)
     _check_load(q, D)
     if form == "140":
-        M = levy_select_m_centre(orient.r_L) if M is None else _check_odd(M)
-        trunc = levy_centre_tail_bound(M, orient.r_L)
+        M = _select_m_centre_unchecked(orient.r_L, LEVY_CENTRE_TOL) if M is None else _check_odd(M)
+        trunc = _centre_tail_unchecked(M, orient.r_L)
     else:
         M = _resolve_m(M)
         trunc = levy_field_tail_bound(M)
@@ -510,5 +511,5 @@ def levy_centre_wbar(r, M=None):
     multiplied by (a_L / a)^4 = r^4 (ЧВ-R1).
     """
     orient = levy_orientation(1.0, r)
-    M = levy_select_m_centre(orient.r_L) if M is None else _check_odd(M)
+    M = _select_m_centre_unchecked(orient.r_L, LEVY_CENTRE_TOL) if M is None else _check_odd(M)
     return _centre_140(orient.r_L, M) * orient.a_L**4

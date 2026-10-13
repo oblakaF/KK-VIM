@@ -504,7 +504,7 @@ def test_r2_signature_and_defaults_kept():
     assert rec.s_max == 3 and rec.m_scale == 1 and rec.b == rec.a and rec.r == 1.0
 
 
-# --- input range (ERROR_INPUT, exact, without the Navier tolerance of D-037) --------------------
+# --- input range (D-038: common symmetric 4u representation tolerance) --------------------
 
 
 @pytest.mark.parametrize(("a", "b"), [(1.0, 5.0), (5.0, 1.0), (1.0, 0.2), (2.0, 10.0)])
@@ -514,10 +514,9 @@ def test_range_ends_accepted(a, b):
 
 @pytest.mark.parametrize(
     ("a", "b"),
-    [(1.0, 5.000000000000001), (1.0, 0.19999999999999998), (1.0, 5.5), (10.0, 1.0), (3.0, 0.6)],
+    [(1.0, 5.000000000000003), (1.0, 0.1999999999999999), (1.0, 5.5), (10.0, 1.0)],
 )
 def test_ratio_outside_range_is_error_input(a, b):
-    # (3.0, 0.6): the float 0.6 is below 3/5, so b/a < 1/5 exactly; see docs/R3_PARSEVAL_REFERENCE.md, 6
     with pytest.raises(ValueError, match="ERROR_INPUT"):
         ParsevalRecursion(a=a, b=b, q=1.0, D=1.0)
 
@@ -538,5 +537,5 @@ def test_module_imports_unchanged():
             names.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             names.add(node.module)
-    assert names == {"math", "dataclasses", "numpy", "kkvim_reference.sine_halfstep"}
+    assert names == {"math", "dataclasses", "numpy", "kkvim_reference.sine_halfstep", "kkvim_reference._r3_range"}
     assert ROUND_VALUES > 0

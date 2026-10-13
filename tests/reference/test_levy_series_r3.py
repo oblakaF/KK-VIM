@@ -64,9 +64,8 @@ CENTRE_SQUARE_FIRST = 0.004109346839
 TOL_A4V = 5e-13
 
 # Representative physical data, consistent units (D-009). A and the scale
-# factors are binary fractions, so that b = r A and lam b stay inside the exactly
-# checked range at r = 5 and r = 1/5 (with A = 2.9, 5 * A rounds above 5 A and is
-# rejected; R3_LEVY_REFERENCE_DRAFT.md, 2.3).
+# factors are binary fractions; D-038 now also accepts slightly rounded
+# boundary products such as 5 * 2.9.
 A, Q, D = 2.5, 3.7e3, 1.3e2
 
 
@@ -372,11 +371,6 @@ def test_range_boundary_accepted(a, b):
         (5.0 * (1 + 2**-50), 1.0),
         (1.0, 5.000001),
         (1.0, 0.19999),
-        # Decimal intention 0.2, float ratio below 1/5 (0.6 < 3/5 as floats): rejected
-        # by the exact check; the 4u band of D-037 is not carried over (draft, 2.3).
-        (3.0, 0.6),
-        # b = 5 * a computed in floats rounds above 5 a for a = 2.9 (same remark).
-        (2.9, 5 * 2.9),
     ],
 )
 def test_range_outside_rejected(a, b):
@@ -421,4 +415,11 @@ def test_levy_module_imports_neither_kkvim_nor_other_references():
         elif isinstance(node, ast.ImportFrom):
             assert node.level == 0, "relative import in levy.py"
             imported.add(node.module.split(".")[0])
-    assert imported <= {"math", "fractions", "typing", "numpy"}
+    assert imported <= {"math", "typing", "numpy", "kkvim_reference"}
+    assert "kkvim_reference._r3_range" in {
+        node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+    }
+    assert not any(
+        node.module in {"kkvim_reference.navier", "kkvim_reference.parseval_recursion"}
+        for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+    )

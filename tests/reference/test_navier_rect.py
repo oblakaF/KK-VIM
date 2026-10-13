@@ -329,9 +329,9 @@ def test_integral_and_energy_axis_exchange(r):
 
 
 # Representation tolerance of the input ratio (owner's decision of 2026-10-14):
-# 0.2 (1 - 4u) <= b/a <= 5 (1 + 4u), u = 2^-53, on the exact ratio of the given floats.
-RATIO_LOW = Fraction(1, 5) * (1 - 4 * Fraction(1, 2**53))
+# D-038 symmetric band: 1/[5(1+4u)] <= b/a <= 5(1+4u), original floats.
 RATIO_HIGH = 5 * (1 + 4 * Fraction(1, 2**53))
+RATIO_LOW = 1 / RATIO_HIGH
 
 
 def ulps(x, k):
@@ -466,7 +466,7 @@ def test_navier_module_imports_only_math_dataclasses_numpy():
             modules.update(alias.name.split(".")[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             modules.add(node.module.split(".")[0])
-    assert modules <= {"math", "dataclasses", "numpy"}
+    assert modules <= {"math", "dataclasses", "numpy", "kkvim_reference"}
 
 
 # --- control checks at M = M_R3 = 2559 (few points, small grids) ---------------------------------

@@ -103,6 +103,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from kkvim_reference._r3_range import check_r3_ratio
 from kkvim_reference.sine_halfstep import SineHalfStep, _sin_pi_ratio
 
 __all__ = [
@@ -170,16 +171,8 @@ R3_RATIO_MAX = 5.0
 
 
 def _check_r3_ratio(a, b):
-    """0.2 <= b / a <= 5 exactly for the given floats (integer arithmetic), else ERROR_INPUT."""
-    p, q = float(b).as_integer_ratio()
-    s, t = float(a).as_integer_ratio()
-    # b / a = (p t) / (q s) with positive integers
-    left, right = p * t, q * s
-    if not (right <= 5 * left and left <= 5 * right):
-        raise ValueError(
-            f"ERROR_INPUT: b / a = {b / a!r} is outside the approved range 0.2 <= b/a <= 5 of R3 "
-            "(D-036, Р-1); checked exactly, without the Navier representation tolerance of D-037"
-        )
+    """Shared D-038 aspect-ratio check on the original float lengths."""
+    check_r3_ratio(a, b)
 
 
 @dataclass(frozen=True)
@@ -640,7 +633,7 @@ class ParsevalRecursion:
         return np.array([step.value(float(v)) for v in xi])
 
     def centre_value(self, s):
-        """w_s(a/2, a/2): the node i = j = 1 of the grid nx = ny = 2."""
+        """w_s(a/2, b/2): the node i = j = 1 of the grid nx = ny = 2."""
         return float(self.field_on_grid(s, 2, 2, i=[1], j=[1])[0, 0])
 
     def field_change(self, s, nx, ny):
