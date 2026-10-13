@@ -86,22 +86,42 @@ def test_svg_figures_are_valid_xml(tmp_path):
         assert ET.parse(tmp_path / name).getroot().tag.endswith("svg")
 
 
-def test_continuous_energy_uses_series_integrals():
+def test_own_recursion_matches_reference_within_budgets():
     from kkvim_reference.parseval_recursion import ParsevalRecursion
 
-    rec = ParsevalRecursion(a=1.0, q=1.0, D=1.0)
-    cont = study.continuous_energy(rec)
-    # int Y1 = F(G2)/q and int X2 = F(G3)/q by Parseval (NUMERICAL_SPEC.md 15.2): an independent path
-    int_y1, int_x2 = rec.coefficients(2).F, rec.coefficients(3).F
-    assert cont[1]["pi"] == pytest.approx(-0.5 * (2 / math.pi) * int_y1, rel=1e-13, abs=0)
-    assert cont[2]["pi"] == pytest.approx(-0.5 * int_x2 * int_y1, rel=1e-13, abs=0)
-    assert all(cont[s]["pi"] < 0 and cont[s]["pi_bound"] < 1e-15 for s in (1, 2, 3))
+    rec = ParsevalRecursion(a=1.0, q=1.0, D=1.0, s_max=7)
+    own = study.own_recursion(7)
+    for s in range(1, 8):
+        budget, energy = rec.halfstep(s).budget, rec.energy(s)
+        for x, y in zip(rec.coefficients(s).invariants(), own[s]["invariants"]):
+            assert abs(x - y) <= budget.invariant_error * abs(y)
+        assert abs(rec.centre_value(s) - own[s]["centre"]) <= budget.field_error * abs(own[s]["centre"])
+        assert abs(energy.energy - own[s]["energy"]) <= energy.error * abs(own[s]["energy"])
+
+
+def test_russian_number_format():
+    assert study.ru(0.0040623526607, 11) == "0,0040623526607"
+    assert study.ru(-1.0281e-3, 5) == "−0,0010281"
+    assert study.ru(5.301e-6) == "5,301·10⁻⁶"
+    assert study.ru(1350.0, 3) == "1,35·10³"
+    assert study.signed(2.4e-10, 2) == "+2,4·10⁻¹⁰" and study.ru(None) == "—" and study.ru("") == "—"
+    assert study.md_table(["max|x|"], [("a|b",)]).splitlines()[0] == "| max\|x\| |"
+
+
+def test_report_tables_are_generated_from_the_committed_csv():
+    """The AUTO blocks of docs/R2_ACCURACY_STUDY.md equal the tables built from docs/results/r2/*.csv."""
+    root = SCRIPT.parents[1]
+    generated = study.report_blocks(root / "docs" / "results" / "r2")
+    in_report = study.report_block_contents(root / "docs" / "R2_ACCURACY_STUDY.md")
+    assert set(generated) == set(in_report)
+    for name, block in generated.items():
+        assert in_report[name] == block, name
 
 
 def test_pipeline_on_small_grids(tmp_path):
-    study.run_study(tmp_path, grids=(20, 40), diagnostic_grid=None)
+    study.run_study(tmp_path, grids=(20, 40), diagnostic_grid=None, report=None)
     expected = {"deflection_errors.csv", "quarters.csv", "halfsteps_n160_n320.csv", "grid_convergence.csv", "richardson.csv",
-                "energy_discrete.csv", "energy_continuous_sa.csv", "energy_extrapolation.csv", "error_decomposition.csv",
+                "energy_discrete.csv", "sa_states.csv", "parseval_extended.csv", "energy_extrapolation.csv", "error_decomposition.csv",
                 "asymmetry.csv", "navier_reference.csv", "stopping.csv", "metadata.json", "tables.md", "centre_vs_s.svg",
                 "delta_c_vs_s.svg", "errors_vs_h.svg", "energy_vs_h.svg", "difference_field_stop.svg"}
     assert expected <= {p.name for p in tmp_path.iterdir()}
@@ -115,3 +135,8 @@ def test_pipeline_on_small_grids(tmp_path):
         dc = (float(r["w_h_centre"]) - float(r["w_N_centre"])) / float(r["w_N_centre"])
         # CSV keeps 12 significant digits: the recomputed delta_c (~1e-3) carries ~1e-9 relative rounding
         assert abs(dc - float(r["delta_c"])) <= 1e-8 * max(abs(dc), 1e-12)
+    blocks = study.report_blocks(tmp_path)  # report tables can be built from the CSV of any run
+    assert {"key_results", "decomposition", "sa_states", "parseval_extended"} <= set(blocks)
+    with open(tmp_path / "sa_states.csv", encoding="utf-8") as f:
+        sa = list(csv.DictReader(f))
+    assert [r["s"] for r in sa] == ["1", "2", "3", "4", "stop"] and sa[-1]["s_actual"] == "7"

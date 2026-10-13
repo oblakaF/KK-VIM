@@ -14,9 +14,10 @@
     320
   ],
   "diagnostic_grid": 640,
+  "recursion_s_max": 10,
   "python": "3.13.15",
   "numpy": "2.5.4",
-  "source_sha256": "dd02e68f9577af5af68a6f3d278020cb93ddfcfa4f5ea3aa346d38e7c83ff68e",
+  "source_sha256": "e635575113ab48ab7f9be8c448efb64eff3fdcf81f2ed284cfbca599a8865b27",
   "stop_status": {
     "20": [
       "CONVERGED",

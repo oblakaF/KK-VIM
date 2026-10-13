@@ -9,9 +9,15 @@ Reproduction (from the repository root):
 
     uv run python scripts/r2_accuracy_study.py
 
-writes compact CSV tables, generated Markdown tables and SVG figures to docs/results/r2/.
-Option --grids selects the main grids (default 20 40 80 160 320); --diagnostic-grid the additional
-grid (default 640, 0 to skip); --out the output directory.
+writes compact CSV tables, generated Markdown tables and SVG figures to docs/results/r2/ and regenerates
+the AUTO blocks of docs/R2_ACCURACY_STUDY.md from those CSV files (the report's numerical tables have no
+other source). Option --grids selects the main grids (default 20 40 80 160 320); --diagnostic-grid the
+additional grid (default 640, 0 to skip); --out the output directory; --report the report ('' to skip).
+
+The semi-analytic sequence (Parseval recursion) is used for every studied state s = 1, 2, 3, 4 and the
+actual stopping half-step of the controller; it is an independent computation without the spatial
+finite-difference approximation, but it has its own truncation and error accumulation (budgets
+reported); it is not the limit of the sequence for s -> infinity.
 
 Dimensionless case a = D = q = 1, so w = w_bar = w D / (q a^4) and Pi is in q^2 a^6 / D.
 """
@@ -22,6 +28,7 @@ import hashlib
 import json
 import math
 import platform
+import re
 import sys
 from pathlib import Path
 
@@ -35,8 +42,6 @@ A = D = Q = 1.0
 NU = 0.3
 MAIN_GRIDS = (20, 40, 80, 160, 320)
 DIAGNOSTIC_GRID = 640
-S_FIXED = (1, 2, 3, 4)
-S_REFERENCE = (1, 2, 3)  # semi-analytic recursion is implemented for s <= 3
 P_WINDOW = (1.9, 2.1)  # NUMERICAL_SPEC.md 12: Richardson only if the observed p is in this window
 QUARTERS = ((1, 4, 1, 4), (1, 4, 1, 2), (1, 2, 1, 4))  # (x numerator, denominator, y numerator, denominator)
 
@@ -245,6 +250,9 @@ def svg_heatmap(path, field, *, title, stride, width=560, height=520):
 # Computation
 # ---------------------------------------------------------------------------------------------------
 
+STATES = ("1", "2", "3", "4", "stop")  # half-step states of the study; "stop" = actual s of the controller
+S_EXTENDED = 10  # half-steps of the extended recursion shown in the qualification table
+
 
 def source_digest(root):
     """SHA-256 of the sources used (kkvim, kkvim_reference, this script): identifies the code version."""
@@ -256,52 +264,66 @@ def source_digest(root):
     return h.hexdigest()
 
 
+def s_of(entry, state):
+    """Actual half-step number of a state on a grid (the controller's s for "stop")."""
+    return entry["run"].s if state == "stop" else int(state)
+
+
 def compute(grids, diagnostic_grid):
     all_grids = tuple(grids) + ((diagnostic_grid,) if diagnostic_grid else ())
     navier = NavierPlate(a=A, q=Q, D=D, nu=NU)
-    recursion = ParsevalRecursion(a=A, q=Q, D=D)
+    runs = {n: run_until_stopped(A, D, Q, n, n) for n in all_grids}
+    s_max = max([4] + [run.s for run in runs.values()])
+    recursion = ParsevalRecursion(a=A, q=Q, D=D, s_max=max(s_max, S_EXTENDED))
     data = {}
     for n in all_grids:
-        run = run_until_stopped(A, D, Q, n, n)
-        fields = {s: run.history.field(s) for s in range(1, run.s + 1)}
+        run = runs[n]
         reference = navier.at_nodes(n, n, M=M_R2, diagnostics=False)
         data[n] = {
             "run": run,
-            "fields": fields,
+            "fields": {s: run.history.field(s) for s in range(1, run.s + 1)},
             "w_N": reference.w_coef,
             "w_N_rounding": reference.rounding_w,
-            "w_SA": {s: recursion.field_on_grid(s, n, n) for s in S_REFERENCE},
+            "w_SA": {s: recursion.field_on_grid(s, n, n) for s in range(1, max(4, run.s) + 1)},
             "weights": trapezoid_weights(n, n),
         }
     return data, navier, recursion
 
 
-def label(s, n_stop):
-    return "stop" if s == "stop" else str(s)
+def field_of(entry, state):
+    return entry["fields"][s_of(entry, state)]
 
 
-def field_of(entry, s):
-    return entry["fields"][entry["run"].s] if s == "stop" else entry["fields"][s]
+def sa_of(entry, state):
+    return entry["w_SA"][s_of(entry, state)]
 
 
-def continuous_energy(recursion):
-    """Pi(w_SA(s)) = -q/2 (int X)(int Y) from the sine series (MATH_SPEC.md 7.4, В-23), with truncation bounds."""
-    two_over_pi = 2.0 / math.pi
-    integrals, bounds = {0: two_over_pi * recursion.x0_scale}, {0: 0.0}
-    for s in S_REFERENCE:
-        record = recursion.halfstep(s)
-        step = record.step
-        terms = [c * 2.0 / (m * math.pi) for m, c in zip(range(1, step.M + 1, 2), step.coefficients())]
-        integrals[s] = math.fsum(terms)
-        bounds[s] = parseval_tails(record.coefficients, D=D, ell=A, q=Q, M=step.M)[4] / abs(Q)
+M_OWN = 4001  # truncation of the QA cross-check recursion (independent of the rule И-12 of the Reference)
+
+
+def own_recursion(s_max, M=M_OWN):
+    """QA cross-check: the semi-analytic sequence written here from NUMERICAL_SPEC.md 15.1-15.3 (ChV-17 .. ChV-19).
+
+    c_m = 4F / (D m pi (A lam^4 + 2B lam^2 + C)), odd m; next A, B, C, F by Parseval; integral 2 sum c_m/lam_m.
+    Returns per s: invariants of G_s, centre value of w_s and Pi_s = -q/2 I_X I_Y. Different organisation
+    (NumPy arrays, fixed M) from the Reference; no Reference values are used.
+    """
+    m = np.arange(1, M + 1, 2, dtype=float)
+    lam = m * math.pi / A
+    sign = np.where(np.arange(m.size) % 2 == 0, 1.0, -1.0)  # sin(m pi / 2)
+    G = (A / 2, math.pi**2 / (2 * A), math.pi**4 / (2 * A**3), 2 * Q * A / math.pi)
+    centre = {0: 1.0}
+    integral = {0: 2 * A / math.pi}
     out = {}
-    for s in S_REFERENCE:
+    for s in range(1, s_max + 1):
+        a_, b_, c_, f_ = G
+        coef = 4 * f_ / (D * m * math.pi * (a_ * lam**4 + 2 * b_ * lam**2 + c_))
+        centre[s] = math.fsum(coef * sign)
+        integral[s] = 2 * math.fsum(coef / lam)
         ix, iy = (s if s % 2 == 0 else s - 1), (s if s % 2 == 1 else s - 1)
-        IX, IY = integrals[ix], integrals[iy]
-        product = IX * IY
-        bound = abs(IX) * bounds[iy] + abs(IY) * bounds[ix] + bounds[ix] * bounds[iy]
-        out[s] = {"pi": -0.5 * Q * product, "pi_bound": 0.5 * abs(Q) * bound,
-                  "field_error_budget": recursion.halfstep(s).budget.field_error, "M": recursion.halfstep(s).budget.M}
+        out[s] = {"invariants": (b_ / a_, c_ / a_, f_ * f_ / a_), "centre": centre[ix] * centre[iy],
+                  "energy": -0.5 * Q * integral[ix] * integral[iy]}
+        G = (A / 2 * math.fsum(coef**2), A / 2 * math.fsum(lam**2 * coef**2), A / 2 * math.fsum(lam**4 * coef**2), 2 * Q * math.fsum(coef / lam))
     return out
 
 
@@ -314,6 +336,8 @@ def write_csv(path, header, rows):
 
 
 def _cell(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
     if isinstance(v, float):
         if not math.isfinite(v):
             return "nan"
@@ -323,10 +347,20 @@ def _cell(v):
     return str(v)
 
 
+def read_csv(path):
+    with open(path, encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def _escape_cell(text):
+    """A literal '|' inside a Markdown table cell must be escaped."""
+    return str(text).replace("|", "\\|")
+
+
 def md_table(header, rows):
-    lines = ["| " + " | ".join(header) + " |", "|" + "|".join("---" for _ in header) + "|"]
+    lines = ["| " + " | ".join(_escape_cell(h) for h in header) + " |", "|" + "|".join("---" for _ in header) + "|"]
     for row in rows:
-        lines.append("| " + " | ".join(_md(v) for v in row) + " |")
+        lines.append("| " + " | ".join(_escape_cell(_md(v)) for v in row) + " |")
     return "\n".join(lines)
 
 
@@ -342,27 +376,72 @@ def _md(v):
     return str(v)
 
 
-def run_study(out_dir, grids=MAIN_GRIDS, diagnostic_grid=DIAGNOSTIC_GRID):
+_SUP = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
+
+
+def ru(v, digits=4):
+    """Number for the Russian report: decimal comma, Unicode minus, a·10ⁿ for small/large values."""
+    if v is None or v == "":
+        return "—"
+    v = float(v)
+    if not math.isfinite(v):
+        return "—"
+    if v == 0.0:
+        return "0"
+    sign = "−" if v < 0 else ""
+    a = abs(v)
+    e = math.floor(math.log10(a))
+    if -3 <= e <= 0:
+        text = f"{a:.{max(digits - 1 - e, 0)}f}"
+        return sign + text.replace(".", ",")
+    mant = a / 10.0**e
+    text = f"{mant:.{digits - 1}f}"
+    if text.startswith("10"):
+        e += 1
+        text = f"{a / 10.0**e:.{digits - 1}f}"
+    return f"{sign}{text.replace('.', ',')}·10{str(e).translate(_SUP)}"
+
+
+def signed(v, digits=4):
+    s = ru(v, digits)
+    return s if s.startswith("−") or s in ("0", "—") else "+" + s
+
+
+# ---------------------------------------------------------------------------------------------------
+# Study
+# ---------------------------------------------------------------------------------------------------
+
+
+def run_study(out_dir, grids=MAIN_GRIDS, diagnostic_grid=DIAGNOSTIC_GRID, report=None):
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     root = Path(__file__).resolve().parents[1]
     data, navier, recursion = compute(grids, diagnostic_grid)
     all_grids = tuple(grids) + ((diagnostic_grid,) if diagnostic_grid else ())
-    labels = list(S_FIXED) + ["stop"]
+    finest = max(grids)
     md = []
 
     # --- Navier reference accuracy -------------------------------------------------------------
     integral = navier.deflection_integral(M=M_R2)
     pi_N, pi_N_bound = integral.Pi_M, integral.Pi_tail_bound
-    finest = max(grids)
-    stop_diff_abs = float(np.max(np.abs(field_of(data[finest], "stop") - data[finest]["w_N"])))
+    diffs = [(float(np.max(np.abs(field_of(data[n], st) - data[n]["w_N"]))), n, st) for n in all_grids for st in STATES]
+    smallest = min(diffs)
+    finest_stop = float(np.max(np.abs(field_of(data[finest], "stop") - data[finest]["w_N"])))
     navier_rows = [
-        ("M", M_R2), ("w_N centre (n = %d)" % finest, float(data[finest]["w_N"][finest // 2, finest // 2])),
-        ("strict truncation bound 8.2, uniform", deflection_tail_bound(M_R2)), ("delta_w", DELTA_W),
-        ("first-order rounding bound of w_N at nodes", data[finest]["w_N_rounding"]),
-        ("smallest measured max|w_h - w_N| (stop, n = %d)" % finest, stop_diff_abs),
-        ("ratio bound / smallest measured difference", deflection_tail_bound(M_R2) / stop_diff_abs),
-        ("Pi_N = Pi_M (M = 1279)", pi_N), ("Pi_N truncation bound", pi_N_bound), ("J_M", integral.J_M),
+        ("M", M_R2),
+        ("w_N_centre", float(data[finest]["w_N"][finest // 2, finest // 2])),
+        ("strict_truncation_bound_8_2_uniform", deflection_tail_bound(M_R2)),
+        ("delta_w", DELTA_W),
+        ("first_order_rounding_bound_w_N_nodes", data[finest]["w_N_rounding"]),
+        ("smallest_max_abs_diff_all_grids_states", smallest[0]),
+        ("smallest_at_grid", smallest[1]),
+        ("smallest_at_state", smallest[2]),
+        ("max_abs_diff_stop_finest_main_grid", finest_stop),
+        ("finest_main_grid", finest),
+        ("ratio_bound_to_smallest", deflection_tail_bound(M_R2) / smallest[0]),
+        ("Pi_N", pi_N),
+        ("Pi_N_truncation_bound", pi_N_bound),
+        ("J_M", integral.J_M),
     ]
     write_csv(out / "navier_reference.csv", ["quantity", "value"], navier_rows)
     md.append("### Эталон Навье\n\n" + md_table(["Величина", "Значение"], navier_rows))
@@ -371,25 +450,61 @@ def run_study(out_dir, grids=MAIN_GRIDS, diagnostic_grid=DIAGNOSTIC_GRID):
     rows, quarter_rows = [], []
     for n in all_grids:
         e = data[n]
-        for s in labels:
-            w, wN = field_of(e, s), e["w_N"]
+        for st in STATES:
+            w, wN = field_of(e, st), e["w_N"]
             c = n // 2
             value, xm, ym = max_abs_difference(w, wN)
-            s_actual = e["run"].s if s == "stop" else s
-            rows.append((n, label(s, None), s_actual, s_actual // 2, float(w[c, c]), float(wN[c, c]), float(delta_centre(w, wN)),
+            s = s_of(e, st)
+            rows.append((n, st, s, s // 2, float(w[c, c]), float(wN[c, c]), float(delta_centre(w, wN)),
                          error_inf(w, wN), error_l2(w, wN, e["weights"]), value, xm, ym, "diagnostic" if n == diagnostic_grid else "main"))
             for xn, xd, yn, yd in QUARTERS:
                 i, j = n * xn // xd, n * yn // yd
-                quarter_rows.append((n, label(s, None), f"({xn}/{xd}, {yn}/{yd})", float(w[i, j]), float(wN[i, j]),
-                                     float((w[i, j] - wN[i, j]) / wN[i, j])))
-    header = ["n", "s", "s_actual", "k", "w_h_centre", "w_N_centre", "delta_c", "E_inf", "E_2", "max_abs_diff", "x_at_max", "y_at_max", "grid"]
-    write_csv(out / "deflection_errors.csv", header, rows)
+                quarter_rows.append((n, st, f"({xn}/{xd}, {yn}/{yd})", float(w[i, j]), float(wN[i, j]), float((w[i, j] - wN[i, j]) / wN[i, j])))
+    write_csv(out / "deflection_errors.csv",
+              ["n", "s", "s_actual", "k", "w_h_centre", "w_N_centre", "delta_c", "E_inf", "E_2", "max_abs_diff", "x_at_max", "y_at_max", "grid"], rows)
     write_csv(out / "quarters.csv", ["n", "s", "point", "w_h", "w_N", "relative_deviation"], quarter_rows)
-    md.append("### Отличие прогиба от Навье (центр, E_inf, E_2)\n\n" + md_table(
+    md.append("### Отличие прогиба от Навье\n\n" + md_table(
         ["n", "s", "s факт.", "k", "w_h(центр)", "δ_c", "E_∞", "E_2", "max|w_h−w_N|", "(x, y) max"],
         [(r[0], r[1], r[2], r[3], r[4], r[6], r[7], r[8], r[9], f"({r[10]:.4f}, {r[11]:.4f})") for r in rows]))
-    md.append("### Четверти (n = %d)\n\n" % finest + md_table(
-        ["s", "точка", "w_h", "w_N", "относит. откл."], [(r[1], r[2], r[3], r[4], r[5]) for r in quarter_rows if r[0] == finest]))
+
+    # --- semi-analytic states (no grid; values at the nodes of the finest main grid) ---------------
+    sa_rows = []
+    e_f = data[finest]
+    own = own_recursion(max(S_EXTENDED, recursion.s_max))
+    for st in STATES:
+        s = s_of(e_f, st)
+        wsa, wN = sa_of(e_f, st), e_f["w_N"]
+        c = finest // 2
+        en = recursion.energy(s)
+        budget = recursion.halfstep(s).budget
+        e_sa = energy_error(en.energy, pi_N)
+        e_sa_unc = (abs(en.energy) * en.error + pi_N_bound) / abs(pi_N)
+        sa_rows.append((st, s, s // 2, float(wsa[c, c]), float(delta_centre(wsa, wN)), error_inf(wsa, wN),
+                        error_l2(wsa, wN, e_f["weights"]), en.energy, e_sa, e_sa_unc, budget.field_error,
+                        abs(own[s]["energy"] - en.energy) / abs(en.energy), budget.M))
+    write_csv(out / "sa_states.csv",
+              ["s", "s_actual", "k", "w_SA_centre", "delta_c_SA", "E_inf_SA", "E_2_SA", "Pi_SA", "e_SA", "e_SA_uncertainty",
+               "SA_field_error_budget", "own_recursion_energy_rel", "M"], sa_rows)
+
+    # --- extended recursion: budgets, energy and change identity (В-24) ------------------------------
+    ext_rows = []
+    for s in range(1, S_EXTENDED + 1):
+        h, b, en = recursion.halfstep(s), recursion.halfstep(s).budget, recursion.energy(s)
+        resolved = None if s == 1 else bool(en.change_rel > en.change_rel_error)
+        inv_ref = recursion.coefficients(s).invariants()
+        d_inv = max(abs(x - y) / abs(y) for x, y in zip(inv_ref, own[s]["invariants"]))
+        d_centre = abs(recursion.centre_value(s) - own[s]["centre"]) / abs(own[s]["centre"])
+        d_energy = abs(en.energy - own[s]["energy"]) / abs(own[s]["energy"])
+        within = bool(d_inv <= b.invariant_error and d_centre <= b.field_error and d_energy <= en.error)
+        ext_rows.append((s, h.k, h.variable, b.M, b.M_rule, b.input_error, b.coefficient_error, b.field_error, b.invariant_error,
+                         b.integral_error, en.error, b.valid, en.energy, (en.energy_full - en.energy) / abs(en.energy),
+                         None if s == 1 else -en.delta, None if s == 1 else 0.5 * en.change_norm2,
+                         en.change_rel, en.change_rel_error, resolved, d_inv, d_centre, d_energy, within))
+    write_csv(out / "parseval_extended.csv",
+              ["s", "k", "variable", "M", "M_rule", "rho", "r_c", "field_error", "invariant_error", "integral_error", "energy_error",
+               "budget_valid", "Pi_s", "Pi_full_minus_Pi_rel", "Pi_prev_minus_Pi_by_subtraction", "half_change_norm2",
+               "change_rel", "change_rel_error_bound", "change_resolved", "own_invariants_rel", "own_centre_rel", "own_energy_rel",
+               "own_within_budgets"], ext_rows)
 
     # --- behaviour over half-steps (n = 160, 320) --------------------------------------------------
     step_rows = []
@@ -399,94 +514,68 @@ def run_study(out_dir, grids=MAIN_GRIDS, diagnostic_grid=DIAGNOSTIC_GRID):
         changes = {ch.s: ch for ch in run.changes}
         for s in range(1, run.s + 1):
             w, wN = e["fields"][s], e["w_N"]
-            ch = changes.get(s)
-            chk = run.energy_checks[s - 1]
-            prev_centre = e["fields"][s - 1][n // 2, n // 2] if s > 1 else None
-            step_rows.append((n, s, s // 2, float(w[n // 2, n // 2]),
-                              None if prev_centre is None else float(w[n // 2, n // 2] - prev_centre),
-                              float(delta_centre(w, wN)), error_inf(w, wN), error_l2(w, wN, e["weights"]),
-                              None if ch is None else ch.eps_inf, None if ch is None else ch.eps_E,
-                              None if ch is None else ch.theta, chk.P_now, chk.status))
+            ch, chk = changes.get(s), run.energy_checks[s - 1]
+            prev = e["fields"][s - 1][n // 2, n // 2] if s > 1 else None
+            wsa = e["w_SA"][s]
+            step_rows.append((n, s, s // 2, float(w[n // 2, n // 2]), None if prev is None else float(w[n // 2, n // 2] - prev),
+                              float(delta_centre(w, wN)), float(delta_centre(wsa, wN)), error_inf(w, wN), error_l2(w, wN, e["weights"]),
+                              None if ch is None else ch.eps_inf, None if ch is None else ch.eps_E, None if ch is None else ch.theta,
+                              chk.P_now, chk.status))
     write_csv(out / "halfsteps_n160_n320.csv",
-              ["n", "s", "k", "w_h_centre", "centre_change", "delta_c", "E_inf", "E_2", "eps_inf", "eps_E", "theta", "Pi_h", "energy_status"], step_rows)
-    md.append("### По полушагам (n = 160, 320; остановка — последняя строка каждой сетки)\n\n" + md_table(
-        ["n", "s", "k", "w_h(центр)", "Δ центра", "δ_c", "E_∞", "E_2", "ε_∞", "ε_E", "θ", "Π_h", "энерг. статус"], step_rows))
+              ["n", "s", "k", "w_h_centre", "centre_change", "delta_c", "delta_c_SA", "E_inf", "E_2", "eps_inf", "eps_E", "theta",
+               "Pi_h", "energy_status"], step_rows)
     status_rows = [(n, data[n]["run"].s, data[n]["run"].s // 2, data[n]["run"].status) for n in all_grids]
     write_csv(out / "stopping.csv", ["n", "s_stop", "k_stop", "status"], status_rows)
 
     # --- grid convergence and Richardson --------------------------------------------------------------
     conv_rows, re_rows = [], []
-    for s in labels:
+    for st in STATES:
         for idx, n in enumerate(all_grids[:-1]):
             n2 = all_grids[idx + 1]
             if n2 != 2 * n:
                 continue
-            w_n, w_2n = field_of(data[n], s), field_of(data[n2], s)
+            w_n, w_2n = field_of(data[n], st), field_of(data[n2], st)
             e_disc = grid_difference(w_n, w_2n)
-            n4 = 4 * n
-            p_self = self_convergence_order(w_n, w_2n, field_of(data[n4], s)) if n4 in data else None
-            p_ref = None
-            if s in S_REFERENCE:
-                e_n = error_inf(w_n, data[n]["w_SA"][s])
-                e_2n = error_inf(w_2n, data[n2]["w_SA"][s])
-                p_ref = observed_order(e_n, e_2n)
-            p_used = p_ref if s in S_REFERENCE else p_self
-            applicable = in_window(p_used)
-            conv_rows.append((label(s, None), n, n2, e_disc, p_self, p_ref, "reference" if s in S_REFERENCE else "self-convergence",
-                              p_used, applicable))
+            p_self = self_convergence_order(w_n, w_2n, field_of(data[4 * n], st)) if 4 * n in data else None
+            p_ref = observed_order(error_inf(w_n, sa_of(data[n], st)), error_inf(w_2n, sa_of(data[n2], st)))
+            applicable = in_window(p_ref)
+            conv_rows.append((st, n, n2, e_disc, p_self, p_ref, applicable))
             if applicable:
                 w_re = richardson(w_n, w_2n)
-                wN = data[n]["w_N"]
+                wN, wsa = data[n]["w_N"], sa_of(data[n], st)
                 c = n // 2
-                re_rows.append((label(s, None), n, n2, float(w_2n[n2 // 2, n2 // 2]), float(w_re[c, c]), float(wN[c, c]),
-                                float(delta_centre(w_2n[::2, ::2], wN)), float(delta_centre(w_re, wN)),
-                                error_inf(w_2n[::2, ::2], wN), error_inf(w_re, wN)))
+                re_rows.append((st, n, n2, float(w_2n[n2 // 2, n2 // 2]), float(w_re[c, c]), float(wsa[c, c]), float(wN[c, c]),
+                                float(delta_centre(w_2n[::2, ::2], wN)), float(delta_centre(w_re, wN)), float(delta_centre(wsa, wN)),
+                                float((w_re[c, c] - wsa[c, c]) / wsa[c, c]), error_inf(w_re, wsa), error_inf(w_2n[::2, ::2], wN), error_inf(w_re, wN)))
     write_csv(out / "grid_convergence.csv",
-              ["s", "n", "2n", "E_disc_max_over_max_w_n", "p_self", "p_reference_s<=3", "p_basis", "p_used", "richardson_applicable"], conv_rows)
+              ["s", "n", "2n", "E_disc_max_over_max_w_n", "p_self", "p_against_SA", "richardson_applicable"], conv_rows)
     write_csv(out / "richardson.csv",
-              ["s", "n", "2n", "w_2n_centre", "w_RE_centre", "w_N_centre", "delta_c_2n", "delta_c_RE", "E_inf_2n_on_nodes_n", "E_inf_RE"], re_rows)
-    md.append("### Сеточная сходимость (E_disc = max по общим узлам |w_n − w_2n| / max|w_n|)\n\n" + md_table(
-        ["s", "n", "2n", "E_disc", "p (самосх.)", "p (по SA, s ≤ 3)", "основание p", "Ричардсон"],
-        [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], "да" if r[8] else "нет") for r in conv_rows]))
-    md.append("### Ричардсон при фиксированном s (только при p ∈ [1,9; 2,1])\n\n" + md_table(
-        ["s", "n", "2n", "w_2n(центр)", "w_RE(центр)", "w_N(центр)", "δ_c(2n)", "δ_c(RE)", "E_∞(2n)", "E_∞(RE)"], re_rows))
+              ["s", "n", "2n", "w_2n_centre", "w_RE_centre", "w_SA_centre", "w_N_centre", "delta_c_2n", "delta_c_RE", "delta_c_SA",
+               "RE_minus_SA_centre_rel", "E_inf_RE_vs_SA", "E_inf_2n_on_nodes_n", "E_inf_RE"], re_rows)
 
     # --- energy -------------------------------------------------------------------------------------
-    cont = continuous_energy(recursion)
     energy_rows = []
     for n in all_grids:
         run = data[n]["run"]
-        for s in labels:
-            s_actual = run.s if s == "stop" else s
-            pi_h = run.energy_checks[s_actual - 1].P_now
-            energy_rows.append((n, label(s, None), s_actual, pi_h, energy_error(pi_h, pi_N)))
+        for st in STATES:
+            s = s_of(data[n], st)
+            pi_h = run.energy_checks[s - 1].P_now
+            energy_rows.append((n, st, s, pi_h, energy_error(pi_h, pi_N)))
     write_csv(out / "energy_discrete.csv", ["n", "s", "s_actual", "Pi_h", "e_h"], energy_rows)
-    cont_rows = [(s, cont[s]["pi"], cont[s]["pi_bound"], energy_error(cont[s]["pi"], pi_N),
-                  (cont[s]["pi_bound"] + pi_N_bound) / abs(pi_N), cont[s]["field_error_budget"], cont[s]["M"]) for s in S_REFERENCE]
-    write_csv(out / "energy_continuous_sa.csv",
-              ["s", "Pi_SA", "Pi_SA_truncation_bound", "e_SA", "e_SA_truncation_bound", "SA_field_error_budget", "M"], cont_rows)
-    # grid extrapolation of the discrete energy at fixed s (estimate only)
     energy_re_rows = []
     pi_by = {(r[0], r[1]): r[3] for r in energy_rows}
-    for s in labels:
-        ls = label(s, None)
+    e_sa_by = {r[0]: r[8] for r in sa_rows}
+    for st in STATES:
         for n in all_grids:
-            if (n * 2, ls) in pi_by and (n * 4, ls) in pi_by:
-                d1 = pi_by[(n, ls)] - pi_by[(2 * n, ls)]
-                d2 = pi_by[(2 * n, ls)] - pi_by[(4 * n, ls)]
-                p = math.log2(abs(d1 / d2)) if d2 != 0 and d1 / d2 > 0 else float("nan")
-                pi_re = (4 * pi_by[(2 * n, ls)] - pi_by[(n, ls)]) / 3
-                energy_re_rows.append((ls, n, 2 * n, p, in_window(p), pi_re if in_window(p) else None,
-                                       energy_error(pi_re, pi_N) if in_window(p) else None))
-    write_csv(out / "energy_extrapolation.csv", ["s", "n", "2n", "p_energy", "applicable", "Pi_RE", "e_RE"], energy_re_rows)
-    md.append(f"### Энергия\n\nΠ_N = {pi_N:.16e} (M = 1279), граница усечения Π_N: {pi_N_bound:.3e}.\n\n"
-              "Дискретная мера e_h = (Π_h(w_h) − Π_N)/|Π_N|:\n\n" + md_table(
-                  ["n"] + [f"s = {s}" for s in labels], [
-                      [n] + [next(r[4] for r in energy_rows if r[0] == n and r[1] == label(s, None)) for s in labels] for n in all_grids]))
-    md.append("Непрерывная мера по полуаналитической рекурсии, e_SA = (Π(w_SA) − Π_N)/|Π_N|:\n\n" + md_table(
-        ["s", "Π(w_SA)", "граница усечения Π(w_SA)", "e_SA", "граница усечения e_SA", "бюджет поля SA", "M"], cont_rows))
-    md.append("Экстраполяция дискретной энергии при фиксированном s (оценка, не непрерывный результат):\n\n" + md_table(
-        ["s", "n", "2n", "p", "применима", "Π_RE", "e_RE"], energy_re_rows))
+            if (2 * n, st) in pi_by and (4 * n, st) in pi_by:
+                d1 = pi_by[(n, st)] - pi_by[(2 * n, st)]
+                d2 = pi_by[(2 * n, st)] - pi_by[(4 * n, st)]
+                p = math.log2(d1 / d2) if d2 != 0 and d1 / d2 > 0 else float("nan")
+                ok = in_window(p)
+                pi_re = (4 * pi_by[(2 * n, st)] - pi_by[(n, st)]) / 3 if ok else None
+                e_re = energy_error(pi_re, pi_N) if ok else None
+                energy_re_rows.append((st, n, 2 * n, p, ok, pi_re, e_re, None if e_re is None else (e_re - e_sa_by[st]) / e_sa_by[st]))
+    write_csv(out / "energy_extrapolation.csv", ["s", "n", "2n", "p_energy", "applicable", "Pi_RE", "e_RE", "e_RE_minus_e_SA_rel"], energy_re_rows)
 
     # --- error decomposition (D-016) ------------------------------------------------------------------
     dec_rows = []
@@ -495,95 +584,232 @@ def run_study(out_dir, grids=MAIN_GRIDS, diagnostic_grid=DIAGNOSTIC_GRID):
         wN = e["w_N"]
         scale = float(np.max(np.abs(wN)))
         c = n // 2
-        for s in S_REFERENCE:
-            w, wsa = e["fields"][s], e["w_SA"][s]
-            disc, cont_part = w - wsa, wsa - wN
-            dec_rows.append((n, str(s), "exact (SA)", float(np.max(np.abs(disc)) / scale), float(np.max(np.abs(cont_part)) / scale),
-                             float(disc[c, c] / wN[c, c]), float(cont_part[c, c] / wN[c, c]), error_l2(w, wsa, e["weights"]),
-                             error_l2(wsa, wN, e["weights"]), float(np.max(np.abs((w - wN) - disc - cont_part)))))
-    for s in ["4", "stop"]:
-        sv = 4 if s == "4" else "stop"
-        for idx, n in enumerate(all_grids[:-1]):
-            if 2 * n not in data:
+        for st in STATES:
+            w, wsa = field_of(e, st), sa_of(e, st)
+            disc, cont = w - wsa, wsa - wN
+            dec_rows.append((n, st, s_of(e, st), "exact (SA)", float(np.max(np.abs(disc)) / scale), float(np.max(np.abs(cont)) / scale),
+                             float(disc[c, c] / wN[c, c]), float(cont[c, c] / wN[c, c]), error_l2(w, wsa, e["weights"]), error_l2(wsa, wN, e["weights"]),
+                             float(np.max(np.abs(cont)) / np.max(np.abs(disc)))))
+    for st in ("4", "stop"):
+        for n in all_grids:
+            if 2 * n not in data or not any(r[0] == st and r[1] == n and r[6] for r in conv_rows):
                 continue
-            ok = any(r[0] == s and r[1] == n and r[8] for r in conv_rows)
-            if not ok:
-                continue
-            w_n, w_re = field_of(data[n], sv), richardson(field_of(data[n], sv), field_of(data[2 * n], sv))
+            w_n = field_of(data[n], st)
+            w_re = richardson(w_n, field_of(data[2 * n], st))
             wN = data[n]["w_N"]
             scale = float(np.max(np.abs(wN)))
             c = n // 2
-            dec_rows.append((n, s, "estimate (Richardson)", float(np.max(np.abs(w_n - w_re)) / scale), float(np.max(np.abs(w_re - wN)) / scale),
-                             float((w_n - w_re)[c, c] / wN[c, c]), float((w_re - wN)[c, c] / wN[c, c]), error_l2(w_n, w_re, data[n]["weights"]),
-                             error_l2(w_re, wN, data[n]["weights"]), None))
+            dec_rows.append((n, st, s_of(data[n], st), "diagnostic (Richardson)", float(np.max(np.abs(w_n - w_re)) / scale),
+                             float(np.max(np.abs(w_re - wN)) / scale), float((w_n - w_re)[c, c] / wN[c, c]), float((w_re - wN)[c, c] / wN[c, c]),
+                             error_l2(w_n, w_re, data[n]["weights"]), error_l2(w_re, wN, data[n]["weights"]),
+                             float(np.max(np.abs(w_re - wN)) / np.max(np.abs(w_n - w_re)))))
     write_csv(out / "error_decomposition.csv",
-              ["n", "s", "basis", "disc_inf_over_max_wN", "cont_inf_over_max_wN", "disc_centre_rel", "cont_centre_rel",
-               "disc_L2_rel_to_SA_or_RE", "cont_L2_rel_to_wN", "bookkeeping_residual"], dec_rows)
-    md.append("### Разделение источников (D-016): w_h − w_N = (w_h − w_SA) + (w_SA − w_N)\n\n" + md_table(
-        ["n", "s", "основание", "дискр. max/max|w_N|", "непрер. max/max|w_N|", "дискр. центр", "непрер. центр"],
-        [r[:7] for r in dec_rows]))
+              ["n", "s", "s_actual", "basis", "disc_inf_over_max_wN", "cont_inf_over_max_wN", "disc_centre_rel", "cont_centre_rel",
+               "disc_L2_rel", "cont_L2_rel", "ratio_cont_to_disc"], dec_rows)
 
     # --- asymmetry ------------------------------------------------------------------------------------
-    asym_rows = [(n, label(s, None), asymmetry(field_of(data[n], s))) for n in all_grids for s in labels]
-    write_csv(out / "asymmetry.csv", ["n", "s", "A_sym"], asym_rows)
-    md.append("### Асимметрия x ↔ y, A_sym = max|w − wᵀ| / max|w|\n\n" + md_table(
-        ["n"] + [f"s = {s}" for s in labels], [[n] + [next(r[2] for r in asym_rows if r[0] == n and r[1] == label(s, None)) for s in labels] for n in all_grids]))
+    asym_rows = [(n, st, s_of(data[n], st), asymmetry(field_of(data[n], st)), asymmetry(sa_of(data[n], st))) for n in all_grids for st in STATES]
+    write_csv(out / "asymmetry.csv", ["n", "s", "s_actual", "A_sym", "A_sym_SA"], asym_rows)
 
     # --- figures ----------------------------------------------------------------------------------------
-    fig_series_c, fig_series_d = [], []
+    fig_c, fig_d = [], []
     for n in ([g for g in (80, 160, 320) if g in data] or list(grids)):
         run = data[n]["run"]
         ss = list(range(1, run.s + 1))
-        centres = [float(data[n]["fields"][s][n // 2, n // 2]) for s in ss]
-        fig_series_c.append((f"KK-VIM n = {n}", ss, centres, False))
-        fig_series_d.append((f"n = {n}", ss, [float(delta_centre(data[n]["fields"][s], data[n]["w_N"])) for s in ss], False))
+        fig_c.append((f"KK-VIM n = {n}", ss, [float(data[n]["fields"][s][n // 2, n // 2]) for s in ss], False))
+        fig_d.append((f"n = {n}", ss, [float(delta_centre(data[n]["fields"][s], data[n]["w_N"])) for s in ss], False))
+    ss = list(range(1, data[finest]["run"].s + 1))
+    fig_c.append(("semi-analytic (no grid)", ss, [float(data[finest]["w_SA"][s][finest // 2, finest // 2]) for s in ss], True))
+    fig_d.append(("semi-analytic (no grid)", ss, [float(delta_centre(data[finest]["w_SA"][s], data[finest]["w_N"])) for s in ss], True))
     wNc = float(data[finest]["w_N"][finest // 2, finest // 2])
-    svg_line_chart(out / "centre_vs_s.svg", fig_series_c, title="Centre deflection w_bar(1/2, 1/2) over half-steps",
+    svg_line_chart(out / "centre_vs_s.svg", fig_c, title="Centre deflection w_bar(1/2, 1/2) over half-steps",
                    xlabel="half-step s", ylabel="w D/(q a^4)", hlines=[("Navier, M = 1279", wNc)])
-    svg_line_chart(out / "delta_c_vs_s.svg", fig_series_d, title="Relative centre difference delta_c from Navier",
+    svg_line_chart(out / "delta_c_vs_s.svg", fig_d, title="Relative centre difference delta_c from Navier",
                    xlabel="half-step s", ylabel="delta_c", hlines=[("0", 0.0)])
-    err_series = []
-    for s in labels:
-        hs = [1.0 / n for n in grids]
-        err_series.append((f"E_inf, s = {label(s, None)}", hs, [next(r[7] for r in rows if r[0] == n and r[1] == label(s, None)) for n in grids], False))
-    for s in (1, "stop"):
-        hs = [1.0 / n for n in grids]
-        err_series.append((f"E_2, s = {label(s, None)}", hs, [next(r[8] for r in rows if r[0] == n and r[1] == label(s, None)) for n in grids], True))
+    hs = [1.0 / n for n in grids]
+    err_series = [(f"E_inf, s = {st}", hs, [next(r[7] for r in rows if r[0] == n and r[1] == st) for n in grids], False) for st in STATES]
+    err_series += [(f"E_2, s = {st}", hs, [next(r[8] for r in rows if r[0] == n and r[1] == st) for n in grids], True) for st in ("1", "stop")]
     svg_line_chart(out / "errors_vs_h.svg", err_series, title="Differences from Navier against the grid step",
                    xlabel="h / a", ylabel="relative difference", xlog=True, ylog=True)
-    en_series = []
-    for s in labels:
-        hs = [1.0 / n for n in grids]
-        en_series.append((f"e_h, s = {label(s, None)}", hs, [next(r[4] for r in energy_rows if r[0] == n and r[1] == label(s, None)) for n in grids], False))
+    en_series = [(f"e_h, s = {st}", hs, [next(r[4] for r in energy_rows if r[0] == n and r[1] == st) for n in grids], False) for st in STATES]
     svg_line_chart(out / "energy_vs_h.svg", en_series, title="Discrete energy measure e_h = (Pi_h - Pi_N)/|Pi_N|",
-                   xlabel="h / a", ylabel="e_h", xlog=True,
-                   hlines=[(f"e_SA, s = {r[0]}", r[3]) for r in cont_rows])
+                   xlabel="h / a", ylabel="e_h", xlog=True, hlines=[(f"e_SA, s = {r[0]}", r[8]) for r in sa_rows if r[0] in ("1", "stop")])
     diff = field_of(data[finest], "stop") - data[finest]["w_N"]
-    svg_heatmap(out / "difference_field_stop.svg", diff, stride=max(1, finest // 40),
-                title=f"w_h - w_N after stopping, n = {finest} (every {max(1, finest // 40)}th node)")
+    stride = max(1, finest // 40)
+    svg_heatmap(out / "difference_field_stop.svg", diff, stride=stride,
+                title=f"w_h - w_N after stopping, n = {finest} (every {stride}th node)")
 
-    # --- metadata and Markdown tables ------------------------------------------------------------------
+    # --- metadata, full generated tables, report blocks ---------------------------------------------
     meta = {
         "case": {"a": A, "D": D, "q": Q, "nu_navier": NU, "M_navier": M_R2},
         "grids": list(grids), "diagnostic_grid": diagnostic_grid,
+        "recursion_s_max": recursion.s_max,
         "python": platform.python_version(), "numpy": np.__version__,
         "source_sha256": source_digest(root),
         "stop_status": {str(n): [data[n]["run"].status, data[n]["run"].s] for n in all_grids},
     }
     (out / "metadata.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    (out / "tables.md").write_text("# R2, группа B — сгенерированные таблицы\n\n"
-                                   "Сформировано `scripts/r2_accuracy_study.py`; не редактировать вручную.\n\n"
-                                   + "\n\n".join(md) + "\n", encoding="utf-8")
+    full = ["# R2, группа B — сгенерированные таблицы\n", "Сформировано `scripts/r2_accuracy_study.py` по CSV этого каталога; не редактировать вручную.\n"]
+    for name, block in report_blocks(out).items():
+        full.append(f"## {name}\n\n{block}\n")
+    (out / "tables.md").write_text("\n".join(full), encoding="utf-8")
+    if report is not None:
+        inject_report(report, report_blocks(out))
     return data
 
 
+# ---------------------------------------------------------------------------------------------------
+# Report blocks generated from the CSV files (the only source of the report's numbers)
+# ---------------------------------------------------------------------------------------------------
+
+
+def report_blocks(out_dir):
+    """Markdown blocks of the report, built only from the CSV files in out_dir."""
+    d = Path(out_dir)
+    nav = {r["quantity"]: r["value"] for r in read_csv(d / "navier_reference.csv")}
+    de = read_csv(d / "deflection_errors.csv")
+    qu = read_csv(d / "quarters.csv")
+    hs = read_csv(d / "halfsteps_n160_n320.csv")
+    sa = read_csv(d / "sa_states.csv")
+    ext = read_csv(d / "parseval_extended.csv")
+    conv = read_csv(d / "grid_convergence.csv")
+    rich = read_csv(d / "richardson.csv")
+    edis = read_csv(d / "energy_discrete.csv")
+    ere = read_csv(d / "energy_extrapolation.csv")
+    dec = read_csv(d / "error_decomposition.csv")
+    asy = read_csv(d / "asymmetry.csv")
+    stop = read_csv(d / "stopping.csv")
+    finest = nav["finest_main_grid"]
+    grids = [r["n"] for r in stop]
+    blocks = {}
+
+    blocks["stopping"] = md_table(["n", "s остановки", "k", "статус"], [(r["n"], r["s_stop"], r["k_stop"], r["status"]) for r in stop])
+
+    blocks["navier"] = md_table(["Величина", "Значение"], [
+        ("w_N(центр), M = 1279", ru(nav["w_N_centre"], 11)),
+        ("строгая равномерная граница усечения прогиба (NAVIER_REFERENCE_SPEC, 8.2)", ru(nav["strict_truncation_bound_8_2_uniform"]) + " ≤ δ_w = " + ru(nav["delta_w"], 3)),
+        ("модель округления w_N в узлах (первого порядка, не строгая)", ru(nav["first_order_rounding_bound_w_N_nodes"], 3)),
+        ("наименьшее max|w_h − w_N| среди всех сеток и состояний", f"{ru(nav['smallest_max_abs_diff_all_grids_states'])} (n = {nav['smallest_at_grid']}, s = {nav['smallest_at_state']})"),
+        (f"max|w_h − w_N| после остановки на n = {finest}", ru(nav["max_abs_diff_stop_finest_main_grid"])),
+        ("отношение границы эталона к наименьшему измеренному отличию", ru(nav["ratio_bound_to_smallest"], 2)),
+        ("Π_N = Π_M (M = 1279)", ru(nav["Pi_N"], 13) + "; граница усечения " + ru(nav["Pi_N_truncation_bound"], 4)),
+    ])
+
+    def de_row(r):
+        return (r["n"], r["s"], r["s_actual"], r["k"], ru(r["w_h_centre"], 9), signed(r["delta_c"], 5), ru(r["E_inf"], 5), ru(r["E_2"], 5),
+                ru(r["max_abs_diff"]), f"({ru(r['x_at_max'], 3)}; {ru(r['y_at_max'], 3)})")
+
+    head = ["n", "s", "s факт.", "k", "w_h(центр)", "δ_c", "E_∞", "E_2", "max|w_h − w_N|", "где (x/a; y/a)"]
+    blocks["deflection_finest"] = md_table(head, [de_row(r) for r in de if r["n"] == finest])
+    blocks["deflection_stop_all"] = md_table(head, [de_row(r) for r in de if r["s"] == "stop"])
+    blocks["quarters"] = md_table(["s", "точка", "w_h", "w_N", "относительное отклонение"],
+                                  [(r["s"], r["point"], ru(r["w_h"], 7), ru(r["w_N"], 7), signed(r["relative_deviation"], 4))
+                                   for r in qu if r["n"] == finest and r["s"] in ("1", "stop")])
+
+    blocks["halfsteps"] = md_table(
+        ["s", "k", "w_h(центр)", "Δ центра", "δ_c (МКР)", "δ_c (SA)", "E_∞", "ε_∞", "ε_E", "θ", "Π_h", "энерг. статус"],
+        [(r["s"], r["k"], ru(r["w_h_centre"], 11), signed(r["centre_change"], 3), signed(r["delta_c"], 5), signed(r["delta_c_SA"], 5),
+          ru(r["E_inf"], 5), ru(r["eps_inf"], 3), ru(r["eps_E"], 3), ru(r["theta"], 3), ru(r["Pi_h"], 7), r["energy_status"])
+         for r in hs if r["n"] == finest])
+
+    blocks["sa_states"] = md_table(
+        ["состояние", "s", "k", "w_SA(центр)", "δ_c^SA", "E_∞^SA", "E_2^SA", "бюджет поля SA"],
+        [(r["s"], r["s_actual"], r["k"], ru(r["w_SA_centre"], 11), signed(r["delta_c_SA"], 5), ru(r["E_inf_SA"], 5), ru(r["E_2_SA"], 5),
+          ru(r["SA_field_error_budget"], 2)) for r in sa])
+
+    blocks["parseval_extended"] = md_table(
+        ["s", "k", "полушаг", "M", "ρ_s", "бюджет поля", "бюджет инвариантов", "бюджет энергии", "Π_{s−1} − Π_s (вычитанием)",
+         "½‖w_s − w_{s−1}‖² (без вычитания)", "‖Δw‖/‖w‖", "граница ошибки ‖Δw‖/‖w‖", "изменение установлено"],
+        [(r["s"], r["k"], r["variable"], r["M"], ru(r["rho"], 2), ru(r["field_error"], 2), ru(r["invariant_error"], 2), ru(r["energy_error"], 2),
+          signed(r["Pi_prev_minus_Pi_by_subtraction"], 3), ru(r["half_change_norm2"], 3), ru(r["change_rel"], 3), ru(r["change_rel_error_bound"], 2),
+          {"true": "да", "false": "нет", "": "—"}[r["change_resolved"]]) for r in ext])
+    blocks["parseval_own_check"] = md_table(
+        ["s", "инварианты: |Reference − QA| / QA", "центр", "Π_s", "в пределах бюджетов Reference"],
+        [(r["s"], ru(r["own_invariants_rel"], 2), ru(r["own_centre_rel"], 2), ru(r["own_energy_rel"], 2),
+          {"true": "да", "false": "нет"}[r["own_within_budgets"]]) for r in ext])
+
+    states = ["1", "2", "3", "4", "stop"]
+    pairs = sorted({(int(r["n"]), int(r["2n"])) for r in conv})
+    blocks["convergence"] = md_table(
+        ["s"] + [f"E_disc ({a}, {b})" for a, b in pairs] + [f"p по SA ({a}, {b})" for a, b in pairs[-3:]],
+        [[st] + [ru(next(r["E_disc_max_over_max_w_n"] for r in conv if r["s"] == st and int(r["n"]) == a), 4) for a, _ in pairs]
+         + [ru(next(r["p_against_SA"] for r in conv if r["s"] == st and int(r["n"]) == a), 5) for a, _ in pairs[-3:]] for st in states])
+
+    blocks["richardson"] = md_table(
+        ["s", "пара", "w_2n(центр)", "w_RE(центр)", "w_SA(центр)", "(w_RE − w_SA)/w_SA в центре", "max|w_RE − w_SA|/max|w_SA|", "δ_c(RE)", "δ_c(SA)"],
+        [(r["s"], f"({r['n']}, {r['2n']})", ru(r["w_2n_centre"], 11), ru(r["w_RE_centre"], 11), ru(r["w_SA_centre"], 11),
+          signed(r["RE_minus_SA_centre_rel"], 2), ru(r["E_inf_RE_vs_SA"], 2), signed(r["delta_c_RE"], 5), signed(r["delta_c_SA"], 5))
+         for r in rich if (r["n"], r["2n"]) == (str(int(finest) // 2), finest)])
+
+    blocks["energy_discrete"] = md_table(["n"] + [f"s = {st}" for st in states],
+                                         [[n] + [ru(next(r["e_h"] for r in edis if r["n"] == n and r["s"] == st), 4) for st in states] for n in grids])
+    blocks["energy_sa"] = md_table(
+        ["состояние", "s", "Π(w_SA)", "e_SA", "неопределённость e_SA", "Π: Reference против рекурсии QA (относит.)", "e_RE (160, 320)", "(e_RE − e_SA)/e_SA"],
+        [(r["s"], r["s_actual"], ru(r["Pi_SA"], 13), ru(r["e_SA"], 6), ru(r["e_SA_uncertainty"], 2), ru(r["own_recursion_energy_rel"], 2),
+          ru(next((x["e_RE"] for x in ere if x["s"] == r["s"] and x["n"] == str(int(finest) // 2)), None), 6),
+          signed(next((x["e_RE_minus_e_SA_rel"] for x in ere if x["s"] == r["s"] and x["n"] == str(int(finest) // 2)), None), 2)) for r in sa])
+
+    dec_grids = [g for g in ("20", "80", finest) if g in grids]
+    blocks["decomposition"] = md_table(
+        ["n", "s", "основание", "max|w_h − w_SA| / max|w_N|", "max|w_SA − w_N| / max|w_N|", "дискр. в центре", "непрер. в центре", "непрер./дискр."],
+        [(r["n"], r["s"], "точное (SA)" if r["basis"] == "exact (SA)" else "диагностика (Ричардсон)", ru(r["disc_inf_over_max_wN"], 4), ru(r["cont_inf_over_max_wN"], 4),
+          signed(r["disc_centre_rel"], 4), signed(r["cont_centre_rel"], 5), ru(r["ratio_cont_to_disc"], 3))
+         for r in dec if r["n"] in dec_grids and (r["basis"] == "exact (SA)" or r["n"] == str(int(finest) // 2))])
+
+    blocks["asymmetry"] = md_table(
+        ["n"] + [f"s = {st}" for st in states] + ["SA, остановка"],
+        [[n] + [ru(next(r["A_sym"] for r in asy if r["n"] == n and r["s"] == st), 3) for st in states]
+         + [ru(next(r["A_sym_SA"] for r in asy if r["n"] == n and r["s"] == "stop"), 2)] for n in grids])
+
+    fs = next(r for r in de if r["n"] == finest and r["s"] == "stop")
+    s1 = next(r for r in de if r["n"] == finest and r["s"] == "1")
+    sas = next(r for r in sa if r["s"] == "stop")
+    re_stop = next(r for r in rich if r["s"] == "stop" and r["2n"] == finest)
+    dstop = next(r for r in dec if r["n"] == finest and r["s"] == "stop" and r["basis"] == "exact (SA)")
+    blocks["key_results"] = md_table(["Величина", "Значение"], [
+        (f"s = 1 (метод Канторовича–Власова), n = {finest}: δ_c; E_∞", f"{signed(s1['delta_c'], 4)}; {ru(s1['E_inf'], 4)}"),
+        (f"остановка (s = {fs['s_actual']}), n = {finest}: δ_c; E_∞; E_2", f"{signed(fs['delta_c'], 5)}; {ru(fs['E_inf'], 5)}; {ru(fs['E_2'], 5)}"),
+        (f"полуаналитическое состояние s = {sas['s_actual']} (без сетки): δ_c^SA; E_∞^SA; E_2^SA",
+         f"{signed(sas['delta_c_SA'], 5)}; {ru(sas['E_inf_SA'], 5)}; {ru(sas['E_2_SA'], 5)}"),
+        ("энергетическая мера e_SA после остановки (непрерывная)", f"{ru(sas['e_SA'], 6)} ± {ru(sas['e_SA_uncertainty'], 2)}"),
+        (f"дискретизация после остановки, n = {finest}: max|w_h − w_SA| / max|w_N|", ru(dstop["disc_inf_over_max_wN"], 4)),
+        (f"отношение непрерывного отличия к дискретизации, n = {finest}", ru(dstop["ratio_cont_to_disc"], 3)),
+        (f"Ричардсон ({int(finest) // 2}, {finest}) против SA после остановки, центр", signed(re_stop["RE_minus_SA_centre_rel"], 2)),
+    ])
+    return blocks
+
+
+def inject_report(path, blocks):
+    """Replace every <!-- AUTO:name --> ... <!-- /AUTO:name --> block of the report by the generated table."""
+    path = Path(path)
+    text = path.read_text(encoding="utf-8")
+    for name, block in blocks.items():
+        start, end = f"<!-- AUTO:{name} -->", f"<!-- /AUTO:{name} -->"
+        i, j = text.find(start), text.find(end)
+        if i < 0 or j < i:
+            raise KeyError(f"report block {name!r} is missing")
+        text = text[: i + len(start)] + "\n" + block + "\n" + text[j:]
+    path.write_text(text, encoding="utf-8")
+
+
+_BLOCK = re.compile(r"<!-- AUTO:(\w+) -->\n(.*?)\n<!-- /AUTO:\1 -->", re.S)
+
+
+def report_block_contents(path):
+    """Blocks currently in the report (for the consistency test): only complete <!-- AUTO:name --> pairs."""
+    return {name: body for name, body in _BLOCK.findall(Path(path).read_text(encoding="utf-8"))}
+
+
 def main(argv=None):
+    root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--out", default=str(Path(__file__).resolve().parents[1] / "docs" / "results" / "r2"))
+    parser.add_argument("--out", default=str(root / "docs" / "results" / "r2"))
     parser.add_argument("--grids", type=int, nargs="+", default=list(MAIN_GRIDS))
     parser.add_argument("--diagnostic-grid", type=int, default=DIAGNOSTIC_GRID)
+    parser.add_argument("--report", default=str(root / "docs" / "R2_ACCURACY_STUDY.md"),
+                        help="report whose AUTO blocks are regenerated; '' to skip")
     args = parser.parse_args(argv)
-    run_study(args.out, tuple(args.grids), args.diagnostic_grid or None)
+    run_study(args.out, tuple(args.grids), args.diagnostic_grid or None, report=args.report or None)
     print(f"written to {args.out}")
 
 
