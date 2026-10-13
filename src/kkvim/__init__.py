@@ -7,6 +7,7 @@ one-dimensional linear solver K Y = g (``kkvim.linear_solver``) and the
 half-step coefficients A_h, B_h, C_h, F_h (``kkvim.coefficients``) and the
 first half-step s = 1 with the field w1 (``kkvim.first_halfstep``) and the
 second half-step s = 2 with the field w2 (``kkvim.second_halfstep``), and a
-fixed number of alternating half-steps with their history (``kkvim.iteration``).
-Pi_h, the energy test and automatic stopping are not implemented yet.
+fixed number of alternating half-steps with their history (``kkvim.iteration``),
+and the discrete energy Pi_h with the energy test of half-steps (``kkvim.energy``).
+Automatic stopping is not implemented yet.
 """
