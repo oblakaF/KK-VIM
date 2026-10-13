@@ -22,7 +22,10 @@ Contents:
   M_x, M_y, truncation bounds and convergence levels at points and at all
   nodes of the tensor grid; truncated integral of the deflection J_M, I_M
   and energy Pi_M with the remainder bound of section 16 (MATH_SPEC.md,
-  В-27; NAVIER_REFERENCE_SPEC.md; NUMERICAL_SPEC.md, section 16, A-10a).
+  В-27; NAVIER_REFERENCE_SPEC.md; NUMERICAL_SPEC.md, section 16, A-10a);
+  for R3 also the rectangle a x b, 0.2 <= b/a <= 5, M = 2559 (NavierRectangle;
+  D-036; bounds ЧВ-R2, ЧВ-R2a; docs/R3_NAVIER_REFERENCE.md), not yet
+  independently qualified.
 
 The Levy cross-check P-12 is not implemented yet.
 """
