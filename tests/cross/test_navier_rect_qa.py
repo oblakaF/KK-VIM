@@ -240,7 +240,7 @@ def test_edges_are_exact_zeros(name):
 
 @pytest.mark.parametrize("name", list(CONTROL))
 def test_reflection_symmetry(name):
-    """П-7: w(a - x, y) = w(x, b - y) = w(x, y) at points (within rounding) and at nodes (bitwise)."""
+    """П-7: w(a - x, y) = w(x, b - y) = w(x, y) at points and at nodes, within the rounding estimate."""
     a, b = CONTROL[name]
     p = rect(a, b)
     rng = np.random.default_rng(5)
@@ -249,8 +249,11 @@ def test_reflection_symmetry(name):
     tol = 2 * base.rounding_w
     for xx, yy in ((a - x, y), (x, b - y), (a - x, b - y)):
         assert np.max(np.abs(p.at_points(xx, yy, M=79, diagnostics=False).w_coef - base.w_coef)) <= tol
-    w = p.at_nodes(10, 14, M=79, diagnostics=False).w_coef
-    assert np.array_equal(w, w[::-1, :]) and np.array_equal(w, w[:, ::-1])
+    # nodes: the rows of S_x for i and n - i are identical, but BLAS may sum rows in different
+    # blocks with a different order of operations (CPU dependent), so not bitwise
+    nodes = p.at_nodes(10, 14, M=79, diagnostics=False)
+    w = nodes.w_coef
+    assert np.max(np.abs(w - w[::-1, :])) <= nodes.rounding_w and np.max(np.abs(w - w[:, ::-1])) <= nodes.rounding_w
 
 
 @pytest.mark.parametrize("name", list(CONTROL))
