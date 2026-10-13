@@ -1,0 +1,11 @@
+quantity,value
+M,1279
+w_N centre (n = 320),4.062352660675e-03
+"strict truncation bound 8.2, uniform",1.337589190458e-09
+delta_w,4.060000000000e-09
+first-order rounding bound of w_N at nodes,1.239318028007e-15
+"smallest measured max|w_h - w_N| (stop, n = 320)",5.890647437159e-06
+ratio bound / smallest measured difference,2.270699791029e-04
+Pi_N = Pi_M (M = 1279),-8.512552623592e-04
+Pi_N truncation bound,1.362970245514e-13
+J_M,1.702510524718e-03

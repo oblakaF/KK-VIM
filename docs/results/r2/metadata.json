@@ -1,0 +1,46 @@
+{
+  "case": {
+    "a": 1.0,
+    "D": 1.0,
+    "q": 1.0,
+    "nu_navier": 0.3,
+    "M_navier": 1279
+  },
+  "grids": [
+    20,
+    40,
+    80,
+    160,
+    320
+  ],
+  "diagnostic_grid": 640,
+  "python": "3.13.15",
+  "numpy": "2.5.4",
+  "source_sha256": "dd02e68f9577af5af68a6f3d278020cb93ddfcfa4f5ea3aa346d38e7c83ff68e",
+  "stop_status": {
+    "20": [
+      "CONVERGED",
+      7
+    ],
+    "40": [
+      "CONVERGED",
+      7
+    ],
+    "80": [
+      "CONVERGED",
+      7
+    ],
+    "160": [
+      "CONVERGED",
+      7
+    ],
+    "320": [
+      "CONVERGED",
+      7
+    ],
+    "640": [
+      "CONVERGED",
+      7
+    ]
+  }
+}
