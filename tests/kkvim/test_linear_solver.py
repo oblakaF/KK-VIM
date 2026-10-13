@@ -228,7 +228,7 @@ def test_backward_error_formula(coeffs):
     expected = np.max(np.abs(residual)) / (D * (16 * A / h**4 + 8 * B / h**2 + C) * np.max(np.abs(y)) + np.max(np.abs(g)))
     eta, residual_norm = backward_error(grid, A, B, C, D, y, g)
     assert residual_norm == pytest.approx(np.max(np.abs(residual)), rel=1e-12)
-    assert eta == pytest.approx(expected, rel=1e-12)
+    assert eta == pytest.approx(expected, rel=1e-12, abs=0)
     np.testing.assert_allclose(apply_k(grid, A, B, C, D, y), dense_k(grid, A, B, C, D) @ y, rtol=0, atol=1e-12 * np.max(np.abs(dense_k(grid, A, B, C, D) @ y)))
 
 
