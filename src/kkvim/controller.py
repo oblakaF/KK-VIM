@@ -36,7 +36,7 @@ from kkvim.energy import EnergyCheck, EnergyError, check_pair, discrete_energy, 
 from kkvim.first_halfstep import HalfStepError, first_halfstep
 from kkvim.grid import N_MIN
 from kkvim.iteration import HalfStepHistory, HalfStepRecord, as_record, next_halfstep
-from kkvim.linear_solver import LinearSolveError
+from kkvim.linear_solver import ERROR_NONFINITE, LinearSolveError
 
 UNIT_ROUNDOFF = 2.0**-53
 TOL_INF = 1e-10
@@ -123,6 +123,8 @@ def stopping_decision(s: int, diagnostics, tol_inf: float, tol_E: float, s_min: 
     rows = tuple(diagnostics)
     if [row[0] for row in rows] != list(range(2, s + 1)):
         raise ValueError(f"diagnostics must cover s = 2 .. {s} in order")
+    if not all(math.isfinite(v) and v >= 0.0 for _, eps_inf, eps_E in rows for v in (eps_inf, eps_E)):
+        raise ValueError("diagnostics must be finite and non-negative")
     satisfied = [eps_inf <= tol_inf and eps_E <= tol_E for _, eps_inf, eps_E in rows]
     if s >= s_min and len(rows) >= 2 and satisfied[-1] and satisfied[-2]:
         return CONVERGED
@@ -180,6 +182,9 @@ def run_until_stopped(
 
         if s >= 2:
             eps_inf, eps_E, eps_L2 = _field_changes(records[-2], record)
+            if not all(math.isfinite(v) for v in (eps_inf, eps_E, eps_L2)):
+                return result(ERROR_NONFINITE, StoppingDiagnosticsError(
+                    ERROR_NONFINITE, f"non-finite changes at s={s}: {eps_inf!r}, {eps_E!r}, {eps_L2!r}"))
             diagnostics.append((s, eps_inf, eps_E))
             theta_all = thetas(row[2] for row in diagnostics)
             theta = theta_all[-1]
@@ -213,6 +218,14 @@ def _field_changes(previous: HalfStepRecord, current: HalfStepRecord) -> tuple[f
 
 class _ConfigurationError(ValueError):
     pass
+
+
+class StoppingDiagnosticsError(RuntimeError):
+    """Non-finite stopping diagnostics, with a specification error code."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(f"{code}: {message}")
+        self.code = code
 
 
 def _parameters(n_x, n_y, tol_inf, tol_E, s_min, s_max) -> StoppingParameters:

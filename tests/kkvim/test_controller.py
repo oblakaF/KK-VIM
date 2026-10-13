@@ -26,7 +26,7 @@ from kkvim.controller import (
 )
 from kkvim.energy import ERROR_ENERGY_TEST, NOT_APPLICABLE, PASS, UNRESOLVED, EnergyError, discrete_energy
 from kkvim.iteration import run_halfsteps
-from kkvim.linear_solver import ERROR_LINEAR_SOLVE, LinearSolveError
+from kkvim.linear_solver import ERROR_LINEAR_SOLVE, ERROR_NONFINITE, LinearSolveError
 
 U = 2.0**-53
 TOL_INF, TOL_E = 1e-10, 1e-8
@@ -141,6 +141,25 @@ def test_decision_rejects_inconsistent_diagnostics():
         decide(4, rows_from([BAD, GOOD]))
     with pytest.raises(ValueError):
         decide(3, [(3, 1.0, 1.0), (2, 1.0, 1.0)])
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf, -1e-3])
+@pytest.mark.parametrize("position", [1, 2])
+def test_decision_rejects_nonfinite_or_negative_changes(bad, position):
+    row = [3, 1e-3, 1e-3]
+    row[position] = bad
+    with pytest.raises(ValueError):
+        decide(3, [(2, 1e-3, 1e-3), tuple(row)], s_max=3)
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf])
+def test_nonfinite_changes_give_error_nonfinite_not_max(monkeypatch, bad):
+    seq = iter([BAD, BAD, (bad, 1e-4)])
+    monkeypatch.setattr(ctl, "_field_changes", lambda prev, now: (*next(seq), 1e-4))
+    r = run_until_stopped(1.0, 1.0, 1.0, 20, 20, s_max=4)
+    assert r.status == ERROR_NONFINITE and not r.converged and r.status != MAX_HALF_STEPS
+    assert r.s == 4 and len(r.changes) == 2 and len(r.energy_checks) == 4
+    assert r.error.code == ERROR_NONFINITE
 
 
 def test_decision_does_not_modify_input():
