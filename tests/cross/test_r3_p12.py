@@ -183,3 +183,25 @@ def test_fresh_recomputation_agrees_with_the_stored_data(points):
             assert abs(r["w_N"] - float(s["w_N"])) <= 2 * r["R_N"]
             assert abs(r["w_L"] - float(s["w_L"])) <= 2 * r["R_L"]
             assert str(r["ok"]) == s["ok"]
+
+
+def test_git_provenance_is_captured_before_any_output(monkeypatch, tmp_path):
+    """Output generation must not mark clean inputs dirty merely by writing CSV."""
+    calls = []
+
+    def fake_git(*args):
+        calls.append(args)
+        return "verified-source-sha" if args == ("rev-parse", "HEAD") else ""
+
+    class StopBeforeNumerics(Exception):
+        pass
+
+    def stop_at_first_plate(*args):
+        assert calls == [("rev-parse", "HEAD"), ("status", "--porcelain")]
+        raise StopBeforeNumerics
+
+    monkeypatch.setattr(study, "_git", fake_git)
+    monkeypatch.setattr(study, "compute_plate", stop_at_first_plate)
+    with pytest.raises(StopBeforeNumerics):
+        study.run(out_dir=tmp_path / "results", report=None)
+    assert calls == [("rev-parse", "HEAD"), ("status", "--porcelain")]

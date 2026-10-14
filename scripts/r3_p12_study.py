@@ -193,6 +193,11 @@ def _fmt(v):
 
 
 def run(out_dir=OUT, report=REPORT, hp_min_margin=False):
+    # Provenance belongs to the CLEAN INPUT tree, not to the output files being
+    # written. Checking git status after producing CSV/JSON would itself turn
+    # a clean reproduction into dirty=true (D-038, P-12).
+    source_commit = _git("rev-parse", "HEAD")
+    source_dirty = bool(_git("status", "--porcelain"))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     all_rows, plates, hp_rows = [], [], []
@@ -234,7 +239,7 @@ def run(out_dir=OUT, report=REPORT, hp_min_margin=False):
     meta = {
         "study": "P-12 of R3, Navier vs full Levy series, deflection (D-038)",
         "decision": "D-038 (accepted 2026-10-14); B_L confirmed by the Auditor (9919f32, VERIFIED_TRUNCATION)",
-        "commit": _git("rev-parse", "HEAD"), "dirty": bool(_git("status", "--porcelain")),
+        "commit": source_commit, "dirty": source_dirty,
         "date_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "python": sys.version.split()[0], "numpy": np.__version__, "platform": platform.platform(),
         "M_N": M_N, "M_L": M_L, "q": Q, "D": D, "nu": NU, "grid": f"{N_GRID + 1}x{N_GRID + 1}",
