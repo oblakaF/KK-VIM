@@ -105,7 +105,7 @@ def test_russian_number_format():
     assert study.ru(5.301e-6) == "5,301·10⁻⁶"
     assert study.ru(1350.0, 3) == "1,35·10³"
     assert study.signed(2.4e-10, 2) == "+2,4·10⁻¹⁰" and study.ru(None) == "—" and study.ru("") == "—"
-    assert study.md_table(["max|x|"], [("a|b",)]).splitlines()[0] == "| max\|x\| |"
+    assert study.md_table(["max|x|"], [("a|b",)]).splitlines()[0] == r"| max\|x\| |"
 
 
 def test_report_tables_are_generated_from_the_committed_csv():
