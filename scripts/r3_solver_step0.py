@@ -432,9 +432,9 @@ def report_blocks(out_dir=OUT):
         out = ["| r | сем. | (n_x, n_y) | s | m_s | m_up (решатель) | m_up (зам.) | Δm/m | \\|γ_s\\|/g_allow | E1 | E2 | "
                "\\|Q−Q_sur\\|/Q_sur | e_sur | статус | вердикт |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for r in selection:
-            ga = abs(float(r["gamma"])) / float(r["g_allow"]) if float(r["g_allow"]) > 0 else float("inf")
+            ga = f"{abs(float(r['gamma'])) / float(r['g_allow']):.2g}" if float(r["g_allow"]) > 0 else "m_up < 1"
             out.append(f"| {r['r']} | {r['family']} | ({r['nx']},{r['ny']}) | {r['s']} | {g3(r['m_s'])} | {g3(r['m_up'])} | "
-                       f"{g3(r['m_up_sur'])} | {g3(r['dm_over_m'])} | {ga:.2g} | {r['e1']} | {r['e2']} | "
+                       f"{g3(r['m_up_sur'])} | {g3(r['dm_over_m'])} | {ga} | {r['e1']} | {r['e2']} | "
                        f"{g3(r['dev_Q_sur'])} | {g3(r['e_sur'])} | {r['status_qa']} | {r['verdict']} |")
         return "\n".join(out)
 
