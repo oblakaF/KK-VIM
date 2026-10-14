@@ -7,6 +7,7 @@ small grids; the report blocks against the CSV. No criterion or grid is derived 
 """
 
 import csv
+import hashlib
 import importlib.util
 import json
 import math
@@ -110,7 +111,10 @@ def test_metadata_is_consistent(rows, runs, meta):
     assert meta["n_energy_rows"] == len(rows) and meta["n_runs"] == len(runs)
     assert meta["n_mandatory_rows"] == sum(r["mandatory"] == "True" for r in rows)
     assert meta["n_blockers"] == sum(r["verdict"] in ("BLOCKER", "FAIL") for r in rows)
-    assert meta["surrogate_margins_sha256"] == step0.sha256(step0.MARGINS)
+    # the hash identifies the R-7 input file; checkouts differ only in line endings (core.autocrlf on Windows, LF in CI)
+    lf = step0.MARGINS.read_bytes().replace(b"\r\n", b"\n")
+    assert meta["surrogate_margins_sha256"] in {hashlib.sha256(lf).hexdigest(),
+                                                hashlib.sha256(lf.replace(b"\n", b"\r\n")).hexdigest()}
     assert len(meta["commit"]) == 40 and meta["dirty"] is False
     assert {"numpy", "scipy", "kkvim"} <= set(meta["versions"])
 
