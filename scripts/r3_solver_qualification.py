@@ -692,9 +692,11 @@ def group_b():
                                 "split_h_SA_centre": sci((centre(w) - centre(wsa)) / centre(wn)),
                                 "e_SA": sci((P.energy(ss).energy - pi0) / abs(pi0))})
                 levels.append(row)
-                if ss <= len(swapped.history):
-                    w2 = field(swapped, ss).T  # back to the nodes of a x b
+                ss_ba = len(swapped.history) if s == "stop" else ss  # each plate at its own stop
+                if ss_ba <= len(swapped.history):
+                    w2 = field(swapped, ss_ba).T  # back to the nodes of a x b
                     starts.append({"r": label, "family": family, "nx": nx, "ny": ny, "s": s, "s_value": ss,
+                                   "s_value_ba": ss_ba,
                                    "s_stop_ab": s_stop, "s_stop_ba": len(swapped.history),
                                    "status_ba": swapped.status,
                                    "field_diff": sci(float(np.max(np.abs(w - w2)) / np.max(np.abs(w)))),
@@ -902,9 +904,20 @@ def report_blocks(out_dir=OUT):
     b["qual_a4_ref"] = f"Перекрёстная проверка эталона А-4 при r ≥ 1 (r ≠ 1): max\\|levy_series_w(M = 1) − Parseval s = 1\\|/max\\|w¹\\| = " \
                        f"{g3(max(lm))} по {len(lm)} сеткам (диагностика эталона, не критерий решателя)."
     un = read(out_dir / "unequal.csv")
-    b["qual_unequal"] = md([r for r in un if r["nx"] in ("20", "640") or r["ny"] in ("20", "640")][:40],
-                           ["r", "refined_axis", "nx", "ny", "E_inf_s1", "E_inf_s2", "E_inf_s3", "p_s1", "p_s3", "A7_s2", "A7_s3"],
-                           ["r", "ось", "n_x", "n_y", "E∞ s=1", "E∞ s=2", "E∞ s=3", "p s=1", "p s=3", "А-7 s=2", "А-7 s=3"])
+    compact = []
+    for label, _, _ in step0.RATIOS:
+        for axis in ("x", "y"):
+            sel = [r for r in un if r["r"] == label and r["refined_axis"] == axis]
+            fixed = sel[0]["ny"] if axis == "x" else sel[0]["nx"]
+            compact.append({"r": label, "axis": axis, "fixed": fixed,
+                            "p1": " ".join(f"{float(r['p_s1']):.2f}" for r in sel if r["p_s1"]),
+                            "p3": " ".join(f"{float(r['p_s3']):.2f}" for r in sel if r["p_s3"]),
+                            "e3": " ".join(f"{float(r['E_inf_s3']):.2g}" for r in sel),
+                            "a7": " ".join(sorted({f"{r['A7_s2']}/{r['A7_s3']}" for r in sel})),
+                            "a6": all(r["A6_ok"] == "True" for r in sel)})
+    b["qual_unequal"] = md(compact, ["r", "axis", "fixed", "p1", "p3", "e3", "a7", "a6"],
+                           ["r", "сгущаемая ось", "вторая компонента", "p, s = 1 (20→…→640)", "p, s = 3", "E∞, s = 3 (20…640)",
+                            "А-7 s = 2/3", "А-6"])
     gb = read(out_dir / "groupB_levels.csv")
     fine = []
     for (label, family), chain in CHAINS.items():
@@ -919,8 +932,9 @@ def report_blocks(out_dir=OUT):
                         ["r", "s", "δ_c^SA", "E∞(SA−N)", "(w_h−w_SA)/w_N центр", "e_s (непр.)", "δ_c (сетка)"])
     st = read(out_dir / "groupB_starts.csv")
     sel = [x for x in st if x["family"] == "I" and int(x["nx"]) == 160]
-    b["groupb_starts"] = md(sel, ["r", "s", "s_value", "field_diff", "centre_ab", "centre_ba", "s_stop_ab", "s_stop_ba", "A7_s2_ba"],
-                            ["r", "s", "s", "max\\|w_ab − w_ba\\|/max\\|w\\|", "центр a×b", "центр b×a", "s_stop a×b", "s_stop b×a", "А-7 s=2 b×a"])
+    b["groupb_starts"] = md(sel, ["r", "s", "s_value", "s_value_ba", "field_diff", "centre_ab", "centre_ba", "A7_s2_ba"],
+                            ["r", "s", "s a×b", "s b×a", "max\\|w_ab − w_ba\\|/max\\|w\\|", "центр a×b", "центр b×a",
+                             "А-7 s=2 b×a"])
     return b
 
 
