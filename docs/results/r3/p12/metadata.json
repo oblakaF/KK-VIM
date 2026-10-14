@@ -1,0 +1,108 @@
+{
+  "study": "P-12 of R3, Navier vs full Levy series, deflection (D-038)",
+  "decision": "D-038 (accepted 2026-10-14); B_L confirmed by the Auditor (9919f32, VERIFIED_TRUNCATION)",
+  "commit": "e7833d92d89768c57494114552a132a9ea124c81",
+  "dirty": false,
+  "date_utc": "2026-10-14T05:38:40+00:00",
+  "python": "3.13.15",
+  "numpy": "2.5.4",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "M_N": 2559,
+  "M_L": 1131,
+  "q": 1.0,
+  "D": 1.0,
+  "nu": 0.3,
+  "grid": "41x41",
+  "edge_distances": [
+    0.001,
+    1e-06,
+    1e-09
+  ],
+  "transverse": [
+    0.25,
+    0.5,
+    0.75
+  ],
+  "plates": [
+    [
+      "0,2",
+      1.0,
+      0.2
+    ],
+    [
+      "1/3",
+      3.0,
+      1.0
+    ],
+    [
+      "1/2",
+      2.0,
+      1.0
+    ],
+    [
+      "2/3",
+      3.0,
+      2.0
+    ],
+    [
+      "1",
+      1.0,
+      1.0
+    ],
+    [
+      "1,4",
+      1.0,
+      1.4
+    ],
+    [
+      "1,5",
+      2.0,
+      3.0
+    ],
+    [
+      "2",
+      1.0,
+      2.0
+    ],
+    [
+      "3",
+      1.0,
+      3.0
+    ],
+    [
+      "5",
+      1.0,
+      5.0
+    ]
+  ],
+  "n_comparisons": 17180,
+  "n_exceed": 0,
+  "global_max_abs_diff": 3.13692214565231e-15,
+  "global_max_at": [
+    "5",
+    "edge",
+    "y=0.001b,x=0.25a"
+  ],
+  "global_min_margin": 545193.1260959554,
+  "global_min_margin_at": [
+    "1",
+    "edge",
+    "x=0.001a,y=0.25b"
+  ],
+  "hp_rechecks": 10,
+  "hp_dps": 45,
+  "verdict": "PASS",
+  "plate_verdicts": {
+    "0,2": "PASS",
+    "1/3": "PASS",
+    "1/2": "PASS",
+    "2/3": "PASS",
+    "1": "PASS",
+    "1,4": "PASS",
+    "1,5": "PASS",
+    "2": "PASS",
+    "3": "PASS",
+    "5": "PASS"
+  },
+  "unresolved_or_fail_reasons": {}
+}
