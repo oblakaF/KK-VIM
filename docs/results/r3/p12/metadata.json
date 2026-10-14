@@ -1,9 +1,9 @@
 {
   "study": "P-12 of R3, Navier vs full Levy series, deflection (D-038)",
   "decision": "D-038 (accepted 2026-10-14); B_L confirmed by the Auditor (9919f32, VERIFIED_TRUNCATION)",
-  "commit": "6765d7ea0c913fffeeb6e7d71305a3873737dc60",
-  "dirty": true,
-  "date_utc": "2026-10-14T05:16:48+00:00",
+  "commit": "e7833d92d89768c57494114552a132a9ea124c81",
+  "dirty": false,
+  "date_utc": "2026-10-14T05:38:40+00:00",
   "python": "3.13.15",
   "numpy": "2.5.4",
   "platform": "Windows-10-10.0.19045-SP0",
