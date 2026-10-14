@@ -1,0 +1,19 @@
+{
+ "study": "A-10b, R3 solver qualification",
+ "commit": "c4974ccdcd6ed32dfbc5e1f4695b69a225ad5735",
+ "dirty": false,
+ "date_utc": "2026-10-14T14:57:26+00:00",
+ "python": "3.13.15",
+ "numpy": "2.5.4",
+ "mpmath": "1.4.1",
+ "dps": 50,
+ "tolerances": {
+  "hp": 1e-13,
+  "tail": 1e-14,
+  "transfer": 1e-12
+ },
+ "script_sha256": "a925ed40079a39e2c6d25537355fe6254f814e64a6ee30fa99b6f65cbf8e1afb",
+ "n_grids": 91,
+ "max_rel_dev": 3.545e-15,
+ "all_pass": true
+}
