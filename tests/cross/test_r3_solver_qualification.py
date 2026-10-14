@@ -187,3 +187,27 @@ def test_report_blocks_are_generated_from_the_stored_results():
     in_report = qual.step0.report_block_contents(qual.REPORT)
     for name, block in generated.items():
         assert in_report[name] == block, name
+
+
+# --- stopping controller on the rectangle (12, item 12; NUMERICAL_SPEC 11.2, 11.3): QA checks of the exits -------------
+
+def test_controller_exits_on_the_rectangle(monkeypatch):
+    import kkvim.rectangle_run as rr
+    from kkvim.controller import eps_floor, strict_parameters
+    from kkvim.rectangle import rectangle_halfsteps
+
+    run = rr.run_rectangle_until_stopped(1.0, 1.5, 1.0, 1.0, 40, 60, s_max=4)
+    assert run.status == "MAX_HALF_STEPS" and len(run.history) == 4
+    fixed = rectangle_halfsteps(1.0, 1.5, 1.0, 1.0, 40, 60, 4)
+    for s in range(1, 5):  # the controller does not change the half-steps
+        assert (run.history.field(s) == fixed.field(s)).all()
+    floor = 10 * 2.0**-53 * (60 / math.pi) ** 2  # eps_floor with max(n_x, n_y) (11.2, ChV-R3)
+    assert math.isclose(eps_floor(40, 60), floor, rel_tol=1e-15)
+    assert strict_parameters(40, 60) == (1e-12, max(1e-10, 10 * floor))
+    bad = rr.run_rectangle_until_stopped(1.0, 1.5, 1.0, 1.0, 40, 60, tol_E=9.9 * floor)
+    assert bad.status == "ERROR_INPUT" and len(bad.history) == 0
+    assert rr.run_rectangle_until_stopped(1.0, 5.000001, 1.0, 1.0, 40, 40).status == "ERROR_INPUT"  # D-038
+    # STAGNATED: ten consecutive theta >= 0.9 with eps_E > tol_E (constant changes give theta = 1 from s = 3)
+    monkeypatch.setattr(rr, "_field_changes", lambda prev, cur: (1e-3, 1e-3, 1e-3))
+    stag = rr.run_rectangle_until_stopped(1.0, 1.5, 1.0, 1.0, 20, 32)
+    assert stag.status == "STAGNATED" and len(stag.history) == 12
