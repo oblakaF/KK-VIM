@@ -3,19 +3,28 @@
 The scientific scope remains 1/5 <= b/a <= 5 (D-036). The 4u band is a
 technical tolerance for binary representation of input lengths, not a
 new scientific range. No rounded division is performed during the check.
+Admissible input types (D-042): int, float, numpy.integer, numpy.floating;
+bool, numpy.bool_ and every other type are rejected before conversion.
 """
 
 import math
+
+import numpy as np
 
 U = 2.0**-53
 _U_INV = 2**53
 _BAND_UNITS = 4
 _RATIO_MAX = 5
+_REAL_TYPES = (int, float, np.integer, np.floating)
+
+
+def _admissible_type(value):
+    return not isinstance(value, (bool, np.bool_)) and isinstance(value, _REAL_TYPES)
 
 
 def in_r3_range(a, b):
     """Test max(a, b) <= 5(1+4u) min(a, b) exactly for positive finite floats."""
-    if isinstance(a, bool) or isinstance(b, bool):
+    if not (_admissible_type(a) and _admissible_type(b)):
         return False
     try:
         a, b = float(a), float(b)
