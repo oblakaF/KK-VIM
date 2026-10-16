@@ -196,3 +196,69 @@ def test_field_stabilizes_but_no_convergence_status():
     run = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=20, research_mode=True)
     assert run.status == RESEARCH_LIMIT_REACHED and run.steps[-1].eps_E < 1e-8 * 1e3  # small change only observed
     assert all(math.isfinite(step.eta_N) for step in run.steps)
+
+
+# QA C-1 (f3f15bf): the research guards decide the status also on the last half-step --------
+
+def forced_on_call(monkeypatch, call, **change):
+    """Replace fields of the rank diagnostics of the given call (1-based) only."""
+    real, calls = cr.rank_diagnostics, []
+
+    def forced(*args):
+        calls.append(1)
+        r = real(*args)
+        return dataclasses.replace(r, **change) if len(calls) == call else r
+
+    monkeypatch.setattr(cr, "rank_diagnostics", forced)
+
+
+def qr_counter(monkeypatch):
+    real, count = cr.orthogonalize_received, []
+    monkeypatch.setattr(cr, "orthogonalize_received", lambda *a: count.append(1) or real(*a))
+    return count
+
+
+def test_c1_rank_guard_failure_on_the_only_half_step(monkeypatch):
+    """As the QA reproduction: N = 3, (40, 40), half_steps = 1, temporary K (production K is unchanged)."""
+    monkeypatch.setattr(cr, "K_RESEARCH", 10**13)
+    count = qr_counter(monkeypatch)
+    run = run_coupled(1.0, 1.0, D, Q, 40, 40, 3, transform="dense", half_steps=1, research_mode=True)
+    assert run.status == PROVISIONAL_RANK_GUARD_STOP and run.s == 1 and count == []
+    assert run.steps[0].guards.rank_ok is False and run.steps[0].stop_reason == PROVISIONAL_RANK_GUARD_STOP
+    assert run.status != STOPPED_RANK_NUMERICALLY_UNRESOLVED
+
+
+@pytest.mark.parametrize("change, status", [
+    (dict(rho_N=1e-12), PROVISIONAL_RANK_GUARD_STOP),
+    (dict(set_sigma=np.array([1.0, 1e-12])), PROVISIONAL_SET_GUARD_STOP),
+])
+def test_c1_guard_failure_on_the_last_half_step_after_qr_steps(change, status, monkeypatch):
+    forced_on_call(monkeypatch, 4, **change)
+    count = qr_counter(monkeypatch)
+    run = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=4, research_mode=True)
+    assert run.status == status and run.s == 4 and len(count) == 3  # QR after s = 1, 2, 3 only
+    last = run.steps[-1]
+    assert last.stop_reason == status and not last.qr_done and not last.guards.passed and last.mark == MARK
+    # the field and the log of the stop are those of the completed half-step 4, as in an unforced run
+    monkeypatch.undo()
+    plain = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=4, research_mode=True)
+    assert plain.status == RESEARCH_LIMIT_REACHED
+    assert np.array_equal(run.field(), plain.field())
+    assert [s.energy.P for s in run.steps] == [s.energy.P for s in plain.steps]
+
+
+def test_c1_limit_is_reached_only_with_passed_guards_and_without_a_last_qr(monkeypatch):
+    count = qr_counter(monkeypatch)
+    run = run_coupled(1.0, 2.0, D, Q, 20, 40, 3, transform="dense", half_steps=5, research_mode=True)
+    assert run.status == RESEARCH_LIMIT_REACHED and len(count) == 4
+    assert all(step.guards.passed for step in run.steps) and not run.steps[-1].qr_done
+    assert run.steps[-1].stop_reason == RESEARCH_LIMIT_REACHED
+
+
+def test_c1_normative_mode_is_unchanged(monkeypatch):
+    monkeypatch.setattr(cr, "K_RESEARCH", 10**13)  # no effect: the normative mode applies no research guard
+    monkeypatch.setattr(cr, "orthogonalize_received", lambda *a: pytest.fail("QR in the normative mode"))
+    one = run_coupled(1.0, 1.0, D, Q, 40, 40, 3, transform="dense", half_steps=1)
+    more = run_coupled(1.0, 1.0, D, Q, 40, 40, 3, transform="dense", half_steps=3)
+    assert (one.status, one.s, one.steps[0].guards) == (HALF_STEP_LIMIT_REACHED, 1, None)
+    assert (more.status, more.s, more.steps[0].guards) == (NOT_QUALIFIED, 1, None)

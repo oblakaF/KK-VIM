@@ -192,7 +192,13 @@ def sine_transform(grid: Grid1D, values, method: str) -> np.ndarray:
 
 def solve_coupled_halfstep(fixed_grid: Grid1D, fixed, solve_grid: Grid1D, q: float, D: float, *,
                            direction: str, transform: str) -> CoupledHalfStep:
-    """ChF-1 (direction "Y") or ChF-2 ("X") by the modal algorithm ChF-3."""
+    """ChF-1 (direction "Y") or ChF-2 ("X") by the modal algorithm ChF-3.
+
+    Limitation (QA O-1, f3f15bf): the numerical accuracy was checked for well-conditioned
+    given sets only (after a QR, or the odd sine start). For a badly conditioned given set
+    U T the error can grow like u cond(T)^2, and a successful Cholesky factorization of the
+    mode matrices does not guarantee an accurate result. No threshold is applied here.
+    """
     if direction not in ("X", "Y"):
         raise ValueError(f"direction must be 'X' or 'Y', got {direction!r}")
     if transform not in TRANSFORMS:

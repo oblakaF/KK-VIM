@@ -233,6 +233,16 @@ def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: i
             steps.append(_log(s, direction, eta, rank, cond_A, cond_M, energy, w_max, eps_inf, eps_E, guards, False, None, None,
                               ERROR_NONFINITE))
             return stop(ERROR_NONFINITE, f"non-finite diagnostics at s={s}")
+        # research guards precede the limit check, also on the last half-step (QA C-1; R4_NUMERICAL_SPEC 5.4.1)
+        if research_mode and not (guards.applicable and guards.rank_ok):
+            steps.append(_log(s, direction, eta, rank, cond_A, cond_M, energy, w_max, eps_inf, eps_E, guards, False, None, None,
+                              PROVISIONAL_RANK_GUARD_STOP))
+            why = "K u kappa_rep >= 1" if not guards.applicable else "rho_N <= K u kappa_rep"
+            return stop(PROVISIONAL_RANK_GUARD_STOP, f"s={s}: {why}; no QR, N kept")
+        if research_mode and not guards.set_ok:
+            steps.append(_log(s, direction, eta, rank, cond_A, cond_M, energy, w_max, eps_inf, eps_E, guards, False, None, None,
+                              PROVISIONAL_SET_GUARD_STOP))
+            return stop(PROVISIONAL_SET_GUARD_STOP, f"s={s}: sigma_min(R_V D_c) <= K u; no QR, N kept")
         if s == half_steps:
             status = RESEARCH_LIMIT_REACHED if research_mode else HALF_STEP_LIMIT_REACHED
             steps.append(_log(s, direction, eta, rank, cond_A, cond_M, energy, w_max, eps_inf, eps_E, guards, False, None, None,
@@ -243,15 +253,6 @@ def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: i
                               NOT_QUALIFIED))
             return stop(NOT_QUALIFIED, "the QR criterion (c_d, c_rank, tau_set, delta_f) is NOT_QUALIFIED; "
                                        "continue only with research_mode=True")
-        if not (guards.applicable and guards.rank_ok):
-            steps.append(_log(s, direction, eta, rank, cond_A, cond_M, energy, w_max, eps_inf, eps_E, guards, False, None, None,
-                              PROVISIONAL_RANK_GUARD_STOP))
-            why = "K u kappa_rep >= 1" if not guards.applicable else "rho_N <= K u kappa_rep"
-            return stop(PROVISIONAL_RANK_GUARD_STOP, f"s={s}: {why}; no QR, N kept")
-        if not guards.set_ok:
-            steps.append(_log(s, direction, eta, rank, cond_A, cond_M, energy, w_max, eps_inf, eps_E, guards, False, None, None,
-                              PROVISIONAL_SET_GUARD_STOP))
-            return stop(PROVISIONAL_SET_GUARD_STOP, f"s={s}: sigma_min(R_V D_c) <= K u; no QR, N kept")
 
         ortho = orthogonalize_received(solve_grid, received, given)
         if direction == "Y":
