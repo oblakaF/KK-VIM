@@ -4,12 +4,19 @@
 Definition: Psi_{ik} = sqrt(2/n) sin(pi i k / n), i, k = 1..n-1, symmetric and orthogonal (Psi^2 = I). For a vector of
 length n - 1, scipy's DST-I with norm="ortho" is y_k = sqrt(2/n) sum_i x_i sin(pi i k / n) = (Psi x)_k (checked here).
 
-Strict bound for the dense product (own; IEEE model, round to nearest, no underflow; ASSUMPTIONS: the library sin is
-accurate within one ulp for arguments in [0, pi/2], and the matrix product uses classical dot products, any order):
-every computed entry Psi^_{ik} = sqrt(2/n) sin(pi r/n), r reduced in integers to [0, n/2], satisfies
-|Psi^ - Psi| <= 7u |Psi| (2/n, sqrt, pi r / n: 4 roundings; sin within one ulp plus the argument error |x cot x| <= 1:
-2u; product: 1u), and |fl(Psi^ x) - Psi^ x| <= gamma_{n-1} |Psi^| |x|, so
-    |fl(Psi^ x) - Psi x| <= (7u + gamma_{n-1} (1 + 7u)) |Psi| |x|   (componentwise).
+Bound for the dense product (own; CONDITIONAL: standard IEEE model, round to nearest, no underflow, and the ASSUMPTIONS
+that np.sin is within one ulp for the arguments used in [0, pi/2] and that the matrix product uses classical dot products
+in any order; the sine assumption is checked for the used n by tests/cross/test_r4_dst_qa.py with 40-digit decimal
+arithmetic). Error of a computed entry Psi^_{ik} = fl(sqrt(2/n)) * fl(sin(fl(fl(pi) r) / n)), r reduced in integers to
+[0, n/2] (first-order count, Reviewer 3aaca8e, 3.1):
+    argument: fl(pi) (|pi - fl(pi)| <= 0.35u pi), x r (u), / n (u)                    <= 2.35u relative;
+    propagation into sin: |x cot x| <= 1 on (0, pi/2]                                   <= 2.35u;
+    own error of sin: one ulp, <= 2u relative                                          <= 2u;
+    scaling sqrt(2/n): 2/n (u), sqrt (half of it plus u)                               <= 1.5u;
+    product                                                                             u;
+    total <= 6.85u <= 7u, i.e. |Psi^ - Psi| <= 7u |Psi| (margin 0.15u, first order);
+and |fl(Psi^ x) - Psi^ x| <= gamma_{n-1} |Psi^| |x|, so
+    |fl(Psi^ x) - Psi x| <= (7u + gamma_{n-1} (1 + 7u)) |Psi| |x|   (componentwise, under the assumptions above).
 For the fast transform no bound is derived: the c u log2(n) model of R4_NUMERICAL_SPEC 5.2.1 requires a Cooley-Tukey
 algorithm with accurate twiddle factors, which is not verified for the library (NOT_VERIFIED); only empirical errors
 against a high-precision reference are measured (report, section 4).

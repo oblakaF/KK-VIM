@@ -19,6 +19,7 @@ from kkvim_reference.r4_levy_partial import (
     bracket,
     levy_x_partial_at_nodes,
     levy_x_partial_rounding_model,
+    navier_m_rounding_bound,
     navier_m_tail_bound,
     navier_m_truncated_at_nodes,
 )
@@ -76,15 +77,30 @@ def test_s1_partial_sums_agree(N, r):
     m = np.max(np.abs(Nv))
     assert navier_m_tail_bound(1.0, r, 1.0, 1.0, modes, 40001) <= 1e-16 * m
     assert np.max(np.abs(C - Nv)) <= 1e-12 * m
-    if r >= 1:  # alpha_m >= pi/2: the stable form is accurate, the rounding model applies
-        model = levy_x_partial_rounding_model(1.0, r, 1.0, 1.0, modes, 40, 80)
-        assert np.max(np.abs(L - Nv) - 4 * model) <= 4e-16 * m  # model of both sums; the Navier sum is not modelled
+    # s = 1 reference: m-truncated Navier with a strict tail and a rounding bound strict under the stated assumptions
+    assert navier_m_rounding_bound(1.0, r, 1.0, 1.0, modes, 40001) <= 4e-12 * m
+    if r >= 1:  # alpha_m >= pi/2: the Levy-x path as an independent DIAGNOSTIC (its rounding is MODEL_ONLY)
+        assert np.max(np.abs(L - Nv)) <= 1e-14 * m  # diagnostic agreement (observed <= 4.7e-15), not a budget
         ls = levy_series_w_grid(np.arange(41) / 40, r * np.arange(81) / 80, a=1.0, b=r, q=1.0, D=1.0, M=2 * N - 1)
         assert np.max(np.abs(L - ls)) <= 1e-14 * m  # accepted Levy series along the short side = x for r >= 1
     else:
         with pytest.raises(ValueError, match="alpha_m < pi/2"):
-            levy_x_partial_rounding_model(1.0, r, 1.0, 1.0, modes, 40, 80)
+            levy_x_partial_rounding_model(1.0, r, 1.0, 1.0, modes, 40, 80, 10 * 2.0**-53)
         assert np.max(np.abs(L - Nv)) <= 1e-13 * m  # accuracy loss of the stable form for small alpha (section 6.1)
+
+
+def test_navier_m_requires_odd_M_and_levy_model_requires_bracket_error():
+    """Р-2: the tail bound 1/(8 M^4) holds for the largest kept odd n = M only; Р-3: eps_T has no a-priori bound."""
+    for bad in (400, 0, -3, 2.0, True):
+        with pytest.raises(ValueError, match="odd"):
+            navier_m_tail_bound(1.0, 1.0, 1.0, 1.0, [1, 3], bad)
+        with pytest.raises(ValueError, match="odd"):
+            navier_m_truncated_at_nodes(1.0, 1.0, 1.0, 1.0, [1, 3], 8, 8, bad)
+        with pytest.raises(ValueError, match="odd"):
+            navier_m_rounding_bound(1.0, 1.0, 1.0, 1.0, [1, 3], bad)
+    for bad in (-1e-16, math.nan, math.inf):
+        with pytest.raises(ValueError, match="bracket_rel"):
+            levy_x_partial_rounding_model(1.0, 2.0, 1.0, 1.0, [1, 3], 8, 8, bad)
 
 
 def test_bracket_edges_and_symmetry():
@@ -197,3 +213,41 @@ def test_high_precision_bracket_accuracy_domain():
         T = bracket(alpha, ss)
         rel = max(abs(float(mp.mpf(T[i]) - exact(alpha, ss[i])) / exact(alpha, ss[i])) for i in range(len(ss)))
         assert lo <= rel / 2.0**-53 <= hi, (alpha, rel / 2.0**-53)
+
+
+@pytest.mark.parametrize("r", (0.2, 1.0, 5.0))
+def test_high_precision_navier_m_rounding_bound_and_levy_model(r):
+    """50-digit Navier-m sum at a few nodes (same M): the double sum lies within the rounding bound (strict under its
+    assumptions); for r >= 1 the Levy-x path lies within its MODEL_ONLY estimate with eps_T measured here."""
+    mp = _mp()
+    modes, M, nx, ny = [1, 3, 5], 4001, 8, 16
+    W = navier_m_truncated_at_nodes(1.0, r, 1.0, 1.0, modes, nx, ny, M)
+    bound = navier_m_rounding_bound(1.0, r, 1.0, 1.0, modes, M)
+    a, b = mp.mpf(1), mp.mpf(r)
+    pts = [(2, 3), (4, 8), (1, 15), (6, 5)]
+    exact = {}
+    for i, j in pts:
+        tot = mp.mpf(0)
+        for m in modes:
+            sx = mp.sin(m * mp.pi * i / nx)
+            col = mp.fsum(16 / (mp.pi**6 * m * n * (mp.mpf(m) ** 2 / a**2 + mp.mpf(n) ** 2 / b**2) ** 2)
+                          * mp.sin(n * mp.pi * j / ny) for n in range(1, M + 1, 2))
+            tot += sx * col
+        exact[(i, j)] = tot
+        assert abs(mp.mpf(W[i, j]) - tot) <= bound
+    if r >= 1:
+        s_nodes = [2 * min(j, ny - j) / ny for j in range(ny + 1)]
+        eps_T = 0.0
+        for m in modes:
+            al = m * math.pi * r / 2
+            T = bracket(al, np.array(s_nodes))
+            for sv, tv in zip(s_nodes[1:-1], T[1:-1]):
+                A, t = mp.mpf(al), 1 - mp.mpf(sv)
+                P = (A * mp.tanh(A) + 2) / (2 * mp.cosh(A))
+                te = 1 - P * mp.cosh(A * t) + A / (2 * mp.cosh(A)) * t * mp.sinh(A * t)
+                eps_T = max(eps_T, float(abs((mp.mpf(tv) - te) / te)))
+        L = levy_x_partial_at_nodes(1.0, r, 1.0, 1.0, modes, nx, ny)
+        model = levy_x_partial_rounding_model(1.0, r, 1.0, 1.0, modes, nx, ny, eps_T)
+        tail = navier_m_tail_bound(1.0, r, 1.0, 1.0, modes, M)
+        for (i, j), tot in exact.items():  # the 50-digit Navier-m value differs from the Levy series only by the tail
+            assert abs(mp.mpf(L[i, j]) - tot) <= model[i, j] + tail

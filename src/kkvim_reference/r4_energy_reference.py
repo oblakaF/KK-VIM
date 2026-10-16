@@ -11,11 +11,19 @@ Truncation (own, strict): with odd m, n <= M kept, the remainder splits into {m 
 sum_{odd} m^-2 = pi^2/8, hence
     0 <= S - S_M <= (a^4 + b^4) pi^2 / (80 M^5).
 
-Rounding (first order, standard IEEE model, round to nearest, no underflow or overflow; products m^2 n^2 exact for
-M <= 9999): every term <= 9u relative, rows and the total summed with math.fsum (correctly rounded, + u each), the
-constant 64 a b / (pi^8 D) <= 13u (pi^8 by pow, assumed within one ulp): |J_computed - J_M| <= 24 u J_M + O(u^2).
-The bound is a count of operations in the stated model, not a machine-checked proof; checked against an independent
-semi-analytic evaluation (closed form in n) and, in a temporary QA environment, against mpmath.
+Rounding (operation count to first order in the standard IEEE model: round to nearest, no underflow or overflow;
+ASSUMPTION: x ** 8 of the double fl(pi) is within one ulp, <= 2u relative - checked by tests/cross/test_r4_dst_qa.py):
+    term 1/((m^2 n^2) (m^2/a^2 + n^2/b^2)^2): a^2, b^2, m^2/a^2, n^2/b^2 and their sum <= 3u; the square <= 7u;
+        the product with m^2 n^2 <= 8u (m^2 n^2 is an odd integer, exact in binary64 iff m^2 n^2 <= 2^53, guaranteed for
+        odd M <= 9741 since 9741^4 < 2^53 < 9743^4; for 9741 < M <= 9999 some products are rounded: one more u, <= 9u);
+        the reciprocal <= 9u (10u);
+    S: rows and total by math.fsum, correctly rounded: + u each, <= 11u (12u);
+    constant 64 a b / (pi^8 D): a b (u), pi^8 = fl(pi)^8 (8 x 0.35u for |pi - fl(pi)| <= 0.35u pi) and pow (2u), x D (u),
+        the division (u): <= 7.8u;
+    J = q * const * S and Pi = -0.5 q J: three multiplications, 3u;
+    total <= 21.8u for odd M <= 9741 and <= 22.8u for 9741 < M <= 9999, both <= ROUNDING_REL = 24u (+ O(u^2)).
+The count is not a machine-checked proof. Checked against an independent semi-analytic evaluation (closed form in n),
+the qualified Navier integral and, in a temporary QA environment, 50-digit sums (Reviewer 3aaca8e: <= 6.2u at M = 4001).
 """
 
 import math
@@ -33,7 +41,10 @@ def S_TAIL(a, b, M):
 
 
 def energy_sum(a, b, M):
-    """S_M = sum over odd m, n <= M of 1 / (m^2 n^2 (m^2/a^2 + n^2/b^2)^2), rows and total by math.fsum."""
+    """S_M = sum over odd m, n <= M of 1 / (m^2 n^2 (m^2/a^2 + n^2/b^2)^2), rows and total by math.fsum.
+
+    Odd M <= 9999; the products m^2 n^2 are exact for M <= 9741 and rounded once for some terms above (module docstring).
+    """
     if isinstance(M, bool) or not isinstance(M, int) or M < 1 or M % 2 == 0 or M > 9999:
         raise ValueError("M must be an odd integer in [1, 9999]")
     a2, b2 = a * a, b * b

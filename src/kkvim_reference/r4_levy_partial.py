@@ -19,12 +19,28 @@ Independent cross-check: the same partial sum of the Navier double series [L-107
 whose tail is bounded strictly: (m^2/a^2 + n^2/b^2)^2 >= n^4/b^4 and sum_{n odd > M} n^-5 <= 1/(8 M^4) give
     |w - w_M| <= 16 |q| b^4 / (pi^6 D) * sum_j 1/m_j * 1/(8 M^4)   (uniformly in x, y).
 
-Rounding of the Levy partial sum: first-order MODEL (not a strict bound) per term relative 12u (bracket <= 4u
-observed in R3, sine and products), plus the summation of N terms: |err| <= C0 (12u + gamma_N) sum_j m_j^-5 |T_mj| |sin|,
-C0 = 4|q| a^4 / (pi^5 D). DOMAIN: alpha_m >= pi/2 only, the range for which ЧВ-Л1 was checked in R3 (r_L >= 1). QA
-measurement against 50-digit arithmetic (report, section 6.1): for alpha < pi/2 the bracket T is a small difference of
-terms of order one and the stable form loses accuracy, about 200 u at alpha = 0.31 (r = 0.2, m = 1) and 1200 u at
-alpha = 0.16; there the model does not apply (ValueError) and the m-truncated Navier sum is the s = 1 reference.
+Navier-m is checked for an odd M only (the bound 1/(8 M^4) needs n >= M + 2 for the omitted odd n; ValueError otherwise).
+
+Rounding of the m-truncated Navier sum (``navier_m_rounding_bound``): STRICT in the standard IEEE model (round to nearest,
+no overflow or underflow) under the ASSUMPTIONS that math.pow / ** of a double is within one ulp (<= 2u relative) and that
+np.sin of an argument in [0, pi/2] is within one ulp (checked for the used grids by tests/cross/test_r4_dst_qa.py), with
+classical dot products in any order. Factors (1 + delta) are composed exactly, not to first order:
+    coefficient c_mn = 16 q / (pi^6 D m n (m^2/a^2 + n^2/b^2)^2): fl(pi)^6 (6 x 0.35u), pow (2u), x D, x m, x n, x square
+        (1u each), m^2/a^2 and n^2/b^2 (a^2 or b^2 and the division: 2u each), their sum (u), the square (2 x 3u + u),
+        final division (u);
+    sine sin(pi r / n), r reduced to [0, n/2]: argument fl(pi) (0.35u), x r (u), / n (u); propagation |dx| <= eta x and
+        x / sin(x) <= pi/2 on (0, pi/2] (with the second-order term), own error 2u;
+    dot product of K = (M + 1)/2 terms: gamma_K; outer product with sin(m pi x/a): u and the sine; sum over N modes: gamma_N.
+Hence |w_computed - w_M| <= theta * sum_m sum_n |c_mn| at every node, theta from the composition (about gamma_K + 26u).
+
+Rounding of the Levy partial sum (``levy_x_partial_rounding_model``): MODEL_ONLY. The relative error eps_T of the stable
+bracket T has NO a-priori bound here: R3 recorded <= 3.92u, the Reviewer measured 8.9u at alpha = pi/2 (3aaca8e, 2.1) and
+QA 7.4u, and the sensitivity of T to the rounding of alpha and s is not bounded. eps_T must therefore be supplied by the
+caller (e.g. measured in a temporary high-precision environment for the alpha and nodes used); the remaining operations
+add 16.1u by count (C0 = 4 q a^4 / (pi^5 D): 8.75u; x C0 and / m^5: 2u; x sin(m pi x/a) and the outer product: 5.35u),
+plus gamma_N for the sum of N modes. DOMAIN: alpha_m >= pi/2 only. For alpha < pi/2 the bracket T = O(alpha^4) is a
+small difference of terms of order one (QA, 50 digits: about 200u at alpha = 0.31, r = 0.2; Reviewer 160u) and the
+m-truncated Navier sum is the s = 1 reference (R4_NUMERICAL_SPEC 9.1; Reviewer note С-2).
 """
 
 import math
@@ -32,7 +48,7 @@ import math
 import numpy as np
 
 __all__ = ["bracket", "levy_x_partial_at_nodes", "levy_x_partial_rounding_model", "navier_m_truncated_at_nodes",
-           "navier_m_tail_bound"]
+           "navier_m_tail_bound", "navier_m_rounding_bound"]
 
 U_ROUND = 2.0**-53
 
@@ -74,13 +90,16 @@ def levy_x_partial_at_nodes(a, b, q, D, modes, nx, ny):
     return W
 
 
-def levy_x_partial_rounding_model(a, b, q, D, modes, nx, ny):
-    """First-order model of the rounding of ``levy_x_partial_at_nodes`` (absolute, per node); not a strict bound.
+def levy_x_partial_rounding_model(a, b, q, D, modes, nx, ny, bracket_rel):
+    """MODEL_ONLY rounding estimate of ``levy_x_partial_at_nodes`` (absolute, per node); not a bound.
 
-    Only for alpha_m = m pi b/(2a) >= pi/2 for every mode (see the module docstring); ValueError otherwise.
+    bracket_rel -- relative error of the bracket T supplied by the caller (no a-priori bound exists, module docstring);
+    per term (bracket_rel + 16.1u), plus gamma_N for the sum of the N modes. Only for alpha_m >= pi/2 (ValueError).
     """
     if min(modes) * b / a < 1.0:
         raise ValueError("rounding model not applicable: alpha_m < pi/2 (stable form loses accuracy, use the Navier sum)")
+    if not (math.isfinite(bracket_rel) and bracket_rel >= 0.0):
+        raise ValueError("bracket_rel must be a finite non-negative number")
     C0 = 4.0 * abs(q) * a**4 / (math.pi**5 * D)
     s = _s_nodes(ny)
     N = len(modes)
@@ -89,16 +108,24 @@ def levy_x_partial_rounding_model(a, b, q, D, modes, nx, ny):
     for m in modes:
         alpha = m * math.pi * b / (2.0 * a)
         S += np.outer(np.abs(_sin_nodes(nx, m)), C0 * np.abs(bracket(alpha, s)) / m**5)
-    return (12.0 * U_ROUND + gamma) * S
+    return (bracket_rel + 16.1 * U_ROUND + gamma) * S
+
+
+def _check_odd_M(M):
+    if isinstance(M, bool) or not isinstance(M, (int, np.integer)) or M < 1 or M % 2 == 0:
+        raise ValueError(f"M must be a positive odd integer (largest kept odd n), got {M!r}")
+    return int(M)
 
 
 def navier_m_tail_bound(a, b, q, D, modes, M):
-    """Strict uniform bound of the n-tail of the m-truncated Navier sum (odd n > M)."""
+    """Strict uniform bound of the n-tail of the m-truncated Navier sum (omitted odd n > M; M odd)."""
+    M = _check_odd_M(M)
     return 16.0 * abs(q) * b**4 / (math.pi**6 * D) * sum(1.0 / m for m in modes) / (8.0 * M**4)
 
 
 def navier_m_truncated_at_nodes(a, b, q, D, modes, nx, ny, M):
     """sum_{m in modes} sum_{n odd <= M} w_mn sin(m pi x_i/a) sin(n pi y_j/b) at all nodes; separable evaluation."""
+    M = _check_odd_M(M)
     n = np.arange(1, M + 1, 2)
     j = np.arange(ny + 1)
     r = np.mod(np.outer(j, n), 2 * ny)
@@ -110,3 +137,27 @@ def navier_m_truncated_at_nodes(a, b, q, D, modes, nx, ny, M):
         c = 16.0 * q / (math.pi**6 * D * m * n * (m**2 / a**2 + n**2 / b**2) ** 2)
         W += np.outer(_sin_nodes(nx, m), Sy @ c)
     return W
+
+
+def navier_m_rounding_bound(a, b, q, D, modes, M):
+    """Uniform bound of |w_computed - w_M| for ``navier_m_truncated_at_nodes`` (strict under the stated assumptions).
+
+    Composition of the relative errors listed in the module docstring; returns theta * sum_m sum_n |c_mn| (absolute).
+    """
+    M = _check_odd_M(M)
+    u = U_ROUND
+    K = (M + 1) // 2
+    N = len(modes)
+    gamma_K = K * u / (1 - K * u)
+    gamma_N = N * u / (1 - N * u)
+    # coefficient: denominator pi^6 D m n (sq)^2 and the final division
+    den = (1 + 0.35 * u) ** 6 * (1 + 2 * u) * (1 + u) ** 3 * (1 + u) ** 7 * (1 + u) - 1  # pi^6, pow, xD xm xn, square, x sq
+    c_rel = (1 + den / (1 - den)) * (1 + u) - 1
+    # sine: argument (fl(pi), x r, / n), propagation with x/sin(x) <= pi/2 and the second-order term, own error 2u
+    eta = (1 + 0.35 * u) * (1 + u) ** 2 - 1
+    s_rel = (1 + eta * math.pi / 2 + eta**2) * (1 + 2 * u) - 1
+    theta = (1 + gamma_K) * (1 + c_rel) * (1 + s_rel) * (1 + u) * (1 + s_rel) * (1 + gamma_N) - 1
+    n = np.arange(1, M + 1, 2)
+    total = math.fsum(math.fsum((16.0 * abs(q) / (math.pi**6 * D * m * n * (m**2 / a**2 + n**2 / b**2) ** 2)).tolist())
+                      for m in modes)
+    return theta * total * (1 + 8 * u)  # the bound itself computed with a few roundings

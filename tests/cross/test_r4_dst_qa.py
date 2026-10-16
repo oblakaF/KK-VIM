@@ -9,12 +9,13 @@ fast transform is only measured (empirical, normwise) - no bound for it is claim
 """
 
 import math
+from decimal import Decimal, localcontext
 
 import numpy as np
 import pytest
 
 from kkvim_reference.r4_dst_check import U_ROUND, dense_bound, dense_dst, fast_dst, ones_transform
-from kkvim_reference.r4_spectral_control import dst_matrix
+from kkvim_reference.r4_spectral_control import _sin_pi_ratio, dst_matrix
 
 SIZES = (4, 7, 20, 64, 128, 320, 640)
 
@@ -78,3 +79,59 @@ def test_high_precision_dense_bound_and_fast_errors(n):
                 worst_fast = max(worst_fast, float(np.max(np.linalg.norm(err, axis=0) / np.linalg.norm(x, axis=0))))
     # observation only: normwise error of the fast transform in units of u log2(n) (no bound is claimed)
     assert worst_fast <= 10 * U_ROUND * math.log2(n)
+
+
+# --- premises of the conditional bounds (no mpmath: 40-digit decimal arithmetic of the standard library; runs in CI) ---
+
+def _dec_sin(x):
+    """sin of a Decimal x in [0, 2] by the Taylor series at 40 digits (terms decrease; truncation < 1e-40)."""
+    with localcontext() as ctx:
+        ctx.prec = 45
+        term, total, k = x, x, 1
+        while abs(term) > Decimal(10) ** -44:
+            term = -term * x * x / ((2 * k) * (2 * k + 1))
+            total += term
+            k += 1
+        return +total
+
+
+SIN_SIZES = sorted(set(range(2, 65)) | set(range(68, 641, 4)) | {7, 13, 21, 640})
+
+
+def test_sin_premise_within_one_ulp_for_the_used_arguments():
+    """np.sin(np.pi * r / n), r = 0..n//2, as evaluated inside dst_matrix (2D arrays) and for node vectors (1D), is
+    within one ulp of the exact sine of the double argument (premise of r4_dst_check, r4_levy_partial). Every distinct
+    computed value per argument is checked (array evaluation paths may differ)."""
+    worst = 0.0
+    for n in SIN_SIZES:
+        k = np.arange(1, n)
+        R = np.outer(k, k)
+        vals = np.abs(_sin_pi_ratio(R, n))  # exactly the values that enter Psi (sign handled separately, exact)
+        r = np.mod(R, 2 * n)
+        r1 = np.mod(r, n)
+        r2 = np.minimum(r1, n - r1)
+        line = np.abs(_sin_pi_ratio(np.arange(n + 1), n))  # one-dimensional evaluation (node vectors, r4_levy_partial)
+        r_line = np.minimum(np.mod(np.arange(n + 1), n), n - np.mod(np.arange(n + 1), n))
+        for rr in range(0, n // 2 + 1):
+            computed = np.unique(np.concatenate([vals[r2 == rr], line[r_line == rr]]))
+            if computed.size == 0:
+                continue
+            arg = float(np.pi * np.int64(rr) / n)  # the double argument as formed in _sin_pi_ratio
+            exact = _dec_sin(Decimal(arg))
+            for v in computed:
+                err = abs(Decimal(float(v)) - exact)
+                if v == 0.0:
+                    assert rr == 0
+                    continue
+                worst = max(worst, float(err) / math.ulp(float(v)))
+    assert worst <= 1.0, worst
+
+
+@pytest.mark.parametrize("k", (5, 6, 8))
+def test_pow_premise_for_powers_of_pi(k):
+    """math.pi ** k within one ulp of fl(pi)^k (premise of r4_energy_reference, r4_levy_partial)."""
+    with localcontext() as ctx:
+        ctx.prec = 60
+        exact = Decimal(math.pi) ** k
+    v = math.pi**k
+    assert abs(Decimal(v) - exact) <= Decimal(math.ulp(v))

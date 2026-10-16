@@ -25,6 +25,12 @@ section 2):
 
 Nodal quantities (2D assembly of Delta_h by second differences, the path of R2) are computed separately and serve as
 an independent check of the spectral ones.
+
+``projection_residual`` checks the variational equation (stationarity of Pi_h on M_h of the given set) by nodal assembly;
+it detects errors of the FORMULA (assembly, sign of 2B, cross terms, directions), but it is NOT an estimate of the error
+of the field: it is scaled by the rounding scale |Delta_h|^2 |W|, which grows like n^4, so its sensitivity to a field
+error falls roughly like n^-4 (Reviewer 3aaca8e, 1.4: a smooth field error 1e-6 passes the 1e-13 check at n = 320).
+The quantitative comparisons of QA are the field, the energy and the independent spectral quantities.
 """
 
 import math
@@ -203,7 +209,7 @@ class ControlStep:
     kappa_rep: float  # representation dependent
     given_cond: float  # sigma_1/sigma_N of the given set with unit columns (before its orthonormalisation)
     ls_cond_max: float  # largest condition number of the weighted least-squares matrices
-    projection_residual: float  # nodal check of stationarity on M_h(given set), relative
+    projection_residual: float  # nodal check of the variational equation (formula check, not a field-error estimate)
     energy_identity_defect: float | None  # |Pi(s-1) - Pi(s) - 1/2|w(s) - w(s-1)|_a^2| / |Pi(s)| (s >= 2)
 
 
@@ -215,6 +221,8 @@ def _unit_columns_cond(X):
 
 def _projection_residual(grid, W, given, axis):
     """max over basis directions of |a_h(w, g_i x e) - l_h(g_i x e)| / scale, by nodal assembly only.
+
+    A check of the variational equation, not of the accuracy of the field (sensitivity ~ n^-4, module docstring).
 
     axis "x": given set on G(a, n_x) (Y-half-step); "y": given set on G(b, n_y) (X-half-step).
     """

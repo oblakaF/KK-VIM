@@ -59,7 +59,9 @@ def test_internal_identities(N, r):
     energies = [x.energy_spectral for x in steps]
     for x in steps:
         assert abs(x.energy_nodal - x.energy_spectral) <= 1e-13 * abs(x.energy_spectral)
-        assert x.projection_residual <= 1e-13  # stationarity on M_h(given set), nodal assembly, relative to rounding scale
+        # variational equation on M_h(given set) by nodal assembly: a FORMULA check, not a field-error estimate (the
+        # scale grows ~n^4, Reviewer 3aaca8e, 1.4); the field itself is checked against R3, 50 digits and closed forms
+        assert x.projection_residual <= 1e-13
         if x.energy_identity_defect is not None:
             assert x.energy_identity_defect <= 1e-12
         assert np.max(np.abs(x.W - x.W[::-1, :])) <= 1e-12 * np.max(np.abs(x.W))  # reflections (ВБ-22, item 6)

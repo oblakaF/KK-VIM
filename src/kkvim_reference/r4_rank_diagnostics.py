@@ -14,6 +14,14 @@ error of the factors (delta_f, 5.2 item 6(f)), which is zero for such factors.
 Storage component of delta_f (own, strict in the IEEE model, round to nearest, no underflow): storing exact factors
 U*, V* as doubles gives |dU_w|_2 <= |dU_w|_F <= u |U*_w|_F <= u sqrt(N) |U*_w|_2, the same for V, so by 5.2, item 6(f)
     delta_f(storage) <= kappa_rep (2 sqrt(N) u + N u^2).
+CONDITIONS (Reviewer 3aaca8e, 4.1): (1) kappa_rep is that of the EXACT weighted representation, kappa_rep =
+|U*_w|_2 |V*_w|_2 / sigma_1(W*_w); (2) exactly one correct rounding of every element of the weighted factors; (3) forming
+the weighted factors from stored ones, fl(sqrt(h) U), adds a rounding per element and is not covered (in the same form it
+gives kappa_rep (4 sqrt(N) u + O(u^2))); (4) with kappa_rep computed from the stored arrays, kappa_hat, a correction is
+needed: with e = 2 sqrt(N) u + N u^2 and kappa' = kappa_hat / (1 - sqrt(N) u)^2, kappa_rep <= kappa' / (1 - e kappa') for
+e kappa' < 1, plus the (NOT_VERIFIED, c_d-type) error of computing kappa_hat by QR/SVD. Factors obtained by computation
+(products, numerical inverses, solves) are NOT single roundings of exact factors and are not covered. The bound says nothing
+about the accumulated delta_f of the solver (mode solves, assembly, DST, transfer over s: NOT_VERIFIED).
 The constant c_d of Householder QR and of the SVD is NOT derived here (no source in the project library): only its
 empirical ratio rho_hat / (u kappa_rep) on the synthetic sets is measured (report, section 5).
 """
@@ -72,7 +80,8 @@ def exact_rank(U, V):
 
 
 def storage_delta_f(kappa_rep, N):
-    """Strict bound of delta_f caused only by storing exact factors in double (see the module docstring)."""
+    """Strict bound of delta_f caused only by ONE rounding of every element of exact weighted factors (conditions in
+    the module docstring); not applicable to computed factors and not to the accumulated delta_f."""
     return kappa_rep * (2.0 * math.sqrt(N) * U_ROUND + N * U_ROUND**2)
 
 
