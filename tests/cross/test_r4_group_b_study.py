@@ -6,6 +6,7 @@ the spectral discrete path with run_control, and the reproduction of the prelimi
 precision they were given. The full pipeline (minutes) runs only with KKVIM_GROUP_B=1 - not in the mandatory CI.
 """
 
+import csv
 import importlib.util
 import math
 import os
@@ -18,7 +19,9 @@ from kkvim_reference.r4_continuous_sequence import continuous_sequence, field_at
 from kkvim_reference.r4_energy_reference import omega0_energy
 from kkvim_reference.r4_spectral_control import SpectralGrid, run_control
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "r4_group_b_study.py"
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = ROOT / "scripts" / "r4_group_b_study.py"
+RESULTS = ROOT / "docs" / "results" / "r4_group_b"
 spec = importlib.util.spec_from_file_location("r4_group_b_study", SCRIPT)
 study = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(study)
@@ -66,7 +69,10 @@ def test_energy_routes_agree_and_projection_identities_hold():
     identity err2(s-1) = err2(s) + |w_s - w_{s-1}|^2 (MATH_SPEC ВБ-17) holds to rounding and err_abs does not grow."""
     rows = study.continuous_case(1.0, 1.0, 1.0, 1.0, 2, M=201, M_check=401, s_max=6)
     for row in rows:
-        assert abs(2 * row["dPi_energy_route"] - row["err2_direct"]) <= 2 * row["budget_energy_route"] + row["budget_direct"]
+        budget_E = (row["E_strict_rel"] + row["E_model_rel"] + row["E_diag_rel"]) * row["dPi_energy_route"]
+        budget_D = (row["D_strict_rel"] + row["D_model_rel"] + row["D_diag_rel"]) * row["err2_direct"]
+        # the two routes share the coefficient arrays: this checks the evaluation of the norm, not the recursion
+        assert abs(2 * row["dPi_energy_route"] - row["err2_direct"]) <= 2 * budget_E + budget_D
     for prev, row in zip(rows, rows[1:]):
         assert abs(row["pythagoras_defect_rel"]) <= 1e-12
         assert row["err2_direct"] <= prev["err2_direct"] * (1 + 1e-12)
@@ -77,6 +83,75 @@ def test_status_rule():
     assert study.status(1e-3, -0.2) == "RESOLVED"
     assert study.status(3e-3, 0.2) == "UNRESOLVED"
     assert study.status(math.nan, 0.2) == "UNRESOLVED"
+
+
+def test_mode_count_is_not_the_largest_index():
+    """M is the largest kept odd index; the number of odd modes per axis is (M + 1)/2 (review b0c208d, И-2)."""
+    for M, count in ((1, 1), (41, 21), (81, 41), (4001, 2001), (8001, 4001)):
+        assert study.mode_count(M) == count == study.odd_modes(M).size
+        assert study.odd_modes(M)[-1] == M
+    for bad in (0, 80, 4000, 2.0, True):
+        with pytest.raises(ValueError):
+            study.mode_count(bad)
+
+
+def test_measurement_status_and_continuous_method_status_are_separate():
+    """И-1: RESOLVED for the finite spectral problem; for the untruncated continuous KK-VIM RESOLVED only at s = 1 (strict
+    Navier-m tail), at s >= 2 at best PROVISIONAL (Q-022) - never RESOLVED, never automatically UNRESOLVED."""
+    cs = study.continuous_status
+    assert cs(1, "RESOLVED", 1e-6, 1.0, 1.0) == "RESOLVED"  # s = 1: decided by the strict budget, not by diagnostics
+    assert cs(1, "RESOLVED", 0.5, 0.0, 1.0) == "UNRESOLVED"
+    assert cs(2, "RESOLVED", 0.0, 1e-6, 1.0) == "PROVISIONAL"
+    assert cs(2, "RESOLVED", 0.0, 0.5, 1.0) == "UNRESOLVED"  # diagnostics do not support the transfer
+    assert cs(2, "UNRESOLVED", 0.0, 1e-6, 1.0) == "UNRESOLVED"
+    rows = study.continuous_case(1.0, 1.0, 1.0, 1.0, 3, M=401, M_check=801, s_max=4)
+    for row in rows:
+        for key in ("e_rel", "e_rel_E", "delta_c", "E_inf"):
+            assert row[f"status_meas_{key}"] == "RESOLVED"
+            assert row[f"status_cont_{key}"] == ("RESOLVED" if row["s"] == 1 else "PROVISIONAL")
+        assert row["sqrt_e_rel"] == math.sqrt(row["e_rel"]) and row["modes_per_axis"] == 201
+
+
+def _read(name):
+    with open(RESULTS / name, encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def test_committed_tables_keep_the_scientific_numbers():
+    """The committed CSV values are the output of the generator: recomputation of N = 3, r = 1 (M = 4001) reproduces
+    e_rel, err_abs, sqrt(e_rel), delta_c, Pi(w), Pi(omega_0) to the 7 significant digits written (И-1...И-4 changed only
+    statuses, budget columns and names, not the measured numbers)."""
+    committed = {(int(t["N"]), t["r_label"], int(t["s"])): t for t in _read("continuous.csv")}
+    rows = study.continuous_case(1.0, 1.0, 1.0, 1.0, 3, M=4001, M_check=4001, s_max=10)
+    for row in rows:
+        if row["s"] not in (1, 2, 3, 10):
+            continue
+        t = committed[(3, "1", row["s"])]
+        for key in ("e_rel", "err_abs", "sqrt_e_rel", "delta_c", "Pi_w", "Pi_0", "E_inf_sampled", "L2_rel"):
+            assert math.isclose(float(t[key]), row[key], rel_tol=1e-6), (key, row["s"])
+        for key in ("status_meas_e_rel", "status_cont_e_rel", "status_meas_delta_c", "status_cont_delta_c"):
+            assert t[key] == row[key]
+
+
+def test_master_and_tables_are_consistent_with_the_sources():
+    cont = {(t["N"], t["r_label"], t["s"]): t for t in _read("continuous.csv")}
+    grid = {(t["N"], t["r_label"], t["s"], t["nx"], t["ny"], t["family"]): t for t in _read("grid.csv")}
+    master = _read("master.csv")
+    assert len(master) == len(grid)
+    for m in master:
+        c = cont[(m["N"], m["r"], m["s"])]
+        g = grid[(m["N"], m["r"], m["s"], m["n_x"], m["n_y"], m["family"])]
+        for key in ("e_rel", "sqrt_e_rel", "err_abs", "status_meas_e_rel", "status_cont_e_rel", "status_meas_delta_c",
+                    "status_cont_delta_c"):
+            assert m[key] == c[key]
+        assert m["delta_c_method"] == c["delta_c"] and m["delta_c_disc"] == g.get("d_disc_c", "")
+        assert m["E_inf_disc"] == g["E_inf_disc"] and m["e_rel_h"] == g["e_rel_h"]
+        assert math.isclose(float(m["sqrt_e_rel"]) ** 2, float(m["e_rel"]), rel_tol=2e-6)
+        if int(m["s"]) >= 2:
+            assert m["status_cont_e_rel"] != "RESOLVED" and m["status_cont_delta_c"] != "RESOLVED"
+    tables = (RESULTS / "tables.md").read_text(encoding="utf-8")
+    assert "√e_rel" in tables and "согласие e_rel,h с e_rel (1 %)" in tables
+    assert "1/100 (энергия)" not in tables  # И-4: the agreement measure is not an energy distinguishability
 
 
 def test_spectral_discrete_path_equals_run_control_and_discrete_identity():

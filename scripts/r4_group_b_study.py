@@ -22,10 +22,18 @@ e_rel = err_abs^2 / |omega_0|^2 = [Pi(w_cont) - Pi(omega_0)] / [-Pi(omega_0)]. T
                Outside the computed block (m or n > M) w_cont has no coefficients; the omega_0 part there is bounded
                strictly by the energy tail (r4_energy_reference.S_TAIL).
 
+M denotes the LARGEST KEPT ODD INDEX; the number of odd modes per axis is (M + 1)/2 (M = 4001: 2001 modes).
 The continuous recursion truncated at M is itself an exact KK-VIM sequence of the problem restricted to the sines
-<= M in both directions (every half-step decouples over the modes of the computed function); its field is a legitimate
+with odd indices <= M in both directions (every half-step decouples over the modes of the computed function); its field is a legitimate
 element of H_T, so Pi and |.|_{H_T} of it are exact functionals of that field. Its distance from the untruncated
 w_cont is the truncation of the reference: diagnosed by doubling M (not a proof; transfer over s - Q-022).
+
+Two statuses are kept apart (review b0c208d, И-1): status_meas_* - the measurement of the FINITE spectral problem
+(budget = strict tails + rounding models with stated premises; the rounding of the recursion arrays themselves is not
+in the budget - checked by high precision: QA at M <= 81, Reviewer at M = 4001); status_cont_* - the statement on the
+UNTRUNCATED continuous KK-VIM: s = 1 RESOLVED/UNRESOLVED with the strict Navier-m tail, s >= 2 at best PROVISIONAL
+(Q-022). Budgets are written in three separate parts: *_strict_rel, *_model_rel, *_diag_rel (diagnostics: doubling
+of M, least squares). Routes D and E share the coefficient arrays of the recursion.
 
 Reproduction (repository root):
     uv run python scripts/r4_group_b_study.py                       # all tables except high precision
@@ -58,9 +66,9 @@ NS = (2, 3)
 R_INITIAL = {"1/5": 0.2, "1/3": 1 / 3, "1/2": 0.5, "1": 1.0, "2": 2.0, "3": 3.0, "5": 5.0}
 R_EXTRA = {"2/3": 2 / 3, "7/5": 1.4, "3/2": 1.5}  # the ten control r of R3_NUMERICAL_SPEC (line 78)
 R_ALL = {**R_INITIAL, **R_EXTRA}
-M_CONT = 4001  # odd modes of the continuous recursion (both directions)
-M_CHECK = 8001  # doubling diagnostic
-M_ENERGY = 4001  # Pi(omega_0): strict tail (a^4+b^4) pi^2/(80 M^5), rounding 24u
+M_CONT = 4001  # largest kept odd index of the continuous recursion, both axes (2001 odd modes per axis)
+M_CHECK = 8001  # doubling diagnostic (largest odd index; 4001 odd modes per axis)
+M_ENERGY = 4001  # Pi(omega_0), odd m, n <= 4001: strict tail (a^4+b^4) pi^2/(80 M^5), rounding 24u (count)
 SAMPLE = 64  # nodes per side of the sampling grid of E_inf for the continuous part
 SQUARE_CHAIN = (40, 80, 160, 320, 640, 1280)
 P_WINDOW = (1.9, 2.1)  # asymptotic window accepted for R2 (NUMERICAL_SPEC 12) - used here as a research criterion only
@@ -73,10 +81,26 @@ REFERENCE_FULL_GRID_640 = -2.76e-7  # (omega_h - omega_0)(centre) / omega_0(cent
 
 
 def status(budget, measured):
-    """RESOLVED if the budget of the references is <= 1/100 of the measured quantity (same relative norm)."""
+    """Status of a MEASUREMENT: RESOLVED if the budget of the references (strict parts + rounding models, with their
+    stated premises) is <= 1/100 of the measured quantity in the same relative norm (D-046), else UNRESOLVED."""
     if not (math.isfinite(budget) and math.isfinite(measured)):
         return "UNRESOLVED"
     return "RESOLVED" if budget <= RULE * abs(measured) else "UNRESOLVED"
+
+
+def continuous_status(s, meas_status, budget_s1, diagnostic, measured):
+    """Status of the SCIENTIFIC statement on the untruncated continuous KK-VIM (report 2.3; review b0c208d, И-1).
+
+    s = 1: the difference from the untruncated half-step is strictly bounded (Navier-m tail), so RESOLVED is possible
+    at the level of the measurement - budget_s1 includes that strict tail (not a normative qualification of the s = 1
+    reference, РВ4-8). s >= 2: no strict bound of the transfer of the truncation over the half-steps (Q-022): at best
+    PROVISIONAL - the measurement is RESOLVED and the diagnostics (doubling of M, least squares) are <= 1/100;
+    otherwise UNRESOLVED."""
+    if s == 1:
+        return status(budget_s1, measured)
+    if meas_status == "RESOLVED" and status(diagnostic, measured) == "RESOLVED":
+        return "PROVISIONAL"
+    return "UNRESOLVED"
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -85,7 +109,15 @@ def status(budget, measured):
 
 
 def odd_modes(M):
+    """The odd indices 1, 3, ..., M (M = largest kept odd index)."""
     return np.arange(1, M + 1, 2, dtype=float)
+
+
+def mode_count(M):
+    """Number of odd modes per axis for the largest kept odd index M: (M + 1)/2 (M = 81 -> 41, 4001 -> 2001)."""
+    if isinstance(M, bool) or not isinstance(M, int) or M < 1 or M % 2 == 0:
+        raise ValueError(f"M must be a positive odd integer (largest kept odd index), got {M!r}")
+    return (M + 1) // 2
 
 
 _LAM = {}
@@ -197,6 +229,13 @@ def continuous_case(a, b, q, D, N, M=M_CONT, M_check=M_CHECK, s_max=S_MAX):
     W0 = levy_series_w_grid(xs, ys, a=a, b=b, q=q, D=D)
     lb = levy_field_bounds(a=a, b=b, q=q, D=D)
     W0_max = float(np.max(np.abs(W0)))
+    pi0_tail = pi0_budget - ROUNDING_REL * abs(pi0)  # omega0_energy returns tail + 24u |Pi|; split back
+    pi0_round = ROUNDING_REL * abs(pi0)
+    # s = 1: the untruncated first half-step is the m-truncated Navier sum with ALL n (ВБ-23); the computed one keeps
+    # n <= M. The difference is strictly bounded: in H_T^2 by the omega_0 part outside the block (out_ht), pointwise by
+    # the Navier-m tail (R4_NUMERICAL_SPEC 9.1 (б)). For s >= 2 no strict bound of the transfer exists (Q-022).
+    modes_L = list(range(1, 2 * N, 2))
+    s1_point_tail = navier_m_tail_bound(a, b, q, D, modes_L, M)
     rows, prev = [], None
     for st, ck in zip(steps, check):
         s = st.s
@@ -206,45 +245,68 @@ def continuous_case(a, b, q, D, N, M=M_CONT, M_check=M_CHECK, s_max=S_MAX):
         err2_block = ht_norm2(dv, a, b, D, M)
         err2_check = ht_norm2(Cc - w0_check, a, b, D, M_check)
         err2_direct = err2_block + 0.5 * out_ht  # midpoint of [block, block + out_ht]
-        # route E: difference of the energies
+        # route E: difference of the energies. strict: tail of Pi(omega_0); model: 24u count of Pi(omega_0) and the
+        # rounding model of Pi(w); diagnostic: doubling of M.
         dpi = st.energy - pi0
         pi_w_round = energy_rounding_model(st.x, st.y, a, b, q, D, modes)
         pi_w_trunc = abs(st.energy - ck.energy)
-        budget_E = pi0_budget + pi_w_round + pi_w_trunc
-        # route D budget: omega_0 outside the block, rounding of the positive sum (gamma over K^2 terms of the
-        # coefficients' differences, ~u |omega_0| err), truncation of w_cont (doubling)
-        round_D = direct_rounding(st.x, st.y, w0, err2_block, a, b, D, M)
-        budget_D = 0.5 * out_ht + round_D + abs(err2_check - err2_block)
-        # point values
+        strict_E, model_E, diag_E = pi0_tail, pi0_round + pi_w_round, pi_w_trunc
+        # route D: strict - omega_0 outside the block (half width of [block, block + out_ht]); model - rounding of the
+        # positive sum of the coefficients' differences; diagnostic - doubling of M. Routes D and E use the SAME
+        # coefficient arrays of the recursion: their agreement checks the evaluation of the norm, not the recursion.
+        strict_D, model_D = 0.5 * out_ht, direct_rounding(st.x, st.y, w0, err2_block, a, b, D, M)
+        diag_D = abs(err2_check - err2_block)
+        # point values: strict - Levy truncation; model - Levy rounding model and the rounding of the centre sum;
+        # diagnostic - doubling of M and the independent least squares (centre only, s <= 10)
         wc = centre_value(st.x, st.y)
         wc_check = centre_value(ck.x, ck.y)
         wc_ls = centre_value(ls[s - 1].x, ls[s - 1].y) if s <= len(ls) else math.nan
-        c_budget = c0_budget + abs(wc - wc_check) + (abs(wc - wc_ls) if s <= len(ls) else 0.0) + centre_rounding(st.x, st.y)
+        strict_c, model_c = cb.truncation, cb.rounding_model + centre_rounding(st.x, st.y)
+        diag_c = abs(wc - wc_check) + (abs(wc - wc_ls) if s <= len(ls) else 0.0)
         dc = (wc - c0) / c0
         Wc = field_at_nodes(st, SAMPLE, SAMPLE)
         Wc_check = field_at_nodes(ck, SAMPLE, SAMPLE)
         e_inf = float(np.max(np.abs(Wc - W0))) / W0_max
-        e_inf_budget = (lb.truncation + lb.rounding_model + float(np.max(np.abs(Wc - Wc_check)))
-                        + K * U * float(np.max(np.abs(Wc)))) / W0_max
+        strict_inf, model_inf = lb.truncation, lb.rounding_model + K * U * float(np.max(np.abs(Wc)))
+        diag_inf = float(np.max(np.abs(Wc - Wc_check)))
         l2 = l2_norm2(dv, a, b) + 0.5 * out_l2
+        e_rel = err2_direct / norm0
         row = {
-            "N": N, "s": s, "r": b / a, "a": a, "b": b, "q": q, "D": D, "M": M,
-            "Pi_w": st.energy, "Pi_0": pi0, "Pi_0_budget": pi0_budget, "Pi_w_rounding_model": pi_w_round,
-            "Pi_w_truncation_diag": pi_w_trunc, "dPi_energy_route": dpi, "budget_energy_route": budget_E,
-            "status_energy_route": status(budget_E, dpi) if dpi > 0 else "UNRESOLVED",
+            "N": N, "s": s, "r": b / a, "a": a, "b": b, "q": q, "D": D, "M": M, "modes_per_axis": mode_count(M),
+            "Pi_w": st.energy, "Pi_0": pi0, "Pi_0_tail_strict": pi0_tail, "Pi_0_rounding_count": pi0_round,
+            "Pi_w_rounding_model": pi_w_round, "Pi_w_truncation_diag": pi_w_trunc, "dPi_energy_route": dpi,
             "e_rel_energy_route": dpi / (-pi0),
-            "err2_direct": err2_direct, "budget_direct": budget_D, "status_direct": status(budget_D, err2_direct),
-            "err_abs": math.sqrt(err2_direct), "e_rel": err2_direct / norm0,
-            "route_E_minus_D_over_budget_E": (2.0 * dpi - err2_direct) / (2.0 * budget_E),
+            "err2_direct": err2_direct, "err_abs": math.sqrt(err2_direct), "e_rel": e_rel, "sqrt_e_rel": math.sqrt(e_rel),
+            # route D (main value e_rel): budget parts relative to err^2
+            "D_strict_rel": strict_D / err2_direct, "D_model_rel": model_D / err2_direct, "D_diag_rel": diag_D / err2_direct,
+            # route E: budget parts relative to Pi(w) - Pi(omega_0)
+            "E_strict_rel": strict_E / dpi, "E_model_rel": model_E / dpi, "E_diag_rel": diag_E / dpi,
+            "route_E_minus_D_over_budget_E": (2.0 * dpi - err2_direct) / (2.0 * (strict_E + model_E + diag_E)),
             "w_cont_centre": wc, "omega0_centre": c0, "omega0_centre_budget": c0_budget,
             "omega0_centre_140_minus_j": (c0 - c0_j) / c0,
-            "delta_c": dc, "delta_c_budget": c_budget / abs(c0), "status_delta_c": status(c_budget / abs(c0), dc),
+            "delta_c": dc, "c_strict_rel": strict_c / abs(c0 * dc), "c_model_rel": model_c / abs(c0 * dc),
+            "c_diag_rel": diag_c / abs(c0 * dc),
             "w_cont_centre_ls_minus_rec": (wc_ls - wc) / c0 if s <= len(ls) else math.nan,
             "w_cont_centre_M_doubling": (wc_check - wc) / c0,
-            "E_inf_sampled": e_inf, "E_inf_budget": e_inf_budget, "status_E_inf": status(e_inf_budget, e_inf),
+            "E_inf_sampled": e_inf, "inf_strict_rel": strict_inf / (W0_max * e_inf),
+            "inf_model_rel": model_inf / (W0_max * e_inf), "inf_diag_rel": diag_inf / (W0_max * e_inf),
             "L2_rel": math.sqrt(l2 / l2_0),
             "given_cond": st.given_cond,
         }
+        # two statuses (report, section 2.3): measurement of the finite spectral problem (odd modes <= M) and the
+        # scientific statement on the untruncated continuous KK-VIM
+        row["status_meas_e_rel"] = status(strict_D + model_D, err2_direct)
+        row["status_meas_e_rel_E"] = status(strict_E + model_E, dpi) if dpi > 0 else "UNRESOLVED"
+        row["status_meas_delta_c"] = status(strict_c + model_c, c0 * dc)
+        row["status_meas_E_inf"] = status(strict_inf + model_inf, W0_max * e_inf)
+        row["status_cont_e_rel"] = continuous_status(s, row["status_meas_e_rel"], strict_D + model_D + out_ht, diag_D,
+                                                     err2_direct)
+        row["status_cont_e_rel_E"] = continuous_status(s, row["status_meas_e_rel_E"], strict_E + model_E + 0.5 * out_ht,
+                                                       diag_E, dpi)
+        row["status_cont_delta_c"] = continuous_status(s, row["status_meas_delta_c"], strict_c + model_c + s1_point_tail,
+                                                       diag_c, c0 * dc)
+        row["status_cont_E_inf"] = continuous_status(s, row["status_meas_E_inf"], strict_inf + model_inf + s1_point_tail,
+                                                     diag_inf, W0_max * e_inf)
         if prev is not None:
             pst, perr2, pC = prev
             inc2 = ht_norm2(C - pC, a, b, D, M)  # |w_s - w_{s-1}|_{H_T}^2 (exact identity: = 2 (Pi_{s-1} - Pi_s))
@@ -592,13 +654,16 @@ def make_tables(out):
         master.append({
             "N": g["N"], "s": g["s"], "r": g["r_label"], "a": g["a"], "b": g["b"], "n_x": g["nx"], "n_y": g["ny"],
             "family": g["family"], "Pi_w_cont": c["Pi_w"], "Pi_omega0": c["Pi_0"], "err_abs": c["err_abs"], "e_rel": c["e_rel"],
+            "sqrt_e_rel": c["sqrt_e_rel"],
             "delta_c_method": c["delta_c"], "E_inf_method_sampled": c["E_inf_sampled"],
             "delta_c_disc": g.get("d_disc_c", math.nan), "delta_c_total": g.get("d_total_c", math.nan),
             "delta_c_full_grid": g.get("d_full_grid_c", math.nan),
             "E_inf_disc": g["E_inf_disc"], "E_inf_method_nodes": g["E_inf_method"], "E_inf_total": g["E_inf_total"],
             "E_inf_full_grid": g["E_inf_full_grid"], "e_rel_h": g["e_rel_h"],
-            "budget_e_rel_rel": c["budget_direct"] / c["err2_direct"], "budget_delta_c_rel": c["delta_c_budget"],
-            "status_e_rel": c["status_direct"], "status_delta_c": c["status_delta_c"],
+            "budget_meas_e_rel_rel": c["D_strict_rel"] + c["D_model_rel"], "diag_e_rel_rel": c["D_diag_rel"],
+            "budget_meas_delta_c_rel": c["c_strict_rel"] + c["c_model_rel"], "diag_delta_c_rel": c["c_diag_rel"],
+            "status_meas_e_rel": c["status_meas_e_rel"], "status_cont_e_rel": c["status_cont_e_rel"],
+            "status_meas_delta_c": c["status_meas_delta_c"], "status_cont_delta_c": c["status_cont_delta_c"],
             "status_disc_vs_method_centre": ("DISTINGUISHABLE" if abs(g.get("d_disc_c", math.inf)) <= RULE * abs(c["delta_c"])
                                              else "NOT_DISTINGUISHABLE"),
         })
@@ -607,14 +672,18 @@ def make_tables(out):
     parts = []
     # T1: continuous, r = 1
     for N in NS:
-        rows = [(t["s"], t["Pi_w"], t["Pi_0"], t["err_abs"], t["e_rel"], t["budget_direct"] / t["err2_direct"],
-                 t["status_direct"], t["e_rel_energy_route"], t["budget_energy_route"] / t["dPi_energy_route"],
-                 t["status_energy_route"], t.get("rel_energy_change_direct", math.nan), t["delta_c"], t["delta_c_budget"],
-                 t["status_delta_c"], t["E_inf_sampled"], t["L2_rel"])
+        rows = [(t["s"], t["Pi_w"], t["Pi_0"], t["err_abs"], t["e_rel"], t["sqrt_e_rel"], t["D_strict_rel"],
+                 t["D_model_rel"], t["D_diag_rel"], t["e_rel_energy_route"], t["E_strict_rel"], t["E_model_rel"],
+                 t["E_diag_rel"], t.get("rel_energy_change_direct", math.nan), t["delta_c"], t["c_strict_rel"],
+                 t["c_model_rel"], t["c_diag_rel"], t["E_inf_sampled"], t["L2_rel"],
+                 f'{t["status_meas_e_rel"]} / {t["status_cont_e_rel"]}', f'{t["status_meas_delta_c"]} / {t["status_cont_delta_c"]}')
                 for t in cont if t["N"] == N and t["r_label"] == "1" and t["s"] in S_LIST]
-        parts.append(f"### T1-N{N}: continuous, r = 1, a = b = 1, q = D = 1\n\n" + md_table(
-            ["s", "Π(w_cont)", "Π(ω₀)", "err_abs", "e_rel (D)", "бюджет/err² (D)", "статус (D)", "e_rel (E)",
-             "бюджет/ΔΠ (E)", "статус (E)", "ΔΠ_s/|Π_s|", "δ_c", "бюджет δ_c", "статус δ_c", "E_∞ (65²)", "L₂"], rows))
+        parts.append(f"### T1-N{N}: finite spectral problem (odd modes <= {M_CONT}, {mode_count(M_CONT)} per axis) and the "
+                     "untruncated continuous method; r = 1, a = b = 1, q = D = 1\n\n" + md_table(
+            ["s", "Π(w_cont)", "Π(ω₀)", "err_abs", "e_rel (D)", "√e_rel", "D: строгое/err²", "D: модель/err²",
+             "D: диагн./err²", "e_rel (E)", "E: строгое/ΔΠ", "E: модель/ΔΠ", "E: диагн./ΔΠ", "ΔΠ_s/|Π_s|", "δ_c",
+             "δ_c: строгое", "δ_c: модель", "δ_c: диагн.", "E_∞ (65²)", "L₂",
+             "статус e_rel: измерение / непрерывный метод", "статус δ_c: измерение / непрерывный метод"], rows))
     # T2: all r
     rows = []
     for N in NS:
@@ -622,15 +691,30 @@ def make_tables(out):
             ts = {t["s"]: t for t in cont if t["N"] == N and t["r_label"] == lab}
             if not ts:
                 continue
-            worst_D = max(t["budget_direct"] / t["err2_direct"] for t in ts.values())
-            worst_E = max(t["budget_energy_route"] / t["dPi_energy_route"] for t in ts.values())
-            worst_c = max(t["delta_c_budget"] / abs(t["delta_c"]) for t in ts.values())
-            rows.append((N, lab, ts[1]["e_rel"], ts[2]["e_rel"], ts[3]["e_rel"], ts[10]["e_rel"], ts[40]["e_rel"],
-                         ts[1]["delta_c"], ts[2]["delta_c"], ts[3]["delta_c"], ts[10]["delta_c"], ts[40]["delta_c"],
-                         ts[10]["E_inf_sampled"], worst_D, worst_E, worst_c, max(t["given_cond"] for t in ts.values())))
-    parts.append("### T2: continuous, all r (b = r, a = 1)\n\n" + md_table(
-        ["N", "r", "e_rel s=1", "s=2", "s=3", "s=10", "s=40", "δ_c s=1", "s=2", "s=3", "s=10", "s=40", "E_∞ s=10",
-         "max бюджет/err² (D)", "max бюджет/ΔΠ (E)", "max бюджет/|δ_c|", "max cond заданного набора"], rows))
+            rows.append((N, lab, *[v for k in (1, 2, 3, 10, 40) for v in (ts[k]["e_rel"], ts[k]["sqrt_e_rel"])],
+                         ts[1]["status_cont_e_rel"], ts[2]["status_cont_e_rel"]))
+    parts.append("### T2a: energy error, all r (b = r, a = 1): e_rel and sqrt(e_rel)\n\n" + md_table(
+        ["N", "r", "e_rel s=1", "√e_rel s=1", "e_rel s=2", "√ s=2", "e_rel s=3", "√ s=3", "e_rel s=10", "√ s=10",
+         "e_rel s=40", "√ s=40", "непр. метод s=1", "непр. метод s≥2"], rows))
+    rows = []
+    for N in NS:
+        for lab in R_ALL:
+            ts = {t["s"]: t for t in cont if t["N"] == N and t["r_label"] == lab}
+            if not ts:
+                continue
+            meas_D = max(t["D_strict_rel"] + t["D_model_rel"] for t in ts.values())
+            meas_E = max(t["E_strict_rel"] + t["E_model_rel"] for t in ts.values())
+            meas_c = max(t["c_strict_rel"] + t["c_model_rel"] for t in ts.values())
+            diag = max(max(t["D_diag_rel"], t["E_diag_rel"], t["c_diag_rel"]) for t in ts.values())
+            meas_all = {t[k] for t in ts.values() for k in ("status_meas_e_rel", "status_meas_e_rel_E", "status_meas_delta_c",
+                                                            "status_meas_E_inf")}
+            rows.append((N, lab, ts[1]["delta_c"], ts[2]["delta_c"], ts[3]["delta_c"], ts[10]["delta_c"], ts[40]["delta_c"],
+                         ts[10]["E_inf_sampled"], meas_D, meas_E, meas_c, diag, "/".join(sorted(meas_all)),
+                         max(t["given_cond"] for t in ts.values())))
+    parts.append("### T2b: centre and budgets, all r: measurement budget = strict + model (relative), diagnostics separately\n\n"
+                 + md_table(["N", "r", "δ_c s=1", "s=2", "s=3", "s=10", "s=40", "E_∞ s=10", "max изм. бюджет/err² (D)",
+                             "max изм. бюджет/ΔΠ (E)", "max изм. бюджет/|δ_c|", "max диагностика (D, E, δ_c)",
+                             "статусы измерения", "max cond заданного набора"], rows))
     # T3: monotonicity. Noise level of the computed fields: eps_rec = largest relative H_T difference of the double
     # recursion from the 40-digit one (T10); without it 1e-13 (prequalification report 6.3: <= 1e-13).
     hp = read_csv(out / "high_precision.csv") if (out / "high_precision.csv").exists() else []
@@ -709,7 +793,7 @@ def make_tables(out):
     parts.append("### T6: B-4 — distinguishability of the method error on the grid (finest grid of each chain)\n\n"
                  + md_table(["сем.", "N", "r", "s", "(n_x, n_y)", "δ_c disc", "δ_c method", "|disc/method| (центр)",
                              "E_∞ disc/method", "(e_rel,h−e_rel)/e_rel", "n_x для 1/100 (центр)*",
-                             "n_x для 1/100 (E_∞)*", "n_x для 1/100 (энергия)*", "cond МНК (макс.)"], rows))
+                             "n_x для 1/100 (E_∞)*", "n_x: согласие e_rel,h с e_rel (1 %)**", "cond МНК (макс.)"], rows))
     if hp:
         rows = []
         for N, r, M in sorted({(t["N"], t["r"], t["M"]) for t in hp if t.get("M") not in ("", None)}):
@@ -718,8 +802,8 @@ def make_tables(out):
                          max(abs(t["centre_rel_double_vs_hp"]) for t in ts),
                          max(abs(t["Pi_double_minus_exact_rel"]) for t in ts), max(t["Pi_rounding_model_rel"] for t in ts)))
         parts.append("### T10: high precision (40 digits, temporary mpmath; s = 1..10, maxima)\n\n" + md_table(
-            ["N", "r", "M", "поле (H_T), double vs 40 зн.", "центр", "Π(w) double vs точно (те же массивы)",
-             "модель округления Π"], rows))
+            ["N", "r", "M (наиб. нечётный индекс; мод на ось = (M+1)/2)", "поле (H_T), double vs 40 зн.", "центр",
+             "Π(w) double vs точно (те же массивы)", "модель округления Π"], rows))
         rows = [(t["omega0_centre_r"], t["levy140_double_minus_hp_rel"], t["levy140_budget_rel"])
                 for t in hp if t.get("omega0_centre_r") not in ("", None)]
         parts.append("### T10b: omega_0(centre), Levy (140) in double against 40 digits\n\n" + md_table(
@@ -739,8 +823,17 @@ def make_tables(out):
     parts.append("### T12: B-2 — preliminary values of the task against this study (r = 1)\n\n" + md_table(
         ["N", "s", "ориентир", "δ_c (это исследование)", "(δ_c − ориентир)/|ориентир|"], ref))
     (out / "tables.md").write_text("# R4 group B — generated tables (scripts/r4_group_b_study.py)\n\n"
+                                   f"M = largest kept odd index; odd modes per axis = (M + 1)/2 (M = {M_CONT}: "
+                                   f"{mode_count(M_CONT)}; M = {M_CHECK}: {mode_count(M_CHECK)}).\n\n"
+                                   "Statuses: status_meas_* - measurement of the finite spectral problem (strict tails + "
+                                   "rounding models; the rounding of the recursion arrays is not in the budget); "
+                                   "status_cont_* - untruncated continuous KK-VIM: s = 1 with the strict Navier-m tail, "
+                                   "s >= 2 at best PROVISIONAL (Q-022). Not a normative qualification (D-046, РВ4-8).\n\n"
                                    "* n for 1/100: estimate n_f (|E_disc(n_f)| / (0.01 |E_method|))^(1/2) from the "
-                                   "observed h^2 law on the finest grid - a research estimate, not a requirement.\n\n"
+                                   "observed h^2 law on the finest grid - a research estimate, not a requirement.\n"
+                                   "** agreement of the two squared energy errors e_rel,h (discrete, against omega_h) and "
+                                   "e_rel (continuous): NOT the energy norm |w_h - w_cont|_{H_T} of E_disc (not computed) "
+                                   "and not a ratio |E_disc| / |E_method|.\n\n"
                                    + "\n\n".join(parts) + "\n", encoding="utf-8")
 
 
@@ -793,8 +886,15 @@ def main(argv=None):
     write_csv(out / "centre_decomposition.csv", [row for N in NS for r in rset.values() for row in centre_decomposition(N, r)])
     if not args.quick:
         write_csv(out / "scale_invariance.csv", scale_invariance(3, 1.0) + scale_invariance(2, 2.0))
-    meta = {"python": sys.version.split()[0], "numpy": np.__version__, "platform": platform.platform(),
-            "M_CONT": M_CONT, "M_CHECK": M_CHECK, "M_ENERGY": M_ENERGY, "S_LIST": S_LIST, "RULE": RULE}
+    # a partial run (--no-grid, no --hp) keeps the records of the parts it does not recompute
+    old = json.loads((out / "meta.json").read_text(encoding="utf-8")) if (out / "meta.json").exists() else {}
+    meta = {**old, "python": sys.version.split()[0], "numpy": np.__version__, "platform": platform.platform(),
+            "M_CONT": M_CONT, "M_CHECK": M_CHECK, "M_ENERGY": M_ENERGY,
+            "M_meaning": "largest kept odd index; odd modes per axis = (M + 1)/2",
+            "modes_per_axis": {"M_CONT": mode_count(M_CONT), "M_CHECK": mode_count(M_CHECK), "M_ENERGY": mode_count(M_ENERGY)},
+            "S_LIST": S_LIST, "RULE": RULE,
+            "last_run_parts": ["continuous"] + ([] if args.no_grid else ["grid"]) + (["hp"] if args.hp else [])}
+    meta.pop("seconds", None)
     if not args.no_grid:
         light = [check_light_path(N, r, nx, ny) for N, r, nx, ny in ((2, 1.0, 40, 40), (3, 0.2, 100, 20), (3, 5.0, 20, 100))]
         meta["light_path_vs_run_control_max"] = max(light)

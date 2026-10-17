@@ -16,5 +16,14 @@
  ],
  "RULE": 0.01,
  "light_path_vs_run_control_max": 0.0,
- "seconds": 665
+ "M_meaning": "largest kept odd index; odd modes per axis = (M + 1)/2",
+ "modes_per_axis": {
+  "M_CONT": 2001,
+  "M_CHECK": 4001,
+  "M_ENERGY": 2001
+ },
+ "last_run_parts": [
+  "continuous"
+ ],
+ "seconds": 894
 }
