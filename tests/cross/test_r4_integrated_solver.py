@@ -71,7 +71,10 @@ def test_merged_solver_against_the_qa_control_and_the_group_b_tables(N, lab, gri
             assert lg.qr_done == (lg.s < s) and lg.guards is not None and lg.guards.passed
         # field against the QA control (existing first-order model)
         W, Wq = np.asarray(run.x) @ np.asarray(run.y).T, qa[s - 1].W  # interior nodes (run.field() includes the edges)
-        assert np.array_equal(run.field()[1:-1, 1:-1], W)
+        # run.field() forms the same products on zero-padded arrays (another BLAS shape): not bitwise (AGENTS.md, 4);
+        # two evaluations of a dot product of N terms differ by <= 2 gamma_N |X| |Y|^T elementwise
+        gamma = 2 * N * U / (1 - N * U)
+        assert np.all(np.abs(run.field()[1:-1, 1:-1] - W) <= 2 * gamma * (np.abs(run.x) @ np.abs(run.y).T))
         eps = r4cmp._model(run.steps, qa, s, nx, ny)
         assert np.max(np.abs(W - Wq)) <= eps * np.max(np.abs(Wq)), (s, eps)
         # singular values / rho_N (Weyl) and QR field preservation (existing bounds)
