@@ -9,8 +9,8 @@ Combined environment (reproducible; docs/R4_CONTROLLER_COMPARISON.qa-report.md, 
     git archive <this QA commit> src/kkvim_reference tests scripts docs pyproject.toml | tar -x -C scratch/r4cmp/qa
     KKVIM_R4_COMBINED=1 PYTHONPATH="scratch/r4cmp/builder/src;scratch/r4cmp/qa/src" \
         uv run pytest scratch/r4cmp/qa/tests/cross/test_r4_controller_comparison.py
-In the ordinary CI of the QA branch the Builder modules are absent and the module is SKIPPED (not passed); with
-KKVIM_R4_COMBINED=1 a missing Builder module is an error, never a skip.
+Since PR #20 (main 36f8fbb) the Builder modules are in main and this module RUNS in the ordinary CI; the skip branch
+remains only for trees without them; with KKVIM_R4_COMBINED=1 a missing Builder module is an error, never a skip.
 
 All Builder results of the research mode are PROVISIONAL / NOT_QUALIFIED (D-047 addendum 1). The tolerances below are
 first-order MODELS fixed before the comparison from conditioning and rounding quantities (unit constants, not fitted);
@@ -325,10 +325,9 @@ def test_guard_failure_on_the_last_half_step_is_reported(monkeypatch):
     run = cr.run_coupled(1.0, 1.0, 1.0, 1.0, 40, 40, 3, transform="fft", half_steps=1, research_mode=True)
     log = run.steps[-1]
     assert log.guards is not None and not log.guards.rank_ok  # the guard fails on the last half-step
-    if run.status == cr.RESEARCH_LIMIT_REACHED:
-        pytest.xfail("DEFECT C-1 (report 4.2): s == half_steps is checked before the guards; RESEARCH_LIMIT_REACHED "
-                     "is returned although rank_ok is False")
-    assert run.status in (cr.PROVISIONAL_RANK_GUARD_STOP, cr.PROVISIONAL_SET_GUARD_STOP)
+    # C-1 is fixed in main (Builder d23bb02, PR #20): a regression must FAIL here, not xfail
+    assert run.status in (cr.PROVISIONAL_RANK_GUARD_STOP, cr.PROVISIONAL_SET_GUARD_STOP), run.status
+    assert not log.qr_done
 
 
 def test_negative_energy_changes_are_unresolved_and_within_the_rounding_model():
