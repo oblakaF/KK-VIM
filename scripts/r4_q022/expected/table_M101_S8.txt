@@ -1,0 +1,11 @@
+M=101, criterion: budget <= 1/100 of measured quantity; s_max = last s with all s'<=s satisfied
+r=0.2   N=1: s_max err_abs= 1 e_rel= 1 centre= 1 (void from None; g_s tail~0.23) | N=2: s_max err_abs= 1 e_rel= 1 centre= 1 (void from 3; g_s tail~6.3e+03) | N=3: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 2; g_s tail~0)
+r=0.333 N=1: s_max err_abs= 1 e_rel= 1 centre= 1 (void from None; g_s tail~0.11) | N=2: s_max err_abs= 1 e_rel= 1 centre= 1 (void from 3; g_s tail~7.8e+02) | N=3: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 2; g_s tail~0)
+r=0.5   N=1: s_max err_abs= 8 e_rel= 8 centre= 1 (void from None; g_s tail~0.059) | N=2: s_max err_abs= 1 e_rel= 1 centre= 1 (void from 3; g_s tail~1.8e+02) | N=3: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 2; g_s tail~0)
+r=0.667 N=1: s_max err_abs= 8 e_rel= 8 centre= 1 (void from None; g_s tail~0.04) | N=2: s_max err_abs= 1 e_rel= 1 centre= 1 (void from 4; g_s tail~40) | N=3: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 3; g_s tail~1.7e+03)
+r=1     N=1: s_max err_abs= 8 e_rel= 8 centre= 1 (void from None; g_s tail~0.025) | N=2: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 5; g_s tail~2.1) | N=3: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 3; g_s tail~5.5e+02)
+r=1.4   N=1: s_max err_abs= 8 e_rel= 8 centre= 1 (void from None; g_s tail~0.019) | N=2: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 6; g_s tail~2.7) | N=3: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 3; g_s tail~3.2e+02)
+r=1.5   N=1: s_max err_abs= 8 e_rel= 8 centre= 1 (void from None; g_s tail~0.018) | N=2: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 6; g_s tail~2.9) | N=3: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 3; g_s tail~3e+02)
+r=2     N=1: s_max err_abs= 8 e_rel= 8 centre= 1 (void from None; g_s tail~0.015) | N=2: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 5; g_s tail~4.7) | N=3: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 3; g_s tail~2.5e+02)
+r=3     N=1: s_max err_abs= 8 e_rel= 2 centre= 0 (void from None; g_s tail~0.012) | N=2: s_max err_abs= 1 e_rel= 1 centre= 0 (void from 5; g_s tail~8.9) | N=3: s_max err_abs= 1 e_rel= 0 centre= 0 (void from 2; g_s tail~0)
+r=5     N=1: s_max err_abs= 1 e_rel= 1 centre= 0 (void from None; g_s tail~0.0091) | N=2: s_max err_abs= 1 e_rel= 0 centre= 0 (void from 3; g_s tail~13) | N=3: s_max err_abs= 0 e_rel= 0 centre= 0 (void from 2; g_s tail~0)
