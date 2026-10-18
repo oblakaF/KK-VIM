@@ -35,6 +35,13 @@ Modes:
     test does not stop the run and is reported by energy_s2_mandatory_unresolved = True with m_2
     and the reason; a resolved E1 violation stops with PROVISIONAL_ENERGY_E1_STOP.
   STAGNATED, the strict mode and an analogue of A-11 are not implemented (D-048.3).
+- research with a fixed number of half-steps (``research_mode=True, stop_on_stabilization=False``; dated
+  addendum to D-048 of 2026-10-18): the stabilization criterion is checked and recorded
+  (``stabilization_ok``, ``first_stabilization_s``) but does not stop the run; the QR is done after all guards
+  before every next half-step; ``half_steps < S_MAX`` ends with RESEARCH_LIMIT_REACHED, S_MAX with
+  MAX_HALF_STEPS. Finiteness, the residual control, E1, the rank and set guards, S-1, ERROR_INPUT and S_MAX
+  are not bypassed; PROVISIONAL_FIELD_STABILIZED is not used. ``stop_on_stabilization=False`` without the
+  research mode is ERROR_INPUT.
 
 S-1 (STOPPED_RANK_LOSS_PROVEN) is given only for a proven dependence: n_x < 2N or n_y < 2N
 before the first half-step (ChV4-8, ChV4-9) or a set that is exactly dependent (zero or
@@ -164,6 +171,7 @@ class CoupledRunParameters:
     s_min: int | None = None
     s_max: int | None = None
     eta_max: float | None = None
+    stop_on_stabilization: bool | None = None  # research mode: True (D-048 stop) or False (fixed half-steps)
 
 
 @dataclass(frozen=True)
@@ -186,6 +194,7 @@ class CoupledRun:
     energy_s2_m: float | None = None  # m_2 = Q_2 / (10 tau_2)
     energy_s2_mandatory_unresolved: bool | None = None  # True: mandatory and UNRESOLVED (None: not reached)
     energy_s2_reason: str | None = None
+    first_stabilization_s: int | None = None  # first s with the two-step criterion of D-048.3 (research mode)
 
     @property
     def s(self) -> int:
@@ -227,14 +236,19 @@ def is_mandatory_s2_grid(a: float, b: float, n_x: int, n_y: int) -> bool:
 
 
 def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: int, *, transform: str,
-                half_steps: int, research_mode: bool = False) -> CoupledRun:
-    """Coupled half-steps s = 1, 2, ... at fixed N (research controller; D-047, D-048)."""
+                half_steps: int, research_mode: bool = False, stop_on_stabilization: bool = True) -> CoupledRun:
+    """Coupled half-steps s = 1, 2, ... at fixed N (research controller; D-047, D-048 and its addendum)."""
     if transform not in TRANSFORMS:
         raise ValueError(f"transform must be one of {TRANSFORMS}, got {transform!r}")
     if isinstance(half_steps, bool) or not isinstance(half_steps, (int, np.integer)) or half_steps < 1:
         raise ValueError(f"half_steps must be a positive integer, got {half_steps!r}")
     if not isinstance(research_mode, bool):
         raise TypeError("research_mode must be True or False")
+    if not isinstance(stop_on_stabilization, bool):
+        raise TypeError("stop_on_stabilization must be True or False")
+    if not research_mode and not stop_on_stabilization:
+        return CoupledRun(ERROR_INPUT, None, (), None, None, None, None,
+                          reason="stop_on_stabilization=False requires research_mode=True (addendum to D-048)")
     try:
         a, b = validate_r3_sides(a, b)
         D = _positive_input("D", D)
@@ -250,7 +264,8 @@ def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: i
         half_steps=int(half_steps), research_mode=research_mode, K_research=K_RESEARCH, eps_floor=floor,
         tol_inf=TOL_INF if research_mode else None, tol_E=TOL_E if research_mode else None,
         s_min=S_MIN if research_mode else None, s_max=S_MAX if research_mode else None,
-        eta_max=ETA_MAX if research_mode else None)
+        eta_max=ETA_MAX if research_mode else None,
+        stop_on_stabilization=stop_on_stabilization if research_mode else None)
 
     # S-1 before the first half-step: n_x, n_y >= 2N is necessary for the full rank (ChV4-8, ChV4-9)
     for axis, grid in (("x", grid_x), ("y", grid_y)):
@@ -266,10 +281,12 @@ def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: i
     Y = None  # no previous field before s = 1
     steps: list[StepLog] = []
     s2 = {}  # run-level record of the energy test at s = 2 (D-048.1)
+    first_stabilization = []  # the first s with the two-step criterion (research mode)
 
     def stop(status, reason, error=None):
         return CoupledRun(status, params, tuple(steps), grid_x, grid_y, X if Y is not None else None, Y,
-                          reason=reason, error=error, energy_s2_checked=bool(s2), **s2)
+                          reason=reason, error=error, energy_s2_checked=bool(s2),
+                          first_stabilization_s=first_stabilization[0] if first_stabilization else None, **s2)
 
     last = min(half_steps, S_MAX) if research_mode else half_steps
     previous_field = None
@@ -358,7 +375,10 @@ def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: i
             log(guards, PROVISIONAL_SET_GUARD_STOP)
             return stop(PROVISIONAL_SET_GUARD_STOP, f"s={s}: sigma_min(R_V D_c) <= K u; no QR, N kept")
         if research_mode:
-            if s >= S_MIN and stab_ok and previous_ok:
+            stabilized = bool(s >= S_MIN and stab_ok and previous_ok)
+            if stabilized and not first_stabilization:
+                first_stabilization.append(s)
+            if stabilized and stop_on_stabilization:
                 log(guards, PROVISIONAL_FIELD_STABILIZED)
                 return stop(PROVISIONAL_FIELD_STABILIZED,
                             f"field stabilization of the finite problem at s={s} (D-048.3, D-048.4); not convergence "
@@ -366,7 +386,11 @@ def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: i
             previous_ok = bool(stab_ok)
             if s == S_MAX:
                 log(guards, MAX_HALF_STEPS)
-                return stop(MAX_HALF_STEPS, f"s_max = {S_MAX} reached without field stabilization (D-048.3)")
+                if first_stabilization:  # fixed half-steps: stabilization recorded, run not stopped by it
+                    why = f"s_max = {S_MAX} reached; stabilization first recorded at s={first_stabilization[0]} (fixed half-steps)"
+                else:
+                    why = f"s_max = {S_MAX} reached without field stabilization (D-048.3)"
+                return stop(MAX_HALF_STEPS, why)
         if s == half_steps:
             status = RESEARCH_LIMIT_REACHED if research_mode else HALF_STEP_LIMIT_REACHED
             log(guards, status)

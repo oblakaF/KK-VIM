@@ -357,3 +357,119 @@ def test_unresolved_s2_on_a_free_grid_is_not_a_mandatory_failure(monkeypatch):
     run = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=3, research_mode=True)
     assert run.energy_s2_status == UNRESOLVED and run.energy_s2_mandatory is False
     assert run.energy_s2_mandatory_unresolved is False and run.energy_s2_reason is None
+
+
+# Addendum to D-048 (2026-10-18): fixed number of half-steps, stop_on_stabilization=False ----------------------
+
+AUTO_CONFIGS = [(1.0, 2.0, 20, 40, 2), (1.0, 2.0, 20, 40, 3), (1.0, 0.2, 160, 32, 3), (1.0, 5.0, 32, 160, 2)]
+
+
+def fixed(a, b, n_x, n_y, N, half_steps, transform="fft"):
+    return run_coupled(a, b, D, Q, n_x, n_y, N, transform=transform, half_steps=half_steps, research_mode=True,
+                       stop_on_stabilization=False)
+
+
+@pytest.mark.parametrize("half_steps", [12, 20, 40])
+@pytest.mark.parametrize("a, b, n_x, n_y, N", AUTO_CONFIGS)
+def test_fixed_half_steps_run_to_the_requested_count(a, b, n_x, n_y, N, half_steps):
+    auto = run_coupled(a, b, D, Q, n_x, n_y, N, transform="fft", half_steps=60, research_mode=True)
+    run = fixed(a, b, n_x, n_y, N, half_steps)
+    assert auto.status == PROVISIONAL_FIELD_STABILIZED and auto.first_stabilization_s == auto.s
+    assert run.status == RESEARCH_LIMIT_REACHED and run.s == half_steps and not run.converged and run.mark == MARK
+    assert run.status != PROVISIONAL_FIELD_STABILIZED and run.parameters.stop_on_stabilization is False
+    assert all(step.qr_done for step in run.steps[:-1]) and not run.steps[-1].qr_done  # no QR on the last half-step
+    assert all(step.guards.passed for step in run.steps) and all(step.mark == MARK for step in run.steps)
+    s_stop = auto.s
+    if half_steps >= s_stop:
+        assert run.first_stabilization_s == s_stop
+        assert not auto.steps[-1].qr_done
+        if s_stop < half_steps:  # QR at s_stop only in the fixed mode, when a next half-step is needed
+            assert run.steps[s_stop - 1].qr_done
+    else:
+        assert run.first_stabilization_s is None
+    # same platform and environment: the first common half-steps are identical to the automatic mode
+    common = min(s_stop, half_steps)
+    for x, y in zip(run.steps[:common], auto.steps[:common], strict=True):
+        assert (x.energy.P, x.eps_inf, x.eps_E, x.rank.rho_N, x.w_max, x.eta_N, x.stabilization_ok) == \
+            (y.energy.P, y.eps_inf, y.eps_E, y.rank.rho_N, y.w_max, y.eta_N, y.stabilization_ok)
+
+
+@pytest.mark.parametrize("a, b, n_x, n_y, N", AUTO_CONFIGS[:2])
+def test_fixed_mode_at_s_stop_has_the_automatic_field(a, b, n_x, n_y, N):
+    auto = run_coupled(a, b, D, Q, n_x, n_y, N, transform="fft", half_steps=60, research_mode=True)
+    at_stop = fixed(a, b, n_x, n_y, N, auto.s)
+    assert at_stop.status == RESEARCH_LIMIT_REACHED and at_stop.first_stabilization_s == auto.s
+    assert np.array_equal(at_stop.x, auto.x) and np.array_equal(at_stop.y, auto.y)
+
+
+@pytest.mark.parametrize("half_steps", [100, 150])
+def test_fixed_mode_stops_at_s_max(half_steps):
+    run = fixed(1.0, 2.0, 20, 40, 2, half_steps)
+    assert run.status == MAX_HALF_STEPS and run.s == cr.S_MAX == 100 and not run.steps[-1].qr_done
+    assert run.first_stabilization_s is not None and "stabilization first recorded" in run.reason
+    assert all(step.qr_done for step in run.steps[:-1]) and all(step.guards.passed for step in run.steps)
+
+
+def test_wrong_combination_and_types():
+    bad = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=5, stop_on_stabilization=False)
+    assert bad.status == ERROR_INPUT and bad.s == 0 and "research_mode=True" in bad.reason
+    with pytest.raises(TypeError):
+        run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=5, research_mode=True,
+                    stop_on_stabilization=0)
+    default = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=5, stop_on_stabilization=True)
+    assert default.status == NOT_QUALIFIED and default.s == 1  # default behaviour of D-047 unchanged
+    assert default.parameters.stop_on_stabilization is None
+
+
+def test_fixed_mode_keeps_the_rank_guard_after_stabilization(monkeypatch):
+    auto = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=60, research_mode=True)
+    real, calls = cr.rank_diagnostics, []
+
+    def forced(*args):
+        calls.append(1)
+        r = real(*args)
+        return dataclasses.replace(r, rho_N=1e-12) if len(calls) == auto.s + 3 else r
+
+    monkeypatch.setattr(cr, "rank_diagnostics", forced)
+    run = fixed(1.0, 2.0, 20, 40, 2, 40)
+    assert run.status == PROVISIONAL_RANK_GUARD_STOP and run.s == auto.s + 3 and not run.steps[-1].qr_done
+    assert run.first_stabilization_s == auto.s
+
+
+def test_fixed_mode_keeps_the_set_guard_and_e1(monkeypatch):
+    real, calls = cr.rank_diagnostics, []
+
+    def forced(*args):
+        calls.append(1)
+        r = real(*args)
+        return dataclasses.replace(r, set_sigma=np.array([1.0, 1e-12])) if len(calls) == 15 else r
+
+    monkeypatch.setattr(cr, "rank_diagnostics", forced)
+    run = fixed(1.0, 2.0, 20, 40, 2, 40)
+    assert run.status == cr.PROVISIONAL_SET_GUARD_STOP and run.s == 15
+    monkeypatch.undo()
+    real_e = cr.pair_energy
+    monkeypatch.setattr(cr, "pair_energy", lambda *a, **k: dataclasses.replace(real_e(*a, **k), status=cr.E1_VIOLATED, e1=False))
+    run = fixed(1.0, 2.0, 20, 40, 2, 40)
+    assert run.status == cr.PROVISIONAL_ENERGY_E1_STOP and run.s == 2
+
+
+def test_fixed_mode_uses_the_same_residual_control(monkeypatch):
+    perturbing_solver(monkeypatch, at_s=14, factor=1e-6)
+    run = fixed(1.0, 2.0, 20, 40, 2, 20)
+    assert run.status == RESEARCH_LIMIT_REACHED and run.steps[13].refined and run.steps[13].eta_N <= cr.ETA_MAX
+    monkeypatch.undo()
+    real = cp._correction_modes
+    monkeypatch.setattr(cp, "_correction_modes", lambda *a, **k: 0.5 * real(*a, **k))
+    perturbing_solver(monkeypatch, at_s=14, factor=1e-6)
+    run = fixed(1.0, 2.0, 20, 40, 2, 20)
+    assert run.status == ERROR_LINEAR_SOLVE and run.s == 13
+
+
+def test_fixed_mode_keeps_s1_and_error_input():
+    s1 = run_coupled(1.0, 1.0, D, Q, 5, 40, 3, transform="fft", half_steps=40, research_mode=True,
+                     stop_on_stabilization=False)
+    assert s1.status == cr.STOPPED_RANK_LOSS_PROVEN and s1.s == 0
+    big = run_coupled(1.0, 1.0, D, Q, 2400, 2400, 3, transform="fft", half_steps=40, research_mode=True,
+                      stop_on_stabilization=False)
+    assert big.status == ERROR_INPUT and big.s == 0
