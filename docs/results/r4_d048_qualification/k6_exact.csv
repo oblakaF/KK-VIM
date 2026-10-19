@@ -1,0 +1,5 @@
+n,exact_zeros,symmetry,sign_antisymmetry,own_reduction_equal,verdict
+40,True,True,True,True,PASS
+160,True,True,True,True,PASS
+640,True,True,True,True,PASS
+1280,True,True,True,True,PASS

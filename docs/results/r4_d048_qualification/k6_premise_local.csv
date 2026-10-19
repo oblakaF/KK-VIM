@@ -1,0 +1,5 @@
+n,reference,digits,distinct_arguments,arguments_rebuilt_bitwise,same_values_1d_2d,max_ulp_np_sin_1d,max_ulp_np_sin_2d,premise_le_1ulp,max_formation_err_ulp_of_x,max_formation_err_abs
+40,mpmath,50,20,True,True,6.303722e-01,6.303722e-01,True,3.309191e-01,6.123234e-17
+160,mpmath,50,80,True,True,6.303722e-01,6.303722e-01,True,7.723189e-01,1.714892e-16
+640,mpmath,50,320,True,True,6.303722e-01,6.303722e-01,True,8.412604e-01,1.714892e-16
+1280,mpmath,50,640,True,True,6.303722e-01,6.303722e-01,True,8.412604e-01,1.714892e-16

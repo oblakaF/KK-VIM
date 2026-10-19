@@ -1,0 +1,31 @@
+group,N,r,n,s_stop_auto,first_stabilization_s_fixed,fixed_status,fixed_len,logs_bitwise_equal_up_to_s_stop,field_at_s_stop_bitwise_equal,guards_passed_after_s_stop,fixed_never_stabilized_status,verdict
+area,2,1/5,40,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,2,1,40,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,2,5,40,9,9,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,1/5,40,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,1,40,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,5,40,9,9,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,2,1/5,160,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,2,1,160,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,2,5,160,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,1/5,160,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,1,160,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,5,160,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,2,1/5,640,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,2,1,640,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,2,5,640,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,1/5,640,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,1,640,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+area,3,5,640,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+independent n=320,2,1/5,320,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+independent n=320,2,1,320,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+independent n=320,2,5,320,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+independent n=320,3,1/5,320,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+independent n=320,3,1,320,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+independent n=320,3,5,320,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+research n=1280,2,1/5,1280,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+research n=1280,2,1,1280,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+research n=1280,2,5,1280,10,10,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+research n=1280,3,1/5,1280,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+research n=1280,3,1,1280,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
+research n=1280,3,5,1280,12,12,RESEARCH_LIMIT_REACHED,40,True,True,True,True,PASS
