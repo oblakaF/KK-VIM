@@ -10,6 +10,7 @@ import dataclasses
 import hashlib
 import importlib.util
 import math
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -133,20 +134,47 @@ def test_k3_unresolved_mandatory_s2_keeps_running_and_is_recorded(monkeypatch):
     assert run.steps[1].energy.status == cr.UNRESOLVED  # not PASS
 
 
-@pytest.mark.xfail(strict=True, reason="K-3.3 FAIL on Builder 3da624a: the flag energy_s2_mandatory_unresolved is in the "
-                   "run metadata but not in the log of half-step s = 2 (plan e4e1109, K-3.3; "
-                   "docs/R4_D048_QUALIFICATION.qa-report.md). strict: an implementation with the flag turns this red")
 def test_k3_unresolved_mandatory_s2_flag_in_the_half_step_log(monkeypatch):
+    """K-3.3, sub-point 2 (FAIL on 3da624a, QA 7bb60e7; Builder fix 00cf453): the flag is in the log of s = 2 too."""
     real = cr.pair_energy
 
     def unresolved(*args, **kwargs):
         e = real(*args, **kwargs)
         return dataclasses.replace(e, status=cr.UNRESOLVED, tau=e.Q) if e.tau is not None else e
 
-    monkeypatch.setattr(cr, "pair_energy", unresolved)
-    run = cr.run_coupled(1.0, 1.0, 1.0, 1.0, 160, 160, 2, transform="fft", half_steps=3, research_mode=True,
-                         stop_on_stabilization=False)
-    assert getattr(run.steps[1], "energy_s2_mandatory_unresolved", None) is True
+    with monkeypatch.context() as m:
+        m.setattr(cr, "pair_energy", unresolved)
+        run = cr.run_coupled(1.0, 1.0, 1.0, 1.0, 160, 160, 2, transform="fft", half_steps=3, research_mode=True,
+                             stop_on_stabilization=False)
+        off = cr.run_coupled(1.0, 1.0, 1.0, 1.0, 40, 40, 2, transform="fft", half_steps=3, research_mode=True,
+                             stop_on_stabilization=False)  # UNRESOLVED on a grid outside D-048.1
+    # mandatory grid, s = 2 UNRESOLVED: flag in the result and in the log of s = 2, same reason, same m_2
+    assert run.status == cr.RESEARCH_LIMIT_REACHED and len(run.steps) == 3  # not stopped by the UNRESOLVED test
+    st2 = run.steps[1]
+    assert st2.s == 2 and run.energy_s2_mandatory is True
+    assert run.energy_s2_mandatory_unresolved is True and st2.energy_s2_mandatory_unresolved is True
+    assert run.energy_s2_reason and st2.energy_s2_reason == run.energy_s2_reason
+    assert st2.m_s == run.energy_s2_m and math.isclose(run.energy_s2_m, 0.1, rel_tol=1e-12)
+    assert st2.energy.status == run.energy_s2_status == cr.UNRESOLVED  # not PASS
+    for st in (run.steps[0], run.steps[2]):  # s != 2
+        assert st.energy_s2_mandatory_unresolved is None and st.energy_s2_reason is None
+    # not mandatory: UNRESOLVED at s = 2 gives False, without a reason
+    assert off.energy_s2_mandatory is False and off.energy_s2_status == cr.UNRESOLVED
+    assert off.energy_s2_mandatory_unresolved is False and off.steps[1].energy_s2_mandatory_unresolved is False
+    assert off.energy_s2_reason is None and off.steps[1].energy_s2_reason is None
+    # resolved s = 2 on a mandatory grid: False in both, no reason
+    ok = cr.run_coupled(1.0, 1.0, 1.0, 1.0, 160, 160, 2, transform="fft", half_steps=3, research_mode=True,
+                        stop_on_stabilization=False)
+    assert ok.energy_s2_mandatory is True and ok.energy_s2_status != cr.UNRESOLVED
+    assert ok.energy_s2_mandatory_unresolved is False and ok.steps[1].energy_s2_mandatory_unresolved is False
+    assert ok.energy_s2_reason is None and ok.steps[1].energy_s2_reason is None
+    assert all(st.energy_s2_mandatory_unresolved is None and st.energy_s2_reason is None
+               for st in ok.steps if st.s != 2)
+    # s = 2 not reached: no value anywhere
+    one = cr.run_coupled(1.0, 1.0, 1.0, 1.0, 160, 160, 2, transform="fft", half_steps=1, research_mode=True)
+    assert len(one.steps) == 1 and not one.energy_s2_checked
+    assert one.energy_s2_mandatory_unresolved is None and one.energy_s2_reason is None and one.energy_s2_m is None
+    assert one.steps[0].energy_s2_mandatory_unresolved is None and one.steps[0].energy_s2_reason is None
 
 
 def test_k3_resolved_e1_violation_stops_before_the_qr(monkeypatch):
@@ -156,6 +184,83 @@ def test_k3_resolved_e1_violation_stops_before_the_qr(monkeypatch):
     run = cr.run_coupled(1.0, 1.0, 1.0, 1.0, 160, 160, 3, transform="fft", half_steps=10, research_mode=True)
     assert run.status == cr.PROVISIONAL_ENERGY_E1_STOP and len(run.steps) == 2 and not run.steps[-1].qr_done
     assert run.x.shape[1] == run.y.shape[1] == 3
+
+
+# --- D-1 (review 782e4ab): integer types of the grid sizes in the s = 2 classifier (address re-check of 00cf453) ------
+
+def _qa_mandatory(a, b, nx, ny):
+    """QA's own statement of D-048.1 (list of grids) with the 4u comparison of r = b/a (D-038), exact rationals."""
+    fa, fb, tol = Fraction(a), Fraction(b), 4 * Fraction(U)
+    close = lambda r: abs(fb - r * fa) <= tol * max(fb, r * fa)  # noqa: E731
+    if nx == ny and nx in (160, 640, 1280):
+        return any(close(Fraction(lab)) for lab in q.R10)
+    if (nx, ny) in list(q.FAMILY_II.values()):
+        return close(Fraction(ny, nx))
+    return False
+
+
+INT_TYPES = (int, np.int64, np.int32)
+
+
+def test_d1_reviewer_case_returns_a_status_and_agrees_with_int():
+    runs = {t.__name__: cr.run_coupled(1.0, 0.2, 1.0, 1.0, t(1600), t(320), 2, transform="fft", half_steps=2,
+                                       research_mode=True) for t in INT_TYPES}  # no OverflowError escapes
+    base = runs["int"]
+    assert base.status == cr.RESEARCH_LIMIT_REACHED and len(base.steps) == 2
+    assert base.energy_s2_mandatory is True and base.energy_s2_mandatory_unresolved is False
+    for name, run in runs.items():  # same process, same path: bitwise
+        assert run.status == base.status and run.reason == base.reason, name
+        assert np.array_equal(run.x, base.x) and np.array_equal(run.y, base.y), name
+        assert (run.energy_s2_checked, run.energy_s2_mandatory, run.energy_s2_status, run.energy_s2_m,
+                run.energy_s2_mandatory_unresolved, run.energy_s2_reason) == \
+               (base.energy_s2_checked, base.energy_s2_mandatory, base.energy_s2_status, base.energy_s2_m,
+                base.energy_s2_mandatory_unresolved, base.energy_s2_reason), name
+        log = [(st.energy.P, st.energy.status, st.m_s, st.eta_N, st.energy_s2_mandatory_unresolved, st.energy_s2_reason)
+               for st in run.steps]
+        assert log == [(st.energy.P, st.energy.status, st.m_s, st.eta_N, st.energy_s2_mandatory_unresolved,
+                        st.energy_s2_reason) for st in base.steps], name
+        assert type(run.parameters.n_x) is int and (run.parameters.n_x, run.parameters.n_y) == (1600, 320)
+        assert abs(run.parameters.eps_floor - base.parameters.eps_floor) <= 4 * U * base.parameters.eps_floor
+
+
+def test_d1_classifier_same_for_int_types_and_equal_to_the_qa_rule_around_the_4u_boundary():
+    grids = [(n, n) for n in (160, 640, 1280)] + list(q.FAMILY_II.values())
+    neighbours = [(nx + d, ny) for nx, ny in grids for d in (-2, 2)] + [(nx, ny + 2) for nx, ny in grids] \
+        + [(ny, nx) for nx, ny in q.FAMILY_II.values()] + [(n, n) for n in (40, 80, 320, 2560)]
+    crossed = 0
+    for nx, ny in grids + neighbours:
+        for lab in q.R10:
+            b0 = float(Fraction(lab))
+            seen = set()
+            for k in range(-6, 7):  # b0 moved by k ulps: crosses the 4u band (about 3 ulps at r = 1/5)
+                b = b0
+                for _ in range(abs(k)):
+                    b = math.nextafter(b, math.inf if k > 0 else -math.inf)
+                want = _qa_mandatory(1.0, b, nx, ny)
+                seen.add(want)
+                got = {cr.is_mandatory_s2_grid(1.0, b, t(nx), t(ny)) for t in INT_TYPES}
+                assert got == {want}, (nx, ny, lab, k)
+            crossed += seen == {True, False}
+    assert crossed > 0  # the sweep reaches both sides of the 4u boundary
+    # the six family II grids are mandatory exactly at h_x = h_y, for every integer type
+    for lab, (nx, ny) in q.FAMILY_II.items():
+        for t in INT_TYPES:
+            assert cr.is_mandatory_s2_grid(1.0, q.R10[lab], t(nx), t(ny)) is True
+            assert cr.is_mandatory_s2_grid(1.0, q.R10[lab] * (1 + 1e-3), t(nx), t(ny)) is False
+    assert cr.MANDATORY_S2_FAMILY_I == (160, 640, 1280)
+    assert set(cr.MANDATORY_S2_FAMILY_II) == set(q.FAMILY_II.values()) and len(cr.MANDATORY_S2_FAMILY_II) == 6
+    assert set(cr.CONTROL_R) == {Fraction(lab) for lab in q.R10}
+
+
+@pytest.mark.parametrize("bad", [1600.0, np.float64(1600.0), "1600", True, np.bool_(True), Fraction(1600), None])
+def test_d1_invalid_size_types_are_not_converted(bad):
+    with pytest.raises(TypeError):
+        cr.is_mandatory_s2_grid(1.0, 0.2, bad, 320)
+    with pytest.raises(TypeError):
+        cr.is_mandatory_s2_grid(1.0, 0.2, 1600, bad)
+    for run in (cr.run_coupled(1.0, 0.2, 1.0, 1.0, bad, 320, 2, transform="fft", half_steps=2, research_mode=True),
+                cr.run_coupled(1.0, 0.2, 1.0, 1.0, 1600, bad, 2, transform="fft", half_steps=2, research_mode=True)):
+        assert run.status == "ERROR_INPUT" and run.steps == () and run.parameters is None
 
 
 # --- K-4: residual, one refinement, ERROR_LINEAR_SOLVE (monkeypatch of the internal mode solvers) -----------------
