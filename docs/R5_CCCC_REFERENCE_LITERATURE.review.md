@@ -24,6 +24,22 @@
 Библиографические данные взяты из самих PDF (титул, колонтитулы, DOI). Файлы прочитаны полностью, включая формулы,
 таблицы, рисунки и приложения.
 
+**Дополнение 2026-10-19 (ветка `literature/r5-cccc-external-d2-data`).** Builder зарегистрировал файлы как L-114–L-121
+(`a3f0d57`, `references/INDEX.md`, разд. 4.2). Копии в тематических каталогах совпадают с исходными по SHA-256.
+
+Метки P1–P8 и исходные имена файлов в этом обзоре сохранены; постоянные пути указаны в INDEX.md, разд. 4.2.
+
+| P | L | Каталог |
+|---|---|---|
+| P1 | L-114 | `Plate_Benchmarks_Linear_BC/` |
+| P2 | L-115 | `Rectangular_Plates/` |
+| P3 | L-116 | `Plate_Benchmarks_Linear_BC/` |
+| P4 | L-117 | `Plate_Benchmarks_Linear_BC/` |
+| P5 | L-118 | `Plate_Benchmarks_Linear_BC/` |
+| P6 | L-119 | `Plate_Benchmarks_Linear_BC/` |
+| P7 | L-120 | `Plate_Benchmarks_Linear_BC/` |
+| P8 | L-121 | `Plate_Benchmarks_Linear_BC/` |
+
 | № | Файл | Библиография | Стр. PDF | Содержание |
 |---|---|---|---|---|
 | P1 | `1-s2.0-S0893965909002468-main.pdf` | Li R., Zhong Y., Tian B., Liu Y. On the finite integral transform method for exact bending solutions of fully clamped orthotropic rectangular thin plates. *Appl. Math. Lett.* 22 (2009) 1821–1827, doi:10.1016/j.aml.2009.07.003 | 7 | Двойное конечное синус-преобразование. Неизвестные — преобразования изгибающих моментов на краях. Четыре бесконечные системы (21a–d). Таблицы 1–4. |
