@@ -473,3 +473,77 @@ def test_fixed_mode_keeps_s1_and_error_input():
     big = run_coupled(1.0, 1.0, D, Q, 2400, 2400, 3, transform="fft", half_steps=40, research_mode=True,
                       stop_on_stabilization=False)
     assert big.status == ERROR_INPUT and big.s == 0
+
+
+# Review 782e4ab, D-1: numpy integer grid sizes in the mandatory-grid classifier ------------------------------------
+
+FAMILY_II = [((1600, 320), 1 / 5), ((960, 320), 1 / 3), ((640, 320), 1 / 2), ((320, 640), 2.0), ((320, 960), 3.0),
+             ((320, 1600), 5.0)]
+
+
+@pytest.mark.parametrize("grid, r", FAMILY_II)
+def test_classifier_accepts_numpy_integers_for_all_family_ii_grids(grid, r):
+    n_x, n_y = grid
+    assert is_mandatory_s2_grid(1.0, r, np.int64(n_x), np.int64(n_y)) is True
+    assert is_mandatory_s2_grid(1.0, r, np.int32(n_x), n_y) is is_mandatory_s2_grid(1.0, r, n_x, n_y) is True
+
+
+@pytest.mark.parametrize("a, b, n_x, n_y", [
+    (1.0, 0.21, 1600, 320), (1.0, 0.2, 1599, 320), (1.0, 0.2, 1600, 321), (1.0, 1 / 3, 1600, 320),
+    (1.0, 2.0, 640, 320), (1.0, 5.0, 1600, 320), (1.0, 1.0, 320, 320), (1.0, 1.0, 161, 161),
+])
+def test_no_false_classification_of_neighbouring_grids(a, b, n_x, n_y):
+    assert is_mandatory_s2_grid(a, b, n_x, n_y) is False
+    assert is_mandatory_s2_grid(a, b, np.int64(n_x), np.int64(n_y)) is False
+
+
+@pytest.mark.parametrize("bad", [1600.0, True, "1600", None])
+def test_classifier_rejects_non_integer_sizes(bad):
+    with pytest.raises(TypeError):
+        is_mandatory_s2_grid(1.0, 0.2, bad, 320)
+
+
+def test_reviewer_reproduction_of_d1_and_int_equivalence():
+    """review 782e4ab, section 3: the run_coupled call with np.int64 sizes returns a status, as on main."""
+    big = run_coupled(1.0, 0.2, 1.0, 1.0, np.int64(1600), np.int64(320), 2, transform="fft", half_steps=2,
+                      research_mode=True)
+    ref = run_coupled(1.0, 0.2, 1.0, 1.0, 1600, 320, 2, transform="fft", half_steps=2, research_mode=True)
+    assert big.status == ref.status == RESEARCH_LIMIT_REACHED and big.s == ref.s == 2
+    assert (big.energy_s2_mandatory, big.energy_s2_mandatory_unresolved, big.energy_s2_status) == \
+        (ref.energy_s2_mandatory, ref.energy_s2_mandatory_unresolved, ref.energy_s2_status)
+    assert big.energy_s2_mandatory is True
+    assert np.array_equal(big.field(), ref.field())
+
+
+# QA 7bb60e7, K-3.3: the mandatory s = 2 marks in the log record of s = 2 ----------------------------------------
+
+def test_mandatory_s2_unresolved_is_in_the_log_of_s2_and_in_the_result(monkeypatch):
+    real, calls = cr.pair_energy, []
+
+    def unresolved_at_s2(*args, **kwargs):  # the first pair_energy call is the test of s = 2
+        calls.append(1)
+        e = real(*args, **kwargs)
+        return dataclasses.replace(e, status=UNRESOLVED) if len(calls) == 1 else e
+
+    monkeypatch.setattr(cr, "pair_energy", unresolved_at_s2)
+    run = run_coupled(1.0, 1.0, D, Q, 160, 160, 2, transform="fft", half_steps=4, research_mode=True)
+    step2 = run.steps[1]
+    assert run.status == RESEARCH_LIMIT_REACHED and run.s == 4  # UNRESOLVED does not stop and is not PASS
+    assert step2.energy.status == UNRESOLVED and step2.energy_s2_mandatory_unresolved is True
+    assert step2.energy_s2_reason == run.energy_s2_reason and "m_2" in step2.energy_s2_reason
+    assert run.energy_s2_mandatory_unresolved is True and step2.m_s == run.energy_s2_m
+    assert all(st.energy_s2_mandatory_unresolved is None and st.energy_s2_reason is None
+               for st in run.steps if st.s != 2)  # not duplicated on other half-steps
+
+
+def test_s2_log_marks_resolved_and_not_reached():
+    resolved = run_coupled(1.0, 1.0, D, Q, 160, 160, 2, transform="fft", half_steps=3, research_mode=True)
+    assert resolved.steps[1].energy_s2_mandatory_unresolved is False and resolved.steps[1].energy_s2_reason is None
+    assert resolved.energy_s2_mandatory_unresolved is False
+    free = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=3, research_mode=True,
+                       stop_on_stabilization=False)
+    assert free.steps[1].energy_s2_mandatory_unresolved is False == free.energy_s2_mandatory_unresolved
+    one = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=1, research_mode=True)
+    assert one.steps[0].energy_s2_mandatory_unresolved is None and one.energy_s2_mandatory_unresolved is None
+    normative = run_coupled(1.0, 1.0, D, Q, 160, 160, 2, transform="fft", half_steps=5)
+    assert normative.steps[0].energy_s2_mandatory_unresolved is None and normative.status == NOT_QUALIFIED

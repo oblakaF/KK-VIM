@@ -150,6 +150,8 @@ class StepLog:
     refined: bool = False  # one refinement step done (D-048.2)
     m_s: float | None = None  # Q_s / (10 tau_s) for s >= 2
     stabilization_ok: bool | None = None  # eps_inf <= TOL_INF and eps_E <= TOL_E at this s (research mode, s >= 2)
+    energy_s2_mandatory_unresolved: bool | None = None  # only in the record of s = 2 (D-048.1); None elsewhere
+    energy_s2_reason: str | None = None  # only in the record of s = 2: reason of a mandatory UNRESOLVED test
 
 
 @dataclass(frozen=True)
@@ -221,7 +223,10 @@ def is_mandatory_s2_grid(a: float, b: float, n_x: int, n_y: int) -> bool:
     """D-048.1: family I n in {160, 640, 1280} at the ten control r, or one of the six family II grids with h_x = h_y.
 
     r = b/a is compared with the exact rational value within the representation of the input floats (4u, as D-038).
+    Grid sizes must be integers (int or numpy integer, not bool); they are normalized to Python int before the
+    exact rational arithmetic (numpy integers inside Fraction overflow; review 782e4ab, D-1). Other types are rejected.
     """
+    n_x, n_y = _grid_size("n_x", n_x), _grid_size("n_y", n_y)
     fa, fb = Fraction(a), Fraction(b)
     tol = 4 * Fraction(UNIT_ROUNDOFF)
 
@@ -233,6 +238,12 @@ def is_mandatory_s2_grid(a: float, b: float, n_x: int, n_y: int) -> bool:
     if (n_x, n_y) in MANDATORY_S2_FAMILY_II:
         return close(Fraction(n_y, n_x))  # h_x = h_y
     return False
+
+
+def _grid_size(name: str, value) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, np.integer)):
+        raise TypeError(f"{name} must be an integer grid size, got {value!r}")
+    return int(value)
 
 
 def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: int, *, transform: str,
@@ -332,7 +343,7 @@ def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: i
             return stop(exc.code, f"energy of s={s}: {exc}", exc)
         m_s = None if energy.tau is None else (energy.Q / (FACTOR_10 * energy.tau) if energy.tau > 0 else math.inf)
         if s == 2:
-            mandatory = is_mandatory_s2_grid(a, b, n_x, n_y)
+            mandatory = is_mandatory_s2_grid(a, b, params.n_x, params.n_y)  # Python int (D-1)
             unresolved = energy.status == UNRESOLVED
             s2 = dict(energy_s2_mandatory=mandatory, energy_s2_status=energy.status, energy_s2_m=m_s,
                       energy_s2_mandatory_unresolved=bool(mandatory and unresolved),
@@ -352,8 +363,10 @@ def run_coupled(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: i
         previous_field = w_now
 
         def log(guards, reason, qr_done=False, qr_error=None, P_qr=None):
+            s2_flag = s2.get("energy_s2_mandatory_unresolved") if s == 2 else None
+            s2_reason = s2.get("energy_s2_reason") if s == 2 else None
             steps.append(_log(s, direction, eta, rank, cond_A, cond_M, energy, w_max, eps_inf, eps_E, guards, qr_done,
-                              qr_error, P_qr, reason, eta_initial, refined, m_s, stab_ok))
+                              qr_error, P_qr, reason, eta_initial, refined, m_s, stab_ok, s2_flag, s2_reason))
 
         if not (energy.P < 0.0):
             log(None, ERROR_DEGENERATE)
@@ -420,8 +433,10 @@ def _guards(rank: RankDiagnostics) -> GuardResult:
 
 
 def _log(s, direction, eta, rank, cond_A, cond_M, energy, w_max, eps_inf, eps_E, guards, qr_done, qr_error, P_qr,
-         reason, eta_initial=None, refined=False, m_s=None, stabilization_ok=None):
+         reason, eta_initial=None, refined=False, m_s=None, stabilization_ok=None,
+         energy_s2_mandatory_unresolved=None, energy_s2_reason=None):
     return StepLog(s=s, k=s // 2, direction=direction, eta_N=eta, rank=rank, cond_A_given=cond_A, cond_M_max=cond_M,
                    energy=energy, w_max=w_max, eps_inf=eps_inf, eps_E=eps_E, guards=guards, qr_done=qr_done,
                    qr_field_error=qr_error, P_after_qr=P_qr, stop_reason=reason, eta_initial=eta_initial,
-                   refined=refined, m_s=m_s, stabilization_ok=stabilization_ok)
+                   refined=refined, m_s=m_s, stabilization_ok=stabilization_ok,
+                   energy_s2_mandatory_unresolved=energy_s2_mandatory_unresolved, energy_s2_reason=energy_s2_reason)
