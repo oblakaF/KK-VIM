@@ -20,6 +20,14 @@
 не переписывалась; L-109–L-113 в неё не входят и приоритет A/B/C им не назначен. Три поступивших файла
 оказались копиями L-109 и L-110; они не зарегистрированы и удалены по указанию владельца (раздел 4.3).
 
+**Пополнение R5** (2026-10-19, задание владельца, роль Builder): из входящей папки `Поиск статей/`
+зарегистрированы 8 новых публикаций **L-114–L-121** (PDF; 7 — в `Plate_Benchmarks_Linear_BC/`, L-115 —
+в `Rectangular_Plates/`; разделы 4, 4.2, 4.4). Научная идентификация — Literature,
+`docs/R5_CCCC_REFERENCE_LITERATURE.review.md` (ветка `literature/r5-cccc-pdf-review`, коммит `fe0fac1`);
+библиографические сведения повторно сверены Builder по самим файлам. Активная библиотека — **119 публикаций**:
+104 PDF, 7 DjVu, 8 DOC. Дубликатов по SHA256 среди 119 файлов нет; дубликатов по DOI и названию нет.
+Историческая инвентаризация R1-T1 не переписывалась; L-114–L-121 в неё не входят и приоритет A/B/C им не назначен.
+
 ## 1. Правила каталога
 
 - **Иерархия источников** — [`AGENTS.md`](../AGENTS.md), раздел 2: `primary/` — первоисточники КК-ВИМ;
@@ -29,13 +37,13 @@
   и не научная классификация. Исключение — папки `primary/` и `additional/`, задающие иерархию;
   соответствие каждого файла `primary/` роли первоисточника алгоритма проверяется в R1 (Q-001).
 - **Идентификаторы** `L-001`… постоянны. Новые файлы получают следующий свободный номер (сейчас —
-  L-114), номера не переиспользуются, в том числе номера выведенных файлов (раздел 4.1). Метки первоисточников (P80, P81, P81-S, P82) — дополнительные короткие имена.
+  L-122), номера не переиспользуются, в том числе номера выведенных файлов (раздел 4.1). Метки первоисточников (P80, P81, P81-S, P82) — дополнительные короткие имена.
 - **Содержимое публикаций неизменно.** Файлы не редактируются и не переконвертируются; целостность
   контролируется по SHA256 (раздел 5). Переименование и перемещение остальных файлов не допускается,
   за одним исключением: владелец проекта разрешил (2026-10-11, задача R1-T1) контролируемое переименование
   и перемещение файлов входящей папки `Поиск статей/` в тематические каталоги по подтверждённым
   сведениям, с сохранением L-ID и SHA256 (раздел 4.2). 2026-10-12 владелец дал такое же разрешение
-  для пополнения L-109–L-113 (раздел 4.2); в `primary/` и `additional/` файлы не помещаются. Принцип имени: `YYYY_Author_ShortTitle.ext`;
+  для пополнения L-109–L-113, 2026-10-19 — для пополнения R5 L-114–L-121 (раздел 4.2); в `primary/` и `additional/` файлы не помещаются. Принцип имени: `YYYY_Author_ShortTitle.ext`;
   неподтверждённый год записывается как `19XX`.
 
 ### Статусы библиографических сведений
@@ -59,8 +67,8 @@
 | `Mori_Tanaka_FGM/` | 4 |  |  | 4 |
 | `Physical_Nonlinearity_Birger_Ilyushin/` | 12 | 2 |  | 14 |
 | `Plate_Benchmarks_3D_Thick/` | 11 |  |  | 11 |
-| `Plate_Benchmarks_Linear_BC/` | 5 | 1 |  | 6 |
-| `Rectangular_Plates/` | 11 |  |  | 11 |
+| `Plate_Benchmarks_Linear_BC/` | 12 | 1 |  | 13 |
+| `Rectangular_Plates/` | 12 |  |  | 12 |
 | `Refined_Beam_Theories/` | 2 |  |  | 2 |
 | `Refined_Plate_Theories/` | 12 | 1 |  | 13 |
 | `Strain_Localization/` | 5 |  |  | 5 |
@@ -69,13 +77,17 @@
 | `vim/04_Kantorovich_EKM_Background/` | 3 |  |  | 3 |
 | `vim/05_Reviews/` | 1 |  |  | 1 |
 | `Оболочки/` | 2 | 2 |  | 4 |
-| **Итого** | **96** | **7** | **8** | **111** |
+| **Итого** | **104** | **7** | **8** | **119** |
 
-Таблица отражает текущее состояние (2026-10-12): 106 публикаций, принятых в R1-T1 (91 PDF, 7 DjVu, 8 DOC;
-в `vim/02_Krysko_Group_Later/` — 8 PDF и 4 DOC), и пополнение L-109–L-113 (+5 PDF в `vim/02_Krysko_Group_Later/`).
+Таблица отражает текущее состояние (2026-10-19): 106 публикаций, принятых в R1-T1 (91 PDF, 7 DjVu, 8 DOC;
+в `vim/02_Krysko_Group_Later/` — 8 PDF и 4 DOC), пополнение L-109–L-113 (+5 PDF в `vim/02_Krysko_Group_Later/`)
+и пополнение R5 L-114–L-121 (+7 PDF в `Plate_Benchmarks_Linear_BC/`, +1 PDF в `Rectangular_Plates/`).
 
 Папка `Поиск статей/` — входящие файлы. 2026-10-11 (R1-T1) из неё перемещены L-104–L-107, 2026-10-12 —
-L-109–L-113 (раздел 4.2); дубликаты удалены (раздел 4.3). Папка пуста.
+L-109–L-113 (раздел 4.2); дубликаты удалены (раздел 4.3). 2026-10-19 файлы L-114–L-121 **скопированы**
+в тематические каталоги (раздел 4.2). Исходные копии временно оставлены в `Поиск статей/`: Literature
+читает их по прежним путям. Они удаляются после подтверждения Literature и повторной сверки SHA256.
+До удаления это рабочие копии входящей папки, а не отдельные публикации каталога; в счётчики выше они не входят.
 
 ## 3. Метки первоисточников
 
@@ -214,6 +226,14 @@ L-109–L-113 (раздел 4.2); дубликаты удалены (разде�
 | L-111 |  | `references/vim/02_Krysko_Group_Later/2023_Krysko_Porous_Geometrically_Nonlinear_Metal_Nanoplates_Moisture_IzvTPU.pdf` | PDF | 1637248 | `0f4120af28bba3b4f5607dfd884af9493c3b1d52a17324ea20d2732b7bb8d77e` | ПРОВЕРЕНО: Крысько А. В., Калуцкий Л. А., Захарова А. А., Крысько В. А. «Математическое моделирование пористых геометрически нелинейных металлических нанопластин с учетом влажности». Известия Томского политехнического университета. Инжиниринг георесурсов, 2023, т. 334, № 9, с. 36–48; статья; поступила 08.06.2023; DOI 10.18799/24131830/2023/9/4210 (с. 36: колонтитул, заголовок, DOI). Файл — оттиск статьи (13 страниц). Пополнение 2026-10-12, Builder |
 | L-112 |  | `references/vim/02_Krysko_Group_Later/2025_Kalutsky_Krysko_FG_Sector_Plates_Drill_Bits_IzvTPU.pdf` | PDF | 1463643 | `ca85fae2f2b7fd6d36f079f4dee4e1b561882961c92c5a6ab45bf37c0c5923ea` | ПРОВЕРЕНО: Калуцкий Л. А., Крысько А. В., Захарова А. А., Крысько В. А. «Анализ физических свойств функционально-градиентных пластин секторальных долот с учетом размерной зависимости, нелинейности, пористости, температуры и влажности». Известия Томского политехнического университета. Инжиниринг георесурсов, 2025, т. 336, № 12, с. 118–130; научная статья; поступила 26.05.2025; DOI 10.18799/24131830/2025/12/5172 (с. 118: колонтитул, DOI, «Для цитирования»). Файл — оттиск статьи (13 страниц). Пополнение 2026-10-12, Builder |
 | L-113 |  | `references/vim/02_Krysko_Group_Later/2024_Krysko_Porous_Flexible_FGM_Size-Dependent_Plate_Transverse_Loading_TWS.pdf` | PDF | 28378556 | `bb63c19955961cf1bed34fabf4cc459d6eaae3671c4c3ef66a6f58d3227e64d7` | ПРОВЕРЕНО: Krysko A. V., Kalutsky L. A., Krysko V. A. «Stress-strain state of a porous flexible rectangular FGM size-dependent plate subjected to different types of transverse loading: Analysis and numerical solution using several alternative methods». Thin-Walled Structures, 2024, 196: 111512; статья; поступила 18.09.2023, принята 17.12.2023; doi 10.1016/j.tws.2023.111512 (с. 1 PDF). Пополнение 2026-10-12, Builder |
+| L-114 |  | `references/Plate_Benchmarks_Linear_BC/2009_Li_Zhong_Tian_Liu_Finite_Integral_Transform_Fully_Clamped_Orthotropic_Plates_AML.pdf` | PDF | 477885 | `69c1a4f3386dae5d2db5f17bfc2bd440c0c70c440af678a3923b423fdd660bcb` | ПРОВЕРЕНО: Li R., Zhong Y., Tian B., Liu Y. «On the finite integral transform method for exact bending solutions of fully clamped orthotropic rectangular thin plates». Applied Mathematics Letters, 2009, 22: 1821–1827; статья; поступила 27.03.2009, исправлена 29.06.2009, принята 06.07.2009; doi 10.1016/j.aml.2009.07.003 (с. 1 PDF: верхний и нижний колонтитулы). Пополнение R5 2026-10-19, Builder |
+| L-115 |  | `references/Rectangular_Plates/2008_Bhaskar_Sivaram_Untruncated_Infinite_Series_Superposition_Arbitrary_Edges_CompStruct.pdf` | PDF | 218108 | `544dcc1f15b184d21cef80596776502872a45694e2208c8904f5912086215814` | ПРОВЕРЕНО: Bhaskar K., Sivaram A. «Untruncated infinite series superposition method for accurate flexural analysis of isotropic/orthotropic rectangular plates with arbitrary edge conditions». Composite Structures, 2008, 83: 83–92; статья; доступна онлайн 14.04.2007; doi 10.1016/j.compstruct.2007.04.001 (с. 1 PDF: верхний и нижний колонтитулы). Пополнение R5 2026-10-19, Builder |
+| L-116 |  | `references/Plate_Benchmarks_Linear_BC/2003_Davis_Infinite_Systems_Biharmonic_Rectangle_Non-Uniqueness_ProcRSocA.pdf` | PDF | 285200 | `0c7c7b9b2b8de5c8577cd744fa2801a417ab1fac0141bab572d0c772e07e8dfc` | ПРОВЕРЕНО: Davis A. M. J. «Infinite systems for a biharmonic problem in a rectangle: discussion of non-uniqueness». Proceedings of the Royal Society of London A, 2003, 459: 409–412; статья; поступила 21.03.2002, принята 07.06.2002, опубликована онлайн 02.12.2002; doi 10.1098/rspa.2002.1029 (с. 1 PDF — обложка издателя; с. 2 PDF — первая страница статьи). Номер выпуска 2030 — только по URL на обложке. Пополнение R5 2026-10-19, Builder |
+| L-117 |  | `references/Plate_Benchmarks_Linear_BC/1997_Meleshko_Gomilko_Infinite_Systems_Biharmonic_Rectangle_ProcRSocA.pdf` | PDF | 503170 | `52000027cbdb159ff5f1ffa4bf813d63baadc88373c81338f85643538b2def2e` | ПРОВЕРЕНО: Meleshko V. V., Gomilko A. M. «Infinite systems for a biharmonic problem in a rectangle». Proceedings of the Royal Society of London A, 1997, 453: 2139–2160; статья; поступила 26.11.1996, принята 29.04.1997; doi 10.1098/rspa.1997.0115 (с. 1 PDF — обложка издателя; с. 2 PDF — колонтитул первой страницы; даты — последняя страница). Номер выпуска 1965 — только по URL на обложке. **Другая работа, не L-046** (Meleshko V. V., J. Elasticity, 1997, 48: 1–50). Пополнение R5 2026-10-19, Builder |
+| L-118 |  | `references/Plate_Benchmarks_Linear_BC/2004_Meleshko_Gomilko_Infinite_Systems_Biharmonic_Rectangle_Further_Discussion_ProcRSocA.pdf` | PDF | 354512 | `2b45282a7125b18f402beaf8a38be175e0681a5ecb69849af64a43b9cae431ec` | ПРОВЕРЕНО: Meleshko V. V., Gomilko A. M. «Infinite systems for a biharmonic problem in a rectangle: further discussion». Proceedings of the Royal Society of London A, 2004, 460: 807–819; статья; поступила 23.09.2002, исправлена 17.04.2003, принята 28.04.2003; doi 10.1098/rspa.2003.1186 (с. 1 PDF — обложка издателя; с. 2 PDF — первая страница статьи). Пополнение R5 2026-10-19, Builder |
+| L-119 |  | `references/Plate_Benchmarks_Linear_BC/1963_Morley_Simple_Series_Clamped_Rectangular_Plate_Uniform_Load_QJMAM.pdf` | PDF | 190607 | `ad6e2f14f504d64d57bc55702156608c770c91465c5bc4354ae6265de52f0549` | ПРОВЕРЕНО: Morley L. S. D. «Simple series solution for the bending of a clamped rectangular plate under uniform normal load». Quarterly Journal of Mechanics and Applied Mathematics, 1963, vol. XVI, pt. 1, pp. 109–114; статья; поступила 08.01.1962, исправленный вариант 02.03.1962 (с. 1 PDF: заголовок и нижний колонтитул «Quart. Journ. Mech. and Applied Math., Vol. XVI, Pt. 1, 1963»; сверено по изображению страницы, текстовый слой искажён). На первой странице номер не напечатан; с. 109 следует из печатной нумерации 110–114 (с. 2–6 PDF). DOI в файле не напечатан. Пополнение R5 2026-10-19, Builder |
+| L-120 |  | `references/Plate_Benchmarks_Linear_BC/2002_Taylor_Govindjee_Solution_Clamped_Rectangular_Plate_Problems_Report_UCB-SEMM-2002-09.pdf` | PDF | 552948 | `149c733760ec20b7198cc9f39a86e21ed04e2867d09d3e938533f44ffa8d64b7` | ПРОВЕРЕНО: Taylor R. L., Govindjee S. «Solution of Clamped Rectangular Plate Problems». Report No. UCB/SEMM-2002/09, Structural Engineering, Mechanics and Materials, Department of Civil and Environmental Engineering, University of California, Berkeley, November 2002; технический отчёт, с. 1–7 (= с. 4–10 PDF). Титульный лист — с. 2 PDF; сверено по изображению страницы, файл — скан без текстового слоя. Обложка eScholarship (с. 1 PDF): permalink https://escholarship.org/uc/item/4bj7133z, дата публикации 2002-11-01. **Университетский отчёт 2002 г., не журнальная версия 2004 г.**; журнальной версии в библиотеке нет. Пополнение R5 2026-10-19, Builder |
+| L-121 |  | `references/Plate_Benchmarks_Linear_BC/2016_An_Gu_Su_Exact_Bending_Clamped_Orthotropic_Plates_GITT_JBSMSE.pdf` | PDF | 663718 | `37ed55f13f1ef641a42bb75bb891e90d3bb604bcea9707ff363550f70420bd36` | ПРОВЕРЕНО: An C., Gu J., Su J. «Exact solution of bending problem of clamped orthotropic rectangular thin plates». Journal of the Brazilian Society of Mechanical Sciences and Engineering, 2016, 38: 601–607; статья (Technical Paper); поступила 09.01.2012, принята 30.10.2012, опубликована онлайн 26.03.2015; DOI 10.1007/s40430-015-0329-1 (с. 1 PDF). Пополнение R5 2026-10-19, Builder |
 
 ### 4.1. Выведенные идентификаторы
 
@@ -255,6 +275,29 @@ L-107 перемещён 2026-10-11 после установки DjVuLibre (р�
 | L-112 | `references/Поиск статей/№+12_336_2025_макет_А4-118-130.pdf` | `references/vim/02_Krysko_Group_Later/2025_Kalutsky_Krysko_FG_Sector_Plates_Drill_Bits_IzvTPU.pdf` |
 | L-113 | `references/Поиск статей/31232132.pdf` | `references/vim/02_Krysko_Group_Later/2024_Krysko_Porous_Flexible_FGM_Size-Dependent_Plate_Transverse_Loading_TWS.pdf` |
 
+**Пополнение R5, 2026-10-19** (задание владельца, роль Builder). Научная идентификация и метки P1–P8 взяты
+из обзора Literature `docs/R5_CCCC_REFERENCE_LITERATURE.review.md`, разд. 1 (коммит `fe0fac1`). SHA256 и размер
+каждого нового файла вычислены и совпадают с исходным файлом и с разделом 4; содержимое не менялось.
+Literature в этот момент ещё читал файлы по прежним путям, поэтому они **скопированы**, а не перемещены.
+Исходные копии удаляются после подтверждения Literature и повторной сверки SHA256 (раздел 2).
+Семь публикаций непосредственно связаны с задачей CCCC и помещены в `Plate_Benchmarks_Linear_BC/`.
+L-115 описывает метод суперпозиции для произвольных краевых условий и значений CCCC не содержит, поэтому помещён
+в `Rectangular_Plates/`. Размещение — физическое, не научная классификация (раздел 1).
+
+| ID | Метка R5 | Прежний путь | Новый путь |
+|---|---|---|---|
+| L-114 | P1 | `references/Поиск статей/1-s2.0-S0893965909002468-main.pdf` | `references/Plate_Benchmarks_Linear_BC/2009_Li_Zhong_Tian_Liu_Finite_Integral_Transform_Fully_Clamped_Orthotropic_Plates_AML.pdf` |
+| L-115 | P2 | `references/Поиск статей/bhaskar2008.pdf` | `references/Rectangular_Plates/2008_Bhaskar_Sivaram_Untruncated_Infinite_Series_Superposition_Arbitrary_Edges_CompStruct.pdf` |
+| L-116 | P3 | `references/Поиск статей/davis2003.pdf` | `references/Plate_Benchmarks_Linear_BC/2003_Davis_Infinite_Systems_Biharmonic_Rectangle_Non-Uniqueness_ProcRSocA.pdf` |
+| L-117 | P4 | `references/Поиск статей/meleshko1997.pdf` | `references/Plate_Benchmarks_Linear_BC/1997_Meleshko_Gomilko_Infinite_Systems_Biharmonic_Rectangle_ProcRSocA.pdf` |
+| L-118 | P5 | `references/Поиск статей/meleshko2004.pdf` | `references/Plate_Benchmarks_Linear_BC/2004_Meleshko_Gomilko_Infinite_Systems_Biharmonic_Rectangle_Further_Discussion_ProcRSocA.pdf` |
+| L-119 | P6 | `references/Поиск статей/morley1963.pdf` | `references/Plate_Benchmarks_Linear_BC/1963_Morley_Simple_Series_Clamped_Rectangular_Plate_Uniform_Load_QJMAM.pdf` |
+| L-120 | P7 | `references/Поиск статей/qt4bj7133z.pdf` | `references/Plate_Benchmarks_Linear_BC/2002_Taylor_Govindjee_Solution_Clamped_Rectangular_Plate_Problems_Report_UCB-SEMM-2002-09.pdf` |
+| L-121 | P8 | `references/Поиск статей/s40430-015-0329-1.pdf` | `references/Plate_Benchmarks_Linear_BC/2016_An_Gu_Su_Exact_Bending_Clamped_Orthotropic_Plates_GITT_JBSMSE.pdf` |
+
+Метки P1–P8 — локальные номера обзора R5. Они не являются метками первоисточников раздела 3 (P80, P81, P81-S, P82)
+и в столбец «Метка» раздела 4 не вносятся.
+
 ### 4.3. Удалённые дубликаты поступлений
 
 Файлы — двоично отличающиеся копии уже зарегистрированных статей: тот же DOI, текстовый слой всех страниц
@@ -267,9 +310,27 @@ L-107 перемещён 2026-10-11 после установки DjVuLibre (р�
 | `412213.pdf` | 4321865 | `08432109d20533998d000c4c90da738d061aeebcf1ea1d1b93146acb079145fc` | L-110 (DOI 10.1016/j.camwa.2023.01.004) |
 | `2112.pdf` | 7009974 | `2cd0c2bf6819082db5df9defc8c9c7531ec29344f8f1d3f87409992ff895f95b` | L-109 (DOI 10.1016/j.ijnonlinmec.2022.104162) |
 
+### 4.4. Роль пополнения R5 и ограничения применимости
+
+Роли — **рекомендация Literature** (`docs/R5_CCCC_REFERENCE_LITERATURE.review.md`, разд. 6.5 и 7, коммит `fe0fac1`),
+а не решение владельца: выбор эталонов R5 не принят (ОВ-1 обзора). Формулы обзора — шаг 2 последовательности
+AGENTS.md (транскрипция); сверка Reviewer не выполнена (ОВ-13). Регистрация в каталоге не повышает публикацию
+до эталона и не даёт разрешения менять метод (раздел 1).
+
+| ID | Метка R5 | Роль для R5 (рекомендация Literature) | Ограничения применимости |
+|---|---|---|---|
+| L-114 | P1 | Опубликованные значения в центре CCCC (3 знака, r = 1,0–2,0) — только подтверждение порядка величины (эталон C) | Ортотропная постановка; теории сходимости и оценки остатка нет; предполагаемая связь с семейством суперпозиции не доказана (ОВ-11) |
+| L-115 | P2 | **Не эталон CCCC.** Справочный источник по методу суперпозиции; предшественник — L-047 | Значений CCCC нет: таблицы 1–6 — только пластины со свободными краями и упругими опорами. Подтверждённым эталоном CCCC не считать |
+| L-116 | P3 | Теория бесконечных систем Хенки и Коялович–Бубнова: обсуждение неединственности; контекст эталона A | Ответ Meleshko и Gomilko — L-118; численные значения из L-116 в обзоре R5 не используются |
+| L-117 | P4 | Теоретический источник эталона A (суперпозиция Хенки–Инглиса, форма (2.1)): полная регулярность, асимптотика неизвестных | Опечатки исправлены в L-118, прил. A; явной оценки остатка редукции нет (ОВ-3). Не путать с L-046 |
+| L-118 | P5 | Основной источник эталона A: исправленная форма Хенки–Инглиса (3.1)–(3.3), неравенство (3.7), асимптотика (3.13)–(3.14) | Транскрипции не сверены Reviewer (ОВ-13); открыт вопрос о множителе p₀/(8D); доказательство (3.7) при всех λh > 0 опирается на работы, которых нет в библиотеке (ОВ-2); точность 10⁻⁸–10⁻¹⁰ не обоснована (ОВ-3) |
+| L-119 | P6 | Независимое представление (функции Папковича–Фадля); значения в центре (3 знака, r = 1; 2) — подтверждение порядка величины (эталон C) | Теории сходимости нет; только r = 1 и 2 |
+| L-120 | P7 | Эталон B (метод Ритца, базис (1 − cos 2mπξ)(1 − cos 2nπη)); эталон C — табл. I–II (r = 1; 1,2–2,0; 20) | Отчёт 2002 г., не журнальная версия 2004 г.; оценки точности в точке нет; не для моментов на краю; расхождение E в табл. I (ОВ-6); возможное совпадение базиса с дискретизацией КК-МВИ (ОВ-10) |
+| L-121 | P8 | Опубликованные значения (до 4 знаков) — только подтверждение порядка величины | Ортотропная постановка; полудискретный метод GITT со структурой полушага Канторовича, поэтому не независимый эталон (ОВ-12); немонотонность и расхождение при c = 1,2 (ОВ-5) |
+
 ## 5. Проверка целостности
 
-SHA256 вычислены по содержимому файлов 2026-10-11; для L-109–L-113 — 2026-10-12. Проверка локальной копии: вычислить SHA256 каждого
+SHA256 вычислены по содержимому файлов 2026-10-11; для L-109–L-113 — 2026-10-12; для L-114–L-121 — 2026-10-19. Проверка локальной копии: вычислить SHA256 каждого
 файла (например, `sha256sum` или `Get-FileHash -Algorithm SHA256`) и сравнить со столбцом SHA256
 раздела 4. Файл с несовпадающим хешем не считается публикацией каталога, пока расхождение
 не объяснено.
