@@ -49,7 +49,7 @@ MASTER = {(int(t["N"]), t["r"], int(t["n_x"]), int(t["n_y"]), t["family"], int(t
 
 def builder_runs(N, r, nx, ny, transform="fft"):
     """run_coupled with half_steps = s for every checked s (the sequence is deterministic: same prefix)."""
-    return {s: cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform=transform, half_steps=s, research_mode=True)
+    return {s: cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform=transform, half_steps=s, research_mode=True, stop_on_stabilization=False)
             for s in S_CHECK}
 
 

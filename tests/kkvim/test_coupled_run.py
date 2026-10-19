@@ -23,6 +23,8 @@ from kkvim.coupled_run import (
     PROVISIONAL_ENERGY_E1_STOP,
     PROVISIONAL_RANK_GUARD_STOP,
     PROVISIONAL_SET_GUARD_STOP,
+    MAX_HALF_STEPS,
+    PROVISIONAL_FIELD_STABILIZED,
     RESEARCH_LIMIT_REACHED,
     STOPPED_RANK_LOSS_PROVEN,
     STOPPED_RANK_NUMERICALLY_UNRESOLVED,
@@ -44,8 +46,21 @@ def check_run(run, half_steps, research_mode=True):
     assert run.status != STOPPED_RANK_NUMERICALLY_UNRESOLVED  # S-2 is never assigned from the research K
     for i, step in enumerate(run.steps, start=1):
         assert (step.s, step.k, step.direction) == (i, i // 2, "Y" if i % 2 else "X")
-    if run.status == RESEARCH_LIMIT_REACHED:
-        assert run.s == half_steps
+    if run.status in (RESEARCH_LIMIT_REACHED, PROVISIONAL_FIELD_STABILIZED, MAX_HALF_STEPS):
+        if run.status == RESEARCH_LIMIT_REACHED:
+            assert run.s == half_steps < cr.S_MAX
+        elif run.status == MAX_HALF_STEPS:
+            assert run.s == cr.S_MAX <= half_steps
+        else:  # D-048.3/D-048.4: criterion at s - 1 and s, s >= s_min, guards passed, first such s
+            assert cr.S_MIN <= run.s <= half_steps
+            assert run.steps[-1].stabilization_ok and run.steps[-2].stabilization_ok
+        if run.parameters.research_mode and run.status != PROVISIONAL_FIELD_STABILIZED:
+            oks = [st.stabilization_ok for st in run.steps]
+            assert not any(a and b for a, b in zip(oks[cr.S_MIN - 2:], oks[cr.S_MIN - 1:]))
+        if run.status == PROVISIONAL_FIELD_STABILIZED:
+            oks = [st.stabilization_ok for st in run.steps[:-1]]
+            assert not any(a and b for a, b in zip(oks[cr.S_MIN - 2:], oks[cr.S_MIN - 1:]))  # not earlier
+        assert all(step.guards.passed for step in run.steps)  # also on the last half-step (C-1, D-048.4)
         assert all(step.qr_done for step in run.steps[:-1]) and not run.steps[-1].qr_done
         for step in run.steps[:-1]:
             assert step.guards.passed
@@ -103,7 +118,8 @@ RESEARCH_CASES = [
 def test_research_runs_reach_the_limit_or_stop_honestly(a, b, n_x, n_y, N, s, transform):
     run = run_coupled(a, b, D, Q, n_x, n_y, N, transform=transform, half_steps=s, research_mode=True)
     check_run(run, s)
-    assert run.status in (RESEARCH_LIMIT_REACHED, PROVISIONAL_RANK_GUARD_STOP, PROVISIONAL_SET_GUARD_STOP)
+    assert run.status in (RESEARCH_LIMIT_REACHED, PROVISIONAL_FIELD_STABILIZED, PROVISIONAL_RANK_GUARD_STOP,
+                          PROVISIONAL_SET_GUARD_STOP)
     for step in run.steps:
         if step.qr_done:
             assert step.qr_field_error <= 64 * gamma(n_x + n_y + N) * step.rank.kappa_rep
@@ -113,7 +129,8 @@ def test_research_runs_reach_the_limit_or_stop_honestly(a, b, n_x, n_y, N, s, tr
 def test_dense_and_fft_give_the_same_sequence(a, b, n_x, n_y, N, s):
     dense = run_coupled(a, b, D, Q, n_x, n_y, N, transform="dense", half_steps=s, research_mode=True)
     fast = run_coupled(a, b, D, Q, n_x, n_y, N, transform="fft", half_steps=s, research_mode=True)
-    assert dense.status == fast.status == RESEARCH_LIMIT_REACHED
+    assert dense.status == fast.status and dense.s == fast.s
+    assert dense.status in (RESEARCH_LIMIT_REACHED, PROVISIONAL_FIELD_STABILIZED)
     w_d, w_f = dense.field(), fast.field()
     cond = max(step.cond_M_max for step in dense.steps)
     assert np.max(np.abs(w_d - w_f)) <= 64 * s * gamma(n_x + n_y + N) * cond * np.max(np.abs(w_d))
@@ -194,8 +211,10 @@ def test_solver_errors_keep_completed_half_steps(code, expected, monkeypatch):
 
 def test_field_stabilizes_but_no_convergence_status():
     run = run_coupled(1.0, 2.0, D, Q, 20, 40, 2, transform="fft", half_steps=20, research_mode=True)
-    assert run.status == RESEARCH_LIMIT_REACHED and run.steps[-1].eps_E < 1e-8 * 1e3  # small change only observed
+    assert run.status == PROVISIONAL_FIELD_STABILIZED and not run.converged and run.mark == MARK
+    assert run.steps[-1].eps_inf <= cr.TOL_INF and run.steps[-1].eps_E <= cr.TOL_E and not run.steps[-1].qr_done
     assert all(math.isfinite(step.eta_N) for step in run.steps)
+    check_run(run, 20)
 
 
 # QA C-1 (f3f15bf): the research guards decide the status also on the last half-step --------

@@ -156,7 +156,7 @@ def qa_energy(rec, a, b, nx, ny):
 
 def test_harness_reproduces_run_coupled_bitwise():
     for N, r, g, tr in ((2, 1.0, (40, 40), "dense"), (3, 0.2, (100, 20), "fft"), (3, 5.0, (20, 100), "dense")):
-        run = cr.run_coupled(1.0, r, 1.0, 1.0, *g, N, transform=tr, half_steps=12, research_mode=True)
+        run = cr.run_coupled(1.0, r, 1.0, 1.0, *g, N, transform=tr, half_steps=12, research_mode=True, stop_on_stabilization=False)
         rec = harness(r, N, *g, tr, 12)
         assert run.status == cr.RESEARCH_LIMIT_REACHED and len(run.steps) == 12
         for log, h in zip(run.steps, rec):
@@ -187,8 +187,9 @@ def test_fields_energies_and_singular_values_against_the_qa_control(N, lab, grid
     r = RATIOS[lab]
     nx, ny = grid
     hx, hy = 1.0 / nx, r / ny
-    run = cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform=transform, half_steps=max(S_LIST), research_mode=True)
+    run = cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform=transform, half_steps=max(S_LIST), research_mode=True, stop_on_stabilization=False)
     assert run.status == cr.RESEARCH_LIMIT_REACHED, run.reason
+    assert len(run.steps) == max(S_LIST)  # every compared s exists (fixed half-steps, addendum to D-048)
     rec = harness(r, N, nx, ny, transform, max(S_LIST))
     g = SpectralGrid(1.0, r, nx, ny)
     qa = run_control(g, N, max(S_LIST))
@@ -217,8 +218,9 @@ def test_fields_energies_and_singular_values_against_the_qa_control(N, lab, grid
 def test_independent_energy_quantities_against_the_builder_log(N, lab, grid, transform):
     r = RATIOS[lab]
     nx, ny = grid
-    run = cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform=transform, half_steps=20, research_mode=True)
+    run = cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform=transform, half_steps=20, research_mode=True, stop_on_stabilization=False)
     rec = harness(r, N, nx, ny, transform, 20)
+    assert len(run.steps) == len(rec) == 20
     for log, h in zip(run.steps[1:], rec[1:]):
         e, b = qa_energy(h, 1.0, r, nx, ny), log.energy
         tau = e["tau"]
@@ -235,7 +237,8 @@ def test_independent_energy_quantities_against_the_builder_log(N, lab, grid, tra
 def test_eta_n_recomputed_independently():
     for N, r, g, tr in ((2, 1.0, (40, 40), "fft"), (3, 0.2, (100, 20), "dense"), (3, 5.0, (20, 100), "fft")):
         rec = harness(r, N, *g, tr, 6)
-        run = cr.run_coupled(1.0, r, 1.0, 1.0, *g, N, transform=tr, half_steps=6, research_mode=True)
+        run = cr.run_coupled(1.0, r, 1.0, 1.0, *g, N, transform=tr, half_steps=6, research_mode=True, stop_on_stabilization=False)
+        assert len(run.steps) == len(rec) == 6
         for log, h in zip(run.steps, rec):
             A, B, C, F = qa_coefficients(np.asarray(h["given"]), h["given_grid"].h)
             hs = h["solve_grid"].h
@@ -275,7 +278,8 @@ def test_joint_halfstep_with_non_orthogonal_given_set(cond):
 
 def test_qr_keeps_field_and_energy():
     for N, r, g, tr in ((2, 1.0, (40, 40), "fft"), (3, 0.2, (100, 20), "dense"), (3, 5.0, (20, 100), "fft")):
-        run = cr.run_coupled(1.0, r, 1.0, 1.0, *g, N, transform=tr, half_steps=10, research_mode=True)
+        run = cr.run_coupled(1.0, r, 1.0, 1.0, *g, N, transform=tr, half_steps=10, research_mode=True, stop_on_stabilization=False)
+        assert len(run.steps) == 10
         hx, hy = 1.0 / g[0], r / g[1]
         for log in run.steps[:-1]:
             assert log.qr_done and log.qr_field_error <= 8 * U * math.sqrt(N) * log.rank.kappa_rep * N
@@ -336,7 +340,8 @@ def test_negative_energy_changes_are_unresolved_and_within_the_rounding_model():
     seen = 0
     for N, r, g, tr in ((2, 0.2, (40, 40), "fft"), (3, 1.0, (40, 40), "dense"), (3, 5.0, (20, 100), "fft"),
                         (2, 1 / 3, (60, 20), "dense")):
-        run = cr.run_coupled(1.0, r, 1.0, 1.0, *g, N, transform=tr, half_steps=40, research_mode=True)
+        run = cr.run_coupled(1.0, r, 1.0, 1.0, *g, N, transform=tr, half_steps=40, research_mode=True, stop_on_stabilization=False)
+        assert len(run.steps) == 40
         for log in run.steps[1:]:
             e = log.energy
             if e.delta_P < 0:
@@ -371,7 +376,8 @@ def test_high_precision_accumulated_field_error(N):
     mp = pytest.importorskip("mpmath")
     mp.mp.dps = 60
     nx = ny = 12
-    run = cr.run_coupled(1.0, 1.0, 1.0, 1.0, nx, ny, N, transform="fft", half_steps=6, research_mode=True)
+    run = cr.run_coupled(1.0, 1.0, 1.0, 1.0, nx, ny, N, transform="fft", half_steps=6, research_mode=True, stop_on_stabilization=False)
+    assert len(run.steps) == 6
     rec = harness(1.0, N, nx, ny, "fft", 6)
     qa = run_control(SpectralGrid(1.0, 1.0, nx, ny), N, 6)
     P = mp.matrix([[mp.sqrt(mp.mpf(2) / nx) * (0 if (i * k) % nx == 0 else mp.sin(mp.pi * i * k / nx)) for k in range(1, nx)]
@@ -482,12 +488,14 @@ def test_a4_7_first_halfstep_against_the_navier_m_partial_sum(N, r):
 
 
 def test_a4_12_reflections_and_scaling():
-    run = cr.run_coupled(1.0, 3.0, 1.0, 1.0, 40, 120, 3, transform="fft", half_steps=10, research_mode=True)
+    run = cr.run_coupled(1.0, 3.0, 1.0, 1.0, 40, 120, 3, transform="fft", half_steps=10, research_mode=True, stop_on_stabilization=False)
+    assert len(run.steps) == 10
     W = run.field()
     m = np.max(np.abs(W))
     assert np.max(np.abs(W - W[::-1, :])) <= 1e-12 * m and np.max(np.abs(W - W[:, ::-1])) <= 1e-12 * m
     # w_bar = w D / (q a^4) does not depend on q, D and on a common scale of a, b (ChV-14)
     base = run.field() * 1.0 / (1.0 * 1.0**4)
     for a, q, D in ((2.9, 1.0, 1.0), (1.0, 3.7, 1.0), (1.0, 1.0, 0.013), (2.9, -3.7, 0.013)):
-        other = cr.run_coupled(a, 3.0 * a, D, q, 40, 120, 3, transform="fft", half_steps=10, research_mode=True)
+        other = cr.run_coupled(a, 3.0 * a, D, q, 40, 120, 3, transform="fft", half_steps=10, research_mode=True, stop_on_stabilization=False)
+        assert len(other.steps) == 10
         assert np.max(np.abs(other.field() * D / (q * a**4) - base)) <= 1e-11 * m

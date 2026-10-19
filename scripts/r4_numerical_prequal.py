@@ -81,7 +81,7 @@ def harness(r, N, nx, ny, s_max, transform="fft"):
 
 
 def harness_matches_run_coupled(r, N, nx, ny, s_max):
-    run = cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform="fft", half_steps=s_max, research_mode=True)
+    run = cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform="fft", half_steps=s_max, research_mode=True, stop_on_stabilization=False)
     rec = harness(r, N, nx, ny, s_max)
     return bool(np.array_equal(run.x, rec[-1]["new"][0]) and np.array_equal(run.y, rec[-1]["new"][1]))
 
@@ -356,7 +356,7 @@ def b5_energy():
     configs += [("II", lab, R_TEN[lab], nx, ny) for lab, (nx, ny) in FAMILY_II_TOP.items()]
     for fam, lab, r, nx, ny in configs:
         for N in (2, 3):
-            run = cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform="fft", half_steps=4, research_mode=True)
+            run = cr.run_coupled(1.0, r, 1.0, 1.0, nx, ny, N, transform="fft", half_steps=4, research_mode=True, stop_on_stabilization=False)
             for lg in run.steps:
                 e = lg.energy
                 row = {"family": fam, "r": lab, "nx": nx, "ny": ny, "N": N, "s": lg.s, "status_run": run.status,
@@ -375,7 +375,7 @@ def b6_stopping():
     for lab, r in R_THREE.items():
         for n in (40, 160, 640):
             for N in (2, 3):
-                run = cr.run_coupled(1.0, r, 1.0, 1.0, n, n, N, transform="fft", half_steps=40, research_mode=True)
+                run = cr.run_coupled(1.0, r, 1.0, 1.0, n, n, N, transform="fft", half_steps=40, research_mode=True, stop_on_stabilization=False)
                 floor = 10 * U * (n / math.pi) ** 2 * math.sqrt(N) / (1 - N * U * math.sqrt(N))  # kappa_W <= sqrt N/(1 - gamma_N sqrt N)
                 s_stop = None
                 prev_ok = False
@@ -393,7 +393,7 @@ def b6_stopping():
                 w40 = (run.x @ run.y.T)[c]
                 drift_c = drift_P = math.nan
                 if s_stop is not None:
-                    rs = cr.run_coupled(1.0, r, 1.0, 1.0, n, n, N, transform="fft", half_steps=s_stop, research_mode=True)
+                    rs = cr.run_coupled(1.0, r, 1.0, 1.0, n, n, N, transform="fft", half_steps=s_stop, research_mode=True, stop_on_stabilization=False)
                     ws = (rs.x @ rs.y.T)[c]
                     drift_c = abs(w40 - ws) / abs(w40 - W0c)
                     drift_P = abs(run.steps[-1].energy.P - run.steps[s_stop - 1].energy.P) / abs(run.steps[-1].energy.P)

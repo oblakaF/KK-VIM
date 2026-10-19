@@ -47,6 +47,7 @@ normalization or stopping is done here. N = 1 stays on the R2/R3 path: the half-
 solver accepts only N = 2-3 (D-047).
 """
 
+import dataclasses
 import math
 from dataclasses import dataclass
 
@@ -171,9 +172,24 @@ def sine_eigenvalues(grid: Grid1D) -> np.ndarray:
 
 
 def sine_matrix(grid: Grid1D) -> np.ndarray:
-    """Psi with psi_k(i) = sqrt(2/n) sin(k pi i / n), i, k = 1 .. n - 1 (symmetric, orthogonal)."""
-    i = np.arange(1, grid.n)
-    return math.sqrt(2.0 / grid.n) * np.sin(np.outer(i, i) * math.pi / grid.n)
+    """Psi with psi_k(i) = sqrt(2/n) sin(k pi i / n), i, k = 1 .. n - 1 (symmetric, orthogonal).
+
+    The argument is reduced exactly in integers (D-048.6): m = i k mod 2n; m >= n gives
+    sin(pi m / n) = -sin(pi (m - n) / n); 2m > n gives sin(pi m / n) = sin(pi (n - m) / n). The
+    sine is then evaluated only on [0, pi/2] and the sign restored, so equal arguments give
+    bitwise equal entries and the exact zeros stay zero. The QA elementwise model 7u assumes
+    that np.sin is within 1 ulp on [0, pi/2]; that premise is not taken for granted here.
+    """
+    n = grid.n
+    i = np.arange(1, n, dtype=np.int64)
+    m = np.outer(i, i) % (2 * n)  # i k <= (n - 1)^2: no int64 overflow for n < 3e9
+    negative = m >= n
+    m = np.where(negative, m - n, m)
+    m = np.where(2 * m > n, n - m, m)
+    values = np.sin(m * (math.pi / n))  # arguments in [0, pi/2]
+    values = np.where(negative, -values, values)
+    values[m == 0] = 0.0
+    return math.sqrt(2.0 / n) * values
 
 
 def sine_transform(grid: Grid1D, values, method: str) -> np.ndarray:
@@ -242,6 +258,42 @@ def _solve_modes(coefficients: CoupledCoefficients, mu: np.ndarray, load: np.nda
             raise CoupledHalfStepError(ERROR_NONFINITE, "non-finite mode solution", direction=direction, mode=k + 1, N=N, n=n)
         modal[k] = v
     return modal
+
+
+def refine_once(step: CoupledHalfStep) -> CoupledHalfStep:
+    """Exactly one step of iterative refinement of a solved half-step (D-048.2; R4_NUMERICAL_SPEC 7).
+
+    rho = F (x) 1 - K vec(V) is computed in the nodal space without the sine transform; the
+    correction solves K delta = rho with the same mode systems D M_k delta_k = (Psi rho)_k and the
+    same transform; V <- V + delta. No new solution from scratch; errors are explicit.
+    """
+    grid, c = step.solve_grid, step.coefficients
+    rho, _ = coupled_residual(grid, c, step.D, step.solved)
+    rho_modal = sine_transform(grid, rho, step.transform)
+    delta_modal = _correction_modes(c, sine_eigenvalues(grid), rho_modal, step.D, direction=step.direction, n=grid.n)
+    delta = sine_transform(grid, delta_modal, step.transform)
+    solved = step.solved + delta
+    if not np.all(np.isfinite(solved)):
+        raise CoupledHalfStepError(ERROR_NONFINITE, "non-finite refined set", direction=step.direction, N=c.N, n=grid.n)
+    return dataclasses.replace(step, solved=solved, modal=step.modal + delta_modal)
+
+
+def _correction_modes(coefficients: CoupledCoefficients, mu: np.ndarray, rhs_modal: np.ndarray, D: float, *,
+                      direction: str, n: int) -> np.ndarray:
+    """D M_k d_k = rhs_k for every mode with the same M_k and Cholesky as the solve; explicit errors."""
+    A, B, C, N = coefficients.A, coefficients.B, coefficients.C, coefficients.N
+    if not np.all(np.isfinite(rhs_modal)):
+        raise CoupledHalfStepError(ERROR_NONFINITE, "non-finite modal residual", direction=direction, N=N, n=n)
+    correction = np.empty_like(rhs_modal)
+    for k in range(mu.size):
+        M = mu[k] ** 2 * A + 2.0 * mu[k] * B + C
+        try:
+            factor = scipy.linalg.cho_factor(M, lower=True, check_finite=False)
+        except np.linalg.LinAlgError as exc:
+            raise CoupledHalfStepError(ERROR_LINEAR_SOLVE, f"Cholesky factorization of M_k failed in refinement: {exc}",
+                                       direction=direction, mode=k + 1, N=N, n=n) from exc
+        correction[k] = scipy.linalg.cho_solve(factor, rhs_modal[k], check_finite=False) / D
+    return correction
 
 
 # residual without the sine transform (3.3) ------------------------------------------------
