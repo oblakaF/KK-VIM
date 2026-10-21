@@ -1,0 +1,3 @@
+N,fields,min_rho_N,max_kappa_rep,c_d_obs,delta_f_obs,min_rho_over_2eps_obs,criterion_ratio_ge_100,min_rho_over_K_u_kappa,min_set_sigma_over_K_u
+2,504,4.933204e-04,1.000000e+00,1.893823e+00,2.500027e-15,9.100900e+10,True,4.443435e+06,1.676146e+07
+3,504,2.187155e-06,1.000000e+00,1.893823e+00,2.500027e-15,4.034919e+08,True,1.970014e+04,1.207404e+05

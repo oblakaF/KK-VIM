@@ -1,0 +1,3 @@
+# Byte-exact copies of the original R-7 scripts (LF): no end-of-line conversion (core.autocrlf would turn LF into
+# CRLF on Windows), so that their SHA256 equal the values recorded in docs/results/r3/r7/metadata.json.
+* -text

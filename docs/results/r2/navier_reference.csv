@@ -1,0 +1,15 @@
+quantity,value
+M,1279
+w_N_centre,4.062352660675e-03
+strict_truncation_bound_8_2_uniform,1.337589190458e-09
+delta_w,4.060000000000e-09
+first_order_rounding_bound_w_N_nodes,1.239318028007e-15
+smallest_max_abs_diff_all_grids_states,5.300558633651e-06
+smallest_at_grid,20
+smallest_at_state,3
+max_abs_diff_stop_finest_main_grid,5.890647437159e-06
+finest_main_grid,320
+ratio_bound_to_smallest,2.523487207492e-04
+Pi_N,-8.512552623592e-04
+Pi_N_truncation_bound,1.362970245514e-13
+J_M,1.702510524718e-03

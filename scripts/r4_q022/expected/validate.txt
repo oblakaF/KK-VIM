@@ -1,0 +1,9 @@
+validate r=1.0 N=1: T=3.87e-07  max(observed/bound) over s=1..12 = 0.639  bound/obs at s=12: 4.1
+validate r=1.0 N=2: T=3.87e-07  max(observed/bound) over s=1..12 = 0.674  bound/obs at s=12: inf
+validate r=1.0 N=3: T=3.87e-07  max(observed/bound) over s=1..12 = 0.686  bound/obs at s=12: inf
+validate r=0.2 N=1: T=1.20e-07  max(observed/bound) over s=1..12 = 0.109  bound/obs at s=12: 12.3
+validate r=0.2 N=2: T=1.20e-07  max(observed/bound) over s=1..12 = 0.039  bound/obs at s=12: inf
+validate r=0.2 N=3: T=1.20e-07  max(observed/bound) over s=1..12 = 0.039  bound/obs at s=12: inf
+validate r=5.0 N=1: T=1.51e-05  max(observed/bound) over s=1..12 = 0.916  bound/obs at s=12: 5.0
+validate r=5.0 N=2: T=1.51e-05  max(observed/bound) over s=1..12 = 0.964  bound/obs at s=12: inf
+validate r=5.0 N=3: T=1.51e-05  max(observed/bound) over s=1..12 = 0.980  bound/obs at s=12: inf

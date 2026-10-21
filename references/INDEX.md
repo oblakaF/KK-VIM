@@ -13,6 +13,13 @@
 **После приёмки R1-T1** (2026-10-11): номер L-108 выведен по решению владельца (D-027, раздел 4.1).
 Активная библиотека — те же 106 публикаций; результаты инвентаризации R1-T1 не пересматривались.
 
+**Пополнение после R1-T1** (2026-10-12, задание владельца, роль Builder): из входящей папки `Поиск статей/`
+зарегистрированы 5 новых публикаций **L-109–L-113** (PDF, `vim/02_Krysko_Group_Later/`; разделы 4, 4.2).
+Активная библиотека — **111 публикаций**: 96 PDF, 7 DjVu, 8 DOC. Дубликатов по SHA256, DOI и названию нет.
+Историческая инвентаризация R1-T1 (106 файлов, [`LITERATURE_INVENTORY.md`](LITERATURE_INVENTORY.md))
+не переписывалась; L-109–L-113 в неё не входят и приоритет A/B/C им не назначен. Три поступивших файла
+оказались копиями L-109 и L-110; они не зарегистрированы и удалены по указанию владельца (раздел 4.3).
+
 ## 1. Правила каталога
 
 - **Иерархия источников** — [`AGENTS.md`](../AGENTS.md), раздел 2: `primary/` — первоисточники КК-ВИМ;
@@ -22,12 +29,13 @@
   и не научная классификация. Исключение — папки `primary/` и `additional/`, задающие иерархию;
   соответствие каждого файла `primary/` роли первоисточника алгоритма проверяется в R1 (Q-001).
 - **Идентификаторы** `L-001`… постоянны. Новые файлы получают следующий свободный номер (сейчас —
-  L-109), номера не переиспользуются, в том числе номера выведенных файлов (раздел 4.1). Метки первоисточников (P80, P81, P81-S, P82) — дополнительные короткие имена.
+  L-114), номера не переиспользуются, в том числе номера выведенных файлов (раздел 4.1). Метки первоисточников (P80, P81, P81-S, P82) — дополнительные короткие имена.
 - **Содержимое публикаций неизменно.** Файлы не редактируются и не переконвертируются; целостность
   контролируется по SHA256 (раздел 5). Переименование и перемещение остальных файлов не допускается,
   за одним исключением: владелец проекта разрешил (2026-10-11, задача R1-T1) контролируемое переименование
   и перемещение файлов входящей папки `Поиск статей/` в тематические каталоги по подтверждённым
-  сведениям, с сохранением L-ID и SHA256 (раздел 4.2). Принцип имени: `YYYY_Author_ShortTitle.ext`;
+  сведениям, с сохранением L-ID и SHA256 (раздел 4.2). 2026-10-12 владелец дал такое же разрешение
+  для пополнения L-109–L-113 (раздел 4.2); в `primary/` и `additional/` файлы не помещаются. Принцип имени: `YYYY_Author_ShortTitle.ext`;
   неподтверждённый год записывается как `19XX`.
 
 ### Статусы библиографических сведений
@@ -56,16 +64,18 @@
 | `Refined_Beam_Theories/` | 2 |  |  | 2 |
 | `Refined_Plate_Theories/` | 12 | 1 |  | 13 |
 | `Strain_Localization/` | 5 |  |  | 5 |
-| `vim/02_Krysko_Group_Later/` | 8 |  | 4 | 12 |
+| `vim/02_Krysko_Group_Later/` | 13 |  | 4 | 17 |
 | `vim/03_Dissertations_and_Chapters/` |  |  | 4 | 4 |
 | `vim/04_Kantorovich_EKM_Background/` | 3 |  |  | 3 |
 | `vim/05_Reviews/` | 1 |  |  | 1 |
 | `Оболочки/` | 2 | 2 |  | 4 |
-| **Итого** | **91** | **7** | **8** | **106** |
+| **Итого** | **96** | **7** | **8** | **111** |
 
-Таблица отражает 106 публикаций, принятых в R1-T1.
+Таблица отражает текущее состояние (2026-10-12): 106 публикаций, принятых в R1-T1 (91 PDF, 7 DjVu, 8 DOC;
+в `vim/02_Krysko_Group_Later/` — 8 PDF и 4 DOC), и пополнение L-109–L-113 (+5 PDF в `vim/02_Krysko_Group_Later/`).
 
-Папка `Поиск статей/` — входящие файлы. 2026-10-11 (R1-T1) из неё перемещены L-104–L-107 (раздел 4.2).
+Папка `Поиск статей/` — входящие файлы. 2026-10-11 (R1-T1) из неё перемещены L-104–L-107, 2026-10-12 —
+L-109–L-113 (раздел 4.2); дубликаты удалены (раздел 4.3). Папка пуста.
 
 ## 3. Метки первоисточников
 
@@ -199,6 +209,11 @@
 | L-105 |  | `references/Refined_Beam_Theories/19XX_Timoshenko_Correction_for_Shear_Transverse_Vibrations_Prismatic_Bars_PhilMag.pdf` | PDF | 101684 | `dacbfbc5ec70f49645b4fc7d65330843ea63340f58c4485c6a45c6d8ebc63d48` | ЧАСТИЧНО: Timoshenko S. P. «On the Correction for Shear of the Differential Equation for Transverse Vibrations of Prismatic Bars»; статья LXVI, печ. с. 744–746; перевод с русского M. G. Yatsevitch (с. 744); в конце — «Yougoslavia, Videm. Summer 1920» (с. 746). Журнал и том — Phil. Mag., vol. xli, pp. 744–746 — только по сноске в L-106, с. 125. Год издания в файле не напечатан. R1-T1, 2026-10-11 |
 | L-106 |  | `references/Refined_Beam_Theories/19XX_Timoshenko_Transverse_Vibrations_Bars_Uniform_Cross-Section.pdf` | PDF | 243681 | `043df6557a3e434ad191608281568381b058434741fd3e55fe4e77e30b231bd9` | ЧАСТИЧНО: Timoshenko S. P. «On the Transverse Vibrations of Bars of Uniform Cross-Section»; статья X, печ. с. 125–131 (с. 125, 131 PDF); подпись «Zagreb, January 26, 1921» (с. 131). Журнал назван в тексте «this Magazine», ранняя статья автора — «Phil. Mag. vol. xli» (сноска, с. 125); том и год самой статьи не напечатаны. R1-T1, 2026-10-11 |
 | L-107 |  | `references/Plate_Benchmarks_Linear_BC/1966_Timoshenko_Woinowsky-Krieger_Plates_and_Shells_Nauka.djvu` | DjVu | 7139913 | `1f3eb5cf7b805b686a7149d1133e5cd1fe3b34a172f0caf035b55246479b1461` | ПРОВЕРЕНО: Тимошенко С. П., Войновский-Кригер С. «Пластинки и оболочки». Перевод с английского В. И. Контовта под редакцией Г. С. Шапиро. Издание второе, стереотипное. М.: Наука, Главная редакция физико-математической литературы, 1966; монография. Оригинал: Timoshenko S., Woinowsky-Krieger S. «Theory of Plates and Shells», 2nd ed., McGraw-Hill, New York, 1959 (титул и оборот — DjVu-с. 1–2). R1-T1, 2026-10-11 |
+| L-109 |  | `references/vim/02_Krysko_Group_Later/2022_Awrejcewicz_Krysko_Static_Flexible_Rectangular_von_Karman_Plates_IJNLM.pdf` | PDF | 6693953 | `d3622982f96725f265cb0dcfc48fe475c8d4c4e1c978f8a74ce90eb9bf03d565` | ПРОВЕРЕНО: Awrejcewicz J., Krysko jr V. A., Kalutsky L. A., Krysko V. A. «Computing static behavior of flexible rectangular von Kármán plates in fast and reliable way». International Journal of Non-Linear Mechanics, 2022, 146: 104162; статья; поступила 31.03.2022, принята 17.07.2022; doi 10.1016/j.ijnonlinmec.2022.104162 (с. 1 PDF). Пополнение 2026-10-12, Builder |
+| L-110 |  | `references/vim/02_Krysko_Group_Later/2023_Krysko-jr_Reduced_Order_Modelling_Methods_Size-Dependent_Plates_CAMWA.pdf` | PDF | 4321062 | `49f739e6061ccbc469f76ecdf90fa4837b3f6e7491b5ccfa9846d718f9df350d` | ПРОВЕРЕНО: Krysko-jr. V. A., Awrejcewicz J., Kalutsky L. A., Krysko V. A. «Quantification of various reduced order modelling computational methods to study deflection of size-dependent plates». Computers and Mathematics with Applications, 2023, 133: 61–84; статья; поступила 06.07.2022, принята 02.01.2023 (с. 1 PDF). DOI 10.1016/j.camwa.2023.01.004 — по метаданным издателя в файле (XMP `prism:doi`); в текстовом слое не найден. Пополнение 2026-10-12, Builder |
+| L-111 |  | `references/vim/02_Krysko_Group_Later/2023_Krysko_Porous_Geometrically_Nonlinear_Metal_Nanoplates_Moisture_IzvTPU.pdf` | PDF | 1637248 | `0f4120af28bba3b4f5607dfd884af9493c3b1d52a17324ea20d2732b7bb8d77e` | ПРОВЕРЕНО: Крысько А. В., Калуцкий Л. А., Захарова А. А., Крысько В. А. «Математическое моделирование пористых геометрически нелинейных металлических нанопластин с учетом влажности». Известия Томского политехнического университета. Инжиниринг георесурсов, 2023, т. 334, № 9, с. 36–48; статья; поступила 08.06.2023; DOI 10.18799/24131830/2023/9/4210 (с. 36: колонтитул, заголовок, DOI). Файл — оттиск статьи (13 страниц). Пополнение 2026-10-12, Builder |
+| L-112 |  | `references/vim/02_Krysko_Group_Later/2025_Kalutsky_Krysko_FG_Sector_Plates_Drill_Bits_IzvTPU.pdf` | PDF | 1463643 | `ca85fae2f2b7fd6d36f079f4dee4e1b561882961c92c5a6ab45bf37c0c5923ea` | ПРОВЕРЕНО: Калуцкий Л. А., Крысько А. В., Захарова А. А., Крысько В. А. «Анализ физических свойств функционально-градиентных пластин секторальных долот с учетом размерной зависимости, нелинейности, пористости, температуры и влажности». Известия Томского политехнического университета. Инжиниринг георесурсов, 2025, т. 336, № 12, с. 118–130; научная статья; поступила 26.05.2025; DOI 10.18799/24131830/2025/12/5172 (с. 118: колонтитул, DOI, «Для цитирования»). Файл — оттиск статьи (13 страниц). Пополнение 2026-10-12, Builder |
+| L-113 |  | `references/vim/02_Krysko_Group_Later/2024_Krysko_Porous_Flexible_FGM_Size-Dependent_Plate_Transverse_Loading_TWS.pdf` | PDF | 28378556 | `bb63c19955961cf1bed34fabf4cc459d6eaae3671c4c3ef66a6f58d3227e64d7` | ПРОВЕРЕНО: Krysko A. V., Kalutsky L. A., Krysko V. A. «Stress-strain state of a porous flexible rectangular FGM size-dependent plate subjected to different types of transverse loading: Analysis and numerical solution using several alternative methods». Thin-Walled Structures, 2024, 196: 111512; статья; поступила 18.09.2023, принята 17.12.2023; doi 10.1016/j.tws.2023.111512 (с. 1 PDF). Пополнение 2026-10-12, Builder |
 
 ### 4.1. Выведенные идентификаторы
 
@@ -226,9 +241,35 @@
 
 L-107 перемещён 2026-10-11 после установки DjVuLibre (решение владельца) и сверки титула.
 
+**Пополнение 2026-10-12** (задание владельца, роль Builder). SHA256 и размер каждого файла вычислены до
+и после перемещения и совпадают с разделом 4; содержимое не менялось. Все пять — работы группы Крысько,
+в которых применяется метод вариационных итераций (сведение уравнений в частных производных к ОДУ
+разделением переменных и итерациями; в L-109, L-110, L-113 — ссылки на Кириченко, Крысько 1980, 1981). Отнесение
+к `vim/02_Krysko_Group_Later/` — физическое размещение, не повышение до источника алгоритма (AGENTS.md, раздел 2).
+
+| ID | Прежний путь | Новый путь |
+|---|---|---|
+| L-109 | `references/Поиск статей/awrejcewicz2022.pdf` | `references/vim/02_Krysko_Group_Later/2022_Awrejcewicz_Krysko_Static_Flexible_Rectangular_von_Karman_Plates_IJNLM.pdf` |
+| L-110 | `references/Поиск статей/231123312312(10).pdf` | `references/vim/02_Krysko_Group_Later/2023_Krysko-jr_Reduced_Order_Modelling_Methods_Size-Dependent_Plates_CAMWA.pdf` |
+| L-111 | `references/Поиск статей/№+09_334_2023_А4_макет-36-48.pdf` | `references/vim/02_Krysko_Group_Later/2023_Krysko_Porous_Geometrically_Nonlinear_Metal_Nanoplates_Moisture_IzvTPU.pdf` |
+| L-112 | `references/Поиск статей/№+12_336_2025_макет_А4-118-130.pdf` | `references/vim/02_Krysko_Group_Later/2025_Kalutsky_Krysko_FG_Sector_Plates_Drill_Bits_IzvTPU.pdf` |
+| L-113 | `references/Поиск статей/31232132.pdf` | `references/vim/02_Krysko_Group_Later/2024_Krysko_Porous_Flexible_FGM_Size-Dependent_Plate_Transverse_Loading_TWS.pdf` |
+
+### 4.3. Удалённые дубликаты поступлений
+
+Файлы — двоично отличающиеся копии уже зарегистрированных статей: тот же DOI, текстовый слой всех страниц
+совпадает побайтно. Не зарегистрированы; удалены 2026-10-12 по указанию владельца. Хеши сохранены, чтобы
+копии не были внесены повторно.
+
+| Файл (`references/Поиск статей/`) | Размер | SHA256 | Копия |
+|---|---:|---|---|
+| `Quantification-of-various-reduced-order-modelling-computational-methods-to-study-deflection.pdf` | 4224594 | `e9ece44f30d736db24bffb9b9f6d8ab61ec89a79d5a600156f73be4de0660318` | L-110 (без издательских метаданных) |
+| `412213.pdf` | 4321865 | `08432109d20533998d000c4c90da738d061aeebcf1ea1d1b93146acb079145fc` | L-110 (DOI 10.1016/j.camwa.2023.01.004) |
+| `2112.pdf` | 7009974 | `2cd0c2bf6819082db5df9defc8c9c7531ec29344f8f1d3f87409992ff895f95b` | L-109 (DOI 10.1016/j.ijnonlinmec.2022.104162) |
+
 ## 5. Проверка целостности
 
-SHA256 вычислены по содержимому файлов 2026-10-11. Проверка локальной копии: вычислить SHA256 каждого
+SHA256 вычислены по содержимому файлов 2026-10-11; для L-109–L-113 — 2026-10-12. Проверка локальной копии: вычислить SHA256 каждого
 файла (например, `sha256sum` или `Get-FileHash -Algorithm SHA256`) и сравнить со столбцом SHA256
 раздела 4. Файл с несовпадающим хешем не считается публикацией каталога, пока расхождение
 не объяснено.

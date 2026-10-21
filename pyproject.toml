@@ -48,8 +48,7 @@ gui-test = [
 ]
 
 [tool.hatch.build.targets.wheel]
-# Add "src/kkvim_reference" here when that package is created (D-028).
-packages = ["src/kkvim", "src/kkvim_gui"]
+packages = ["src/kkvim", "src/kkvim_reference", "src/kkvim_gui"]
 
 [tool.pytest.ini_options]
 minversion = "8.4"

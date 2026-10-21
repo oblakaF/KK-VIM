@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="440" font-family="sans-serif" font-size="12">
+<rect width="100%" height="100%" fill="white"/>
+<text x="310.0" y="22" text-anchor="middle" font-size="14">Differences from Navier against the grid step</text>
+<rect x="90" y="40" width="440" height="340" fill="none" stroke="#444"/>
+<line x1="164.6" y1="380" x2="164.6" y2="385" stroke="#444"/>
+<text x="164.6" y="398" text-anchor="middle">5e-3</text>
+<line x1="274.6" y1="380" x2="274.6" y2="385" stroke="#444"/>
+<text x="274.6" y="398" text-anchor="middle">1e-2</text>
+<line x1="384.6" y1="380" x2="384.6" y2="385" stroke="#444"/>
+<text x="384.6" y="398" text-anchor="middle">2e-2</text>
+<line x1="530.0" y1="380" x2="530.0" y2="385" stroke="#444"/>
+<text x="530.0" y="398" text-anchor="middle">5e-2</text>
+<line x1="85" y1="300.7" x2="530" y2="300.7" stroke="#ddd"/>
+<text x="82" y="304.7" text-anchor="end">2e-3</text>
+<line x1="85" y1="184.2" x2="530" y2="184.2" stroke="#ddd"/>
+<text x="82" y="188.2" text-anchor="end">5e-3</text>
+<line x1="85" y1="96.0" x2="530" y2="96.0" stroke="#ddd"/>
+<text x="82" y="100.0" text-anchor="end">1e-2</text>
+<text x="310.0" y="425" text-anchor="middle">h / a</text>
+<text x="18" y="210.0" text-anchor="middle" transform="rotate(-90 18 210.0)">relative difference</text>
+<polyline points="530.0,62.8 420.0,63.3 310.0,63.4 200.0,63.4 90.0,63.4" fill="none" stroke="#1f77b4" stroke-width="1.8"/>
+<circle cx="530.0" cy="62.8" r="3" fill="#1f77b4"/>
+<circle cx="420.0" cy="63.3" r="3" fill="#1f77b4"/>
+<circle cx="310.0" cy="63.4" r="3" fill="#1f77b4"/>
+<circle cx="200.0" cy="63.4" r="3" fill="#1f77b4"/>
+<circle cx="90.0" cy="63.4" r="3" fill="#1f77b4"/>
+<line x1="542" y1="50" x2="566" y2="50" stroke="#1f77b4" stroke-width="1.8"/>
+<text x="572" y="54">E_inf, s = 1</text>
+<polyline points="530.0,353.6 420.0,344.3 310.0,340.9 200.0,340.0 90.0,339.8" fill="none" stroke="#d62728" stroke-width="1.8"/>
+<circle cx="530.0" cy="353.6" r="3" fill="#d62728"/>
+<circle cx="420.0" cy="344.3" r="3" fill="#d62728"/>
+<circle cx="310.0" cy="340.9" r="3" fill="#d62728"/>
+<circle cx="200.0" cy="340.0" r="3" fill="#d62728"/>
+<circle cx="90.0" cy="339.8" r="3" fill="#d62728"/>
+<line x1="542" y1="68" x2="566" y2="68" stroke="#d62728" stroke-width="1.8"/>
+<text x="572" y="72">E_inf, s = 2</text>
+<polyline points="530.0,355.1 420.0,346.0 310.0,342.8 200.0,341.8 90.0,341.6" fill="none" stroke="#2ca02c" stroke-width="1.8"/>
+<circle cx="530.0" cy="355.1" r="3" fill="#2ca02c"/>
+<circle cx="420.0" cy="346.0" r="3" fill="#2ca02c"/>
+<circle cx="310.0" cy="342.8" r="3" fill="#2ca02c"/>
+<circle cx="200.0" cy="341.8" r="3" fill="#2ca02c"/>
+<circle cx="90.0" cy="341.6" r="3" fill="#2ca02c"/>
+<line x1="542" y1="86" x2="566" y2="86" stroke="#2ca02c" stroke-width="1.8"/>
+<text x="572" y="90">E_inf, s = 3</text>
+<polyline points="530.0,355.0 420.0,346.1 310.0,342.9 200.0,341.8 90.0,341.6" fill="none" stroke="#9467bd" stroke-width="1.8"/>
+<circle cx="530.0" cy="355.0" r="3" fill="#9467bd"/>
+<circle cx="420.0" cy="346.1" r="3" fill="#9467bd"/>
+<circle cx="310.0" cy="342.9" r="3" fill="#9467bd"/>
+<circle cx="200.0" cy="341.8" r="3" fill="#9467bd"/>
+<circle cx="90.0" cy="341.6" r="3" fill="#9467bd"/>
+<line x1="542" y1="104" x2="566" y2="104" stroke="#9467bd" stroke-width="1.8"/>
+<text x="572" y="108">E_inf, s = 4</text>
+<polyline points="530.0,355.0 420.0,346.1 310.0,342.9 200.0,341.8 90.0,341.6" fill="none" stroke="#ff7f0e" stroke-width="1.8"/>
+<circle cx="530.0" cy="355.0" r="3" fill="#ff7f0e"/>
+<circle cx="420.0" cy="346.1" r="3" fill="#ff7f0e"/>
+<circle cx="310.0" cy="342.9" r="3" fill="#ff7f0e"/>
+<circle cx="200.0" cy="341.8" r="3" fill="#ff7f0e"/>
+<circle cx="90.0" cy="341.6" r="3" fill="#ff7f0e"/>
+<line x1="542" y1="122" x2="566" y2="122" stroke="#ff7f0e" stroke-width="1.8"/>
+<text x="572" y="126">E_inf, s = stop</text>
+<polyline points="530.0,58.2 420.0,58.2 310.0,58.2 200.0,58.2 90.0,58.2" fill="none" stroke="#8c564b" stroke-width="1.8" stroke-dasharray="4,3"/>
+<circle cx="530.0" cy="58.2" r="3" fill="#8c564b"/>
+<circle cx="420.0" cy="58.2" r="3" fill="#8c564b"/>
+<circle cx="310.0" cy="58.2" r="3" fill="#8c564b"/>
+<circle cx="200.0" cy="58.2" r="3" fill="#8c564b"/>
+<circle cx="90.0" cy="58.2" r="3" fill="#8c564b"/>
+<line x1="542" y1="140" x2="566" y2="140" stroke="#8c564b" stroke-width="1.8" stroke-dasharray="4,3"/>
+<text x="572" y="144">E_2, s = 1</text>
+<polyline points="530.0,358.0 420.0,361.3 310.0,361.7 200.0,361.8 90.0,361.8" fill="none" stroke="#17becf" stroke-width="1.8" stroke-dasharray="4,3"/>
+<circle cx="530.0" cy="358.0" r="3" fill="#17becf"/>
+<circle cx="420.0" cy="361.3" r="3" fill="#17becf"/>
+<circle cx="310.0" cy="361.7" r="3" fill="#17becf"/>
+<circle cx="200.0" cy="361.8" r="3" fill="#17becf"/>
+<circle cx="90.0" cy="361.8" r="3" fill="#17becf"/>
+<line x1="542" y1="158" x2="566" y2="158" stroke="#17becf" stroke-width="1.8" stroke-dasharray="4,3"/>
+<text x="572" y="162">E_2, s = stop</text>
+</svg>

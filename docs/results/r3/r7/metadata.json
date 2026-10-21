@@ -1,0 +1,75 @@
+{
+  "study": "R-7 (Q-029): surrogate margins Q_s/(10 tau_s) of the energy test A-7 for R3 rectangles, preliminary",
+  "base_commit": "a8e3a60f6c60b454ffb785e492c189344b523346",
+  "date_utc": "2026-10-14T06:40:13+00:00",
+  "python": "3.13.15",
+  "numpy": "2.5.4",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "plate": "a = 1, b = r, q = D = 1 (margins invariant under a, q, D at fixed r, nx, ny)",
+  "surrogate": "kkvim_reference.parseval_recursion (b = r, s_max = 4) sampled at nodes; discrete a_h, R, R_f of NUMERICAL_SPEC 4.1, 10.3",
+  "calibration": "kkvim.iteration.run_halfsteps + kkvim.energy.check_history (accepted R2 code, run only), r = 1, n = 20..640",
+  "C_s": {
+    "2": 12.596892390516768,
+    "3": 7.152240717468618,
+    "4": 7.152240717468618
+  },
+  "rules_sha256": "cee66304c12fb7f06b581de75748853b6ae92e507e9ed090c32791bf8967dadc",
+  "scripts_sha256": {
+    "surrogate.py": "5bbeedbf4a57acd02afd566e04415610b2237c6346a1a031496f1afe73629162",
+    "calibrate.py": "2a13066f6e7a7461de3fbc3a863eaefb9b06900f3434bf99ada20dc815502539",
+    "margins.py": "f52fdef0fdf7834d6bfad0ee911c2bcc8e5c2d580a568d4bdd6620690b298842",
+    "summarize.py": "b39888fb73852ffc6d080d1cdd578516303116484b9684e5c273a3a8d95b9a40",
+    "extra.py": "2e6a22dee0894dd07f427faea3620e122f4206d1634c83d40e4232f212cda531",
+    "selfcheck.py": "652a035fcc29752b4b5964e7fb87ce084e5451aa633199c9ad2df0e2eca76545",
+    "export.py": "f600db16297b141ae6f69b9af4fe842cea729fc3c7e1f061346c98ab9c2db4fc"
+  },
+  "scripts_location": "scratch/r7 (outside git, task rule)",
+  "rows": {
+    "margins": 6534,
+    "grid_pairs": 2178
+  },
+  "versioned_scripts": {
+    "location": "scripts/r3_r7 (byte-exact copies of scratch/r7, LF line ends; scripts/r3_r7/.gitattributes '* -text' prevents end-of-line conversion)",
+    "copied_from_commit": "c877807ece5eae813d24418e90e9ce8c2319ff11 (study commit; scripts were outside git there)",
+    "sha256": {
+      "surrogate.py": "5bbeedbf4a57acd02afd566e04415610b2237c6346a1a031496f1afe73629162",
+      "calibrate.py": "2a13066f6e7a7461de3fbc3a863eaefb9b06900f3434bf99ada20dc815502539",
+      "margins.py": "f52fdef0fdf7834d6bfad0ee911c2bcc8e5c2d580a568d4bdd6620690b298842",
+      "summarize.py": "b39888fb73852ffc6d080d1cdd578516303116484b9684e5c273a3a8d95b9a40",
+      "extra.py": "2e6a22dee0894dd07f427faea3620e122f4206d1634c83d40e4232f212cda531",
+      "selfcheck.py": "652a035fcc29752b4b5964e7fb87ce084e5451aa633199c9ad2df0e2eca76545",
+      "export.py": "f600db16297b141ae6f69b9af4fe842cea729fc3c7e1f061346c98ab9c2db4fc",
+      "RULES_fixed_before_R3.md": "cee66304c12fb7f06b581de75748853b6ae92e507e9ed090c32791bf8967dadc"
+    },
+    "identical_to_original_sha256": true,
+    "path_or_import_changes": "none; the originals expect cwd containing scratch/r7/, provided by scripts/r3_r7/reproduce.py",
+    "new_files": {
+      "reproduce.py": "driver added for reproducibility (not part of the original study)",
+      "README.md": "commands and provenance",
+      ".gitattributes": "no end-of-line conversion in this directory"
+    }
+  },
+  "reproduction": {
+    "date_utc": "2026-10-14T07:14:21+00:00",
+    "command": "uv run --no-sync python scripts/r3_r7/reproduce.py --workdir <temporary directory>",
+    "python": "3.13.15",
+    "numpy": "2.5.4",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "calibration_r1_csv_bytes_equal": true,
+    "margins_csv_bytes_equal": true,
+    "rows": 6534,
+    "grid_pairs": 2178,
+    "categories": {
+      "BORDERLINE": 7,
+      "DIAGNOSTIC_S4": 2178,
+      "EXPECTED_UNRESOLVED": 641,
+      "MANDATORY_CANDIDATE": 3150,
+      "RESOLVABLE_NO_HEADROOM": 558
+    },
+    "metadata_differences": {
+      "base_commit": "empty in the reproduction: export.py runs 'git rev-parse HEAD' in the temporary directory, which is not a git repository",
+      "date_utc": "time of the reproduction run"
+    },
+    "note": "the original fields above (date_utc, base_commit, scripts_sha256, rules_sha256) describe the study run of 2026-10-14 and are unchanged"
+  }
+}

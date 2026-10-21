@@ -1,0 +1,13 @@
+{
+ "object": "builder/r4-d048-implementation 3da624a",
+ "plan": "e4e1109",
+ "python": "3.13.15",
+ "numpy": "2.5.4",
+ "os": "Windows-10-10.0.19045-SP0",
+ "machine": "AMD64",
+ "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+ "cpu_features_enabled": "MMX,SSE,SSE2,SSE3,SSSE3,SSE41,POPCNT,SSE42,X86_V2,AVX,F16C,FMA3,AVX2,LAHF,CX16,MOVBE,BMI,BMI2,LZCNT,GFNI,VPCLMULQDQ,VAES,X86_V3",
+ "cpu_baseline": "X86_V2",
+ "cpu_dispatch": "X86_V3",
+ "seconds": 477
+}
