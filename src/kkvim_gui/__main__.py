@@ -4,4 +4,6 @@ import sys
 
 from kkvim_gui.app import main
 
-sys.exit(main())
+# The guard is required: the computing process (multiprocessing, "spawn") imports the main module again.
+if __name__ == "__main__":
+    sys.exit(main())

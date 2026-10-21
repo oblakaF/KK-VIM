@@ -130,6 +130,7 @@ class AppHeader(QFrame):
         self.project.setObjectName("HeaderProject")
         self.nav = nav
 
+        self._badge_full, self._badge_short = TEST_DATA_BADGE, "TEST DATA"
         self.badge = QLabel(TEST_DATA_BADGE)
         self.badge.setObjectName("TestDataBadge")
         self.badge.setToolTip(TEST_DATA_TOOLTIP)
@@ -180,6 +181,13 @@ class AppHeader(QFrame):
     def _on_theme_changed(self, _name):
         self.logo.set_colour(self._session.tokens["header.fg"])
 
+    def set_badge(self, full, short, tooltip):
+        """Another mark in the badge (e.g. PROVISIONAL / NOT_QUALIFIED of an R4 result)."""
+        self._badge_full, self._badge_short = full, short
+        self.badge.setToolTip(tooltip)
+        self.badge.setVisible(True)
+        self._adapt()
+
     def set_project(self, text, modified=False):
         self._project_text = f"{text}  ●" if modified else text
         self.project.setText(self._project_text)
@@ -194,4 +202,4 @@ class AppHeader(QFrame):
         show_project = bool(self._project_text) and not narrow
         self.project.setVisible(show_project)
         self.separator.setVisible(show_project)
-        self.badge.setText("TEST DATA" if narrow else TEST_DATA_BADGE)
+        self.badge.setText(self._badge_short if narrow else self._badge_full)

@@ -8,7 +8,8 @@
 - Bottom: collapsible «Подробный журнал»; normally only important messages are shown
   (in the details), and there are no per-iteration lines.
 No convergence plot here: scientific figures live in the analysis window. No remaining-time
-estimate. The demonstration backend is marked TEST DATA everywhere.
+estimate. The demonstration backend is marked TEST DATA everywhere; every R4 result carries
+PROVISIONAL / NOT_QUALIFIED. The scientific status comes from the solver outcome, never from the GUI.
 """
 
 from PySide6.QtCore import Qt, Signal
@@ -38,6 +39,12 @@ RESULTS_TEXT = (
     "Доступно в окне анализа: заготовки поля прогиба, сечений и сходимости с демонстрационными "
     "значениями — TEST DATA, не результаты решателя."
 )
+RESULTS_SOLVER = (
+    "Доступно в окне анализа: поле прогиба, максимальный прогиб, безразмерный прогиб, сечения, история "
+    "полушагов, энергия и диагностика — по массивам решателя KK-VIM."
+)
+RESULTS_R4 = RESULTS_SOLVER + " Все величины R4 — PROVISIONAL / NOT_QUALIFIED."
+NO_FIELD = "Поле прогиба не получено. Протокол и диагностика доступны через «Сохранить результаты…»."
 
 
 def _table(columns):
@@ -56,6 +63,7 @@ def _table(columns):
 class RunView(QWidget):
     stopRequested = Signal(int)
     analysisRequested = Signal(int)
+    exportRequested = Signal(int)
 
     def __init__(self, session, runs, parent=None):
         super().__init__(parent)
@@ -105,7 +113,10 @@ class RunView(QWidget):
         self.analysis_button = QPushButton("Открыть анализ результатов")
         self.analysis_button.setProperty("variant", "primary")
         self.analysis_button.clicked.connect(lambda: self.analysisRequested.emit(self.selected_id))
-        for b in (self.stop_button, self.analysis_button):
+        self.export_button = QPushButton("Сохранить результаты…")
+        self.export_button.setToolTip("Исходные данные, статусы, история полушагов и поле: JSON и CSV с единицами")
+        self.export_button.clicked.connect(lambda: self.exportRequested.emit(self.selected_id))
+        for b in (self.stop_button, self.export_button, self.analysis_button):
             head.addWidget(b)
         card.body.addLayout(head)
         statuses = QHBoxLayout()
@@ -124,14 +135,15 @@ class RunView(QWidget):
         return card
 
     def _details_card(self):
-        card = Card("Выбранный запуск", right=label("TEST DATA", "tag"))
+        self.details_tag = label("", "tag")
+        card = Card("Выбранный запуск", right=self.details_tag)
         self.details_card = card
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(5)
         grid.setColumnStretch(1, 1)
         self.details = {}
-        rows = ("Проект", "Метод", "Параметры", "Пластина", "Этап", "Счётчики", "Прошло времени")
+        rows = ("Проект", "Метод", "Параметры", "Пластина", "Этап", "Счётчики", "Прошло времени", "Протокол")
         for i, name in enumerate(rows):
             grid.addWidget(label(name, "fieldLabel"), i, 0, Qt.AlignmentFlag.AlignTop)
             value = label("", wrap=True)
@@ -237,9 +249,20 @@ class RunView(QWidget):
         for w in (self.status_run, self.status_stop, self.status_accept, self.summary_text):
             w.setVisible(has)
         self.stop_button.setVisible(has and run.active)
-        self.analysis_button.setVisible(has and run.status == "finished")
-        self.analysis_button.setEnabled(has and run.has_results)
-        self.results_note.setVisible(has and run.has_results)
+        diagnostic = has and run.has_diagnostic_field
+        self.analysis_button.setVisible(has and (run.status == "finished" or diagnostic))
+        self.analysis_button.setEnabled(has and (run.has_results or diagnostic))
+        self.analysis_button.setText("Открыть диагностику (расчёт не завершён)" if diagnostic
+                                     else "Открыть анализ результатов")
+        self.export_button.setVisible(has and run.outcome is not None)
+        outcome = run.outcome if has else None
+        if has and run.is_demo:
+            self.results_note.text.setText(RESULTS_TEXT)
+        elif outcome is not None:
+            self.results_note.text.setText(
+                NO_FIELD if not outcome.has_field else RESULTS_R4 if outcome.mark else RESULTS_SOLVER)
+        self.results_note.setVisible(has and (run.has_results or (outcome is not None and not outcome.has_field)))
+        self.details_tag.setText(self._tag(run) if has else "")
         if not has:
             self.summary_title.setText("Расчёты ещё не запускались")
             for v in self.details.values():
@@ -251,9 +274,11 @@ class RunView(QWidget):
         self.summary_title.setText(f"{STATUS_TEXT[run.status]} — {elapsed}")
         self.status_run.set_status(STATUS_KIND[run.status], f"Выполнение: {STATUS_TEXT[run.status].lower()}")
         self.status_stop.set_status(*self._criterion(run))
+        self.status_accept.set_status(*self._science(run))
         rows = dict(summary_rows(run.snapshot))
+        tail = " · TEST DATA" if run.is_demo else (" · PROVISIONAL / NOT_QUALIFIED" if run.snapshot.N != 1 else "")
         self.summary_text.setText(f"{run.method} · {run.params_text()} · {rows['Закрепление']} · "
-                                  f"{rows['Геометрия']} · TEST DATA")
+                                  f"{rows['Геометрия']}{tail}")
         d = self.details
         d["Проект"].setText(run.project)
         d["Метод"].setText(f"{run.method} · {run.snapshot.theory}")
@@ -263,11 +288,18 @@ class RunView(QWidget):
         self.counter_label.setVisible(run.iterative)
         d["Счётчики"].setVisible(run.iterative)
         if run.iterative:
-            d["Счётчики"].setText(
-                f"s = {run.s} — выполненные координатные полушаги; "
-                f"k = {run.k} — завершённые циклы (D-030)"
-            )
+            if run.s is None:
+                d["Счётчики"].setText("s и k — после завершения: решатель не передаёт промежуточные полушаги")
+            else:
+                d["Счётчики"].setText(
+                    f"s = {run.s} — выполненные координатные полушаги; "
+                    f"k = {run.k} — завершённые циклы (D-030)"
+                )
         d["Прошло времени"].setText(elapsed)
+        if run.protocol_path:
+            d["Протокол"].setText(str(run.protocol_path))
+        else:
+            d["Протокол"].setText("—" if run.is_demo or run.active else "не сохранён")
         t = self.session.tokens
         lines = []
         for time_, level, text in run.important:
@@ -278,16 +310,38 @@ class RunView(QWidget):
         self._fill_journal(run.detailed)
 
     @staticmethod
+    def _tag(run):
+        if run.is_demo:
+            return "TEST DATA"
+        if run.snapshot.N != 1:
+            return "PROVISIONAL / NOT_QUALIFIED"
+        return "KK-VIM"
+
+    @staticmethod
     def _criterion(run):
         if not run.iterative:
             return "neutral", "Критерий остановки: не применяется"
         if run.status == "running":
             return "neutral", "Критерий остановки: ещё не выполнен"
-        if run.stop_criterion == "met":
-            return "success", f"Критерий остановки выполнен на k = {run.k} (s = {run.s}) — демонстрация"
-        if run.stop_criterion == "k_max":
-            return "warning", "Критерий остановки не выполнен: достигнуто k_max"
-        return "neutral", "Критерий остановки: не выполнен"
+        if run.is_demo:
+            if run.stop_criterion == "met":
+                return "success", f"Критерий остановки выполнен на k = {run.k} (s = {run.s}) — демонстрация"
+            return "neutral", "Критерий остановки: не выполнен"
+        outcome = run.outcome
+        if outcome is None:
+            return "neutral", "Критерий остановки: не выполнен (результата нет)"
+        kind = {"met": "success", "not_met": "warning", "error": "error", "none": "neutral"}[outcome.stop_kind]
+        if outcome.mark and kind == "success":
+            kind = "warning"  # an R4 stabilization is PROVISIONAL, not a success of the method
+        return kind, f"{outcome.stop_text} (s = {outcome.s}, k = {outcome.k})"
+
+    @staticmethod
+    def _science(run):
+        if run.is_demo:
+            return "neutral", "Научная приёмка: не проводилась"
+        if run.snapshot.N != 1:
+            return "warning", "Научный статус: PROVISIONAL / NOT_QUALIFIED (R4, D-047, D-048)"
+        return "neutral", "Научный статус: решатель R3 ACCEPTED (D-043); расчёт — не научная приёмка"
 
     def _fill_journal(self, rows):
         self.journal.setRowCount(len(rows))

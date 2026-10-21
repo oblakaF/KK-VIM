@@ -2,27 +2,37 @@
 
 Opened only by the "Открыть анализ результатов" button; several windows may be open.
 Horizontal tabs at the top, no side menu. Each tab has its own toolbar; tabs with
-figures carry the session-wide "Графики RU | EN" switch. P1 shows the layout with
-TEST DATA placeholders; real figures arrive at P3-P5.
+figures carry the session-wide "Графики RU | EN" switch.
+
+- A solver run (``run`` with a ``RunOutcome``): every tab is drawn from the solver arrays and rows
+  (``analysis.results``); «Экспорт ▾» writes JSON and CSV with units and statuses. The window keeps
+  its run: later changes in the main window do not affect it.
+- Without a solver run (``--demo``): the layout with TEST DATA placeholders, never results.
 """
+
+from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QMainWindow,
+    QMenu,
     QPushButton,
     QTableWidget,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from kkvim_gui import placeholders
+from kkvim_gui.backend import export
 from kkvim_gui.theme.tokens import SIZES
 from kkvim_gui.widgets.common import (
     Card,
@@ -37,6 +47,10 @@ from kkvim_gui.widgets.common import (
 from kkvim_gui.widgets.header import AppHeader, app_icon
 
 TABS = ("Обзор", "Поля", "Сечения", "Численные значения", "Сходимость", "Сравнение")
+SOLVER_TABS = ("Обзор", "Поля", "Сечения", "Численные значения", "История полушагов", "Энергия и диагностика",
+               "Сравнение")
+SOLVER_TAB_HELP = ("results.overview", "results.overview", "results.overview", "results.overview",
+                   "iterations.overview", "iterations.overview", "verification.overview")
 TAB_HELP = (
     "results.overview", "results.overview", "results.overview",
     "results.overview", "iterations.overview", "verification.overview",
@@ -120,13 +134,20 @@ class AnalysisWindow(QMainWindow):
     settingsRequested = Signal()
     helpRequested = Signal()
 
-    def __init__(self, session, model_rows=None, parent=None):
-        """model_rows: input parameters of the analysed run; default: demonstration rows."""
+    def __init__(self, session, model_rows=None, run=None, parent=None):
+        """model_rows: input parameters of the analysed run; run: a finished solver run (None: demonstration)."""
         super().__init__(parent)
         self.session = session
         self.model_rows = tuple(model_rows) if model_rows else MODEL_ROWS
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowIcon(app_icon())
+        has_outcome = run is not None and not run.is_demo and run.outcome is not None and run.outcome.has_field
+        # an error exit with a field is opened only as diagnostics, marked as an unfinished run
+        self.run = run if has_outcome else None
+        self.outcome = self.run.outcome if has_outcome else None
+        if self.outcome is not None:
+            self._build_solver()
+            return
         self.setWindowTitle(f"КК-ВИМ: анализ — {placeholders.RUN_TITLE}")
 
         central = QWidget()
@@ -175,8 +196,130 @@ class AnalysisWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # Narrow window (high Windows scaling): the data note duplicates the TEST DATA badge.
+        # Narrow window (high Windows scaling): the data note duplicates the badge.
         self.data_note.setVisible(self.width() >= 1100)
+
+    # Solver result -----------------------------------------------------------------------------------
+
+    def _build_solver(self):
+        from kkvim_gui.analysis import results
+        from kkvim_gui.model.runs import format_duration
+
+        run, outcome = self.run, self.outcome
+        title = f"запуск {run.run_id} · {run.started:%d.%m.%Y %H:%M:%S}"
+        self.setWindowTitle(f"КК-ВИМ: анализ — {title}")
+        central = QWidget()
+        central.setObjectName("Page")
+        lay = QVBoxLayout(central)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        self.header = AppHeader(self.session, "КК-ВИМ: анализ результатов",
+                                show_badge=bool(outcome.mark) or outcome.is_error)
+        if outcome.is_error:
+            self.header.set_badge("ДИАГНОСТИКА · расчёт не завершён", "ДИАГНОСТИКА",
+                                  f"Решатель завершился ошибкой {outcome.status}: поле последнего выполненного "
+                                  "полушага показано только для диагностики, это не результат")
+        elif outcome.mark:
+            self.header.set_badge(outcome.mark, "PROVISIONAL", "Исследовательский решатель R4 (D-047, D-048): "
+                                  "результаты не квалифицированы, не научная приёмка")
+        self.header.set_project(title)
+        self.header.settingsClicked.connect(self.settingsRequested)
+        self.header.helpClicked.connect(self.helpRequested)
+        lay.addWidget(self.header)
+
+        strip = QFrame()
+        strip.setObjectName("StatusStrip")
+        strip_lay = QHBoxLayout(strip)
+        strip_lay.setContentsMargins(16, 6, 16, 6)
+        strip_lay.setSpacing(24)
+        (k1, t1), (k2, t2), (k3, t3) = results.statuses(outcome, run)
+        self.status_run, self.status_stop, self.status_accept = (StatusLabel(k1, t1), StatusLabel(k2, t2),
+                                                                 StatusLabel(k3, t3))
+        for w in (self.status_run, self.status_stop, self.status_accept):
+            strip_lay.addWidget(w)
+        strip_lay.addStretch(1)
+        self.data_note = label(f"Данные: решатель KK-VIM {outcome.solver}" + (f" · {outcome.mark}" if outcome.mark else ""),
+                               "secondary")
+        strip_lay.addWidget(self.data_note)
+        lay.addWidget(strip)
+
+        elapsed = format_duration(run._elapsed_final or 0.0)
+        self.tabs = QTabWidget()
+        self.tabs.setTabPosition(QTabWidget.TabPosition.North)
+        self.tabs.setDocumentMode(True)
+        s = self.session
+        self.overview = results.OverviewTab(s, outcome, run, self.model_rows, elapsed)
+        self.fields = results.FieldsTab(s, outcome, self.model_rows, trailing=self._trailing())
+        self.sections = results.SectionsTab(s, outcome, trailing=self._trailing())
+        self.values = results.ValuesTab(outcome, trailing=(self._export_button(),))
+        self.history = results.HistoryTab(s, outcome, trailing=self._trailing())
+        self.energy = results.EnergyTab(s, outcome, trailing=self._trailing())
+        for widget, name in zip((self.overview, self.fields, self.sections, self.values, self.history, self.energy,
+                                 QWidget()), SOLVER_TABS, strict=True):
+            self.tabs.addTab(widget, name)
+        self.tabs.setTabEnabled(6, False)
+        self.tabs.setTabToolTip(6, COMPARISON_TOOLTIP)
+        for i, topic in enumerate(SOLVER_TAB_HELP):
+            set_help_context(self.tabs.widget(i), topic)
+        self.report_button = QPushButton("Собрать отчёт…")
+        self.report_button.setEnabled(False)
+        self.report_button.setToolTip(REPORT_TOOLTIP)
+        corner = QWidget()
+        corner_lay = QHBoxLayout(corner)
+        corner_lay.setContentsMargins(0, 4, 16, 4)
+        corner_lay.addWidget(self.report_button)
+        self.tabs.setCornerWidget(corner, Qt.Corner.TopRightCorner)
+        self.tabs.setCurrentIndex(0)
+        lay.addWidget(self.tabs, 1)
+        self.setCentralWidget(central)
+        mark = f" · {outcome.mark}" if outcome.mark else ""
+        if outcome.is_error:
+            self.statusBar().addWidget(label(f"●  ДИАГНОСТИКА: расчёт завершился ошибкой {outcome.status}; "
+                                             f"поле — последнего выполненного полушага, не результат{mark}"), 1)
+        else:
+            self.statusBar().addWidget(label(f"●  Результаты решателя KK-VIM загружены{mark}"), 1)
+        fit_to_screen(self)
+
+    def _trailing(self):
+        return (FigureLanguageSwitch(self.session), self._export_button())
+
+    def _export_button(self):
+        button = QToolButton()
+        button.setText("Экспорт ▾")
+        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(button)
+        menu.addAction("Все результаты: JSON + CSV…", self._export_all_dialog)
+        menu.addAction("История полушагов, CSV…", self._export_history_dialog)
+        menu.addAction("Поле прогиба, CSV…", self._export_field_dialog)
+        button.setMenu(menu)
+        button.setToolTip("Исходные данные, результаты и история вычислений с единицами и научными статусами")
+        return button
+
+    def _base_name(self):
+        return f"kkvim_{self.run.started:%Y%m%d-%H%M%S}_run{self.run.run_id:03d}"
+
+    def export_all(self, folder):
+        meta = self.run.meta(self.run._t0 + (self.run._elapsed_final or 0.0))
+        return export.write_result(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed)
+
+    def _export_all_dialog(self):
+        folder = QFileDialog.getExistingDirectory(self, "Папка для результатов")
+        if folder:
+            paths = self.export_all(folder)
+            self.statusBar().showMessage(f"Сохранено: {paths['manifest'].parent}", 8000)
+
+    def _export_history_dialog(self):
+        path, _ = QFileDialog.getSaveFileName(self, "История полушагов", f"{self._base_name()}_history.csv",
+                                              "CSV (*.csv)")
+        if path:
+            export.write_history_csv(self.outcome, path)
+            self.statusBar().showMessage(f"Сохранено: {path}", 8000)
+
+    def _export_field_dialog(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Поле прогиба", f"{self._base_name()}_field.csv", "CSV (*.csv)")
+        if path:
+            export.write_field_csv(self.outcome, path)
+            self.statusBar().showMessage(f"Сохранено: {path}", 8000)
 
     def _status_strip(self):
         strip = QFrame()

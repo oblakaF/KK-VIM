@@ -24,7 +24,7 @@ CTRL = Qt.KeyboardModifier.ControlModifier
 def gui(qtbot, qapp):
     session = Session(settings=None)
     session.apply_theme()
-    g = GuiApplication(session)
+    g = GuiApplication(session, demo=True)
     qtbot.addWidget(g.main_window)
     g.main_window.show()
     qtbot.waitExposed(g.main_window)

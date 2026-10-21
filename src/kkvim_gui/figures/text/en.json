@@ -10,5 +10,20 @@
   "axis.residual": "Residual (preliminary)",
   "legend.kkvim": "KK-VIM, N = {N}",
   "annot.extremum": "Extremum at nodes: {value} mm",
-  "mark.test_data": "TEST DATA"
+  "mark.test_data": "TEST DATA",
+  "field.wbar.title": "Dimensionless deflection w̄ = wD/(qa⁴)",
+  "colorbar.wbar": "w̄",
+  "axis.w": "w (mm)",
+  "axis.wbar": "w̄",
+  "axis.halfstep": "Half-step s",
+  "axis.change": "Field change ε",
+  "axis.energy": "Π_h (N·m)",
+  "hist.title": "Field change by half-steps",
+  "energy.title": "Discrete energy Π_h by half-steps",
+  "legend.eps_inf": "ε^∞",
+  "legend.eps_E": "ε^E",
+  "legend.tol_inf": "tol_∞",
+  "legend.tol_E": "tol_E",
+  "mark.provisional": "PROVISIONAL / NOT_QUALIFIED",
+  "mark.diagnostic": "DIAGNOSTIC · RUN NOT COMPLETED"
 }

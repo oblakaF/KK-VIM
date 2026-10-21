@@ -9,7 +9,7 @@ result values with DemoBackend output, still marked TEST DATA.
 PROJECT_NAME = "plate_ssss_01.kkv"
 RUN_TITLE = "plate_ssss_01 · 12.10.2026 10:48"
 
-# Initial values of the setup form as text; units are SI symbols (GUI-D14).
+# Initial values of the setup form as text (an example plate for the solver); units are SI symbols (GUI-D14).
 SETUP = {
     "a": ("2,000", "m"),
     "b": ("1,000", "m"),
@@ -17,7 +17,6 @@ SETUP = {
     "E": ("210", "GPa"),
     "nu": "0,300",
     "q": ("5,000", "kPa"),
-    "k_max": "100",
 }
 
 RECENT_PROJECTS = (

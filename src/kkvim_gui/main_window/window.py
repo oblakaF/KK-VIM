@@ -8,12 +8,20 @@ or is stopped. Runs of the session are kept by a RunManager (individual timers).
 Developer mode (dev=True, `kkvim-gui --dev`) adds the state selector in the status bar
 and Ctrl+1..Ctrl+4 for design review; ordinary users do not see them. Application
 shortcuts never use the standard editing keys (Ctrl+C/V/X/Z/Y/A; GUI_DESIGN.md, 12.1).
+
+Backend: the KK-VIM solver in a separate process (default) or, only with demo=True
+(`kkvim-gui --demo`), the demonstration backend marked TEST DATA. Before a solver run the input is
+checked by kkvim's own validation (``kkvim_adapter.check_request``); a rejected input is shown on the
+setup page and no run is started.
 """
+
+from pathlib import Path
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox,
+    QFileDialog,
     QMainWindow,
     QMessageBox,
     QStackedWidget,
@@ -22,12 +30,15 @@ from PySide6.QtWidgets import (
 )
 
 from kkvim_gui import placeholders, program_version
+from kkvim_gui.backend import export
+from kkvim_gui.backend.kkvim_adapter import check_request
+from kkvim_gui.backend.process import SolverProcess
 from kkvim_gui.main_window.run_view import RunView
 from kkvim_gui.main_window.setup_view import SetupView
 from kkvim_gui.main_window.start_view import StartView
 from kkvim_gui.model.runs import RunManager
 from kkvim_gui.model.setup_model import SetupModel
-from kkvim_gui.model.setup_state import summary_rows
+from kkvim_gui.model.setup_state import summary_rows, to_request
 from kkvim_gui.widgets.common import fit_to_screen, label
 from kkvim_gui.widgets.header import AppHeader, HeaderNav, app_icon
 
@@ -43,8 +54,8 @@ NAV_OF_STATE = {"start": "start", "setup": "setup", "running": "run", "finished"
 STATUS_TEXT = {
     "start": "●  Готово",
     "setup": "●  Готово",
-    "running": "●  Выполняется (демонстрация)",
-    "finished": "●  Расчёт выполнен (TEST DATA)",
+    "running": "●  Выполняется расчёт",
+    "finished": "●  Готово",
 }
 
 
@@ -53,13 +64,15 @@ class MainWindow(QMainWindow):
     settingsRequested = Signal()
     helpRequested = Signal()
 
-    def __init__(self, session, dev=False, parent=None):
+    def __init__(self, session, dev=False, demo=False, protocol_dir=None, process_factory=SolverProcess,
+                 parent=None):
         super().__init__(parent)
         self.session = session
         self.dev = dev
+        self.demo = demo
         self.setWindowIcon(app_icon())
         self.state = None
-        self.runs = RunManager(parent=self)
+        self.runs = RunManager(process_factory=process_factory, protocol_dir=protocol_dir, parent=self)
         # One setup model per main window: values survive switching sections (GUI_DESIGN.md, 5.2).
         self.setup_model = SetupModel(parent=self)
         # Snapshot of the setup taken when a run starts; "Ход расчёта" and the analysis show it.
@@ -72,14 +85,14 @@ class MainWindow(QMainWindow):
         lay.setSpacing(0)
         self.nav = HeaderNav(NAV_SECTIONS)
         self.nav.navigate.connect(self._navigate)
-        self.header = AppHeader(session, "КК-ВИМ", nav=self.nav)
+        self.header = AppHeader(session, "КК-ВИМ", nav=self.nav, show_badge=demo)
         self.header.settingsClicked.connect(self.settingsRequested)
         self.header.helpClicked.connect(self.helpRequested)
         lay.addWidget(self.header)
 
         self.stack = QStackedWidget()
-        self.start_view = StartView()
-        self.setup_view = SetupView(self.setup_model, session)
+        self.start_view = StartView(demo=demo)
+        self.setup_view = SetupView(self.setup_model, session, demo=demo)
         self.run_view = RunView(session, self.runs)
         for w in (self.start_view, self.setup_view, self.run_view):
             self.stack.addWidget(w)
@@ -90,6 +103,7 @@ class MainWindow(QMainWindow):
         self.setup_view.runRequested.connect(self._start_run)
         self.run_view.stopRequested.connect(self._confirm_stop)
         self.run_view.analysisRequested.connect(self._open_analysis)
+        self.run_view.exportRequested.connect(self._choose_export_folder)
         self.runs.activeChanged.connect(self._on_active_changed)
 
         bar = self.statusBar()
@@ -109,7 +123,8 @@ class MainWindow(QMainWindow):
             bar.addPermanentWidget(self.state_selector)
             for i, key in enumerate(STATES, start=1):
                 QShortcut(QKeySequence(f"Ctrl+{i}"), self, activated=lambda k=key: self.set_state(k))
-        bar.addPermanentWidget(label(f"Бэкенд: демонстрационный · KK-VIM {program_version()}"))
+        backend = "демонстрационный (TEST DATA)" if demo else "решатель KK-VIM, отдельный процесс"
+        bar.addPermanentWidget(label(f"Бэкенд: {backend} · KK-VIM {program_version()}"))
 
         QShortcut(QKeySequence("Ctrl+N"), self, activated=self._new_shortcut)
         QShortcut(QKeySequence("F5"), self, activated=self._run_shortcut)
@@ -164,10 +179,24 @@ class MainWindow(QMainWindow):
             self.setup_view.try_run()
 
     def _start_run(self):
-        """Called only after the formal input check passed (SetupView.try_run)."""
-        self.run_snapshot = self.setup_model.state
-        self.runs.start_demo(self.run_snapshot)
+        """Called only after the formal input check passed (SetupView.try_run); never twice at once."""
+        if self.runs.active is not None:
+            return None
+        snapshot = self.setup_model.state
+        if self.demo:
+            self.run_snapshot = snapshot
+            run = self.runs.start_demo(snapshot)
+            self.set_state("running")
+            return run
+        request = to_request(snapshot)
+        problems = check_request(request)
+        if problems:
+            self.setup_view.show_solver_problems(problems)
+            return None
+        self.run_snapshot = snapshot
+        run = self.runs.start(snapshot, request)
         self.set_state("running")
+        return run
 
     def _on_active_changed(self, active):
         """Lock the parameters while a run is active; unlock when it ends."""
@@ -180,8 +209,29 @@ class MainWindow(QMainWindow):
     def _open_analysis(self, run_id):
         """Analysis only for a finished run (stopped or failed runs have no results)."""
         run = self.runs.get(run_id)
-        if run is not None and run.has_results:
+        if run is not None and (run.has_results or run.has_diagnostic_field):
             self.analysisRequested.emit()
+
+    def _choose_export_folder(self, run_id):
+        run = self.runs.get(run_id)
+        if run is None or run.outcome is None:
+            return
+        folder = QFileDialog.getExistingDirectory(self, "Папка для результатов")
+        if folder:
+            paths = self.export_run(run_id, folder)
+            self.status_label.setText(f"●  Результаты сохранены: {paths['manifest'].parent}")
+
+    def export_run(self, run_id, folder):
+        """Write manifest.json, history.csv and field.csv of a run into a new subfolder of ``folder``."""
+        run = self.runs.get(run_id)
+        target = Path(folder) / f"kkvim_{run.started:%Y%m%d-%H%M%S}_run{run.run_id:03d}"
+        paths = export.write_result(run.outcome, target, run.meta(self.runs.clock()), run.detailed)
+        run.log("ИНФО", f"Результаты сохранены: {target}")
+        return paths
+
+    def closeEvent(self, event):
+        self.runs.shutdown()
+        super().closeEvent(event)
 
     def selected_run(self):
         return self.run_view.selected()
@@ -190,6 +240,11 @@ class MainWindow(QMainWindow):
         """Input parameters of the selected run as entered (for the analysis window)."""
         run = self.selected_run()
         return summary_rows(run.snapshot if run is not None else self.run_snapshot)
+
+    def analysis_run(self):
+        """The selected run if it has results (for the analysis window), else None."""
+        run = self.selected_run()
+        return run if run is not None and (run.has_results or run.has_diagnostic_field) else None
 
     def _confirm_stop(self, run_id):
         answer = QMessageBox.question(

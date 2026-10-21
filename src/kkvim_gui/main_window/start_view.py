@@ -1,4 +1,9 @@
-"""Start state (GUI_DESIGN.md, 5.1)."""
+"""Start state (GUI_DESIGN.md, 5.1).
+
+The state of the program is the real backend (the KK-VIM solver) unless the demonstration mode was
+requested; the demonstration list of recent projects is shown only in that mode (saving projects .kkv
+is not implemented yet).
+"""
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -20,7 +25,7 @@ from kkvim_gui.widgets.common import Card, label
 class StartView(QWidget):
     newRequested = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, demo=False, parent=None):
         super().__init__(parent)
         self.setObjectName("Page")
         lay = QHBoxLayout(self)
@@ -48,14 +53,15 @@ class StartView(QWidget):
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(6)
-        rows = (
-            ("Решатель", "не подключён"),
-            ("Режим", "демонстрационный (TEST DATA)"),
-            ("Версия", f"KK-VIM {program_version()}"),
-        )
+        if demo:
+            rows = (("Решатель", "не вызывается"), ("Режим", "демонстрационный (TEST DATA)"))
+        else:
+            rows = (("Решатель", "KK-VIM: N = 1 — R3 (ACCEPTED, D-043); N = 2–3 — R4 (PROVISIONAL / NOT_QUALIFIED)"),
+                    ("Режим", "расчёт в отдельном процессе"))
+        rows = (*rows, ("Версия", f"KK-VIM {program_version()}"))
         for i, (k, v) in enumerate(rows):
-            grid.addWidget(label(k, "fieldLabel"), i, 0)
-            grid.addWidget(label(v), i, 1)
+            grid.addWidget(label(k, "fieldLabel"), i, 0, Qt.AlignmentFlag.AlignTop)
+            grid.addWidget(label(v, wrap=True), i, 1)
         grid.setColumnStretch(1, 1)
         status.body.addLayout(grid)
         left.addWidget(status)
@@ -66,12 +72,14 @@ class StartView(QWidget):
         left_box.setFixedWidth(320)
         lay.addWidget(left_box)
 
-        recent = Card("Недавние проекты", right=label("демонстрационные записи", "tag"))
-        self.table = QTableWidget(len(placeholders.RECENT_PROJECTS), 6)
+        projects = placeholders.RECENT_PROJECTS if demo else ()
+        recent = Card("Недавние проекты", right=label("демонстрационные записи" if demo else
+                                                       "сохранение проектов .kkv — следующий этап", "tag"))
+        self.table = QTableWidget(len(projects), 6)
         self.table.setHorizontalHeaderLabels(
             ["Имя", "Пластина", "Закрепление", "N", "Изменён", "Результат"]
         )
-        for r, row in enumerate(placeholders.RECENT_PROJECTS):
+        for r, row in enumerate(projects):
             for c, value in enumerate(row):
                 item = QTableWidgetItem(value)
                 if c in (3,):

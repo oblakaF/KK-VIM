@@ -85,7 +85,7 @@ def test_axes_and_load_sign_are_not_interpreted():
 def test_setup_scheme_shows_current_input_not_the_run_snapshot(qtbot, qapp):
     from kkvim_gui.app import GuiApplication
 
-    g = GuiApplication(Session(settings=None))
+    g = GuiApplication(Session(settings=None), demo=True)
     qtbot.addWidget(g.main_window)
     w = g.main_window
     w.set_state("setup")

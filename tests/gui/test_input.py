@@ -89,7 +89,7 @@ def test_error_disappears_while_correcting(qtbot, view):
     ("a", "a", "", EMPTY),
     ("b", "b", "0", POSITIVE),
     ("h", "h", "-1,5", POSITIVE),
-    ("k_max", "k_max", "2,5", COUNT),
+    ("n_x", "n_x", "2,5", COUNT),
 ])
 def test_formal_checks_in_the_form(qtbot, view, attr, key, text, error):
     retype(qtbot, getattr(view, attr), text)
@@ -114,13 +114,13 @@ def test_points_commas_negatives_and_exponents_are_accepted(qtbot, view):
 
 
 def test_run_is_blocked_and_focus_goes_to_the_first_error(qtbot, gui, view):
-    retype(qtbot, view.k_max, "0")
+    retype(qtbot, view.s_max, "0")
     retype(qtbot, view.b, "abc")
-    view.k_max.edit.setFocus()
+    view.s_max.edit.setFocus()
     with qtbot.assertNotEmitted(view.runRequested):
         assert view.try_run() is False
     assert gui.main_window.state == "setup"
-    assert view.b.edit.hasFocus()  # "b" comes before "k_max" in the form
+    assert view.b.edit.hasFocus()  # "b" comes before "s_max" in the form
     assert "Исправьте поля: 2" in view.check_text.text()
 
 
@@ -190,7 +190,8 @@ def test_run_snapshot_reaches_progress_and_analysis(qtbot, gui, view):
     view.try_run()
     assert w.state == "running"
     assert "a 3,5 m" in w.run_view.summary_text.text()
-    assert "TEST DATA" in w.run_view.summary_text.text()
+    assert "N = 1 · R3" in w.run_view.summary_text.text()     # the solver, not the demonstration
+    assert "TEST DATA" not in w.run_view.summary_text.text()
     snapshot = w.runs.active.snapshot
     w.runs.stop(w.runs.active.run_id)          # editing is possible again after the run
     w.set_state("setup")
@@ -202,7 +203,7 @@ def test_run_snapshot_reaches_progress_and_analysis(qtbot, gui, view):
 
 def test_errors_visible_in_the_narrow_layout(qtbot, view):
     view._apply_mode("narrow")
-    retype(qtbot, view.k_max, "abc")
-    assert view.errors["k_max"].isVisibleTo(view)
-    assert view.errors["k_max"].wordWrap()
+    retype(qtbot, view.n_x, "abc")
+    assert view.errors["n_x"].isVisibleTo(view)
+    assert view.errors["n_x"].wordWrap()
     view._apply_mode("wide")

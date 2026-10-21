@@ -45,7 +45,8 @@ def test_invalid_numbers(text, error):
 
 @pytest.mark.parametrize(("key", "text", "error"), [
     ("a", "0", POSITIVE), ("b", "-1", POSITIVE), ("h", "0,0", POSITIVE), ("E", "-210", POSITIVE),
-    ("k_max", "0", COUNT), ("k_max", "2,5", COUNT), ("k_max", "-3", COUNT),
+    ("n_x", "0", COUNT), ("n_y", "2,5", COUNT), ("s_max", "-3", COUNT), ("half_steps", "0", COUNT),
+    ("tol_E", "0", POSITIVE), ("tol_inf", "-1e-10", POSITIVE),
     ("a", "", EMPTY), ("E", "двести", NOT_A_NUMBER),
 ])
 def test_formal_rules(key, text, error):
@@ -56,9 +57,9 @@ def test_formal_rules(key, text, error):
     ("nu", "-0,3", -0.3),   # no invented physical range: the specification defines it
     ("nu", "0,7", 0.7),
     ("q", "-5", -5.0),      # load sign follows the specification
-    ("k_max", "1e2", 100),
-    ("grid", "любой текст", None),       # preliminary field: content defined by NUMERICAL_SPEC
-    ("stop_rule", "", None),
+    ("s_max", "1e2", 100),
+    ("n_x", "3", 3),        # N_MIN is checked by the solver, not invented in the form
+    ("tol_E", "1e-8", 1e-8),
 ])
 def test_values_accepted_without_invented_limits(key, text, value):
     assert validate_field(key, text) == (value, None)

@@ -10,5 +10,20 @@
   "axis.residual": "Невязка (предварительно)",
   "legend.kkvim": "КК-ВИМ, N = {N}",
   "annot.extremum": "Экстремум по узлам: {value} mm",
-  "mark.test_data": "ТЕСТОВЫЕ ДАННЫЕ · TEST DATA"
+  "mark.test_data": "ТЕСТОВЫЕ ДАННЫЕ · TEST DATA",
+  "field.wbar.title": "Безразмерный прогиб w̄ = wD/(qa⁴)",
+  "colorbar.wbar": "w̄",
+  "axis.w": "w, mm",
+  "axis.wbar": "w̄",
+  "axis.halfstep": "Полушаг s",
+  "axis.change": "Изменение поля ε",
+  "axis.energy": "Π_h, N·m",
+  "hist.title": "Изменение поля по полушагам",
+  "energy.title": "Дискретная энергия Π_h по полушагам",
+  "legend.eps_inf": "ε^∞",
+  "legend.eps_E": "ε^E",
+  "legend.tol_inf": "tol_∞",
+  "legend.tol_E": "tol_E",
+  "mark.provisional": "PROVISIONAL / NOT_QUALIFIED",
+  "mark.diagnostic": "ДИАГНОСТИКА · РАСЧЁТ НЕ ЗАВЕРШЁН"
 }

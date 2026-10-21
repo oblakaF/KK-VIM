@@ -85,13 +85,6 @@ def test_non_iterative_method_has_no_counters(manager, clock):
     assert run.status == "finished" and run.stop_criterion == ""
 
 
-def test_k_max_below_the_demo_stop_is_reported(manager, clock):
-    run = manager.start_demo(SetupState().with_text("k_max", "3"))
-    clock.advance(60, manager)
-    assert run.k == 3 and run.stop_criterion == "k_max"
-    assert any("k_max" in text for _, _, text in run.important)
-
-
 def test_stop_freezes_time_and_disables_analysis(manager, clock):
     run = manager.start_demo(SetupState())
     clock.advance(3, manager)
@@ -124,7 +117,7 @@ def test_journal_has_no_per_iteration_lines(manager, clock):
 def window(qtbot, qapp, clock):
     session = Session(settings=None)
     session.apply_theme()
-    w = MainWindow(session)
+    w = MainWindow(session, demo=True)   # dispatcher mechanics on the demonstration backend
     w.runs.clock = clock
     qtbot.addWidget(w)
     w.show()
@@ -142,7 +135,7 @@ def test_dispatcher_rows_and_individual_durations(window, clock):
     w.setup_view.try_run()
     clock.advance(5, w.runs)
     row = table_row(w, 0)
-    assert row[1] == "КК-ВИМ" and "N = 3" in row[2]
+    assert row[1] == "КК-ВИМ" and "N = 1" in row[2] and "демонстрация" in row[2]
     assert row[3] == "Выполняется" and row[4] == "5 с"
     assert rv.summary_title.text() == "Выполняется — 5 с"
     clock.advance(FULL, w.runs)

@@ -35,14 +35,14 @@ def session(qapp):
 
 @pytest.fixture
 def main_window(qtbot, session):
-    w = MainWindow(session)
+    w = MainWindow(session, demo=True)   # these tests check the demonstration layout and dispatcher
     qtbot.addWidget(w)
     return w
 
 
 @pytest.fixture
 def dev_window(qtbot, session):
-    w = MainWindow(session, dev=True)
+    w = MainWindow(session, dev=True, demo=True)
     qtbot.addWidget(w)
     return w
 
@@ -130,7 +130,7 @@ def test_header_navigation_stays_available_during_a_run(main_window):
 
 @pytest.fixture
 def gui(qtbot, session):
-    g = GuiApplication(session)
+    g = GuiApplication(session, demo=True)
     qtbot.addWidget(g.main_window)
     yield g
     for w in list(g.analysis_windows):

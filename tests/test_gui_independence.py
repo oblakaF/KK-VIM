@@ -49,3 +49,20 @@ def test_gui_and_scientific_packages_are_separated(package, forbidden):
         if module == forbidden
     ]
     assert violations == []
+
+
+def test_only_the_adapter_imports_kkvim():
+    """GUI_DESIGN.md, 3.1: kkvim_gui imports kkvim only in the backend adapter module."""
+    package_dir = SRC_DIR / "kkvim_gui"
+    importers = sorted(
+        path.relative_to(package_dir).as_posix()
+        for path in package_dir.rglob("*.py")
+        if any(module == "kkvim" for _, module in imported_top_level(path))
+    )
+    assert importers == ["backend/kkvim_adapter.py"]
+
+
+def test_the_backend_is_qt_free():
+    """The computing process imports only the Qt-free backend (GUI_DESIGN.md, 3.6)."""
+    for path in sorted((SRC_DIR / "kkvim_gui" / "backend").rglob("*.py")):
+        assert not any(module in ("PySide6", "pyqtgraph") for _, module in imported_top_level(path)), path
