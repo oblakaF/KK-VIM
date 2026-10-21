@@ -1,19 +1,22 @@
-reference,quantity,own_error_estimate_rel,kind,smallest_measurable_rel_error_by_1_100,use,status
-D2 (discrete problem D1 = D2),"alpha, field",8.5663123295562489e-17,"last refinement correction (estimate, not a strict bound)",8.5663123295562481e-15,discrete errors (KK-VIM - D1 on the same grid) above this level; the grid error relative to omega_0 is not measured by D2,estimate; plan candidate e_D2/alpha <= 1e-13 met
-A (Hencky-Inglis),"alpha, work, field",6.0342737838741411e-15,change N_Y 400 -> 800 (OBSERVATION; no strict bound),6.0342737838741415e-13,comparisons with A as a reference,UNRESOLVED (OV-M1...M3: no strict error bound)
-B (Ritz),alpha (centre),2.4777824348628951e-09,"change at the last refinement of M, N (OBSERVATION)",2.4777824348628949e-07,comparisons with B as a reference,UNRESOLVED for the centre (no strict bound)
-B (Ritz),load work,,strict ONE-SIDED bound: Ritz work <= exact work,,detects a work below the bound,one-sided only; no two-sided budget
-C L-120 r=1.0,alpha,3.9515724147137597e-10,half printed step,3.9515724147137596e-08,"control of A, B, final numbers","data, not a tolerance"
-C L-120 r=1.2,alpha,2.898768337277317e-10,half printed step,2.8987683372773174e-08,"control of A, B, final numbers","data, not a tolerance"
-C L-120 r=1.4,alpha,2.4176275502786034e-10,half printed step,2.4176275502786035e-08,"control of A, B, final numbers","data, not a tolerance"
-C L-120 r=1.6,alpha,2.1739442565918196e-10,half printed step,2.1739442565918199e-08,"control of A, B, final numbers","data, not a tolerance"
-C L-120 r=1.8,alpha,2.0440177956833301e-10,half printed step,2.0440177956833302e-08,"control of A, B, final numbers","data, not a tolerance"
-C L-120 r=2.0,alpha,1.9739784094113806e-10,half printed step,1.9739784094113805e-08,"control of A, B, final numbers","data, not a tolerance"
-C L-120 r=20.0,alpha,1.9199999997542398e-10,half printed step,1.91999999975424e-08,"control of A, B, final numbers","data, not a tolerance"
-C L-058 r=1.0,alpha,3.9515695634305954e-06,half printed step,0.00039515695634305945,"control of A, B, final numbers","data, not a tolerance"
-C L-058 r=1.5,alpha,2.2763280097608948e-06,half printed step,0.00022763280097608946,"control of A, B, final numbers","data, not a tolerance"
-C L-058 r=2.0,alpha,1.9739751121217864e-06,half printed step,0.00019739751121217863,"control of A, B, final numbers","data, not a tolerance"
-C L-058 r=3.0,alpha,1.9104167383072946e-06,half printed step,0.00019104167383072944,"control of A, B, final numbers","data, not a tolerance"
-C L-058 r=4.0,alpha,1.9182149858627553e-06,half printed step,0.00019182149858627554,"control of A, B, final numbers","data, not a tolerance"
-C L-058 r=5.0,alpha,1.9199533067355804e-06,half printed step,0.00019199533067355801,"control of A, B, final numbers","data, not a tolerance"
-C L-058 r=10.0,alpha,1.9199975424031458e-06,half printed step,0.00019199975424031459,"control of A, B, final numbers","data, not a tolerance"
+reference,quantity,norm,own_error_estimate_rel,indicator_rel,kind,smallest_measurable_rel_error_by_1_100,use,status
+D2 (discrete problem D1 = D2),alpha; nodal field,relative error of alpha; max norm of the nodal field divided by alpha,8.5663123295562489e-17,,"last refinement correction: estimate of the residual error at the level of the double representation, NOT a strict upper bound; a conditional bound ||e||_inf <= 2 e_D2 + O(u)||x||_inf needs a proved contraction of the refinement with rounding (||F|| <= 1/2), not proved",8.5663123295562481e-15,"discrete errors (KK-VIM - D1 on the same grid) in the same norm; the value is an estimate, not a guaranteed tolerance","estimated, not strictly bounded budget in max norm; plan candidate e_D2/alpha <= 1e-13 met"
+D2 (discrete problem D1 = D2),"energy quantities: Pi_h^C, ||.||_{a_h} (BC-11, BC-12, ST-10)",energy norm,,,no budget derived; it does not follow from the max norm,,-,UNRESOLVED
+D2 (discrete problem D1 = D2),error relative to omega_0,-,,,"not estimated: D1 = D2, the grid error is measured only by A and B",,-,not applicable
+A (Hencky-Inglis),alpha,relative,,6.0342737838741411e-15,"change of alpha N_Y 400 -> 800 (maximum over the aspect ratios): indicator of the observed convergence, NOT an error estimate",,OBSERVATION only,UNRESOLVED until OV-M1...M3
+A (Hencky-Inglis),work; field,relative,,,"the change of alpha is not transferred to the work and the field; independent implementations differ in the work up to 1.7e-13 relative (Reviewer 77de43b, N-2)",,OBSERVATION only,UNRESOLVED until OV-M1...M3
+B (Ritz),alpha (centre),relative,,2.4777824348628951e-09,"last change when M, N are increased (maximum over r = 2, 3, 5): indicator of convergence, NOT a strict error",,OBSERVATION only,UNRESOLVED (no strict bound)
+B (Ritz),load work,-,,,"theoretical ONE-SIDED bound in exact arithmetic: Ritz work <= exact work, non-decreasing for nested bases; for computed values an observation (margin 1e-10...8e-10 relative, comparable with the summation rounding estimate), not a two-sided budget",,detects a work below the bound,no two-sided budget
+C L-120 r=1.0,alpha,relative,,3.9515724147137597e-10,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-120 r=1.2,alpha,relative,,2.898768337277317e-10,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-120 r=1.4,alpha,relative,,2.4176275502786034e-10,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-120 r=1.6,alpha,relative,,2.1739442565918196e-10,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-120 r=1.8,alpha,relative,,2.0440177956833301e-10,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-120 r=2.0,alpha,relative,,1.9739784094113806e-10,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-120 r=20.0,alpha,relative,,1.9199999997542398e-10,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-058 r=1.0,alpha,relative,,3.9515695634305954e-06,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-058 r=1.5,alpha,relative,,2.2763280097608948e-06,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-058 r=2.0,alpha,relative,,1.9739751121217864e-06,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-058 r=3.0,alpha,relative,,1.9104167383072946e-06,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-058 r=4.0,alpha,relative,,1.9182149858627553e-06,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-058 r=5.0,alpha,relative,,1.9199533067355804e-06,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"
+C L-058 r=10.0,alpha,relative,,1.9199975424031458e-06,"half printed step: precision of the publication, not a numerical error of the reference",,"control of A, B, final numbers","data, not a tolerance; rule 1/100 not applied"

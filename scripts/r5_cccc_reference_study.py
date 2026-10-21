@@ -256,39 +256,60 @@ def compare(hencky_rows, ritz_rows, seq_rows) -> list[dict]:
 
 
 def budgets(ext_rows, seq_rows, hencky_rows, ritz_rows) -> list[dict]:
+    """Reference budgets under the rule 1/100 (D-049.6, item 4) - review 77de43b, ER-2, ER-3.
+
+    The rule is evaluated only where an estimate of the OWN error of the reference exists in the norm of the comparison (D2, discrete
+    problem). Changes under refinement of an approximation (A, B) are convergence indicators, not errors; the half printed step of C
+    is the precision of the publication. For them own_error_estimate_rel and the 1/100 column stay empty. Works on freshly computed
+    rows and on rows read back from the CSV files (strings)."""
+    def num(v):
+        return None if v in (None, "", "None") else float(v)
+
+    def row(reference, quantity, norm, own, indicator, kind, smallest, use, status):
+        return {"reference": reference, "quantity": quantity, "norm": norm, "own_error_estimate_rel": own,
+                "indicator_rel": indicator, "kind": kind, "smallest_measurable_rel_error_by_1_100": smallest, "use": use,
+                "status": status}
+
     rows = []
-    e_rel = max([x["e_D2_rel"] for x in ext_rows] + [x["e_D2_rel"] for x in seq_rows])
-    rows.append({"reference": "D2 (discrete problem D1 = D2)", "quantity": "alpha, field",
-                 "own_error_estimate_rel": e_rel, "kind": "last refinement correction (estimate, not a strict bound)",
-                 "smallest_measurable_rel_error_by_1_100": 100 * e_rel,
-                 "use": "discrete errors (KK-VIM - D1 on the same grid) above this level; the grid error relative to omega_0 "
-                        "is not measured by D2", "status": "estimate; plan candidate e_D2/alpha <= 1e-13 met"
-                 if e_rel <= E_D2_CANDIDATE else "UNRESOLVED"})
-    a_changes = [abs(x["change_from_previous_N"]) / abs(x["alpha"]) for x in hencky_rows
-                 if x["NY"] == 800 and x["change_from_previous_N"] is not None]
-    rows.append({"reference": "A (Hencky-Inglis)", "quantity": "alpha, work, field",
-                 "own_error_estimate_rel": max(a_changes), "kind": "change N_Y 400 -> 800 (OBSERVATION; no strict bound)",
-                 "smallest_measurable_rel_error_by_1_100": 100 * max(a_changes),
-                 "use": "comparisons with A as a reference", "status": "UNRESOLVED (OV-M1...M3: no strict error bound)"})
+    e_rel = max(num(x["e_D2_rel"]) for x in list(ext_rows) + list(seq_rows))
+    rows.append(row(
+        "D2 (discrete problem D1 = D2)", "alpha; nodal field", "relative error of alpha; max norm of the nodal field divided by alpha",
+        e_rel, None,
+        "last refinement correction: estimate of the residual error at the level of the double representation, NOT a strict upper "
+        "bound; a conditional bound ||e||_inf <= 2 e_D2 + O(u)||x||_inf needs a proved contraction of the refinement with rounding "
+        "(||F|| <= 1/2), not proved",
+        100 * e_rel, "discrete errors (KK-VIM - D1 on the same grid) in the same norm; the value is an estimate, not a guaranteed tolerance",
+        "estimated, not strictly bounded budget in max norm; plan candidate e_D2/alpha <= 1e-13 met" if e_rel <= E_D2_CANDIDATE
+        else "UNRESOLVED"))
+    rows.append(row("D2 (discrete problem D1 = D2)", "energy quantities: Pi_h^C, ||.||_{a_h} (BC-11, BC-12, ST-10)", "energy norm",
+                    None, None, "no budget derived; it does not follow from the max norm", None, "-", "UNRESOLVED"))
+    rows.append(row("D2 (discrete problem D1 = D2)", "error relative to omega_0", "-", None, None,
+                    "not estimated: D1 = D2, the grid error is measured only by A and B", None, "-", "not applicable"))
+    a_changes = [abs(num(x["change_from_previous_N"])) / abs(num(x["alpha"])) for x in hencky_rows
+                 if int(num(x["NY"])) == 800 and num(x["change_from_previous_N"]) is not None]
+    rows.append(row("A (Hencky-Inglis)", "alpha", "relative", None, max(a_changes),
+                    "change of alpha N_Y 400 -> 800 (maximum over the aspect ratios): indicator of the observed convergence, NOT an "
+                    "error estimate", None, "OBSERVATION only", "UNRESOLVED until OV-M1...M3"))
+    rows.append(row("A (Hencky-Inglis)", "work; field", "relative", None, None,
+                    "the change of alpha is not transferred to the work and the field; independent implementations differ in the work "
+                    "up to 1.7e-13 relative (Reviewer 77de43b, N-2)", None, "OBSERVATION only", "UNRESOLVED until OV-M1...M3"))
     last_b = {}
     for x in ritz_rows:  # the change at the LAST refinement of every M, N sequence (r = 2, 3, 5)
-        if x.get("change_from_previous") is not None:
-            last_b[x["r"]] = abs(x["change_from_previous"]) / abs(x["alpha"])
-    b_changes = list(last_b.values())
-    rows.append({"reference": "B (Ritz)", "quantity": "alpha (centre)",
-                 "own_error_estimate_rel": max(b_changes) if b_changes else None,
-                 "kind": "change at the last refinement of M, N (OBSERVATION)",
-                 "smallest_measurable_rel_error_by_1_100": 100 * max(b_changes) if b_changes else None,
-                 "use": "comparisons with B as a reference", "status": "UNRESOLVED for the centre (no strict bound)"})
-    rows.append({"reference": "B (Ritz)", "quantity": "load work", "own_error_estimate_rel": None,
-                 "kind": "strict ONE-SIDED bound: Ritz work <= exact work", "smallest_measurable_rel_error_by_1_100": None,
-                 "use": "detects a work below the bound", "status": "one-sided only; no two-sided budget"})
+        change = num(x.get("change_from_previous"))
+        if change is not None:
+            last_b[x["r"]] = abs(change) / abs(num(x["alpha"]))
+    rows.append(row("B (Ritz)", "alpha (centre)", "relative", None, max(last_b.values()) if last_b else None,
+                    "last change when M, N are increased (maximum over r = 2, 3, 5): indicator of convergence, NOT a strict error",
+                    None, "OBSERVATION only", "UNRESOLVED (no strict bound)"))
+    rows.append(row("B (Ritz)", "load work", "-", None, None,
+                    "theoretical ONE-SIDED bound in exact arithmetic: Ritz work <= exact work, non-decreasing for nested bases; for "
+                    "computed values an observation (margin 1e-10...8e-10 relative, comparable with the summation rounding estimate), "
+                    "not a two-sided budget", None, "detects a work below the bound", "no two-sided budget"))
     for p in tb.ALPHA:
         if p.role == tb.CONTROL:
-            rows.append({"reference": f"C {p.source.split()[0]} r={p.r}", "quantity": "alpha",
-                         "own_error_estimate_rel": 0.5 * p.step / p.alpha, "kind": "half printed step",
-                         "smallest_measurable_rel_error_by_1_100": 50 * p.step / p.alpha,
-                         "use": "control of A, B, final numbers", "status": "data, not a tolerance"})
+            rows.append(row(f"C {p.source.split()[0]} r={p.r}", "alpha", "relative", None, 0.5 * p.step / p.alpha,
+                            "half printed step: precision of the publication, not a numerical error of the reference", None,
+                            "control of A, B, final numbers", "data, not a tolerance; rule 1/100 not applied"))
     return rows
 
 
