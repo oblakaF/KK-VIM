@@ -1,0 +1,19 @@
+reference,quantity,own_error_estimate_rel,kind,smallest_measurable_rel_error_by_1_100,use,status
+D2 (discrete problem D1 = D2),"alpha, field",8.5663123295562489e-17,"last refinement correction (estimate, not a strict bound)",8.5663123295562481e-15,discrete errors (KK-VIM - D1 on the same grid) above this level; the grid error relative to omega_0 is not measured by D2,estimate; plan candidate e_D2/alpha <= 1e-13 met
+A (Hencky-Inglis),"alpha, work, field",6.0342737838741411e-15,change N_Y 400 -> 800 (OBSERVATION; no strict bound),6.0342737838741415e-13,comparisons with A as a reference,UNRESOLVED (OV-M1...M3: no strict error bound)
+B (Ritz),alpha (centre),2.4777824348628951e-09,"change at the last refinement of M, N (OBSERVATION)",2.4777824348628949e-07,comparisons with B as a reference,UNRESOLVED for the centre (no strict bound)
+B (Ritz),load work,,strict ONE-SIDED bound: Ritz work <= exact work,,detects a work below the bound,one-sided only; no two-sided budget
+C L-120 r=1.0,alpha,3.9515724147137597e-10,half printed step,3.9515724147137596e-08,"control of A, B, final numbers","data, not a tolerance"
+C L-120 r=1.2,alpha,2.898768337277317e-10,half printed step,2.8987683372773174e-08,"control of A, B, final numbers","data, not a tolerance"
+C L-120 r=1.4,alpha,2.4176275502786034e-10,half printed step,2.4176275502786035e-08,"control of A, B, final numbers","data, not a tolerance"
+C L-120 r=1.6,alpha,2.1739442565918196e-10,half printed step,2.1739442565918199e-08,"control of A, B, final numbers","data, not a tolerance"
+C L-120 r=1.8,alpha,2.0440177956833301e-10,half printed step,2.0440177956833302e-08,"control of A, B, final numbers","data, not a tolerance"
+C L-120 r=2.0,alpha,1.9739784094113806e-10,half printed step,1.9739784094113805e-08,"control of A, B, final numbers","data, not a tolerance"
+C L-120 r=20.0,alpha,1.9199999997542398e-10,half printed step,1.91999999975424e-08,"control of A, B, final numbers","data, not a tolerance"
+C L-058 r=1.0,alpha,3.9515695634305954e-06,half printed step,0.00039515695634305945,"control of A, B, final numbers","data, not a tolerance"
+C L-058 r=1.5,alpha,2.2763280097608948e-06,half printed step,0.00022763280097608946,"control of A, B, final numbers","data, not a tolerance"
+C L-058 r=2.0,alpha,1.9739751121217864e-06,half printed step,0.00019739751121217863,"control of A, B, final numbers","data, not a tolerance"
+C L-058 r=3.0,alpha,1.9104167383072946e-06,half printed step,0.00019104167383072944,"control of A, B, final numbers","data, not a tolerance"
+C L-058 r=4.0,alpha,1.9182149858627553e-06,half printed step,0.00019182149858627554,"control of A, B, final numbers","data, not a tolerance"
+C L-058 r=5.0,alpha,1.9199533067355804e-06,half printed step,0.00019199533067355801,"control of A, B, final numbers","data, not a tolerance"
+C L-058 r=10.0,alpha,1.9199975424031458e-06,half printed step,0.00019199975424031459,"control of A, B, final numbers","data, not a tolerance"
