@@ -1,6 +1,6 @@
 # Статус KK-VIM
 
-Обновлено: 2026-10-21.
+Обновлено: 2026-10-22.
 
 Статусы: **PLANNED** — запланировано; **IN_PROGRESS** — выполняется; **READY_FOR_REVIEW** —
 подготовлено к проверке; **READY_FOR_OWNER_REVIEW** — проверено независимо, ожидает решения владельца;
@@ -20,8 +20,9 @@ ACCEPTED (D-035), неизменным. Следующие описания пр
 CCCC (D-049.0…D-049.9): функционал Π_h^C, решатель полушага B-C (A-C — контроль), старт 𝒯_N и ориентация x, исследовательский
 режим N = 2–3 с диагностикой ранга, план QA как PLAN с переносом бюджета эталона 1/100 (D-046), эталоны A/B/C/D2. Основание —
 Reviewer `06f8501` (PASS_FOR_OWNER_D049). Спецификации R5 не приняты, численные пороги CCCC не утверждены, программирование CCCC не
-разрешено; часть C MATH_SPEC — отдельным решением; полный ранг N = 3 и дискретный ранг — UNRESOLVED; R5-P — отдельная задача.
-R5 не ACCEPTED.
+разрешено; полный ранг N = 3 и дискретный ранг — UNRESOLVED; R5-P — отдельная задача. R5 не ACCEPTED.
+**Обновление 22.10.2026:** часть C `docs/MATH_SPEC.md` (CCCC, N = 2–3) — **ACCEPTED по D-050** (решение владельца от 2026-10-21; Reviewer
+`b59bd5e` — PASS_WITH_NOTES, `42d73e9` — ADDRESS_PASS). Научные статусы части C не повышены; R5 в целом — IN_PROGRESS.
 
 **R4, актуально 21.10.2026: IN_PROGRESS.** Реализация D-048 в `main` — **ACCEPTED_LIMITED_ENGINEERING** в области D-048 (D-049.7,
 2026-10-21); дополнение к D-048 о фиксированном числе полушагов подтверждено (D-049.9). R4 в целом — IN_PROGRESS.
@@ -523,7 +524,7 @@ merge-коммиты без squash/rebase).**
 |---|---|
 | `README.md`, `AGENTS.md`, `CLAUDE.md` | ACCEPTED в составе R0; изменён после R0 (защита Git; различение КК-МВИ и He's VIM; порядок работы с формулами; импорт AGENTS.md в CLAUDE.md); AGENTS.md дополнен в R1-T1 (различие `additional/` и `vim/02_Krysko_Group_Later/`) — ACCEPTED в составе R1-T1 |
 | `docs/PROJECT_GOALS.md` | ACCEPTED в составе R0 |
-| `docs/DECISIONS.md` (D-001–D-049) | ACCEPTED в составе R0; изменён после R0 (уточнение D-009). Решения D-001–D-049 приняты владельцем; заменённые — см. раздел «Решения» |
+| `docs/DECISIONS.md` (D-001–D-050) | ACCEPTED в составе R0; изменён после R0 (уточнение D-009). Решения D-001–D-050 приняты владельцем; заменённые — см. раздел «Решения» |
 | `docs/ROADMAP.md`, `docs/STATUS.md`, `docs/OPEN_QUESTIONS.md` | ACCEPTED в составе R0; ведутся далее; изменены после R0 (инвентаризация A/B/C в R1; ранняя проверка N = 1 CCCC; Q-019/Q-021; Q-015; 2026-10-12 — поэтапная приёмка MATH_SPEC.md по D-029, матрица блокировок, уточнение Q-017) |
 | `references/INDEX.md` — каталог библиотеки, составленный по фактическим файлам | ACCEPTED в составе R0; изменён в R1-T1 (библиографические сведения, пути L-104–L-107, раздел 4.2, правило о входящей папке) — ACCEPTED в составе R1-T1 |
 | `references/LITERATURE_INVENTORY.md` — первичная инвентаризация 106 файлов (R1-T1) | создан 2026-10-11; ACCEPTED в составе R1-T1 |
@@ -548,7 +549,7 @@ merge-коммиты без squash/rebase).**
 | `docs/R2_ACCURACY_STUDY.md`, `scripts/r2_accuracy_study.py`, `docs/results/r2/`, `tests/cross/test_r2_accuracy_study.py` | R2, группа B: исследование точности относительно Навье (QA, окончательная редакция `2210e4a`); интеграция — PR #1; R2 — ACCEPTED (D-035) |
 | `docs/R2_ACCURACY_STUDY.independent-review.md`, `docs/R2_ACCURACY_STUDY.recheck.md` | независимая научная рецензия (`b906cb0`, CHANGES_REQUIRED, Б-1) и адресная перепроверка (`dc1c769`, READY_TO_ACCEPT) |
 | `docs/SOURCE_MAP.md` (редакция 2) и рецензии: `SOURCE_MAP.review.md`, `SOURCE_MAP.recheck.md` | ACCEPTED (R1-T3A, шаг 1, 2026-10-12); неблокирующие R-1–R-3 открыты (R-2, R-3 — учесть в MATH_SPEC.md) |
-| `docs/MATH_SPEC.md` и рецензии: `MATH_SPEC.independent-review.md`, `MATH_SPEC.recheck.md`, `MATH_SPEC.part-b.review.md` | часть A — ACCEPTED 2026-10-12 (D-031; `MATH_SPEC.md` — `5098c64c5eacee73a6ee7e81a6815e9fe69854b6`, `MATH_SPEC.recheck.md` — `1dbb149dacc9694247b6f57dc73add9f148e9be5`); Р-2–Р-9 открыты; часть B — ACCEPTED 2026-10-15 (D-045; редакция Literature `227d67c`; рецензия `MATH_SPEC.part-b.review.md`, Reviewer `d28d41e` — READY_TO_ACCEPT, 24/24 PASS; исправления НБ-1…НБ-11 проверены адресно) |
+| `docs/MATH_SPEC.md` и рецензии: `MATH_SPEC.independent-review.md`, `MATH_SPEC.recheck.md`, `MATH_SPEC.part-b.review.md` | часть A — ACCEPTED 2026-10-12 (D-031; `MATH_SPEC.md` — `5098c64c5eacee73a6ee7e81a6815e9fe69854b6`, `MATH_SPEC.recheck.md` — `1dbb149dacc9694247b6f57dc73add9f148e9be5`); Р-2–Р-9 открыты; часть B — ACCEPTED 2026-10-15 (D-045; редакция Literature `227d67c`; рецензия `MATH_SPEC.part-b.review.md`, Reviewer `d28d41e` — READY_TO_ACCEPT, 24/24 PASS; исправления НБ-1…НБ-11 проверены адресно); часть C — ACCEPTED 2026-10-21 (D-050; текст C.0–C.12 из `R5_MATH_SPEC_PART_C_DRAFT.md` @ `e6ac40b`; рецензия `R5_MATH_SPEC_PART_C.review.md`, Reviewer `b59bd5e` — PASS_WITH_NOTES; адресная сверка `R5_MATH_SPEC_PART_C.final-check.md`, `42d73e9` — ADDRESS_PASS) |
 | `docs/NUMERICAL_SPEC.md` и рецензии: `NUMERICAL_SPEC.independent-review.md`, `NUMERICAL_SPEC.recheck.md` | ACCEPTED для R2 (2026-10-12, D-032; `NUMERICAL_SPEC.md` — `1b3b5256a4886779708ee2de54a7ce20ebc8fd0d`, `NUMERICAL_SPEC.recheck.md` — `6e507fa877304ab2ca4f81e7e9af6da585a252c7`); программирование R2 разрешено решением D-033 |
 | `docs/R3_NUMERICAL_SPEC.md`, `docs/R3_NUMERICAL_SPEC.audit-review.md`, `docs/R3_NUMERICAL_SPEC.audit-recheck.md` | **ACCEPTED** для полной численной спецификации R3 (D-040, 2026-10-14). Literature `87c8c29`, аудит `f716550` (Б-1), адресная перепроверка `668d794` — READY_FOR_OWNER_ACCEPTANCE, Б-1 и Н-1…Н-7 CLOSED; О-1…О-4 учтены при принятии. Решатель R3 реализован по D-041 и принят D-043 (2026-10-15). |
 | `docs/R3_NUMERICAL_SPEC_DRAFT.md` и рецензии: `R3_NUMERICAL_SPEC_DRAFT.review.md`, `R3_NUMERICAL_SPEC_DRAFT.recheck.md` | черновик численной спецификации R3 — DRAFT, редакция 2 (`ac1c28f`, `80c3d96b06cec2a8e8731dd18ccc0c323adae143`); рецензия `09f33f5` — CHANGES_REQUIRED (Б-1, Б-2); перепроверка `463fda4` — READY_TO_ACCEPT; научная основа — ACCEPTED (D-036, 2026-10-13); полная численная спецификация R3 не принята |
@@ -565,7 +566,8 @@ merge-коммиты без squash/rebase).**
 | `docs/R3_SOLVER_QUALIFICATION.review.md` | независимая научная рецензия Reviewer (`3a206d3`, READY_TO_ACCEPT); неблокирующие Н-1…Н-9 (Н-1, Н-6 — ограничения D-043) |
 | `docs/R5_CCCC_REFERENCE_LITERATURE.review.md`, `docs/R5_CCCC_REFERENCE_MATH.pre-review.md`, `docs/R5_CCCC_REFERENCE_MATH.independent-review.md` | R5, исходные материалы эталонов CCCC A–D (Literature, редакция `ee2ad30`, с исправлениями У-1…У-6 и внешними данными D2 — UNVERIFIED_EXTERNAL_NUMERICAL_EVIDENCE); рецензия Reviewer `62db9f2` редакции `321432d` — PASS_WITH_OPEN_QUESTIONS. Подготовка R5, не спецификация. Выбор эталонов A–D — D-049.8 (2026-10-21); УФ-13 — вариант (б), RM разд. 18 |
 | `docs/R5_NUMERICAL_SPEC_DRAFT.md`, `docs/R5_NUMERICAL_SPEC_DRAFT.independent-review.md` | R5, проект численной спецификации CCCC — **DRAFT** (Literature `9877f69`); рецензия Reviewer `4b18761` — PASS_WITH_OPEN_QUESTIONS; адресные проверки `403755b`/`ec7853b`, `a5b63e6`, `06f8501`. Основа Π_h^C и решатель B-C утверждены D-049.1, D-049.2; спецификация как целое не принята; программирование не разрешено |
-| `docs/R5_CCCC_COUPLED_MATH_DRAFT.md`, `docs/R5_CCCC_COUPLED_MATH.independent-review.md` | R5, математическая часть CCCC N = 2–3 — **DRAFT** (Literature `14f6072`, ВБC-1…ВБC-20; Б-2 — PARTIAL); рецензия Reviewer `87a15ab` — PASS_WITH_CONDITIONS; адресные проверки `403755b`/`ec7853b`, `a5b63e6`. В MATH_SPEC.md не внесена: подготовка части C — D-049.4, приёмка — отдельным решением; N = 3 и дискретный ранг — UNRESOLVED |
+| `docs/R5_CCCC_COUPLED_MATH_DRAFT.md`, `docs/R5_CCCC_COUPLED_MATH.independent-review.md` | R5, математическая часть CCCC N = 2–3 — **DRAFT** (Literature `14f6072`, ВБC-1…ВБC-20; Б-2 — PARTIAL); рецензия Reviewer `87a15ab` — PASS_WITH_CONDITIONS; адресные проверки `403755b`/`ec7853b`, `a5b63e6`. Результаты включены в часть C `MATH_SPEC.md` (D-050, 2026-10-21); документ сохраняется как исходный вывод; N = 3 и дискретный ранг — UNRESOLVED |
+| `docs/R5_MATH_SPEC_PART_C_DRAFT.md`, `docs/R5_MATH_SPEC_PART_C.review.md`, `docs/R5_MATH_SPEC_PART_C.final-check.md`, `docs/R5_MATH_SPEC_PART_C_INTEGRATION.report.md` | черновик части C (Literature `e6ac40b`) и проверки Reviewer `b59bd5e` (PASS_WITH_NOTES), `42d73e9` (ADDRESS_PASS); текст C.0–C.12 перенесён в `MATH_SPEC.md` (D-050); отчёт технической сверки переноса |
 | `docs/R5_CCCC_PREQUALIFICATION.plan.md`, `scripts/r5_cccc_cost_probe.py` | R5, план независимой квалификации CCCC N = 1–3 и эталона D2 — **PLAN** (QA `ecab1ee`), принят как план D-049.6; проба стоимости — не эталон. Пороги плана — кандидаты, не утверждены |
 | `docs/R5_CCCC_FOUNDATION_INTEGRATION.report.md`, `docs/R5_CCCC_FINAL_INTEGRATION.report.md`, `docs/R5_D049_FINAL_ADDRESS_INTEGRATION.report.md`, `docs/R5_D049_APPROVAL_INTEGRATION.report.md` | отчёты интеграции научной основы R5 CCCC (Integrator, ветка `integration/r5-cccc-foundation`) |
 | `docs/R5_CCCC_FOUNDATION.address-review.md`, `docs/R5_CCCC_FINAL.address-check.md`, `docs/R5_D049_FINAL.check.md` | адресные проверки Reviewer: `403755b`/`ec7853b` — PASS_WITH_NOTES; `a5b63e6` — CHANGES_REQUIRED (ФА-1…ФА-9, исправлены); `06f8501` — PASS_FOR_OWNER_D049 |
@@ -575,7 +577,7 @@ merge-коммиты без squash/rebase).**
 
 ## Решения
 
-Реестр — [DECISIONS.md](DECISIONS.md), решения **D-001–D-049**; D-049 — научная основа R5 CCCC и порядок перехода к R5-V (2026-10-21; не приёмка спецификаций R5 и не разрешение программировать CCCC; реализация D-048 — ACCEPTED_LIMITED_ENGINEERING, R4 — IN_PROGRESS); D-048 — ограниченная численная политика R4, N = 2–3 (2026-10-18; не научная приёмка R4), одновременно утверждено уточнение С-1/С-2 к D-046; D-047 — ограниченное разрешение Builder на поэтапную реализацию R4, N = 2–3 (2026-10-16; не научная приёмка); D-046 принимает численную архитектуру R4 (РВ4-1…РВ4-8) без численных нормативов NOT_QUALIFIED и без разрешения программировать N ≥ 2 (2026-10-15); D-045 принимает часть B `docs/MATH_SPEC.md` и этап R1, закрывает Q-001, Q-004, Q-005, Q-007 и явно переносит остатки вопросов R1 (2026-10-15); D-040 принимает полную численную спецификацию R3, D-041 отдельно разрешает программирование R3 в установленной области (2026-10-14); D-043 принимает R3 (2026-10-15); D-044 принимает `docs/R4_SOURCE_NOTES.md` как научную основу части B MATH_SPEC.md (2026-10-15), не принимая часть B и этап R4.
+Реестр — [DECISIONS.md](DECISIONS.md), решения **D-001–D-050**; D-050 — приёмка части C `MATH_SPEC.md` (CCCC, N = 2–3; 2026-10-21; не разрешает программирование CCCC и не утверждает порогов); D-049 — научная основа R5 CCCC и порядок перехода к R5-V (2026-10-21; не приёмка спецификаций R5 и не разрешение программировать CCCC; реализация D-048 — ACCEPTED_LIMITED_ENGINEERING, R4 — IN_PROGRESS); D-048 — ограниченная численная политика R4, N = 2–3 (2026-10-18; не научная приёмка R4), одновременно утверждено уточнение С-1/С-2 к D-046; D-047 — ограниченное разрешение Builder на поэтапную реализацию R4, N = 2–3 (2026-10-16; не научная приёмка); D-046 принимает численную архитектуру R4 (РВ4-1…РВ4-8) без численных нормативов NOT_QUALIFIED и без разрешения программировать N ≥ 2 (2026-10-15); D-045 принимает часть B `docs/MATH_SPEC.md` и этап R1, закрывает Q-001, Q-004, Q-005, Q-007 и явно переносит остатки вопросов R1 (2026-10-15); D-040 принимает полную численную спецификацию R3, D-041 отдельно разрешает программирование R3 в установленной области (2026-10-14); D-043 принимает R3 (2026-10-15); D-044 принимает `docs/R4_SOURCE_NOTES.md` как научную основу части B MATH_SPEC.md (2026-10-15), не принимая часть B и этап R4.
 
 | Решение | Состояние |
 |---|---|
@@ -606,6 +608,7 @@ merge-коммиты без squash/rebase).**
 | D-042 | **ПРИНЯТО** 2026-10-14: ограниченное разрешение — политика допустимых типов входа единого валидатора Reference R3 (`_r3_range`); неравенство D-038, формулы и допуски не меняются |
 | D-043 | **ПРИНЯТО** 2026-10-15 (решение владельца): приёмка R3 — прямоугольник SSSS, N = 1, q = const, 0,2 ≤ b/a ≤ 5, КК-МВИ с одномерным МКР; численная квалификация — десять r, семейства I и II, max(n) ≤ 640, критерии D-040. Основание — QA `7ed0fcb` и Reviewer `3a206d3` (READY_TO_ACCEPT), неизменность R2, CI 38587475828. Ограничения: Ричардсон UNRESOLVED/ограниченный объём (r = 1/5, 5; 1/3, 3), Н-1 (e_sur 0,955 при r = 1/5), Н-6 (регрессия R3 против R2 при r = 1), сходимость по s и моменты не утверждаются |
 | D-049 | **ПРИНЯТО** 2026-10-21 (решение владельца): D-049.0…D-049.9 целиком; бюджет эталона 1/100 перенесён на R5 (D-049.6, п. 4); УФ-13 — вариант (б) (D-049.8, п. 4). Основание — Reviewer `06f8501` (PASS_FOR_OWNER_D049), CI `ee2bee8` — SUCCESS. Ограничения: R4 IN_PROGRESS; N = 3 и дискретный ранг — UNRESOLVED; пороги CCCC не утверждены; PL — PLAN; программирование CCCC и часть C — отдельными решениями; R5-P — отдельно |
+| D-050 | **ПРИНЯТО** 2026-10-21 (решение владельца): часть C `MATH_SPEC.md` — CCCC, N = 2–3 (C.0–C.12 из черновика @ `e6ac40b`); основание — D-049.4, п. 3; Reviewer `b59bd5e` (PASS_WITH_NOTES), `42d73e9` (ADDRESS_PASS). Ограничения: N = 3 и дискретный ранг — UNRESOLVED; сохранение ранга при s ≥ 2 и сходимость полей — не установлены; ВБC-11 — условно; пределы — при 𝒮_∞; программирование CCCC и пороги — не разрешены |
 | остальные D-001–D-025 | Приняты |
 
 **Q-106 закрыт** решением D-022: вложенность циклов проверена по PDF P82 [P82, с. 78, 80].
@@ -672,7 +675,7 @@ D-026); идентификатор не переиспользуется (INDEX.
 | R2 | G3.1, G4 | ACCEPTED | 2026-10-13, D-035 (решение владельца): квадрат SSSS, N = 1, линейная пластина, q = const. Шаги 0–9, А-10а и группа B выполнены; группа A — PASS (А-7 при s ≥ 4 — UNRESOLVED по правилу 10.4); исследование точности относительно Навье — `R2_ACCURACY_STUDY.md`; основание — рецензия `b906cb0`, исправление Б-1 `2210e4a`, перепроверка `dc1c769` — READY_TO_ACCEPT. Ограничения: сходимость при s → ∞ не доказана; моменты не квалифицированы (D-034); R3, CCCC и N ≥ 2 не приняты и не разрешены к программированию |
 | R3 | G3.2, G4 | **ACCEPTED** | 2026-10-15, D-043 (решение владельца): прямоугольник SSSS, N = 1, линейная пластина, q = const, 0,2 ≤ b/a ≤ 5. Спецификация — D-040; решатель Builder по D-041; QA `7ed0fcb` (шаг 0 — 166/166 обязательных PASS, группа A без FAIL, группа B оформлена) и Reviewer `3a206d3` — READY_TO_ACCEPT. Ограничения D-043: Ричардсон UNRESOLVED/ограниченный объём при r = 1/5, 5, 1/3, 3; Н-1, Н-6; сходимость по s и моменты не утверждаются; квалификация — только на проверенных сетках |
 | R4 | G2, G3.3, G4 | IN_PROGRESS | С 2026-10-15: научная подготовка. `docs/R4_SOURCE_NOTES.md` — ACCEPTED по D-044 (Literature `af93c60`, Reviewer `0656178` — READY_TO_ACCEPT); часть B MATH_SPEC.md — ACCEPTED по D-045 (Literature `227d67c`, Reviewer `d28d41e` — 24/24 PASS); численная архитектура `R4_NUMERICAL_SPEC.md` — ACCEPTED по D-046 (РВ4-1…РВ4-8; Literature `ef12539`, Reviewer `e6c351f`, `1f1556a`); уточнение к D-046 (С-1/С-2) — ПРИНЯТО 2026-10-18; D-047 (2026-10-16) — ограниченное разрешение Builder на разработку N = 2–3; D-048 (2026-10-18) — ограниченная численная политика N = 2–3, предквалификация QA `e1b69dd` и аудит `9f7c468` завершены; Q-022 — частичный результат, OPEN; на 2026-10-17 в `main` (`36f8fbb`) — PR #16–#20: связанный решатель N = 2–3 с исследовательским режимом (PR #20) и группа B как B-PREQUALIFICATION (PR #19); интеграционная QA-проверка — `R4_INTEGRATED_SOLVER.qa-report.md`; численные квалификационные ворота — NOT_QUALIFIED; исследовательские результаты — PROVISIONAL; научная приёмка R4 не выполнена |
-| R5 | G3.4, G4 | IN_PROGRESS | С 2026-10-21: научная подготовка R5-V по D-049 (исключение D-049.7, п. 4 из порядка ROADMAP «R4 принят»; R4 не закрыт). Научная основа CCCC — D-049; спецификации R5 не приняты; пороги CCCC не утверждены; программирование CCCC не разрешено; R5-P — отдельная задача. 2026-10-20: черновики, рецензии и план QA объединены в `integration/r5-cccc-foundation` |
+| R5 | G3.4, G4 | IN_PROGRESS | С 2026-10-21: научная подготовка R5-V по D-049 (исключение D-049.7, п. 4 из порядка ROADMAP «R4 принят»; R4 не закрыт). Научная основа CCCC — D-049; часть C MATH_SPEC (CCCC, N = 2–3) — ACCEPTED (D-050, 2026-10-21); численная спецификация R5 не принята; пороги CCCC не утверждены; программирование CCCC не разрешено; R5-P — отдельная задача. 2026-10-20: черновики, рецензии и план QA объединены в `integration/r5-cccc-foundation` |
 | R6–R7 | G3.5, G4, G5 | PLANNED | |
 | R8–R9 | G6 | PLANNED | Q-101, Q-102 |
 | R10–R12 | G7 | PLANNED | Q-104, Q-105, Q-107; вложенность для R11 — D-022 (Q-106 закрыт) |
@@ -681,6 +684,14 @@ D-026); идентификатор не переиспользуется (INDEX.
 **Примечание QA для R3 (D-042):** при сравнении основного решателя с `NavierRectangle` и `ParsevalRecursion` стороны `a`, `b` передавать как встроенные Python `float`; собственные проверки типов конструкторов Reference не расширялись по D-042.
 
 ## Текущая задача
+
+**АКТУАЛЬНО НА 22.10.2026 (R5 — часть C MATH_SPEC принята, D-050):**
+- Владелец утвердил часть C `docs/MATH_SPEC.md` (CCCC, N = 2–3) — **D-050** (решение от 2026-10-21; основание — D-049.4, п. 3).
+  Текст C.0–C.12 перенесён дословно из `docs/R5_MATH_SPEC_PART_C_DRAFT.md` @ `e6ac40b`; техническая сверка —
+  `docs/R5_MATH_SPEC_PART_C_INTEGRATION.report.md`. D-049 включён в `main` (PR #25, `ac354bf`).
+- Сохраняются: полный ранг N = 3 и дискретный ранг CCCC — UNRESOLVED; сохранение ранга при s ≥ 2 и сходимость полей при фиксированном N
+  не установлены; ВБC-11 — условно; пределы при s → ∞ — только при 𝒮_∞; численные пороги CCCC не утверждены; программирование CCCC
+  не разрешено; R4 — IN_PROGRESS; R5 — IN_PROGRESS, не ACCEPTED.
 
 **АКТУАЛЬНО НА 21.10.2026 (R5 — D-049 ПРИНЯТО):**
 - Владелец утвердил **D-049** (DECISIONS.md) целиком, с вариантами: бюджет эталона 1/100 переносится на R5 (D-049.6, п. 4); УФ-13 —
@@ -857,7 +868,7 @@ READY_TO_ACCEPT; утверждение владельца проекта 2026-1
    замечания R2 учитываются позднее.
 5. **R5 — IN_PROGRESS, научная подготовка R5-V (D-049, 2026-10-21; не ACCEPTED).** Решения владельца по научной основе приняты (D-049).
    Следующие шаги — только по отдельным заданиям: правки Literature по D-049 (ссылки «Q-010; ОВ-М11», П-8, ОВ-S1 в NS, PL, RM);
-   подготовка части C MATH_SPEC (D-049.4) с последующим отдельным решением; реализация QA-эталонов (PL Q1); квалификация порогов CCCC и
+   подготовка части C MATH_SPEC (D-049.4) с последующим отдельным решением — *выполнено: часть C ACCEPTED, D-050 (2026-10-21)*; реализация QA-эталонов (PL Q1); квалификация порогов CCCC и
    их отдельное утверждение (D-049.6). Программирование CCCC — только отдельным решением (D-049.7, п. 5).
    *Запись от 20.10.2026:* Научная основа CCCC объединена в ветке `integration/r5-cccc-foundation`
    (`docs/R5_CCCC_FOUNDATION_INTEGRATION.report.md`). До принятия спецификаций R5 нужны решения владельца, перечисленные в отчёте (разд. 4):
