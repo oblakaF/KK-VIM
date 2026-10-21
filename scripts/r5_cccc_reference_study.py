@@ -273,7 +273,8 @@ def budgets(ext_rows, seq_rows, hencky_rows, ritz_rows) -> list[dict]:
     rows = []
     e_rel = max(num(x["e_D2_rel"]) for x in list(ext_rows) + list(seq_rows))
     rows.append(row(
-        "D2 (discrete problem D1 = D2)", "alpha; nodal field", "relative error of alpha; max norm of the nodal field divided by alpha",
+        "D2 (discrete problem D1 = D2)", "alpha; nodal field",
+        "relative error of alpha (dimensionless); field: max norm of the nodal deflection error relative to the centre deflection, ||e||_inf/|w_c|, w_c = alpha q l^4/D (equal to division by |alpha| for D = q = l = 1, as in all runs)",
         e_rel, None,
         "last refinement correction: estimate of the residual error at the level of the double representation, NOT a strict upper "
         "bound; a conditional bound ||e||_inf <= 2 e_D2 + O(u)||x||_inf needs a proved contraction of the refinement with rounding "
