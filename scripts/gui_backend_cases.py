@@ -393,7 +393,8 @@ def golden(out: Path = GOLDEN) -> None:
         result = run_case(spec)
         files = export(name, result, out / "cases", fmt="csv")
         rec = result["record"]
-        summary["cases"][name] = {"spec": spec, "api_call": rec["api_call"], "expected_status": rec["status"],
+        summary["cases"][name] = {"spec": spec, "input": rec["input"], "units": rec["units"],
+                                  "api_call": rec["api_call"], "expected_status": rec["status"],
                                   "expected_status_class": rec["status_class"], "is_error": rec["is_error"],
                                   "scientific_status": rec["scientific_status"], "D": rec["D"],
                                   "half_steps_done": rec["half_steps_done"], "field_available": rec["field_available"],
