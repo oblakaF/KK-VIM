@@ -8,6 +8,8 @@ Runs only kkvim_reference (no kkvim). Writes docs/results/r5_cccc_bc/ (or --out)
 Columns: *_hex exact double of a certified value, *_up decimal rounded up, *_down rounded down (R-4 conventions of
 r5_cccc_halfstep_observations); UNRESOLVED - no certificate or condition not met; all other numbers OBSERVATION.
 The certified bounds are bounds of the SET S of the system actually solved (after QR if applied), not of the field W.
+Review 9f0d5dc: capacitance by the modal path (PB-2), VOK-13 factors (PB-3), RESEARCH_ONLY marking of QR runs (PB-4); the first
+edition of the data is kept in history_1d33fe1/.
 
     uv run python scripts/r5_cccc_bc_prototype_observations.py        # about 1 min
 """
@@ -30,15 +32,25 @@ from kkvim_reference import r5_cccc_halfstep as hs
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "results" / "r5_cccc_bc"
 CHAIN = [(16, 16), (32, 32), (64, 128), (128, 256), (256, 512)]
-LOG = ["cond_A_before_QR", "cond_A_after_QR", "orthonormality_defect_up", "cond_S", "min_eig_sym_S", "max_cond_Mk", "kappa_c",
-       "eta_bc"]
+LOG = ["run_class", "qr_without_qualified_rank_decision", "capacitance_path", "cond_A_before_QR", "cond_A_after_QR",
+       "orthonormality_defect_up", "sin_angle_span_G_Utilde", "cond_S", "cond_S_modal", "cond_S_rows", "S_rows_minus_modal_rel",
+       "min_eig_sym_S", "max_cond_Mk", "rho_0", "kappa_bar_c", "ratio_Y0c_x", "M_norm_2", "M_norm_method", "eta_bc"]
 COLUMNS = {
     "lambda_low_hex / _down": "certified lower bound of lambda_min(K) of the system solved (certify_lambda_min)",
     "bound_abs_bc_hex / _up": "certified upper bound of ||s_BC - s*||_2 (error_bound)",
     "rel_to_exact_bc_hex / _up": "certified upper bound of ||s_BC - s*||_2/||s*||_2 = b/(L - b), L > b",
     "rel_to_exact_ac_hex / _up": "the same for R-AC with refinement",
     "bc_ac_certified_consistent, bc_rh_certified_consistent": "exact check ||s_BC - s_ref|| <= b_BC + b_ref (must be True)",
-    "cond_A_before_QR, cond_A_after_QR, cond_S, min_eig_sym_S, max_cond_Mk, kappa_c": "OBSERVATION (NS 5.1 log; E-6 preparation)",
+    "cond_A_before_QR, cond_A_after_QR, cond_S, min_eig_sym_S, max_cond_Mk": "OBSERVATION (NS 5.1 log; E-6 preparation)",
+    "capacitance_path, cond_S_modal, cond_S_rows, S_rows_minus_modal_rel": "S by the modal path (m, default) and by the rows of Y0 "
+        "(g); cond(S) is that of the chosen path; ||S_g - S_m||_2/||S_m||_2 (PB-2; OBSERVATION)",
+    "rho_0, kappa_bar_c, ratio_Y0c_x, M_norm_2, M_norm_method": "factors of the corrected VOK-13 (fe5d60f): ||x0||/||x||, "
+        "||Y0||_2 ||c||_2/||x||, former kappa_c = ||Y0 c||/||x||; ||M||_2 by VOK-12 item 4 (f62cd79), dense for N m <= 4N, "
+        "subspace otherwise (PB-3; OBSERVATION, not a guarantee); UNRESOLVED when ||x|| = 0",
+    "run_class, qr_without_qualified_rank_decision, sin_angle_span_G_Utilde": "PB-4: every QR run is RESEARCH_ONLY (no qualified "
+        "numerical rank decision); the result refers to span(U~); sine of the largest angle between span(U~) and span(G) "
+        "(exact projection, OBSERVATION); such rows must not enter normative Q3 distributions",
+    "note": "per-row remark (e.g. eps = 1e-8 with QR: changed span)",
     "orthonormality_defect_up": "exact max|h_f U~^T U~ - I| rounded up (QR control), value only",
     "eta_bc, bc_minus_ac_rel, bc_minus_rh_rel, seconds": "OBSERVATION",
 }
@@ -100,7 +112,11 @@ def main(argv=None):
         G = hs.start_set(32, 2)
         G[:, 1] = G[:, 0] + eps * G[:, 1]
         for qr in (False, True):
-            ill.append(row_of(hs.HalfStep(1.0, 32, 1.0, 32, "Y", G), qr, {"eps": eps}))
+            note = ""
+            if qr and eps == 1e-8:
+                note = ("isolated research experiment: cond(A) before QR ~ 1/u (NS 5.1 step 1 would stop before QR); the result "
+                        "refers to the changed span(U~), not to span(G)")
+            ill.append(row_of(hs.HalfStep(1.0, 32, 1.0, 32, "Y", G), qr, {"eps": eps, "note": note}))
     write(out / "ill_conditioned.csv", ill)
     meta = {"study": "R5-V CCCC QA research prototype B-C (self-checks; no thresholds, no Q3 calibration)",
             "python": platform.python_version(), "platform": platform.platform(), "numpy": metadata.version("numpy"),

@@ -8,9 +8,10 @@ Criteria, no tolerance taken from observed discrepancies:
   i.e. ||s_BC - s*|| < ||s_BC|| (rel_to_exact exists: L > b, a qualitative property, not a tolerance);
 - the standard rounding bound gamma_m for the coefficient path (operation count in ``test_coefficients_stencil_path``);
 - identification checks for the DST normalisation, the sign of mu_k and the grid weight of the QR: they separate the correct
-  constant from the plausible wrong ones (relative gaps >= 1/(2n), or a factor h^{+-1}) by a margin that is stated in each test; the
+  constant from the plausible wrong ones (relative gaps of about 1/(2n), or a factor h^{+-1}) by a margin stated in each test; the
   margin is not a tolerance of the method.
-Results without such a criterion (cond(S), kappa_c, differences) are OBSERVATION and are not asserted.
+Results without such a criterion (cond(S), rho_0, kappa_bar_c, ratio_Y0c_x, differences) are OBSERVATION and are not asserted;
+||M||_2 is checked only against the proven statements of VOK-12 (f62cd79) and against its dense value.
 """
 
 import math
@@ -181,9 +182,10 @@ def test_capacitance_decomposition_and_woodbury_are_exact(case):
 
 @pytest.mark.parametrize("n", [3, 4, 8, 17, 64, 257])
 def test_dst_normalisation_is_identified(n):
-    """Psi = dst(I) equals sqrt(2/n) sin(k pi i/n) and is a symmetric involution. Identification margin: the plausible wrong
-    constants sqrt(2/(n+1)), sqrt(1/n), sqrt(2/(n-1)), 1, 2 differ from sqrt(2/n) by a relative >= 1/(2n) >= 2^-10 here; the
-    comparison bound 2^-30 lies 2^20 below that gap."""
+    """Psi = dst(I) equals sqrt(2/n) sin(k pi i/n) and is a symmetric involution. Identification margin (R-1, review 9f0d5dc): the
+    plausible wrong constants differ from sqrt(2/n) by a relative of about 1/(2n) or more - for sqrt(2/(n+1)) exactly
+    1 - sqrt(n/(n+1)) = 1/(2n) - 3/(8n^2) + ...; the assertion uses the absolute gap > 2^-20 (at n = 257 about 1.7e-4), and the
+    comparison bound 2^-30 lies far below it (the DST error is of the order u log n)."""
     m = n - 1
     Psi = bc.dst(np.eye(m), axis=0)
     i = np.arange(1, n)
@@ -223,12 +225,21 @@ def test_modal_blocks_are_positive_and_carry_plus_two_mu_B(case):
     K0 = p.D * (np.kron(A, Ls @ Ls) - 2 * np.kron(B, Ls) + np.kron(C, np.eye(m)))
     Psi = bc.dst(np.eye(m), axis=0)
     a = np.arange(1, N + 1, dtype=float)
+    rejected = False
     for k in range(m):
         Mk = mu[k] ** 2 * A + 2 * mu[k] * B + C
         img = K0 @ np.kron(a, Psi[:, k])
         scale = np.max(np.abs(img))
         assert np.max(np.abs(img - p.D * np.kron(Mk @ a, Psi[:, k]))) < 2.0**-30 * scale
         assert np.linalg.eigvalsh(Mk)[0] > 0
+        # R-2 (review 9f0d5dc): the wrong sign "-2 mu_k B" misses the image by 4 mu_k D |B a| (exact gap of the two candidates);
+        # it is rejected wherever that gap exceeds the comparison bound: the difference is at least half of the gap
+        gap = 4 * mu[k] * p.D * np.max(np.abs(B @ a)) * np.max(np.abs(Psi[:, k]))
+        if gap > 2.0**-29 * scale:
+            wrong = mu[k] ** 2 * A - 2 * mu[k] * B + C
+            assert np.max(np.abs(img - p.D * np.kron(wrong @ a, Psi[:, k]))) >= gap / 2
+            rejected = True
+    assert rejected  # the negative check was active for at least one k
     assert bc.solve_bc(p).diagnostics["min_eig_Mk"] > 0
 
 
@@ -349,3 +360,101 @@ def test_ill_conditioned_sets_keep_a_status_and_certificates(eps, qr):
             assert c["bc_ac_certified_consistent"] is True
         else:
             assert c.get("bc_ac_certified_consistent", bc.UNRESOLVED) == bc.UNRESOLVED
+
+
+# --- review 9f0d5dc: PB-1 (q = 0), PB-2 (capacitance paths), PB-3 (VOK-12/13 factors), PB-4 (QR marking) ---------------
+
+@pytest.mark.parametrize("N, qr", [(1, False), (2, True), (3, False), (3, True)])
+def test_zero_load_gives_zero_solution_and_unresolved_ratios(N, qr):
+    """PB-1: q = 0 => F = 0, s* = 0 and the computed s = 0; relative quantities and eta are 0/0 -> UNRESOLVED; no division by
+    zero and no RuntimeWarning; the absolute certified bound is 0 and the comparison with R-AC stays consistent."""
+    import warnings
+    p = problem(1.0, 10, 1.7, 14, "Y", N, q=0.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        rec = bc.run_halfstep(p, qr=qr)
+        c = bc.compare(rec)
+    assert rec.status == hs.INDEPENDENT and not np.any(rec.bc.s)
+    for key in ("rho_0", "kappa_bar_c", "ratio_Y0c_x", "eta_bc"):
+        assert rec.log[key] == bc.UNRESOLVED
+    for key in ("eta_bc", "rel_to_computed_bc", "rel_to_exact_bc", "bc_minus_ac_rel", "bc_minus_rh_rel"):
+        assert c[key] == bc.UNRESOLVED
+    assert c["bound_abs_bc"] == 0.0 and c["bc_ac_certified_consistent"] is True
+
+
+@pytest.mark.parametrize("case", SMALL + [(1.0, 16, 2.0, 40, "Y", 3), (1.3, 20, 1.0, 33, "X", 2)])
+def test_both_capacitance_paths_are_logged_and_certified(case):
+    """PB-2: the modal path (m) is the default; both S are formed, their difference and the chosen path are logged; the solutions of
+    both paths are certified and consistent with R-AC (values of the difference: OBSERVATION)."""
+    p = problem(*case)
+    with pytest.raises(ValueError):
+        bc.solve_bc(p, capacitance="other")
+    for path in bc.CAPACITANCE_PATHS:
+        rec = bc.run_halfstep(p, qr=True, capacitance=path)
+        log = rec.log
+        assert log["capacitance_path"] == path and log["size_S"] == 2 * p.N
+        assert {"cond_S_modal", "cond_S_rows", "S_rows_minus_modal_rel"} <= set(log)
+        assert rec.bc.S_modal.shape == rec.bc.S_rows.shape == (2 * p.N, 2 * p.N)
+        S = rec.bc.S_modal if path == "modal" else rec.bc.S_rows
+        assert log["cond_S"] == float(np.linalg.cond(S))
+        _assert_certified(bc.compare(rec))
+    assert bc.run_halfstep(p).log["capacitance_path"] == "modal"
+
+
+@pytest.mark.parametrize("nx, ny, N", [(12, 3, 1), (12, 3, 2), (12, 4, 1), (12, 5, 3), (12, 6, 1), (12, 6, 3), (10, 9, 2),
+                                       (16, 12, 3)])
+def test_m_norm_follows_vok12(nx, ny, N):
+    """PB-3: ||M||_2, M = I - Y0 S^-1 Z^T (VOK-12, f62cd79). Small systems (N m <= 4N) are formed densely; otherwise the subspace
+    formula with max(1, .) is used, which holds for any rank of [Z, W] since dim <= 4N < N m (docstring of m_norm). Checks:
+    (a) the subspace value equals the dense value (both floating point; bound 2^-30, consistency of two formulas, not a tolerance
+    of the method); (b) N = 1, n_s = 3: Z G Z^T = g I, so ||M||_2 < 1 (VOK-12, item 3); (c) n_s >= 4: ||M||_2 >= 1 (item 3)."""
+    p = hs.HalfStep(1.0, nx, 1.0, ny, "Y", hs.start_set(nx, N))
+    rec = bc.run_halfstep(p, qr=True)
+    sol, m = rec.bc, ny - 1
+    rows = bc.boundary_rows(N, m)
+    # dense reference: M = I - W Z^T with W = Y0 S^-1, Y0 = K0^-1 Z from the dense K0 of the solved system
+    A, B, C, _ = bc.bc_coefficients(rec.solved)
+    h = 1.0 / ny
+    Ls = hs._L(ny, h)
+    K0 = p.D * (np.kron(A, Ls @ Ls) - 2 * np.kron(B, Ls) + np.kron(C, np.eye(m)))
+    Z = np.zeros((N * m, 2 * N))
+    Z[rows, np.arange(2 * N)] = 1.0
+    W = np.linalg.solve(K0, Z) @ np.linalg.inv(sol.S_modal)
+    dense = float(np.linalg.norm(np.eye(N * m) - W @ Z.T, 2))
+    assert rec.log["M_norm_method"] == ("dense" if N * m <= 4 * N else "subspace (dim <= 4N < N m)")
+    assert abs(rec.log["M_norm_2"] - dense) <= 2.0**-30 * dense
+    if N == 1 and ny == 3:
+        assert rec.log["M_norm_2"] < 1
+    if ny >= 4:
+        assert rec.log["M_norm_2"] >= 1
+
+
+def test_vok13_factors_are_logged_and_old_kappa_renamed():
+    """PB-3: rho_0, kappa_bar_c, ||M||_2 are logged; the former kappa_c is ratio_Y0c_x (no key kappa_c any more)."""
+    log = bc.run_halfstep(problem(1.0, 20, 1.0, 31, "Y", 3)).log
+    assert "kappa_c" not in log
+    assert {"rho_0", "kappa_bar_c", "ratio_Y0c_x", "M_norm_2", "M_norm_method"} <= set(log)
+    assert all(isinstance(log[k], float) and log[k] > 0 for k in ("rho_0", "kappa_bar_c", "ratio_Y0c_x", "M_norm_2"))
+
+
+@pytest.mark.parametrize("eps", [1e-2, 1e-8])
+def test_qr_runs_are_marked_research_only(eps):
+    """PB-4: every QR run is marked (no qualified numerical rank decision exists); runs without QR for N >= 2 are research-only
+    too; N = 1 is not marked; the angle between span(U~) and span(G) is logged (OBSERVATION)."""
+    G = hs.start_set(24, 2)
+    G[:, 1] = G[:, 0] + eps * G[:, 1]
+    p = hs.HalfStep(1.0, 24, 1.0, 20, "Y", G)
+    with_qr = bc.run_halfstep(p, qr=True).log
+    assert with_qr["qr_without_qualified_rank_decision"] is True and with_qr["run_class"] == bc.RESEARCH_QR
+    assert isinstance(with_qr["sin_angle_span_G_Utilde"], float) and with_qr["sin_angle_span_G_Utilde"] >= 0
+    without = bc.run_halfstep(p, qr=False).log
+    assert without["qr_without_qualified_rank_decision"] is False and without["run_class"] == bc.RESEARCH_NO_QR
+    one = bc.run_halfstep(problem(1.0, 24, 1.0, 20, "Y", 1), qr=True).log
+    assert one["qr_without_qualified_rank_decision"] is False and "sin_angle_span_G_Utilde" not in one
+
+
+def test_span_change_sin_is_zero_for_the_same_span():
+    """span_change_sin: an exactly scaled copy has exactly the same span (residual 0); a different column gives a positive sine."""
+    G = hs.start_set(16, 2)
+    assert bc.span_change_sin(G, 4.0 * G, 1 / 16) == 0.0
+    assert bc.span_change_sin(G, hs.start_set(16, 3)[:, [0, 2]], 1 / 16) > 0

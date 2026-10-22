@@ -23,7 +23,10 @@ Order of a half-step (NS 5.1; D-049.2, item 3), ``run_halfstep``:
 2. QR (N >= 2, on request): sqrt(h_f) G = Q R (Householder, numpy.linalg.qr), U~ = Q/sqrt(h_f), A(U~) = I in exact arithmetic
    (R4 5.4); N = 1: no QR (NS 5.1);
 3. diagnostics, values only: cond(A) before QR = cond(R)^2, cond(A) after QR, the exact orthonormality defect max|h_f U~^T U~ - I|,
-   cond(S), max cond(M_k), kappa_c = ||Y0 c||/||x||;
+   the angle between span(U~) and span(G), cond(S) of both capacitance paths and their difference, max cond(M_k), and the factors
+   of the corrected model VOK-13 (fe5d60f, f62cd79): rho_0 = ||x0||/||x||, kappa_bar_c = ||Y0||_2 ||c||_2/||x||, ||M||_2 (VOK-12,
+   item 4); the former kappa_c = ||Y0 c||/||x|| is logged as ratio_Y0c_x (review 9f0d5dc, PB-2, PB-3). Every QR run is RESEARCH_ONLY
+   until a numerical rank criterion is qualified (PB-4). q = 0: x = 0, undefined ratios are UNRESOLVED (PB-1);
 4. B-C solve;
 5. residual of the original operator with D4: eta_QA and the exact residual (R-HP, kkvim_reference.r5_cccc_halfstep).
 
@@ -94,16 +97,53 @@ def boundary_rows(N: int, m: int) -> list[int]:
     return [i * m + q for i in range(N) for q in (0, m - 1)]
 
 
+CAPACITANCE_PATHS = ("modal", "rows")  # (m) modal sum, (g) boundary rows of the computed Y0 (fe5d60f, VOK-13)
+
+
 @dataclass
 class BCSolution:
     status: str
     s: np.ndarray | None = None  # term-first
     diagnostics: dict = field(default_factory=dict)
+    S_modal: np.ndarray | None = None  # capacitance by the path (m)
+    S_rows: np.ndarray | None = None  # capacitance by the path (g)
 
 
-def solve_bc(p: hs.HalfStep) -> BCSolution:
-    """B-C for the half-step system of ``p`` (given set used as is). Statuses: EXACTLY_DEPENDENT (no solve), FACTORIZATION_FAILED
-    (a modal block or S not factorizable in floating point), INDEPENDENT."""
+def _ratio(num: float, den: float):
+    """num/den as an OBSERVATION; UNRESOLVED when den = 0 (e.g. q = 0: x = 0, the ratio is undefined; PB-1)."""
+    return float(num / den) if den != 0 else UNRESOLVED
+
+
+def m_norm(Y0: np.ndarray, S: np.ndarray, rows: list[int]) -> tuple[float, str]:
+    """||M||_2, M = I - W Z^T, W = Y0 S^-1 (VOK-12, item 4, f62cd79), without the dense M on large grids.
+
+    n = N m. If n <= 4N (m <= 4, n_s <= 5): M is formed densely (at most 12 x 12), no branch is chosen. Otherwise Q is an
+    orthonormal basis of the columns of [Z, W] (n x 4N, Householder QR without a rank decision): span Q = S' contains
+    S := span[Z, W] for ANY rank of [Z, W], and dim S' <= 4N < n. With C := S^perp the operator is M = M|_S (+) I_C (VOK-12, item 4,
+    proof) and S' = S (+) (S' minus S) with S' minus S inside C, so ||Q^T M Q||_2 = max(||M|_S||_2, 1 or nothing) and, since C != {0},
+    ||M||_2 = max(1, ||Q^T (I - W Z^T) Q||_2) exactly in exact arithmetic (own derivation, level B). The branch therefore does not
+    depend on a numerical rank decision; the computed value is a floating-point value (OBSERVATION), not a guarantee."""
+    n, k = Y0.shape
+    W = np.linalg.solve(S.T, Y0.T).T  # Y0 S^-1
+    if n <= 2 * k:  # n <= 4N
+        M = np.eye(n)
+        M[:, rows] -= W
+        return float(np.linalg.norm(M, 2)), "dense"
+    Z = np.zeros((n, k))
+    Z[rows, np.arange(k)] = 1.0
+    Q, _ = np.linalg.qr(np.hstack([Z, W]))
+    MQ = np.eye(Q.shape[1]) - (Q.T @ W) @ Q[rows, :]  # Q^T (I - W Z^T) Q, Z^T Q = Q[rows, :]
+    return max(1.0, float(np.linalg.norm(MQ, 2))), "subspace (dim <= 4N < N m)"
+
+
+def solve_bc(p: hs.HalfStep, capacitance: str = "modal") -> BCSolution:
+    """B-C for the half-step system of ``p`` (given set used as is). ``capacitance``: "modal" - path (m), Z^T Y0 =
+    sum_k (D M_k)^-1 (x) z_k z_k^T, z_k = (psi_k(1), psi_k(m)) analytically (NS 5; fe5d60f, VOK-13, step 4 of 3.1) - the default of
+    this research prototype (PB-2); "rows" - path (g), the boundary rows of the computed Y0, kept for comparisons. Both S are
+    computed and logged with their difference and the chosen path. Statuses: EXACTLY_DEPENDENT (no solve), FACTORIZATION_FAILED
+    (a modal block, A or S not factorizable in floating point), INDEPENDENT."""
+    if capacitance not in CAPACITANCE_PATHS:
+        raise ValueError(f"capacitance must be one of {CAPACITANCE_PATHS}")
     if hs.given_set_status(p) == hs.EXACTLY_DEPENDENT:
         return BCSolution(hs.EXACTLY_DEPENDENT)
     A, B, C, F = bc_coefficients(p)
@@ -131,22 +171,34 @@ def solve_bc(p: hs.HalfStep) -> BCSolution:
             Vh = Minv[:, :, i].T * z[side][None, :]  # (N, m): modal coefficients of all terms
             Y0[:, 2 * i + side] = dst(Vh, axis=1).reshape(-1)
     Ginv = h**4 / (2.0 * D) * np.kron(np.linalg.inv(A), np.eye(2))
-    S = Ginv + Y0[rows, :]
+    S_rows = Ginv + Y0[rows, :]  # path (g)
+    k = np.arange(1, p.n_s)
+    psi1 = math.sqrt(2.0 / p.n_s) * np.sin(k * math.pi / p.n_s)  # psi_k(1)
+    zk = np.stack([psi1, np.where(k % 2 == 1, 1.0, -1.0) * psi1], axis=1)  # (psi_k(1), psi_k(m) = (-1)^(k+1) psi_k(1))
+    S_modal = Ginv + np.einsum("kij,ks,kt->isjt", Minv, zk, zk).reshape(2 * N, 2 * N)  # path (m)
+    S = S_modal if capacitance == "modal" else S_rows
     try:
         c = np.linalg.solve(S, x0[rows])
     except np.linalg.LinAlgError:
         return BCSolution(hs.FACTORIZATION_FAILED)
     Y0c = Y0 @ c
     x = x0 - Y0c
+    norm_x = float(np.linalg.norm(x))
     eM = np.linalg.eigvalsh(DM / D)
     eA = np.linalg.eigvalsh(A)
-    diag = {"size_S": S.shape[0], "cond_S": float(np.linalg.cond(S)),
+    Mn, Mn_method = m_norm(Y0, S, rows)
+    diag = {"capacitance_path": capacitance, "size_S": S.shape[0], "cond_S": float(np.linalg.cond(S)),
+            "cond_S_modal": float(np.linalg.cond(S_modal)), "cond_S_rows": float(np.linalg.cond(S_rows)),
+            "S_rows_minus_modal_rel": float(np.linalg.norm(S_rows - S_modal, 2) / np.linalg.norm(S_modal, 2)),
             "min_eig_sym_S": float(np.linalg.eigvalsh((S + S.T) / 2)[0]),
             "asym_S": float(np.max(np.abs(S - S.T)) / np.max(np.abs(S))),
             "cond_A": float(eA[-1] / eA[0]), "max_cond_Mk": float(np.max(eM[:, -1] / eM[:, 0])),
-            "min_eig_Mk": float(np.min(eM[:, 0])), "kappa_c": float(np.linalg.norm(Y0c) / np.linalg.norm(x)),
-            "mu_1": float(mu[0])}
-    return BCSolution(hs.INDEPENDENT, x, diag)
+            "min_eig_Mk": float(np.min(eM[:, 0])),
+            "rho_0": _ratio(float(np.linalg.norm(x0)), norm_x),  # ||x0||_2/||x||_2 (VOK-13)
+            "kappa_bar_c": _ratio(float(np.linalg.norm(Y0, 2)) * float(np.linalg.norm(c)), norm_x),  # ||Y0||_2 ||c||_2/||x||_2
+            "ratio_Y0c_x": _ratio(float(np.linalg.norm(Y0c)), norm_x),  # former kappa_c (rejected by Z-1, f4a4cb9)
+            "M_norm_2": Mn, "M_norm_method": Mn_method, "mu_1": float(mu[0])}
+    return BCSolution(hs.INDEPENDENT, x, diag, S_modal, S_rows)
 
 
 # --- NS 5.1 order: rank -> QR -> diagnostics -> B-C -> residual ---------------------------------------------------------
@@ -176,10 +228,58 @@ class HalfStepRecord:
     log: dict = field(default_factory=dict)
 
 
-def run_halfstep(p: hs.HalfStep, qr: bool = True) -> HalfStepRecord:
+def span_change_sin(original: np.ndarray, new: np.ndarray, h: float) -> float:
+    """sin of the largest principal angle between span(new) and span(original) (new orthonormal in the weight h): the residual of
+    the projection of each column of ``new`` onto span(original) is computed EXACTLY (rational Gram system), then
+    ||(I - P_orig) sqrt(h) new||_2 in double. OBSERVATION (PB-4)."""
+    N = original.shape[1]
+    G = [[Fraction(float(v)) for v in original[:, k]] for k in range(N)]
+    gram = [[sum(a * b for a, b in zip(G[i], G[j])) for j in range(N)] for i in range(N)]
+    res = np.empty_like(new, dtype=float)
+    for c in range(new.shape[1]):
+        u = [Fraction(float(v)) for v in new[:, c]]
+        rhs = [sum(a * b for a, b in zip(G[i], u)) for i in range(N)]
+        coef = _solve_exact(gram, rhs)
+        res[:, c] = [float(u[r] - sum(coef[i] * G[i][r] for i in range(N))) for r in range(len(u))]
+    return float(np.linalg.norm(math.sqrt(h) * res, 2))
+
+
+def _solve_exact(K, f):
+    n = len(K)
+    M = [list(K[i]) + [f[i]] for i in range(n)]
+    for c in range(n):
+        piv = next(r for r in range(c, n) if M[r][c] != 0)
+        M[c], M[piv] = M[piv], M[c]
+        for r in range(c + 1, n):
+            if M[r][c]:
+                g = M[r][c] / M[c][c]
+                M[r] = [a - g * b for a, b in zip(M[r], M[c])]
+    x = [Fraction(0)] * n
+    for i in reversed(range(n)):
+        x[i] = (M[i][n] - sum(M[i][j] * x[j] for j in range(i + 1, n))) / M[i][i]
+    return x
+
+
+def _eta(p: hs.HalfStep, s, coeffs=None):
+    """eta_QA (R-HP, NS 5); UNRESOLVED when its denominator is 0 (s = 0 and F = 0, i.e. q = 0: 0/0; PB-1)."""
+    if not np.any(s) and p.q == 0:
+        return UNRESOLVED
+    return hs.eta_qa(p, s, coeffs)
+
+
+RESEARCH_QR = ("RESEARCH_ONLY: QR without a qualified numerical rank decision (NS 5.1 step 1; D-049.5, D-049.6); the result refers "
+               "to span(U~), not to span(G); not for normative Q3 distributions")
+RESEARCH_NO_QR = "RESEARCH_ONLY: N >= 2 without QR (BC-6 analogue), not the NS 5.1 order"
+
+
+def run_halfstep(p: hs.HalfStep, qr: bool = True, capacitance: str = "modal") -> HalfStepRecord:
     """One half-step in the order NS 5.1 (D-049.2, item 3). The numerical rank decision of NS 5.1, step 1, has no qualified
-    criterion yet (D-049.5, D-049.6): only the exact rank stops here; cond(A) before QR is recorded for that decision."""
-    log = {"N": p.N, "direction": p.direction, "n_f": p.n_f, "n_s": p.n_s, "qr": bool(qr and p.N >= 2)}
+    criterion yet (D-049.5, D-049.6): only the exact rank stops here; cond(A) before QR is recorded for that decision. Every QR run
+    is therefore marked ``qr_without_qualified_rank_decision`` and RESEARCH_ONLY (PB-4), with the angle between span(U~) and
+    span(G) as an OBSERVATION."""
+    log = {"N": p.N, "direction": p.direction, "n_f": p.n_f, "n_s": p.n_s, "qr": bool(qr and p.N >= 2),
+           "qr_without_qualified_rank_decision": bool(qr and p.N >= 2),
+           "run_class": RESEARCH_QR if (qr and p.N >= 2) else (RESEARCH_NO_QR if p.N >= 2 else "N = 1 (no QR, NS 5.1)")}
     if hs.given_set_status(p) == hs.EXACTLY_DEPENDENT:
         log["set_status"] = hs.EXACTLY_DEPENDENT
         return HalfStepRecord(hs.EXACTLY_DEPENDENT, None, None, None, log)
@@ -199,13 +299,14 @@ def run_halfstep(p: hs.HalfStep, qr: bool = True) -> HalfStepRecord:
         eA = np.linalg.eigvalsh(bc_coefficients(solved)[0])
         log["cond_A_after_QR"] = float(eA[-1] / eA[0])
         log["orthonormality_defect_up"] = orthonormality_defect(solved)
+        log["sin_angle_span_G_Utilde"] = span_change_sin(p.given, U, p.l_f / p.n_f)
     else:
         log["cond_A_before_QR"] = log["cond_A_set"]
-    bc = solve_bc(solved)
+    bc = solve_bc(solved, capacitance)
     log["bc_status"] = bc.status
     log.update(bc.diagnostics)
     if bc.s is not None:
-        log["eta_bc"] = hs.eta_qa(solved, bc.s)
+        log["eta_bc"] = _eta(solved, bc.s)
     return HalfStepRecord(bc.status, solved, R, bc, log)
 
 
@@ -243,14 +344,14 @@ def compare(rec: HalfStepRecord, with_rh: bool = True) -> dict:
     out["bound_abs_bc"] = UNRESOLVED if b_bc is None else b_bc
     out["rel_to_computed_bc"] = rel_bc.to_computed if rel_bc.to_computed is not None else UNRESOLVED
     out["rel_to_exact_bc"] = rel_bc.to_exact if rel_bc.to_exact is not None else UNRESOLVED
-    out["eta_bc"] = hs.eta_qa(p, s_bc, coeffs)
+    out["eta_bc"] = _eta(p, s_bc, coeffs)
     ac = hs.solve_ac(p)
     out["ac_status"] = ac.status
     if ac.s is not None:
         b_ac, rel_ac = bounds(ac.s)
         out["bound_abs_ac"] = UNRESOLVED if b_ac is None else b_ac
         out["rel_to_exact_ac"] = rel_ac.to_exact if rel_ac.to_exact is not None else UNRESOLVED
-        out["bc_minus_ac_rel"] = float(np.linalg.norm(s_bc - ac.s) / np.linalg.norm(ac.s))  # OBSERVATION
+        out["bc_minus_ac_rel"] = _ratio(float(np.linalg.norm(s_bc - ac.s)), float(np.linalg.norm(ac.s)))  # OBSERVATION
         out["bc_ac_certified_consistent"] = UNRESOLVED if b_ac is None else \
             _certified_pair_consistent(s_bc, b_bc, ac.s, b_ac)
     if with_rh and p.n_f <= 32 and p.n_s <= 32:
@@ -258,7 +359,7 @@ def compare(rec: HalfStepRecord, with_rh: bool = True) -> dict:
         out["rh_status"] = status_h
         if s_h is not None:
             b_h, _ = bounds(s_h)
-            out["bc_minus_rh_rel"] = float(np.linalg.norm(s_bc - s_h) / np.linalg.norm(s_h))  # OBSERVATION
+            out["bc_minus_rh_rel"] = _ratio(float(np.linalg.norm(s_bc - s_h)), float(np.linalg.norm(s_h)))  # OBSERVATION
             out["bc_rh_certified_consistent"] = UNRESOLVED if b_h is None else \
                 _certified_pair_consistent(s_bc, b_bc, s_h, b_h)
     return out
