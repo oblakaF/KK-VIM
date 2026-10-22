@@ -1,0 +1,9 @@
+{
+ "study": "R5-V CCCC half-step controls R-H, R-AC, R-HP (Q1b)",
+ "python": "3.13.15",
+ "platform": "Windows-10-10.0.19045-SP0",
+ "numpy": "2.5.4",
+ "scipy": "1.18.1",
+ "seconds": 6,
+ "git_commit": "d315e2417b7b36568712ab43fcab30d6377038a4"
+}

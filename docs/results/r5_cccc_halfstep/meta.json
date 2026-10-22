@@ -4,6 +4,6 @@
  "platform": "Windows-10-10.0.19045-SP0",
  "numpy": "2.5.4",
  "scipy": "1.18.1",
- "seconds": 6,
- "git_commit": "d315e2417b7b36568712ab43fcab30d6377038a4"
+ "seconds": 8,
+ "git_commit": "57d3194f50e1dece054a0bfa2d13aa87d2c2e85f"
 }

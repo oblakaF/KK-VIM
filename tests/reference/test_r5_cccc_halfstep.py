@@ -2,10 +2,15 @@
 
 Criteria used here, no tolerance is introduced:
 - exact rational identities (coefficients, scaling, symmetry, exact rank);
-- the standard rounding bound of a floating-point dot product of length m: |fl - exact| <= gamma_m |terms| (gamma_m = m u/(1 - m u)),
-  with m counted generously for the chain of products of each path;
-- the strict a posteriori bound ||s - s*||_2 <= ||r||_2 / lambda_low with the exact residual (R-HP) and lambda_low certified by
-  a decimal Cholesky of K - tau I (module docstring).
+- the standard rounding bound of floating-point dot products and products: |fl - exact| <= gamma_m |terms|, gamma_m = m u/(1 - m u),
+  with the operation count m written below for each path (R-2, review 57d3194). Coefficient path, element of K:
+  h_f (1 rounding); h**k by pow (counted as 2u); L entries (pow + division: 3); D4 = L L + corner (3-term dot of L entries and the
+  corner 2/h**4: <= 10); D4 G (5-term dot: + 5 -> 15); G^T(.) of length n_f - 1 and the factor h (-> n_f + 16); the same for A, B
+  with fewer operations; Kronecker product with the operator entries of the solve grid (<= 10 for D4_s, + 1); the sum of the three
+  terms (+ 2) and the factor D (+ 1): m <= n_f + 21 (Reviewer: about n_f + 19...21). The tests use the conservative gamma(2 n_f + 32),
+  as for the R-H path gamma(2 m_1 + 32) (m_1 the length of the dense products);
+- the strict a posteriori bound ||s - s*||_2 <= ||r||_2 / lambda_low with the exact residual (R-HP) and lambda_low certified by the
+  EXACT defect of a decimal Cholesky factor of K - tau I (module docstring; I-1, I-2), for n_f, n_s >= 3 (I-4).
 Results without such a bound are reported (OBSERVATION), not asserted.
 """
 
@@ -65,12 +70,12 @@ def test_three_paths_assemble_the_same_exact_system(grid, N, direction):
     Kc, rc = hs.coefficient_system(p)
     Kh, rh = hs.hessian_system(p)
     coef_abs, rh_abs, m1 = abs_bounds(p)
-    assert np.all(np.abs(Kc - Kex) <= hs.gamma(p.n_f + 16) * coef_abs + hs.U * np.abs(Kex))
+    assert np.all(np.abs(Kc - Kex) <= hs.gamma(2 * p.n_f + 32) * coef_abs + hs.U * np.abs(Kex))
     assert np.all(np.abs(Kh - Kex) <= hs.gamma(2 * m1 + 32) * rh_abs + hs.U * np.abs(Kex))
     F = hs.exact_coefficients(p)[3]
     Fex = np.repeat([float(f) for f in F], p.n_s - 1)
     hf = p.l_f / p.n_f
-    assert np.all(np.abs(rc - Fex) <= hs.gamma(p.n_f + 4) * p.q * hf * np.repeat(np.abs(p.given).sum(axis=0), p.n_s - 1)
+    assert np.all(np.abs(rc - Fex) <= hs.gamma(p.n_f + 6) * p.q * hf * np.repeat(np.abs(p.given).sum(axis=0), p.n_s - 1)
                   + hs.U * np.abs(Fex))
     hx, hy = p.lx / p.nx, p.ly / p.ny
     rh_abs_terms = (p.q * hx * hy / (p.l_s / p.n_s)) * (np.abs(hs.embedding(p)).T @ np.ones(m1))
@@ -106,7 +111,7 @@ def test_rhp_equals_the_direct_application_of_the_original_operator(grid, N, dir
         K, rhs = hs.coefficient_system(p)
         r_fl = rhs - K @ vec
         coef_abs, _, _ = abs_bounds(p)
-        bound = hs.gamma(p.size + p.n_f + 20) * (coef_abs @ np.abs(vec) + np.abs(rhs)) + hs.U * np.abs(r_ex)
+        bound = hs.gamma(p.size + 2 * p.n_f + 34) * (coef_abs @ np.abs(vec) + np.abs(rhs)) + hs.U * np.abs(r_ex)
         assert np.all(np.abs(r_fl - r_ex) <= bound)
 
 
@@ -228,3 +233,103 @@ def test_input_checks():
         hs.HalfStep(1.0, 10, 1.0, 10, "Y", np.ones((5, 1)))
     with pytest.raises(ValueError):
         hs.HalfStep(1.0, 10, 1.0, 10, "Y", np.ones((9, 4)))
+
+
+# --- review 57d3194: I-1 (error_bound), I-2 (certificate), I-4 (n >= 3), directed rounding ---------------------------
+
+def exact_spd(M) -> bool:
+    """Exact LDL^T (rational Gaussian elimination without pivoting): all pivots > 0 <=> M symmetric positive definite."""
+    A = [row[:] for row in M]
+    n = len(A)
+    for k in range(n):
+        if A[k][k] <= 0:
+            return False
+        for i in range(k + 1, n):
+            f = A[i][k] / A[k][k]
+            if f:
+                for j in range(k, n):
+                    A[i][j] -= f * A[k][j]
+    return True
+
+
+def test_float_up_and_down_are_directed():
+    for x in (Fraction(1, 10), Fraction(2, 3), Fraction(10**400, 3**700), Fraction(1, 10**320), Fraction(5)):
+        up, down = hs._float_up(x), hs._float_down(x)
+        assert Fraction(down) <= x <= Fraction(up)
+        assert Fraction(math_nextafter(up, -1.0)) < x or Fraction(up) == x
+        assert Fraction(math_nextafter(down, 2.0 * abs(down) + 1.0)) > x or Fraction(down) == x
+    assert hs._float_up(Fraction(10**400)) == float("inf")
+    assert hs._float_up(Fraction(1, 10**400)) == 5e-324  # positive, never 0
+
+
+def math_nextafter(x, toward):
+    import math
+    return math.nextafter(x, toward)
+
+
+@pytest.mark.parametrize("q", [1e-200, 1e-160, 1.0, 1e150])
+def test_error_bound_is_never_below_the_exact_residual_bound(q):
+    """I-1: (bound lambda_low)^2 >= ||r||_2^2 checked exactly; q = 1e-200 (underflow of r^2) and 1e-160 (subnormal squares)."""
+    p = hs.HalfStep(1.0, 10, 1.7, 14, "Y", hs.start_set(10, 1), q=q)
+    low = hs.certify_lambda_min(p, float(np.linalg.eigvalsh(hs.coefficient_system(p)[0])[0]) / 2)
+    s = np.zeros(p.size)
+    b = hs.error_bound(p, s, low)
+    rr = sum(x * x for x in hs.residual_exact(p, s))
+    assert rr > 0 and b > 0
+    assert (Fraction(b) * Fraction(low)) ** 2 >= rr
+
+
+def test_error_bound_zero_residual_invalid_lambda_and_overflow():
+    p = hs.HalfStep(1.0, 10, 1.7, 14, "Y", hs.start_set(10, 1), q=0.0)
+    assert hs.error_bound(p, np.zeros(p.size), 1.0) == 0.0  # F = 0, s = 0: zero residual
+    for bad in (0.0, -1.0, float("nan"), float("inf"), None, True):
+        with pytest.raises(ValueError):
+            hs.error_bound(p, np.zeros(p.size), bad)
+    big = hs.HalfStep(1.0, 10, 1.7, 14, "Y", hs.start_set(10, 1), q=1e300)
+    assert hs.error_bound(big, np.zeros(big.size), 5e-324) == float("inf")  # beyond the double range: conservative
+
+
+@pytest.mark.parametrize("N, n_s", [(1, 6), (2, 5), (3, 4), (2, 6)])
+def test_certificate_is_confirmed_by_an_independent_exact_ldlt(N, n_s):
+    """I-2: K - lambda_low I of the exact system is positive definite (exact rational LDL^T), so lambda_min(K) > lambda_low."""
+    p = hs.HalfStep(1.0, 8, 1.3, n_s, "Y", hs.start_set(8, N))
+    K = exact_dense(p)
+    lam = float(np.linalg.eigvalsh(np.array([[float(v) for v in row] for row in K]))[0])
+    for tau in (lam / 2, lam * (1 - 1e-9)):
+        low = hs.certify_lambda_min(p, tau)
+        assert low is not None and 0 < low <= tau
+        shifted = [[K[i][j] - (Fraction(low) if i == j else 0) for j in range(len(K))] for i in range(len(K))]
+        assert exact_spd(shifted)
+
+
+def test_certificate_refuses_what_it_cannot_prove():
+    p = hs.HalfStep(1.0, 8, 1.3, 6, "Y", hs.start_set(8, 2))
+    lam = float(np.linalg.eigvalsh(hs.coefficient_system(p)[0])[0])
+    assert hs.certify_lambda_min(p, 2 * lam) is None  # K - tau I indefinite: factorization fails
+    for bad in (0.0, -1.0, float("nan"), float("inf")):
+        assert hs.certify_lambda_min(p, bad) is None
+    assert hs.certify_lambda_min(p, 5e-324) is None  # bound not a positive normal double
+
+
+@pytest.mark.parametrize("nx, ny, direction", [(2, 8, "Y"), (8, 2, "Y"), (2, 8, "X"), (8, 2, "X")])
+def test_one_interior_node_is_rejected(nx, ny, direction):
+    """I-4: n_f = 2 or n_s = 2 is refused before any matrix is built."""
+    n_f = nx if direction == "Y" else ny
+    with pytest.raises(ValueError):
+        hs.HalfStep(1.0, nx, 1.0, ny, direction, np.ones((n_f - 1, 1)))
+
+
+@pytest.mark.parametrize("n", [3, 4, 5, 6])
+def test_exact_d4_stencil_equals_l2_plus_e2(n):
+    """For n >= 3 the stencil of R-HP (rows (7, -4, 1)) is exactly D4 = L^2 + (2/h^4)(e_1 e_1^T + e_{n-1} e_{n-1}^T)."""
+    h = Fraction(1, n)
+    m = n - 1
+    L = [[Fraction(-2 if i == j else 1 if abs(i - j) == 1 else 0) / h**2 for j in range(m)] for i in range(m)]
+    D4 = [[sum(L[i][k] * L[k][j] for k in range(m)) for j in range(m)] for i in range(m)]
+    D4[0][0] += 2 / h**4
+    D4[m - 1][m - 1] += 2 / h**4
+    for j in range(m):
+        e = [Fraction(int(i == j)) for i in range(m)]
+        assert hs._apply_D4_exact(e, h**4) == [D4[i][j] for i in range(m)]
+    p = hs.HalfStep(1.0, n, 1.0, n, "Y", hs.start_set(n, 1))  # n_f = n_s = n >= 3 is admissible
+    assert p.size == n - 1

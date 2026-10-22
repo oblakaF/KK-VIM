@@ -23,11 +23,19 @@ Three independent computational paths (PL 2.1):
 - **R-HP** (``residual_exact``): F (x) 1 - K vec(S) in exact rational arithmetic (fractions), coefficients from the given floats,
   D4 applied node by node by its stencil with the (7, -4, 1) boundary rows, no modal transformation (NS 5, "Control").
 
-A posteriori bound (QA, level B): with lambda_low <= lambda_min(K) certified by a Cholesky factorization of K - tau I in decimal
-arithmetic (50 digits, backward error bounded below) and the exact residual r of an approximate solution s^,
-    ||s^ - s*||_2 <= ||r||_2 / lambda_low        (K SPD, s* the exact solution of the system with the exact coefficients).
-This is a strict bound for the given set (no tolerance is introduced); it needs an independent given set (exact rank N), otherwise
-the system is singular and no bound exists (status, not a regularization).
+A posteriori bound (QA, level B; review 57d3194, I-1...I-4). Preconditions: K is the matrix of the EXACT system built from the
+input doubles (exact coefficients, D4 = L^2 + E_2 with n_f, n_s >= 3), s* its exact solution, s^ any double vector.
+1. ``certify_lambda_min``: a Cholesky factor R^ of K - t I (t the exact double tau) computed in decimal arithmetic with any rounding;
+   the defect E = R^T R^ - (K - t I) is then computed EXACTLY in rational arithmetic. R^ upper triangular with a positive diagonal
+   gives R^T R^ > 0, hence lambda_min(K - t I) > -||E||_2 >= -||E||_inf and lambda_min(K) > t - ||E||_inf (exact rational number),
+   converted to double downwards. No a priori rounding model is used; a failed factorization, a non-positive or subnormal bound
+   gives None (no certificate).
+2. ``error_bound``: ||s^ - s*||_2 = ||K^-1 r||_2 <= ||r||_2 / lambda_low, r the exact residual (R-HP); ||r||_2 = m sqrt(rho) with
+   m = max|r_i| and rho = sum (r_i/m)^2 exact, sqrt(rho) bounded above by an integer square root, the result converted to double
+   upwards (math.inf on overflow).
+The bound is a bound for the SET S of the half-step (vector of unknowns), not for the field W = G S^T: for the field add the factor
+||G||_2 and the rounding of the product (QA report, section 4). It needs an independent given set (exact rank N), otherwise the
+system is singular and no bound exists (status, not a regularization).
 """
 
 import math
@@ -70,6 +78,10 @@ class HalfStep:
             raise ValueError(f"given set must be (n_f - 1) x N, N = 1..3, got {g.shape}")
         if not np.all(np.isfinite(g)):
             raise ValueError("given set must be finite")
+        for name in ("nx", "ny"):  # I-4: with one interior node both corner terms of D4 fall on one row (8/h^4, not 7/h^4)
+            v = getattr(self, name)
+            if isinstance(v, bool) or not isinstance(v, (int, np.integer)) or v < 3:
+                raise ValueError(f"{name} must be an integer >= 3 (at least two interior nodes), got {v!r}")
         object.__setattr__(self, "given", g)
 
     @property
@@ -265,46 +277,96 @@ def _exact_band_matrix(hs: HalfStep, coeffs):
     return entries
 
 
+def _float_down(x: Fraction) -> float:
+    """Largest double <= x (x finite, representable range)."""
+    f = float(x)
+    while Fraction(f) > x:
+        f = math.nextafter(f, -math.inf)
+    return f
+
+
+def _float_up(x: Fraction) -> float:
+    """Smallest double >= x; math.inf if x exceeds the largest double."""
+    try:
+        f = float(x)
+    except OverflowError:
+        return math.inf
+    while math.isfinite(f) and Fraction(f) < x:
+        f = math.nextafter(f, math.inf)
+    return f
+
+
 def certify_lambda_min(hs: HalfStep, tau: float, coeffs=None, digits: int = 50) -> float | None:
-    """Lower bound of lambda_min(K) of the exact system: Cholesky of K - tau I (banded, node-term ordering) in decimal with
-    ``digits`` digits. Success means K - tau I + E is SPD with |E| below the backward error of the decimal Cholesky
-    (bounded by (p + 2) 10^(1 - digits) |R^T||R|, p the half bandwidth, plus the conversion of the entries), hence
-    lambda_min(K) >= tau - ||E||_2. Returns that bound, or None if the factorization fails (no certificate)."""
+    """Certified lower bound of lambda_min(K) of the exact system (I-2, review 57d3194).
+
+    t = Fraction(tau) exactly; M = K - t I exactly (node-term band, half bandwidth p = 3N - 1); a banded Cholesky factor R^ of M is
+    computed in decimal arithmetic (``digits`` digits, any rounding); the defect E = R^T R^ - M is computed exactly (fractions).
+    R^ upper triangular with a positive diagonal => R^T R^ > 0 => lambda_min(K) > t - ||E||_inf. Returns the largest double not above
+    t - ||E||_inf, or None if tau is not finite and positive, the factorization fails, or the bound is not a positive normal double."""
+    if not (isinstance(tau, (int, float)) and math.isfinite(tau) and tau > 0):
+        return None
     coeffs = coeffs or exact_coefficients(hs)
     entries = _exact_band_matrix(hs, coeffs)
     n = hs.size
     p = 3 * hs.N - 1
+    t = Fraction(float(tau))
+    M = dict(entries)
+    for i in range(n):
+        M[(i, i)] = M.get((i, i), Fraction(0)) - t
+    R = {}
     with localcontext() as ctx:
         ctx.prec = digits
-        a = {key: Decimal(v.numerator) / Decimal(v.denominator) for key, v in entries.items()}
-        t = Decimal(repr(float(tau)))
-        R = {}
+        a = {key: Decimal(v.numerator) / Decimal(v.denominator) for key, v in M.items()}
         for i in range(n):
-            s = a.get((i, i), Decimal(0)) - t - sum(R[(k, i)] ** 2 for k in range(max(0, i - p), i) if (k, i) in R)
+            s = a.get((i, i), Decimal(0)) - sum(R[(k, i)] * R[(k, i)] for k in range(max(0, i - p), i) if (k, i) in R)
             if s <= 0:
                 return None
             rii = s.sqrt()
+            if rii <= 0:
+                return None
             R[(i, i)] = rii
             for j in range(i + 1, min(n, i + p + 1)):
                 s = a.get((i, j), Decimal(0)) - sum(R[(k, i)] * R[(k, j)] for k in range(max(0, j - p), i)
                                                     if (k, i) in R and (k, j) in R)
                 if s != 0:
                     R[(i, j)] = s / rii
-        absrr = max(sum(abs(R.get((k, i), Decimal(0))) * abs(R.get((k, j), Decimal(0)))
-                        for k in range(max(0, i - p), i + 1))
-                    for i in range(n) for j in range(i, min(n, i + p + 1)))
-        amax = max(abs(v) for v in a.values())
-        unit = Decimal(10) ** (1 - digits)
-        err_entry = (p + 2) * unit * absrr + unit * amax  # Cholesky backward error + conversion, per entry
-        err_norm = (2 * p + 1) * err_entry  # ||E||_2 <= max row sum of a banded matrix
-        return float(t - err_norm) if t > err_norm else None
+    Rf = {key: Fraction(v) for key, v in R.items()}  # exact values of the decimal entries
+    row_sum = [Fraction(0)] * n
+    for i in range(n):
+        for j in range(i, min(n, i + p + 1)):
+            prod = sum((Rf[(k, i)] * Rf[(k, j)] for k in range(max(0, j - p), i + 1) if (k, i) in Rf and (k, j) in Rf),
+                       Fraction(0))
+            e = abs(prod - M.get((i, j), Fraction(0)))
+            row_sum[i] += e
+            if j != i:
+                row_sum[j] += e
+    low = t - max(row_sum)  # exact: lambda_min(K) > low
+    if low <= 0:
+        return None
+    f = _float_down(low)
+    if not (math.isfinite(f) and f >= 2.2250738585072014e-308):  # zero or subnormal: no certificate
+        return None
+    return f
 
 
 def error_bound(hs: HalfStep, s, lambda_low: float, coeffs=None) -> float:
-    """||s - s*||_2 <= ||r||_2 / lambda_low with the exact residual (rounded upwards)."""
+    """Upper bound of ||s - s*||_2 = ||K^-1 r||_2 <= ||r||_2 / lambda_low (I-1, review 57d3194).
+
+    r is the exact residual (R-HP). ||r||_2 = m sqrt(rho), m = max|r_i|, rho = sum (r_i/m)^2 in [1, len(r)] exactly;
+    sqrt(rho) <= (isqrt(P Q 4^k) + 1)/(Q 2^k) for rho = P/Q; the exact rational bound is converted to double upwards
+    (math.inf on overflow). Zero residual gives 0.0. ``lambda_low`` must be a finite positive double."""
+    if isinstance(lambda_low, bool) or not isinstance(lambda_low, (int, float)) or not math.isfinite(lambda_low) \
+            or lambda_low <= 0:
+        raise ValueError(f"lambda_low must be a finite positive number, got {lambda_low!r}")
     r = residual_exact(hs, s, coeffs)
-    rr = sum(x * x for x in r)
-    return math.sqrt(float(rr)) * (1 + 4 * U) / lambda_low
+    m = max((abs(x) for x in r), default=Fraction(0))
+    if m == 0:
+        return 0.0
+    rho = sum(((x / m) ** 2 for x in r), Fraction(0))
+    P, Q = rho.numerator, rho.denominator
+    k = 64
+    sqrt_up = Fraction(math.isqrt(P * Q * 4**k) + 1, Q * 2**k)  # >= sqrt(P/Q): isqrt(z) + 1 > sqrt(z)
+    return _float_up(m * sqrt_up / Fraction(float(lambda_low)))
 
 
 # --- solvers --------------------------------------------------------------------------------------------------------

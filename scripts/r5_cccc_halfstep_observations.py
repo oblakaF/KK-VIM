@@ -2,10 +2,11 @@
 
 Runs only kkvim_reference (no kkvim). Writes docs/results/r5_cccc_halfstep/ (or --out):
 - chain.csv        N = 1, 2, 3, both directions, h_x = h_y, n_f x n_s up to 256 x 512: cond(A), cond(K), certified lambda_low,
-                   strict a posteriori bounds ||s - s*||_2 / ||s||_2 of the unrefined and the refined R-AC solution, the last refinement
+                   a posteriori bounds of the SET S, ||s - s*||_2 / ||s||_2 (certificate by the exact defect, review 57d3194), of
+                   the unrefined and the refined R-AC solution, the ratio bound / (cond(K) u), the last refinement
                    correction (estimate), eta_QA (NS 5) of both, R-H against R-AC where the dense R-H is affordable (n <= 32);
 - ill_conditioned.csv  near-dependent given sets G_2 = G_1 + eps G_2 (no QR): cond(A), certification, field difference R-H / R-AC;
-- meta.json.
+- meta.json; the first edition is kept in history_b72515b/ (review 57d3194).
 
     uv run python scripts/r5_cccc_halfstep_observations.py          # about 1 min on the QA machine
 """
@@ -57,6 +58,8 @@ def chain_rows():
                        "cond_A": d["cond_A"], "cond_K": d["cond_K"], "lambda_low_certified": low,
                        "bound_unrefined_rel": None if low is None else hs.error_bound(p, ac.s_unrefined, low, coeffs) / norm_s,
                        "bound_refined_rel": None if low is None else hs.error_bound(p, ac.s, low, coeffs) / norm_s,
+                       "bound_refined_over_condK_u": None if low is None else
+                       hs.error_bound(p, ac.s, low, coeffs) / norm_s / (d["cond_K"] * hs.U),
                        "e_AC_rel_estimate": ac.e_AC / float(np.max(np.abs(ac.s))), "refinement_steps": len(ac.corrections),
                        "eta_unrefined": hs.eta_qa(p, ac.s_unrefined, coeffs), "eta_refined": hs.eta_qa(p, ac.s, coeffs)}
                 if n_f <= 32 and n_s <= 32:
@@ -82,9 +85,11 @@ def ill_rows():
         d = hs.diagnostics(p)
         (status_h, s_h), ac = hs.solve_hessian(p), hs.solve_ac(p)
         both = s_h is not None and ac.s is not None
-        low = hs.certify_lambda_min(p, d["lambda_min_K_float"] / 2) if d["lambda_min_K_float"] > 0 else None
+        run_cert = d["lambda_min_K_float"] > 0
+        low = hs.certify_lambda_min(p, d["lambda_min_K_float"] / 2) if run_cert else None
+        cert = ("certified" if low is not None else "not certified (factorization of K - tau I failed)") if run_cert else             "not run: computed lambda_min(K) in double <= 0 (the exact K is SPD: independent set)"
         row = {"eps": eps, "set_status": d["status"], "RH_status": status_h, "RAC_status": ac.status, "cond_A": d["cond_A"],
-               "cond_K": d["cond_K"], "certified": low is not None,
+               "cond_K": d["cond_K"], "certificate": cert,
                "bound_refined_rel": None if (low is None or ac.s is None) else
                hs.error_bound(p, ac.s, low) / float(np.linalg.norm(ac.s)),
                "field_RH_minus_RAC_rel": None, "set_RH_minus_RAC_rel": None,
