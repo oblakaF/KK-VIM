@@ -3,12 +3,13 @@
 Criteria used here, no tolerance is introduced:
 - exact rational identities (coefficients, scaling, symmetry, exact rank);
 - the standard rounding bound of floating-point dot products and products: |fl - exact| <= gamma_m |terms|, gamma_m = m u/(1 - m u),
-  with the operation count m written below for each path (R-2, review 57d3194). Coefficient path, element of K:
-  h_f (1 rounding); h**k by pow (counted as 2u); L entries (pow + division: 3); D4 = L L + corner (3-term dot of L entries and the
-  corner 2/h**4: <= 10); D4 G (5-term dot: + 5 -> 15); G^T(.) of length n_f - 1 and the factor h (-> n_f + 16); the same for A, B
-  with fewer operations; Kronecker product with the operator entries of the solve grid (<= 10 for D4_s, + 1); the sum of the three
-  terms (+ 2) and the factor D (+ 1): m <= n_f + 21 (Reviewer: about n_f + 19...21). The tests use the conservative gamma(2 n_f + 32),
-  as for the R-H path gamma(2 m_1 + 32) (m_1 the length of the dense products);
+  with the operation count m written below for each path (R-2, review 57d3194; M-3, review 4f92c82). Coefficient path, element
+  of K, counted as factors (1 + delta)^(+-1) against the exact h = l/n: h_f = fl(l_f/n_f) (1); L = (...)/h_f**2: the error of h_f
+  twice, pow counted as 2u, the division (2 + 2 + 1 = 5); L L, 3 terms (5 + 5 + 1 + 2 = 13); the corner 2/h_f**4 (4 + 2 + 1 = 7)
+  and its addition (14); D4_f G, 5 terms (14 + 1 + 4 = 19); G^T(.) of length n_f - 1 (+ 1 + (n_f - 2) = n_f + 18); the factor h_f
+  (+ 2 = n_f + 20, the term C; A and B need fewer); the two sums of the three Kronecker terms and the factor D: m <= n_f + 23.
+  The tests use the conservative gamma(2 n_f + 32) >= gamma(n_f + 23) (n_f >= 1), as for the R-H path gamma(2 m_1 + 32)
+  (m_1 the length of the dense products). Assumption: pow with the exponents 2 and 4 errs by at most 1 ulp;
 - the strict a posteriori bound ||s - s*||_2 <= ||r||_2 / lambda_low with the exact residual (R-HP) and lambda_low certified by the
   EXACT defect of a decimal Cholesky factor of K - tau I (module docstring; I-1, I-2), for n_f, n_s >= 3 (I-4).
 Results without such a bound are reported (OBSERVATION), not asserted.
@@ -333,3 +334,225 @@ def test_exact_d4_stencil_equals_l2_plus_e2(n):
         assert hs._apply_D4_exact(e, h**4) == [D4[i][j] for i in range(m)]
     p = hs.HalfStep(1.0, n, 1.0, n, "Y", hs.start_set(n, 1))  # n_f = n_s = n >= 3 is admissible
     assert p.size == n - 1
+
+
+# --- review 4f92c82: R-4 (relative bounds, directed printing), M-1 (float lambda_low), M-4 (exact K) -------------------
+
+def _mm(X, Y):
+    return [[sum(X[i][k] * Y[k][j] for k in range(len(Y))) for j in range(len(Y[0]))] for i in range(len(X))]
+
+
+def _L_def(n, h):
+    return [[Fraction(-2 if i == j else 1 if abs(i - j) == 1 else 0) / h**2 for j in range(n - 1)] for i in range(n - 1)]
+
+
+def _D4_def(n, h):
+    D4 = _mm(_L_def(n, h), _L_def(n, h))
+    D4[0][0] += 2 / h**4
+    D4[n - 2][n - 2] += 2 / h**4
+    return D4
+
+
+def own_exact_system(p):
+    """K = D[A (x) D4_s - 2 B (x) L_s + C (x) I] and F (x) 1 from the definitions (NS 4.2-4.3), dense, term-first, exact;
+    D4 = L^2 + E_2 as a matrix product. Independent of the module's exact path (stencils, band)."""
+    hf, hsol = Fraction(p.l_f) / p.n_f, Fraction(p.l_s) / p.n_s
+    G = [[Fraction(float(v)) for v in row] for row in p.given]
+    GT = [list(c) for c in zip(*G)]
+    A = [[hf * v for v in row] for row in _mm(GT, G)]
+    B = [[-hf * v for v in row] for row in _mm(GT, _mm(_L_def(p.n_f, hf), G))]
+    C = [[hf * v for v in row] for row in _mm(GT, _mm(_D4_def(p.n_f, hf), G))]
+    D4s, Ls = _D4_def(p.n_s, hsol), _L_def(p.n_s, hsol)
+    m, N, D = p.n_s - 1, p.N, Fraction(p.D)
+    K = [[Fraction(0)] * (N * m) for _ in range(N * m)]
+    for i in range(N):
+        for k in range(N):
+            for a in range(m):
+                for b in range(m):
+                    K[i * m + a][k * m + b] = D * (A[i][k] * D4s[a][b] - 2 * B[i][k] * Ls[a][b] + C[i][k] * (a == b))
+    F = [Fraction(p.q) * hf * sum(G[r][i] for r in range(len(G))) for i in range(N)]
+    return K, [F[i] for i in range(N) for _ in range(m)]
+
+
+def exact_solve(K, f):
+    """Exact solution of K x = f (rational Gaussian elimination with row pivoting on nonzero entries)."""
+    n = len(K)
+    M = [K[i][:] + [f[i]] for i in range(n)]
+    for c in range(n):
+        piv = next(r for r in range(c, n) if M[r][c] != 0)
+        M[c], M[piv] = M[piv], M[c]
+        for r in range(c + 1, n):
+            if M[r][c]:
+                g = M[r][c] / M[c][c]
+                M[r] = [a - g * b for a, b in zip(M[r], M[c])]
+    x = [Fraction(0)] * n
+    for i in reversed(range(n)):
+        x[i] = (M[i][n] - sum(M[i][j] * x[j] for j in range(i + 1, n))) / M[i][i]
+    return x
+
+
+def norm2_sq(v):
+    return sum((Fraction(float(x)) ** 2 for x in v), Fraction(0))
+
+
+M4_CASES = [(1.0, 8, 1.3, 6, "Y", 1, False), (1.0, 7, 0.6, 5, "X", 2, True), (0.9, 6, 1.1, 5, "Y", 3, False),
+            (1.0, 3, 1.0, 3, "Y", 1, False), (1.0, 3, 1.0, 4, "X", 2, True), (1.0, 6, 0.8, 9, "X", 3, True)]
+
+
+@pytest.mark.parametrize("lx, nx, ly, ny, direction, N, random_set", M4_CASES)
+def test_exact_K_from_definitions_band_and_rhp_operator_are_identical(lx, nx, ly, ny, direction, N, random_set):
+    """M-4: the certificate (band) and the bound (R-HP residual) refer to the same exact K, equal to K from the definitions."""
+    n_f = nx if direction == "Y" else ny
+    G = np.random.default_rng(nx * 100 + ny * 10 + N).standard_normal((n_f - 1, N)) if random_set else hs.start_set(n_f, N)
+    p = hs.HalfStep(lx, nx, ly, ny, direction, G, D=1.7, q=0.3)
+    K, f = own_exact_system(p)
+    assert exact_dense(p) == K
+    r0 = hs.residual_exact(p, np.zeros(p.size))
+    assert r0 == f
+    for c in range(p.size):
+        e = np.zeros(p.size)
+        e[c] = 1.0
+        assert [a - b for a, b in zip(r0, hs.residual_exact(p, e))] == [K[i][c] for i in range(p.size)]
+
+
+@pytest.mark.parametrize("case", ["refined", "unrefined", "half", "large_error", "zero"])
+def test_relative_bounds_against_the_exact_solution(case):
+    """R-4: with s* solved exactly, ||s^ - s*||^2 <= b^2, <= to_computed^2 ||s^||^2 and <= to_exact^2 ||s*||^2 (exact)."""
+    p = hs.HalfStep(1.0, 7, 1.3, 8, "Y", hs.start_set(7, 2))
+    K, f = own_exact_system(p)
+    s_star = exact_solve(K, f)
+    ac = hs.solve_ac(p)
+    e0 = np.zeros(p.size)
+    e0[0] = 1.0
+    s = {"refined": ac.s, "unrefined": ac.s_unrefined, "half": 0.5 * ac.s,
+         "large_error": ac.s + 4.0 * float(np.linalg.norm(ac.s)) * e0, "zero": np.zeros(p.size)}[case]
+    low = hs.certify_lambda_min(p, float(np.linalg.eigvalsh(hs.coefficient_system(p)[0])[0]) / 2)
+    b = hs.error_bound(p, s, low)
+    rel = hs.relative_bounds(b, s)
+    err2 = sum(((Fraction(float(x)) - y) ** 2 for x, y in zip(s, s_star)), Fraction(0))
+    L, B = hs.norm_lower(s), Fraction(b)
+    assert err2 <= B * B
+    assert 0 <= L and L * L <= norm2_sq(s)
+    if case == "zero":
+        assert rel == hs.RelativeBounds(None, None)  # L = 0: UNRESOLVED
+        return
+    assert err2 <= Fraction(rel.to_computed) ** 2 * norm2_sq(s)
+    if case in ("refined", "unrefined"):
+        assert rel.to_exact is not None and L > B
+        assert err2 <= Fraction(rel.to_exact) ** 2 * sum(y * y for y in s_star)
+    else:
+        assert rel.to_exact is None and L <= B  # large error: L <= b, no bound relative to s*
+
+
+def test_relative_bounds_ill_conditioned_set_eps_1e6():
+    """R-4: eps = 1e-6 (cond(K) ~ 7e15): exact checks without s*: to_computed ||s^|| >= b, to_exact (||s^|| - b) >= b."""
+    G = hs.start_set(32, 2)
+    G[:, 1] = G[:, 0] + 1e-6 * G[:, 1]
+    p = hs.HalfStep(1.0, 32, 1.0, 32, "Y", G)
+    ac = hs.solve_ac(p)
+    low = hs.certify_lambda_min(p, hs.diagnostics(p)["lambda_min_K_float"] / 2)
+    b = hs.error_bound(p, ac.s, low)
+    rel = hs.relative_bounds(b, ac.s)
+    B, sh2 = Fraction(b), norm2_sq(ac.s)
+    tc, te = Fraction(rel.to_computed), Fraction(rel.to_exact)
+    assert tc * tc * sh2 >= B * B
+    assert te * te * sh2 >= (B * (1 + te)) ** 2  # te ||s^|| >= b (1 + te)  <=>  te (||s^|| - b) >= b
+    assert te > tc  # relative to s* the bound is larger (Reviewer 4f92c82: 0.241 against 0.194)
+
+
+def test_relative_bounds_at_q_1e_200():
+    """R-4: the squares of the set underflow in double (q = 1e-200), the exact L stays positive and the bounds valid."""
+    p = hs.HalfStep(1.0, 10, 1.7, 14, "Y", hs.start_set(10, 2), q=1e-200)
+    ac = hs.solve_ac(p)
+    assert float(np.sum(ac.s * ac.s)) == 0.0  # the danger: a float sum of squares is 0
+    low = hs.certify_lambda_min(p, float(np.linalg.eigvalsh(hs.coefficient_system(p)[0])[0]) / 2)
+    b = hs.error_bound(p, ac.s, low)
+    rel = hs.relative_bounds(b, ac.s)
+    B, sh2 = Fraction(b), norm2_sq(ac.s)
+    assert b > 0 and hs.norm_lower(ac.s) > B
+    tc, te = Fraction(rel.to_computed), Fraction(rel.to_exact)
+    assert tc * tc * sh2 >= B * B and te * te * sh2 >= (B * (1 + te)) ** 2
+
+
+def test_relative_bounds_input_checks():
+    s = np.ones(4)
+    for bad in (-1.0, float("nan"), 1, None, True):
+        with pytest.raises(ValueError):
+            hs.relative_bounds(bad, s)
+    with pytest.raises(ValueError):
+        hs.relative_bounds(1.0, np.array([1.0, float("nan")]))
+    assert hs.relative_bounds(float("inf"), s) == hs.RelativeBounds(None, None)  # no finite bound: UNRESOLVED
+    assert hs.relative_bounds(0.0, s) == hs.RelativeBounds(0.0, 0.0)
+    assert hs.relative_bounds(2.0, s) == hs.RelativeBounds(1.0, None)  # ||s|| = 2 = L <= b: no bound relative to s*
+    assert hs.relative_bounds(1.0, s) == hs.RelativeBounds(0.5, 1.0)  # exact: 1/2 and 1/(2 - 1)
+
+
+def test_norm_lower_is_a_lower_bound_and_tight():
+    rng = np.random.default_rng(7)
+    for v in (rng.standard_normal(50), rng.standard_normal(50) * 1e-200, np.array([3.0, 4.0]), np.array([5e-324]),
+              np.array([1e300, 1e300])):
+        L, ss = hs.norm_lower(v), norm2_sq(v)
+        assert L * L <= ss < (L * (1 + Fraction(1, 2**60))) ** 2
+    assert hs.norm_lower(np.zeros(3)) == 0 and hs.norm_lower(np.array([3.0, 4.0])) == 5
+
+
+@pytest.mark.parametrize("x", [1 / 3, 0.1, 2.5e-202, 5e-324, 1.7976931348623157e308, 1.0, 0.5, 123456789.0, -0.1, 0.0,
+                               4.248773e-14, 2.433941e2])
+def test_decimal_printing_is_directed(x):
+    """R-4: decimal_up >= x >= decimal_down exactly, both with 7 significant digits and at most one unit apart."""
+    from decimal import Decimal
+    up, down = hs.decimal_up(x), hs.decimal_down(x)
+    U_, D_ = Fraction(Decimal(up)), Fraction(Decimal(down))
+    assert D_ <= Fraction(x) <= U_
+    if x != 0:
+        unit = Fraction(10) ** (Decimal(down if x > 0 else up).adjusted() - 6)
+        assert U_ - D_ <= unit
+        if Fraction(Decimal(f"{x:.6e}")) == Fraction(x):  # x has 7 significant digits exactly
+            assert U_ == D_ == Fraction(x)
+
+
+def test_decimal_printing_special_values():
+    assert hs.decimal_up(float("inf")) == "inf" and hs.decimal_down(0.0) == "0.000000e+00"
+    with pytest.raises(ValueError):
+        hs.decimal_up(1)
+
+
+def test_committed_csv_prints_certified_values_conservatively():
+    """R-4: in the committed CSV every printed certified value is on the safe side of its exact double (*_hex)."""
+    import csv
+    import json
+    from decimal import Decimal
+    from pathlib import Path
+    base = Path(__file__).resolve().parents[2] / "docs" / "results" / "r5_cccc_halfstep"
+    for name in ("chain.csv", "ill_conditioned.csv"):
+        rows = list(csv.DictReader(open(base / name, encoding="utf-8")))
+        assert rows
+        for row in rows:
+            for key, hx in row.items():
+                if not key.endswith("_hex"):
+                    continue
+                prefix = key[:-4]
+                side = "down" if prefix == "lambda_low" else "up"
+                text = row[f"{prefix}_{side}"]
+                if hx == "":  # not computed (dense R-H only for n <= 32)
+                    assert text == ""
+                    continue
+                if hx == "UNRESOLVED":
+                    assert text == "UNRESOLVED"
+                    continue
+                exact, printed = Fraction(float.fromhex(hx)), Fraction(Decimal(text))
+                assert printed <= exact if side == "down" else printed >= exact
+            for tag in ("unrefined", "refined", "RH"):
+                c, e = row.get(f"rel_to_computed_{tag}_hex"), row.get(f"rel_to_exact_{tag}_hex")
+                if c not in (None, "", "UNRESOLVED") and e not in (None, "", "UNRESOLVED"):
+                    assert float.fromhex(e) >= float.fromhex(c)  # b/(L - b) >= b/L
+    assert "columns" in json.loads((base / "meta.json").read_text(encoding="utf-8"))
+
+
+def test_error_bound_accepts_only_a_float_lambda_low():
+    """M-1: an int (e.g. 2^53 + 3, not representable) is refused; numpy float64 is a float."""
+    p = hs.HalfStep(1.0, 10, 1.7, 14, "Y", hs.start_set(10, 1))
+    for bad in (1, 2**53 + 3, 10**400):
+        with pytest.raises(ValueError):
+            hs.error_bound(p, np.zeros(p.size), bad)
+    assert hs.error_bound(p, np.zeros(p.size), np.float64(1.0)) > 0

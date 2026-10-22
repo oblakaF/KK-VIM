@@ -33,6 +33,10 @@ input doubles (exact coefficients, D4 = L^2 + E_2 with n_f, n_s >= 3), s* its ex
 2. ``error_bound``: ||s^ - s*||_2 = ||K^-1 r||_2 <= ||r||_2 / lambda_low, r the exact residual (R-HP); ||r||_2 = m sqrt(rho) with
    m = max|r_i| and rho = sum (r_i/m)^2 exact, sqrt(rho) bounded above by an integer square root, the result converted to double
    upwards (math.inf on overflow).
+3. ``relative_bounds`` (R-4, review 4f92c82): L = ``norm_lower(s^)`` <= ||s^||_2 from the exact sum of squares (integer square
+   root downwards); b/L >= ||s^ - s*||_2/||s^||_2 if L > 0, and b/(L - b) >= ||s^ - s*||_2/||s*||_2 if L > b (since
+   ||s*||_2 >= ||s^||_2 - b >= L - b > 0); exact quotients converted upwards, otherwise None (UNRESOLVED).
+4. Printing: ``decimal_up`` / ``decimal_down`` give decimal strings rounded only upwards / downwards from the exact double.
 The bound is a bound for the SET S of the half-step (vector of unknowns), not for the field W = G S^T: for the field add the factor
 ||G||_2 and the rounding of the product (QA report, section 4). It needs an independent given set (exact rank N), otherwise the
 system is singular and no bound exists (status, not a regularization).
@@ -40,7 +44,7 @@ system is singular and no bound exists (status, not a regularization).
 
 import math
 from dataclasses import dataclass, field
-from decimal import Decimal, getcontext, localcontext
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, getcontext, localcontext
 from fractions import Fraction
 
 import numpy as np
@@ -354,10 +358,10 @@ def error_bound(hs: HalfStep, s, lambda_low: float, coeffs=None) -> float:
 
     r is the exact residual (R-HP). ||r||_2 = m sqrt(rho), m = max|r_i|, rho = sum (r_i/m)^2 in [1, len(r)] exactly;
     sqrt(rho) <= (isqrt(P Q 4^k) + 1)/(Q 2^k) for rho = P/Q; the exact rational bound is converted to double upwards
-    (math.inf on overflow). Zero residual gives 0.0. ``lambda_low`` must be a finite positive double."""
-    if isinstance(lambda_low, bool) or not isinstance(lambda_low, (int, float)) or not math.isfinite(lambda_low) \
-            or lambda_low <= 0:
-        raise ValueError(f"lambda_low must be a finite positive number, got {lambda_low!r}")
+    (math.inf on overflow). Zero residual gives 0.0. ``lambda_low`` must be a finite positive float (M-1, review 4f92c82: an int
+    is refused, so that no int above 2^53 is rounded upwards on conversion)."""
+    if not isinstance(lambda_low, float) or not math.isfinite(lambda_low) or lambda_low <= 0:
+        raise ValueError(f"lambda_low must be a finite positive float, got {lambda_low!r}")
     r = residual_exact(hs, s, coeffs)
     m = max((abs(x) for x in r), default=Fraction(0))
     if m == 0:
@@ -366,7 +370,67 @@ def error_bound(hs: HalfStep, s, lambda_low: float, coeffs=None) -> float:
     P, Q = rho.numerator, rho.denominator
     k = 64
     sqrt_up = Fraction(math.isqrt(P * Q * 4**k) + 1, Q * 2**k)  # >= sqrt(P/Q): isqrt(z) + 1 > sqrt(z)
-    return _float_up(m * sqrt_up / Fraction(float(lambda_low)))
+    return _float_up(m * sqrt_up / Fraction(lambda_low))
+
+
+@dataclass(frozen=True)
+class RelativeBounds:
+    """Upper bounds of the relative error of the SET S (R-4, review 4f92c82); None means UNRESOLVED (condition not met)."""
+
+    to_computed: float | None  # >= ||s^ - s*||_2 / ||s^||_2, requires L > 0
+    to_exact: float | None  # >= ||s^ - s*||_2 / ||s*||_2, requires L > b
+
+
+def norm_lower(s) -> Fraction:
+    """Exact rational L <= ||s||_2 of a finite double vector: exact sum of squares P/Q, L = isqrt(P Q 4^k)/(Q 2^k) (0 for s = 0)."""
+    v = np.asarray(s, dtype=float).ravel()
+    if not np.all(np.isfinite(v)):
+        raise ValueError("s must be finite")
+    ss = sum((Fraction(float(x)) ** 2 for x in v), Fraction(0))
+    if ss == 0:
+        return Fraction(0)
+    P, Q = ss.numerator, ss.denominator
+    k = 64
+    return Fraction(math.isqrt(P * Q * 4**k), Q * 2**k)  # isqrt(z) <= sqrt(z), sqrt(P/Q) = sqrt(z)/(Q 2^k)
+
+
+def relative_bounds(b: float, s) -> RelativeBounds:
+    """Relative bounds of the set S from a certified absolute bound b >= ||s - s*||_2 (``error_bound``) and the computed set s.
+
+    L = norm_lower(s): to_computed = b/L if L > 0; to_exact = b/(L - b) if L > b, since ||s*||_2 >= ||s||_2 - b >= L - b > 0.
+    The exact quotients are converted to double upwards. b = inf (no finite bound) or a failed condition gives None (UNRESOLVED);
+    no number is substituted."""
+    if not isinstance(b, float) or math.isnan(b) or b < 0:
+        raise ValueError(f"b must be a non-negative float, got {b!r}")
+    L = norm_lower(s)
+    if math.isinf(b) or L == 0:
+        return RelativeBounds(None, None)
+    B = Fraction(b)
+    return RelativeBounds(_float_up(B / L), _float_up(B / (L - B)) if L > B else None)
+
+
+def _decimal_directed(x: float, digits: int, rounding: str) -> str:
+    if not isinstance(x, float):
+        raise ValueError(f"x must be a float, got {x!r}")
+    if not math.isfinite(x):
+        return repr(x)  # 'inf', '-inf', 'nan'
+    if x == 0:
+        return f"{0:.{digits - 1}e}"  # exact zero (Decimal would keep an exponent of the context)
+    with localcontext() as ctx:
+        ctx.prec = digits
+        ctx.rounding = rounding
+        d = ctx.plus(Decimal(x))  # Decimal(x) is the exact value of the double; one directed rounding to ``digits`` digits
+    return f"{d:.{digits - 1}e}"  # d has at most ``digits`` significant digits: formatting is exact
+
+
+def decimal_up(x: float, digits: int = 7) -> str:
+    """Decimal string with ``digits`` significant digits whose value is >= x (rounding towards +inf only)."""
+    return _decimal_directed(x, digits, ROUND_CEILING)
+
+
+def decimal_down(x: float, digits: int = 7) -> str:
+    """Decimal string with ``digits`` significant digits whose value is <= x (rounding towards -inf only)."""
+    return _decimal_directed(x, digits, ROUND_FLOOR)
 
 
 # --- solvers --------------------------------------------------------------------------------------------------------
