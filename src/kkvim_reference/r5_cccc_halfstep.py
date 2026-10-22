@@ -1,0 +1,412 @@
+"""QA controls of the CCCC half-step system (R5-V, stage Q1b): R-H, R-AC, R-HP.
+
+Independent of the main solver: no import of ``kkvim`` (D-028); nothing of Builder is used. Basis: D-049.1, D-049.2;
+docs/R5_NUMERICAL_SPEC_DRAFT.md (NS) 4.2-4.3, 5; plan docs/R5_CCCC_PREQUALIFICATION.plan.md (PL) 2.1, 7.
+
+Half-step system (NS 4.3, ChF-C1/C2). Given set G (n_f - 1) x N on the fixed grid G(l_f, n_f), unknown set S (n_s - 1) x N on the
+solve grid G(l_s, n_s), h_f = l_f/n_f, h_s = l_s/n_s:
+
+    A = h_f G^T G,  B = -h_f G^T L_f G,  C = h_f G^T D4_f G,  F = q h_f G^T 1,
+    K = D [A (x) D4_s - 2 B (x) L_s + C (x) I_s],   K vec(S) = F (x) 1,      (term index first: vec(S) = [S_:1; S_:2; ...])
+
+L = tridiag(1, -2, 1)/h^2 (Dirichlet), D4 = L^2 + (2/h^4)(e_1 e_1^T + e_{n-1} e_{n-1}^T), rows (7, -4, 1)/h^4 at both ends.
+Y-half-step: fixed = x (l_x, n_x), solve = y (l_y, n_y); X-half-step: fixed = y, solve = x.
+
+Three independent computational paths (PL 2.1):
+- **R-H** (``hessian_system``): restriction of the Hessian of the full discrete functional Pi_h^C to the half-step subspace,
+  K_H = (D h_x h_y / h_s) P^T A2 P, rhs_H = (q h_x h_y / h_s) P^T 1, with A2 = Hess Pi_h^C/(D h_x h_y) assembled from the
+  trapezoid weights and the even-ghost second difference (kkvim_reference.r5_cccc_d2.energy_hessian, Proposition D) and P the
+  embedding of the half-step unknowns into the nodal field (G (x) I for Y, [I (x) G_:k]_k for X);
+- **R-AC** (``solve_ac``): coefficients A, B, C, F in floating point, the block-pentadiagonal SPD matrix in the node-term ordering
+  (index j N + i, half bandwidth 3N - 1; U-R1), banded Cholesky and iterative refinement with the R-HP residual of the ORIGINAL
+  operator; the last correction is an ESTIMATE of the remaining error, not a bound;
+- **R-HP** (``residual_exact``): F (x) 1 - K vec(S) in exact rational arithmetic (fractions), coefficients from the given floats,
+  D4 applied node by node by its stencil with the (7, -4, 1) boundary rows, no modal transformation (NS 5, "Control").
+
+A posteriori bound (QA, level B): with lambda_low <= lambda_min(K) certified by a Cholesky factorization of K - tau I in decimal
+arithmetic (50 digits, backward error bounded below) and the exact residual r of an approximate solution s^,
+    ||s^ - s*||_2 <= ||r||_2 / lambda_low        (K SPD, s* the exact solution of the system with the exact coefficients).
+This is a strict bound for the given set (no tolerance is introduced); it needs an independent given set (exact rank N), otherwise
+the system is singular and no bound exists (status, not a regularization).
+"""
+
+import math
+from dataclasses import dataclass, field
+from decimal import Decimal, getcontext, localcontext
+from fractions import Fraction
+
+import numpy as np
+import scipy.linalg
+
+from kkvim_reference import r5_cccc_d2 as d2
+
+U = 2.0**-53
+DIRECTIONS = ("Y", "X")
+EXACTLY_DEPENDENT = "EXACTLY_DEPENDENT_GIVEN_SET"
+INDEPENDENT = "INDEPENDENT_GIVEN_SET"
+FACTORIZATION_FAILED = "NUMERICAL_FACTORIZATION_FAILED"  # independent set, but the floating-point factorization failed
+
+
+@dataclass(frozen=True)
+class HalfStep:
+    """Half-step on the plate l_x x l_y with grids n_x, n_y; ``given`` is the fixed set (n_f - 1) x N."""
+
+    lx: float
+    nx: int
+    ly: float
+    ny: int
+    direction: str
+    given: np.ndarray = field(compare=False)
+    D: float = 1.0
+    q: float = 1.0
+
+    def __post_init__(self):
+        if self.direction not in DIRECTIONS:
+            raise ValueError(f"direction must be one of {DIRECTIONS}")
+        g = np.asarray(self.given, dtype=float)
+        if g.ndim == 1:
+            g = g[:, None]
+        if g.shape[0] != self.n_f - 1 or not 1 <= g.shape[1] <= 3:
+            raise ValueError(f"given set must be (n_f - 1) x N, N = 1..3, got {g.shape}")
+        if not np.all(np.isfinite(g)):
+            raise ValueError("given set must be finite")
+        object.__setattr__(self, "given", g)
+
+    @property
+    def N(self) -> int:
+        return self.given.shape[1]
+
+    @property
+    def n_f(self) -> int:
+        return self.nx if self.direction == "Y" else self.ny
+
+    @property
+    def n_s(self) -> int:
+        return self.ny if self.direction == "Y" else self.nx
+
+    @property
+    def l_f(self) -> float:
+        return self.lx if self.direction == "Y" else self.ly
+
+    @property
+    def l_s(self) -> float:
+        return self.ly if self.direction == "Y" else self.lx
+
+    @property
+    def size(self) -> int:
+        return self.N * (self.n_s - 1)
+
+
+# --- floating-point operators (coefficient path) -----------------------------------------------------------------
+
+def _L(n: int, h: float) -> np.ndarray:
+    m = n - 1
+    return (np.diag(-2.0 * np.ones(m)) + np.diag(np.ones(m - 1), 1) + np.diag(np.ones(m - 1), -1)) / h**2
+
+
+def _D4(n: int, h: float) -> np.ndarray:
+    L = _L(n, h)
+    D4 = L @ L
+    D4[0, 0] += 2.0 / h**4
+    D4[-1, -1] += 2.0 / h**4
+    return D4
+
+
+def coefficients(hs: HalfStep):
+    """A, B, C, F in floating point (NS 4.2)."""
+    h = hs.l_f / hs.n_f
+    G = hs.given
+    A = h * (G.T @ G)
+    B = -h * (G.T @ (_L(hs.n_f, h) @ G))
+    C = h * (G.T @ (_D4(hs.n_f, h) @ G))
+    F = hs.q * h * G.sum(axis=0)
+    return A, B, C, F
+
+
+def coefficient_system(hs: HalfStep):
+    """K and rhs of ChF-C1/C2 from the coefficients (term-first ordering), floating point."""
+    A, B, C, F = coefficients(hs)
+    hsol = hs.l_s / hs.n_s
+    m = hs.n_s - 1
+    K = hs.D * (np.kron(A, _D4(hs.n_s, hsol)) - 2.0 * np.kron(B, _L(hs.n_s, hsol)) + np.kron(C, np.eye(m)))
+    return K, np.repeat(F, m)
+
+
+# --- R-H: restriction of the Hessian of Pi_h^C ---------------------------------------------------------------------
+
+def embedding(hs: HalfStep) -> np.ndarray:
+    """P: half-step unknowns (term-first) -> nodal field in the D2 ordering k = (i - 1)(n_y - 1) + (j - 1)."""
+    G = hs.given
+    if hs.direction == "Y":
+        return np.kron(G, np.eye(hs.ny - 1))
+    return np.hstack([np.kron(np.eye(hs.nx - 1), G[:, [k]]) for k in range(hs.N)])
+
+
+def hessian_system(hs: HalfStep):
+    """R-H: K_H = (D h_x h_y / h_s) P^T A2 P and rhs_H = (q h_x h_y / h_s) P^T 1 (PL 2.1; NS 4.3)."""
+    A2 = d2.energy_hessian(d2.D2Problem(hs.lx, hs.ly, hs.nx, hs.ny)).toarray()
+    P = embedding(hs)
+    hx, hy = hs.lx / hs.nx, hs.ly / hs.ny
+    hsol = hs.l_s / hs.n_s
+    K = (hs.D * hx * hy / hsol) * (P.T @ (A2 @ P))
+    rhs = (hs.q * hx * hy / hsol) * (P.T @ np.ones(P.shape[0]))
+    return K, rhs
+
+
+# --- exact rational path (R-HP) -----------------------------------------------------------------------------------
+
+def _apply_L_exact(f, h2):
+    n1 = len(f)
+    out = []
+    for i in range(n1):
+        left = f[i - 1] if i > 0 else 0
+        right = f[i + 1] if i + 1 < n1 else 0
+        out.append((left - 2 * f[i] + right) / h2)
+    return out
+
+
+def _apply_D4_exact(f, h4):
+    """D4 f by its stencil: interior (1, -4, 6, -4, 1), boundary rows (7, -4, 1) and (1, -4, 7) (even ghost node)."""
+    n1 = len(f)
+    get = lambda k: f[k] if 0 <= k < n1 else 0  # noqa: E731  (boundary nodes w = 0)
+    out = []
+    for i in range(n1):
+        diag = 7 if i in (0, n1 - 1) else 6
+        out.append((get(i - 2) - 4 * get(i - 1) + diag * f[i] - 4 * get(i + 1) + get(i + 2)) / h4)
+    return out
+
+
+def exact_coefficients(hs: HalfStep):
+    """A, B, C, F of the given floats in exact rational arithmetic."""
+    h = Fraction(hs.l_f) / hs.n_f
+    G = [[Fraction(float(v)) for v in hs.given[:, k]] for k in range(hs.N)]
+    LG = [_apply_L_exact(g, h * h) for g in G]
+    D4G = [_apply_D4_exact(g, h**4) for g in G]
+    dot = lambda a, b: sum(x * y for x, y in zip(a, b))  # noqa: E731
+    A = [[h * dot(G[i], G[k]) for k in range(hs.N)] for i in range(hs.N)]
+    B = [[-h * dot(G[i], LG[k]) for k in range(hs.N)] for i in range(hs.N)]
+    C = [[h * dot(G[i], D4G[k]) for k in range(hs.N)] for i in range(hs.N)]
+    F = [Fraction(hs.q) * h * sum(G[i]) for i in range(hs.N)]
+    return A, B, C, F
+
+
+def residual_exact(hs: HalfStep, s, coeffs=None) -> list[Fraction]:
+    """R-HP: F (x) 1 - K vec(S) exactly (term-first ordering of ``s``)."""
+    A, B, C, F = coeffs or exact_coefficients(hs)
+    m = hs.n_s - 1
+    hsol = Fraction(hs.l_s) / hs.n_s
+    D = Fraction(hs.D)
+    cols = [[Fraction(float(v)) for v in s[k * m:(k + 1) * m]] for k in range(hs.N)]
+    Ls = [_apply_L_exact(c, hsol * hsol) for c in cols]
+    D4s = [_apply_D4_exact(c, hsol**4) for c in cols]
+    r = []
+    for i in range(hs.N):
+        for j in range(m):
+            acc = sum(A[i][k] * D4s[k][j] - 2 * B[i][k] * Ls[k][j] + C[i][k] * cols[k][j] for k in range(hs.N))
+            r.append(F[i] - D * acc)
+    return r
+
+
+def eta_qa(hs: HalfStep, s, coeffs=None) -> float:
+    """NS 5 normalisation with h of the solved direction: ||r||_inf / (D(16||A||/h^4 + 8||B||/h^2 + ||C||)||S||_inf + ||F||_inf)."""
+    coeffs = coeffs or exact_coefficients(hs)
+    A, B, C, F = coeffs
+    r = residual_exact(hs, s, coeffs)
+    h = Fraction(hs.l_s) / hs.n_s
+    norm = lambda M: max(sum(abs(x) for x in row) for row in M)  # noqa: E731
+    scale = Fraction(hs.D) * (16 * norm(A) / h**4 + 8 * norm(B) / h**2 + norm(C)) * Fraction(float(np.max(np.abs(s)))) \
+        + max(abs(f) for f in F)
+    return float(max(abs(x) for x in r) / scale)
+
+
+def exact_rank(M: np.ndarray) -> int:
+    """Rank of the float matrix in exact rational arithmetic (no threshold)."""
+    rows = [[Fraction(float(v)) for v in row] for row in np.asarray(M)]
+    rank, ncol = 0, len(rows[0])
+    for c in range(ncol):
+        pivot = next((r for r in range(rank, len(rows)) if rows[r][c] != 0), None)
+        if pivot is None:
+            continue
+        rows[rank], rows[pivot] = rows[pivot], rows[rank]
+        for r in range(len(rows)):
+            if r != rank and rows[r][c] != 0:
+                f = rows[r][c] / rows[rank][c]
+                rows[r] = [a - f * b for a, b in zip(rows[r], rows[rank])]
+        rank += 1
+    return rank
+
+
+# --- certified lambda_min and the a posteriori bound -------------------------------------------------------------
+
+def _exact_band_matrix(hs: HalfStep, coeffs):
+    """Exact K in the node-term ordering as {(row, col): Fraction} with |row - col| <= 3N - 1 (upper part incl. diagonal)."""
+    A, B, C, _ = coeffs
+    N, m = hs.N, hs.n_s - 1
+    h = Fraction(hs.l_s) / hs.n_s
+    D = Fraction(hs.D)
+    d4 = {0: Fraction(6), 1: Fraction(-4), 2: Fraction(1)}
+    entries = {}
+    for j in range(m):
+        for dj in (0, 1, 2):
+            jj = j + dj
+            if jj >= m:
+                continue
+            v4 = (Fraction(7) if (dj == 0 and j in (0, m - 1)) else d4[dj]) / h**4
+            vl = {0: Fraction(-2), 1: Fraction(1), 2: Fraction(0)}[dj] / h**2
+            vi = Fraction(1) if dj == 0 else Fraction(0)
+            for i in range(N):
+                for k in range(N):
+                    row, col = j * N + i, jj * N + k
+                    if col < row:
+                        continue
+                    val = D * (A[i][k] * v4 - 2 * B[i][k] * vl + C[i][k] * vi)
+                    if val != 0:
+                        entries[(row, col)] = val
+    return entries
+
+
+def certify_lambda_min(hs: HalfStep, tau: float, coeffs=None, digits: int = 50) -> float | None:
+    """Lower bound of lambda_min(K) of the exact system: Cholesky of K - tau I (banded, node-term ordering) in decimal with
+    ``digits`` digits. Success means K - tau I + E is SPD with |E| below the backward error of the decimal Cholesky
+    (bounded by (p + 2) 10^(1 - digits) |R^T||R|, p the half bandwidth, plus the conversion of the entries), hence
+    lambda_min(K) >= tau - ||E||_2. Returns that bound, or None if the factorization fails (no certificate)."""
+    coeffs = coeffs or exact_coefficients(hs)
+    entries = _exact_band_matrix(hs, coeffs)
+    n = hs.size
+    p = 3 * hs.N - 1
+    with localcontext() as ctx:
+        ctx.prec = digits
+        a = {key: Decimal(v.numerator) / Decimal(v.denominator) for key, v in entries.items()}
+        t = Decimal(repr(float(tau)))
+        R = {}
+        for i in range(n):
+            s = a.get((i, i), Decimal(0)) - t - sum(R[(k, i)] ** 2 for k in range(max(0, i - p), i) if (k, i) in R)
+            if s <= 0:
+                return None
+            rii = s.sqrt()
+            R[(i, i)] = rii
+            for j in range(i + 1, min(n, i + p + 1)):
+                s = a.get((i, j), Decimal(0)) - sum(R[(k, i)] * R[(k, j)] for k in range(max(0, j - p), i)
+                                                    if (k, i) in R and (k, j) in R)
+                if s != 0:
+                    R[(i, j)] = s / rii
+        absrr = max(sum(abs(R.get((k, i), Decimal(0))) * abs(R.get((k, j), Decimal(0)))
+                        for k in range(max(0, i - p), i + 1))
+                    for i in range(n) for j in range(i, min(n, i + p + 1)))
+        amax = max(abs(v) for v in a.values())
+        unit = Decimal(10) ** (1 - digits)
+        err_entry = (p + 2) * unit * absrr + unit * amax  # Cholesky backward error + conversion, per entry
+        err_norm = (2 * p + 1) * err_entry  # ||E||_2 <= max row sum of a banded matrix
+        return float(t - err_norm) if t > err_norm else None
+
+
+def error_bound(hs: HalfStep, s, lambda_low: float, coeffs=None) -> float:
+    """||s - s*||_2 <= ||r||_2 / lambda_low with the exact residual (rounded upwards)."""
+    r = residual_exact(hs, s, coeffs)
+    rr = sum(x * x for x in r)
+    return math.sqrt(float(rr)) * (1 + 4 * U) / lambda_low
+
+
+# --- solvers --------------------------------------------------------------------------------------------------------
+
+def given_set_status(hs: HalfStep) -> str:
+    return INDEPENDENT if exact_rank(hs.given) == hs.N else EXACTLY_DEPENDENT
+
+
+def solve_hessian(hs: HalfStep):
+    """Dense Cholesky solve of the R-H system (small grids). Returns (status, s): (EXACTLY_DEPENDENT, None) for an exactly
+    dependent given set (K singular), (FACTORIZATION_FAILED, None) if the floating-point factorization fails, otherwise
+    (INDEPENDENT, s). No regularization."""
+    if given_set_status(hs) == EXACTLY_DEPENDENT:
+        return EXACTLY_DEPENDENT, None
+    K, rhs = hessian_system(hs)
+    try:
+        return INDEPENDENT, scipy.linalg.solve(K, rhs, assume_a="pos")
+    except np.linalg.LinAlgError:
+        return FACTORIZATION_FAILED, None
+
+
+@dataclass
+class ACSolution:
+    status: str
+    s: np.ndarray | None  # term-first
+    s_unrefined: np.ndarray | None
+    corrections: list[float] = field(default_factory=list)  # max |ds| per refinement step (estimate, not a bound)
+
+    @property
+    def e_AC(self) -> float:
+        return self.corrections[-1] if self.corrections else math.inf
+
+
+def _node_term(m: int, N: int) -> np.ndarray:
+    """perm[p] = term-first index of node-term position p = j N + i."""
+    return np.array([i * m + j for j in range(m) for i in range(N)])
+
+
+def solve_ac(hs: HalfStep, max_refine: int = 5) -> ACSolution:
+    """R-AC: banded Cholesky of the block-pentadiagonal SPD matrix (node-term ordering, half bandwidth 3N - 1) and iterative
+    refinement with the exact residual of the original system (R-HP)."""
+    if given_set_status(hs) == EXACTLY_DEPENDENT:
+        return ACSolution(EXACTLY_DEPENDENT, None, None)
+    K, rhs = coefficient_system(hs)
+    m, N = hs.n_s - 1, hs.N
+    perm = _node_term(m, N)
+    Kp = K[np.ix_(perm, perm)]
+    p = 3 * N - 1
+    n = Kp.shape[0]
+    ab = np.zeros((p + 1, n))
+    for d in range(p + 1):
+        ab[p - d, d:] = np.diagonal(Kp, d)
+    try:
+        cb = scipy.linalg.cholesky_banded(ab, lower=False)
+    except np.linalg.LinAlgError:
+        return ACSolution(FACTORIZATION_FAILED, None, None)
+    solve = lambda b: scipy.linalg.cho_solve_banded((cb, False), b)  # noqa: E731
+    x = np.empty(n)
+    x[:] = solve(rhs[perm])
+    s = np.empty(n)
+    s[perm] = x
+    out = ACSolution(INDEPENDENT, s.copy(), s.copy())
+    coeffs = exact_coefficients(hs)
+    previous = math.inf
+    for _ in range(max_refine):
+        r = np.array([float(v) for v in residual_exact(hs, s, coeffs)])
+        ds = np.empty(n)
+        ds[perm] = solve(r[perm])
+        size = float(np.max(np.abs(ds)))
+        s = s + ds
+        out.corrections.append(size)
+        if size >= previous or size == 0.0:
+            break
+        previous = size
+    out.s = s
+    return out
+
+
+# --- start sets and diagnostics -------------------------------------------------------------------------------------
+
+def start_set(n: int, N: int, basis: str = "sin2") -> np.ndarray:
+    """T_N on the interior nodes l = 1..n-1: 'sin2' -> sin^2(i pi l/n); 'product' -> sin(pi l/n) sin((2i - 1) pi l/n) (CM VBC-15)."""
+    l = np.arange(1, n)
+    if basis == "sin2":
+        return np.column_stack([np.sin(i * math.pi * l / n) ** 2 for i in range(1, N + 1)])
+    if basis == "product":
+        return np.column_stack([np.sin(math.pi * l / n) * np.sin((2 * i - 1) * math.pi * l / n) for i in range(1, N + 1)])
+    raise ValueError("basis must be 'sin2' or 'product'")
+
+
+def diagnostics(hs: HalfStep) -> dict:
+    """Values only (no verdicts): exact rank, cond_2(A), cond_2(K) of the coefficient path, discrete start condition 2N < n_f."""
+    A, _, _, F = coefficients(hs)
+    eA = np.linalg.eigvalsh(A)
+    K, _ = coefficient_system(hs)
+    eK = np.linalg.eigvalsh(K)
+    return {"N": hs.N, "direction": hs.direction, "status": given_set_status(hs), "exact_rank": exact_rank(hs.given),
+            "two_N_less_than_n_f": 2 * hs.N < hs.n_f, "cond_A": float(eA[-1] / eA[0]) if eA[0] > 0 else math.inf,
+            "cond_K": float(eK[-1] / eK[0]) if eK[0] > 0 else math.inf, "lambda_min_K_float": float(eK[0]),
+            "F_nonzero": bool(np.any(F != 0))}
+
+
+def gamma(m: int) -> float:
+    """gamma_m = m u / (1 - m u) (standard bound for a floating-point dot product of length m)."""
+    return m * U / (1 - m * U)
