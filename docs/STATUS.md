@@ -686,6 +686,13 @@ D-026); идентификатор не переиспользуется (INDEX.
 
 ## Текущая задача
 
+**Техническая отметка 22.10.2026 (R5-V Q1b — независимые контроли полушага CCCC включены; не научная квалификация).** В ветке
+`integration/r5-cccc-halfstep-controls` объединены контроли R-H, R-AC, R-HP (`src/kkvim_reference/r5_cccc_halfstep.py`, 91 тест, данные
+`docs/results/r5_cccc_halfstep/` с историческими редакциями `history_b72515b/`, `history_aed5ba4/`) — QA `b72515b`…`9d2e487`, Reviewer
+`57d3194`, `4f92c82`, аудит `aa568aa` (AUDIT_PASS_FOR_INTEGRATION); отчёт — `docs/R5_CCCC_HALFSTEP_CONTROLS_INTEGRATION.report.md`.
+Численные наблюдения — OBSERVATION, не пороги; энергетические величины и модель округления DST — UNRESOLVED. Научная квалификация R5
+не завершена; численные пороги CCCC не утверждены; программирование CCCC в `kkvim` не разрешено; R4 и R5 — IN_PROGRESS.
+
 **Техническая отметка 22.10.2026 (R5-V — эталоны CCCC доступны; не научная приёмка).** В ветке `integration/r5-cccc-references` объединены
 независимые эталоны A, B, D2 и данные C (QA `ae4ff8a`, аудит `5b384a1`); отчёт — `docs/R5_CCCC_REFERENCES_INTEGRATION.report.md`.
 
