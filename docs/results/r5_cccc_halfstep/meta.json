@@ -1,0 +1,23 @@
+{
+ "study": "R5-V CCCC half-step controls R-H, R-AC, R-HP (Q1b)",
+ "python": "3.13.15",
+ "platform": "Windows-10-10.0.19045-SP0",
+ "numpy": "2.5.4",
+ "scipy": "1.18.1",
+ "seconds": 7,
+ "columns": {
+  "lambda_low_hex": "certified lower bound of lambda_min(K), exact double (certify_lambda_min, tau = lambda_min_float/2)",
+  "lambda_low_down": "the same, decimal rounded down",
+  "bound_abs_{x}_hex": "certified upper bound of ||s^ - s*||_2 (error_bound), exact double",
+  "bound_abs_{x}_up": "the same, decimal rounded up",
+  "rel_to_computed_{x}_hex": "certified upper bound of ||s^ - s*||_2 / ||s^||_2 = b/L, L = norm_lower(s^) > 0, exact double",
+  "rel_to_computed_{x}_up": "the same, decimal rounded up",
+  "rel_to_exact_{x}_hex": "certified upper bound of ||s^ - s*||_2 / ||s*||_2 = b/(L - b), requires L > b, exact double",
+  "rel_to_exact_{x}_up": "the same, decimal rounded up",
+  "{x}": "unrefined / refined: R-AC before / after the refinement; RH: dense R-H solution (n <= 32)",
+  "cond_A, cond_K, bound_refined_over_condK_u, e_AC_rel_estimate, eta_*, RH_minus_RAC_rel, *_RH_minus_RAC_rel, seconds": "OBSERVATION (floating point, rounded to nearest; cond from eigvalsh; bound_refined_over_condK_u = b/||s^||/(cond(K) u))",
+  "UNRESOLVED": "no certificate, b = inf, or the condition L > 0 / L > b not met; no number is substituted"
+ },
+ "note": "bounds of the SET S, not of the field W = G S^T; earlier editions in history_b72515b/, history_aed5ba4/",
+ "git_commit": "4f92c82ed60a300e97c98495f59f7f66f9a18a1d"
+}
