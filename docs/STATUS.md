@@ -568,6 +568,7 @@ merge-коммиты без squash/rebase).**
 | `docs/R5_NUMERICAL_SPEC_DRAFT.md`, `docs/R5_NUMERICAL_SPEC_DRAFT.independent-review.md` | R5, проект численной спецификации CCCC — **DRAFT** (Literature `9877f69`); рецензия Reviewer `4b18761` — PASS_WITH_OPEN_QUESTIONS; адресные проверки `403755b`/`ec7853b`, `a5b63e6`, `06f8501`. Основа Π_h^C и решатель B-C утверждены D-049.1, D-049.2; спецификация как целое не принята; программирование не разрешено |
 | `docs/R5_CCCC_COUPLED_MATH_DRAFT.md`, `docs/R5_CCCC_COUPLED_MATH.independent-review.md` | R5, математическая часть CCCC N = 2–3 — **DRAFT** (Literature `14f6072`, ВБC-1…ВБC-20; Б-2 — PARTIAL); рецензия Reviewer `87a15ab` — PASS_WITH_CONDITIONS; адресные проверки `403755b`/`ec7853b`, `a5b63e6`. Результаты включены в часть C `MATH_SPEC.md` (D-050, 2026-10-21); документ сохраняется как исходный вывод; N = 3 и дискретный ранг — UNRESOLVED |
 | `docs/R5_MATH_SPEC_PART_C_DRAFT.md`, `docs/R5_MATH_SPEC_PART_C.review.md`, `docs/R5_MATH_SPEC_PART_C.final-check.md`, `docs/R5_MATH_SPEC_PART_C_INTEGRATION.report.md` | черновик части C (Literature `e6ac40b`) и проверки Reviewer `b59bd5e` (PASS_WITH_NOTES), `42d73e9` (ADDRESS_PASS); текст C.0–C.12 перенесён в `MATH_SPEC.md` (D-050); отчёт технической сверки переноса |
+| `src/kkvim_reference/r5_cccc_{d2,ritz,hencky,tables}.py`, `tests/reference/test_r5_cccc_*.py`, `tests/cross/test_r5_cccc_references.py`, `scripts/r5_cccc_reference_study.py`, `docs/results/r5_cccc_references/`, `docs/R5_CCCC_REFERENCES.*.md`, `docs/R5_CCCC_REFERENCES_INTEGRATION.report.md` | R5-V, независимые эталоны CCCC A, B, D2 и данные C (QA `ae4ff8a`). Проверки: рецензия Reviewer `77de43b` (CHANGES_REQUIRED; ЭР-1…ЭР-5 исправлены в `8e67071`); финальная проверка `dd240bf` (Ф-1…Ф-3 исправлены в `ae4ff8a`); технический аудит `5b384a1` (AUDIT_PASS_FOR_INTEGRATION). **Техническая доступность, не научная приёмка.** Статусы: D2 — эталон дискретной задачи D1 = D2 с оценочным, не строгим бюджетом; энергетические величины — UNRESOLVED; A и центр B — OBSERVATION / UNRESOLVED; работа Ритца — односторонняя граница; C — контрольные значения, не допуски; внешние данные — UNVERIFIED_EXTERNAL_NUMERICAL_EVIDENCE |
 | `docs/R5_CCCC_PREQUALIFICATION.plan.md`, `scripts/r5_cccc_cost_probe.py` | R5, план независимой квалификации CCCC N = 1–3 и эталона D2 — **PLAN** (QA `ecab1ee`), принят как план D-049.6; проба стоимости — не эталон. Пороги плана — кандидаты, не утверждены |
 | `docs/R5_CCCC_FOUNDATION_INTEGRATION.report.md`, `docs/R5_CCCC_FINAL_INTEGRATION.report.md`, `docs/R5_D049_FINAL_ADDRESS_INTEGRATION.report.md`, `docs/R5_D049_APPROVAL_INTEGRATION.report.md` | отчёты интеграции научной основы R5 CCCC (Integrator, ветка `integration/r5-cccc-foundation`) |
 | `docs/R5_CCCC_FOUNDATION.address-review.md`, `docs/R5_CCCC_FINAL.address-check.md`, `docs/R5_D049_FINAL.check.md` | адресные проверки Reviewer: `403755b`/`ec7853b` — PASS_WITH_NOTES; `a5b63e6` — CHANGES_REQUIRED (ФА-1…ФА-9, исправлены); `06f8501` — PASS_FOR_OWNER_D049 |
@@ -684,6 +685,15 @@ D-026); идентификатор не переиспользуется (INDEX.
 **Примечание QA для R3 (D-042):** при сравнении основного решателя с `NavierRectangle` и `ParsevalRecursion` стороны `a`, `b` передавать как встроенные Python `float`; собственные проверки типов конструкторов Reference не расширялись по D-042.
 
 ## Текущая задача
+
+**Техническая отметка 22.10.2026 (R5-V — эталоны CCCC доступны; не научная приёмка).** В ветке `integration/r5-cccc-references` объединены
+независимые эталоны A, B, D2 и данные C (QA `ae4ff8a`, аудит `5b384a1`); отчёт — `docs/R5_CCCC_REFERENCES_INTEGRATION.report.md`.
+
+- Научные статусы эталонов — как в отчёте QA.
+- Численные пороги CCCC не утверждены.
+- Программирование CCCC в `kkvim` не разрешено.
+- R4 и R5 — IN_PROGRESS.
+- Вопросы Р-1…Р-5 отчёта QA в `OPEN_QUESTIONS.md` не внесены — нужно решение владельца.
 
 **АКТУАЛЬНО НА 22.10.2026 (R5 — часть C MATH_SPEC принята, D-050):**
 - Владелец утвердил часть C `docs/MATH_SPEC.md` (CCCC, N = 2–3) — **D-050** (решение от 2026-10-21; основание — D-049.4, п. 3).
