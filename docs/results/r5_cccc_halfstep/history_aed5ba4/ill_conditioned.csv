@@ -1,0 +1,5 @@
+eps,set_status,RH_status,RAC_status,cond_A,cond_K,certificate,bound_refined_rel,field_RH_minus_RAC_rel,set_RH_minus_RAC_rel,note
+1.000000e-02,INDEPENDENT_GIVEN_SET,INDEPENDENT_GIVEN_SET,INDEPENDENT_GIVEN_SET,7.296845e+04,6.994351e+07,certified,1.341472e-09,1.631182e-10,1.805646e-09,given set without QR (OBSERVATION; PL BC-6 analogue for the QA controls)
+1.000000e-04,INDEPENDENT_GIVEN_SET,INDEPENDENT_GIVEN_SET,INDEPENDENT_GIVEN_SET,7.200961e+08,6.929286e+11,certified,1.824311e-05,2.442542e-06,2.620498e-05,given set without QR (OBSERVATION; PL BC-6 analogue for the QA controls)
+1.000000e-06,INDEPENDENT_GIVEN_SET,INDEPENDENT_GIVEN_SET,INDEPENDENT_GIVEN_SET,7.205764e+12,6.990261e+15,certified,1.939071e-01,3.464657e-02,3.362423e-01,given set without QR (OBSERVATION; PL BC-6 analogue for the QA controls)
+1.000000e-08,INDEPENDENT_GIVEN_SET,NUMERICAL_FACTORIZATION_FAILED,NUMERICAL_FACTORIZATION_FAILED,inf,inf,not run: computed lambda_min(K) in double <= 0 (the exact K is SPD: independent set),,,,given set without QR (OBSERVATION; PL BC-6 analogue for the QA controls)
