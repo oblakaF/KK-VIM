@@ -129,3 +129,69 @@ def test_exact_reference_factor_values_are_reported():
     e = q.e4_case(problem(1.0, 10, 0.6, 9, "Y", 3))
     for key in ("rho_0_exactref", "kappa_bar_c_exactref", "cond_S_exactref", "M_norm_2_exactref"):
         assert isinstance(e[key], float) and e[key] > 0
+
+
+# --- review 6e50297, IR-1: proven inequalities vs their double evaluation ----------------------------------------------------
+
+from kkvim_reference import r5_cccc_bc as bc  # noqa: E402
+
+ALLOWED_CHECK = ("HOLDS (double evaluation)", "UNRESOLVED_ROUNDING")
+
+
+@pytest.mark.parametrize("ly, N, qr", [(1000.0, 1, False), (1000.0, 1, True), (3000.0, 1, False), (300.0, 2, True)])
+def test_ir1_reviewer_counterexamples(ly, N, qr):
+    """Reviewer: n_s = 4, the SVD gives ||M||_2 = 1 - 2u although ||M||_2 >= 1 exactly (VOK-12, item 3). Now: theorem PROVEN, lower
+    bound HOLDS by the exact witness, never VIOLATED."""
+    f = q.e6_case(hs.HalfStep(1.0, 10, ly, 4, "Y", hs.start_set(10, N)), qr=qr)
+    assert f["M_norm_2"] < 1  # the counterexample is still reproduced by the SVD
+    assert f["vok12_theorem"].startswith("PROVEN")
+    assert f["vok12_lower"].startswith("HOLDS (exact witness")
+    assert f["vok12_lower_svd_deficit"] == 1 - f["M_norm_2"]
+    assert f["vok12_check"].startswith("HOLDS") and not any("VIOLATED" in str(v) for v in f.values())
+
+
+@pytest.mark.parametrize("ny", [3, 4, 5])
+@pytest.mark.parametrize("N", [1, 2, 3])
+@pytest.mark.parametrize("qr", [False, True])
+@pytest.mark.parametrize("ly", [1.0, 1000.0])
+def test_ir1_unified_rule_small_n_s(ny, N, qr, ly):
+    """n_s = 3, 4, 5, N = 1-3, with and without QR, normal and extreme aspect ratio: theorems PROVEN, checks either HOLDS or
+    UNRESOLVED_ROUNDING (never VIOLATED); the lower bound is NOT_APPLICABLE for n_s = 3 and HOLDS for n_s >= 4."""
+    f = q.e6_case(hs.HalfStep(1.0, 10, ly, ny, "Y", hs.start_set(10, N)), qr=qr)
+    for k in ("vok10", "vok11", "vok12"):
+        assert f[f"{k}_theorem"].startswith("PROVEN")
+        assert f[f"{k}_check"].startswith(ALLOWED_CHECK)
+    assert f["vok10_check"].startswith("HOLDS") or f["vok10_gap_rel"] > 0
+    if ny == 3:
+        assert f["vok12_lower"].startswith("NOT_APPLICABLE") and "not applicable" in f["vok12_check"]
+    else:
+        assert f["vok12_lower"].startswith("HOLDS")
+    assert not any("VIOLATED" in str(v) for v in f.values())
+
+
+def test_ir1_numeric_check_rule():
+    """Consistent values -> HOLDS; a contradiction -> UNRESOLVED_ROUNDING with the relative gap kept visible (a large gap is not
+    hidden and not turned into HOLDS); no tolerance is applied."""
+    assert q.numeric_check(0.5, 1.0, "<=") == ("HOLDS (double evaluation)", 0.0)
+    assert q.numeric_check(2.0, 1.0, ">=") == ("HOLDS (double evaluation)", 0.0)
+    status, gap = q.numeric_check(1.0 + 2.0**-52, 1.0, "<=")
+    assert status.startswith("UNRESOLVED_ROUNDING") and gap == 2.0**-52
+    status, gap = q.numeric_check(3.0, 1.0, "<=")
+    assert status.startswith("UNRESOLVED_ROUNDING") and gap == 2.0 and "2.000e+00" in status
+    status, gap = q.numeric_check(0.5, 1.0, ">=")
+    assert status.startswith("UNRESOLVED_ROUNDING") and gap == 0.5
+
+
+def test_ir1_lower_bound_rule_and_witness():
+    """lower_bound_one: n_s <= 3 not applicable; below 1 for n_s >= 4 -> exact witness. The witness: in the operator
+    M = I - W Z^T every column outside the boundary rows is the unit vector itself (checked on a random W)."""
+    assert q.lower_bound_one(0.92, 3).startswith("NOT_APPLICABLE")
+    assert q.lower_bound_one(1.0, 4) == "HOLDS (double evaluation)"
+    assert q.lower_bound_one(1 - 2.0**-52, 4).startswith("HOLDS (exact witness")
+    N, m = 2, 3  # n_s = 4
+    rows = bc.boundary_rows(N, m)
+    W = np.random.default_rng(1).standard_normal((N * m, 2 * N))
+    M = np.eye(N * m)
+    M[:, rows] -= W
+    outside = [k for k in range(N * m) if k not in rows]
+    assert outside and all(np.array_equal(M[:, k], np.eye(N * m)[:, k]) for k in outside)

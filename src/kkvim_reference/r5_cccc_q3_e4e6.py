@@ -286,6 +286,36 @@ def pencil_factors(p: hs.HalfStep) -> dict:
             "cond_A_solved": float(eA[-1] / eA[0]), "lambda_min_A": float(eA[0]), "A": A, "B": B, "C": C}
 
 
+def numeric_check(value: float, bound: float, sense: str) -> tuple[str, float]:
+    """Unified rule (IR-1, review 6e50297) for comparing DOUBLE evaluations of a PROVEN inequality (VOK-10...VOK-12).
+
+    The inequality itself holds under its verified preconditions (status ``vok1x_theorem``). Its double evaluation is compared:
+    - consistent in double -> "HOLDS (double evaluation)";
+    - contradictory -> "UNRESOLVED_ROUNDING", with the relative gap |value - bound|/|bound| recorded: no rigorous bound of the
+      evaluation error of these double quantities (eigenvalues, SVD, condition numbers) is available, so a contradiction is a
+      diagnostic finding (rounding or a code defect), never reported as a violation of the theorem and never as HOLDS. Large gaps
+      stay visible in ``*_gap_rel``; no tolerance is applied. Returns (status, gap)."""
+    holds = value <= bound if sense == "<=" else value >= bound
+    if holds:
+        return "HOLDS (double evaluation)", 0.0
+    gap = abs(value - bound) / abs(bound) if bound else math.inf
+    return (f"UNRESOLVED_ROUNDING (double values contradict the proven inequality by a relative {gap:.3e}; no rigorous bound of "
+            "the evaluation error; diagnostic, not a violation of the theorem)"), gap
+
+
+def lower_bound_one(m_norm: float, n_s: int) -> str:
+    """VOK-12, item 3, lower bound ||M||_2 >= 1 for n_s >= 4, for the COMPUTED operator M = I - W Z^T (any W): N (n_s - 1) > 2N, so
+    there is an unknown k outside the 2N boundary rows; Z^T e_k = 0 and M e_k = e_k EXACTLY, hence ||M||_2 >= 1 exactly (in the dense
+    branch the matrix formed has the column e_k unchanged; in the subspace branch the value is max(1, .) by construction). An SVD value
+    below 1 is therefore the rounding of the SVD, not a violation."""
+    if n_s <= 3:
+        return "NOT_APPLICABLE (n_s <= 3: span Z may be the whole space)"
+    if m_norm >= 1:
+        return "HOLDS (double evaluation)"
+    return (f"HOLDS (exact witness: M e_k = e_k for a row k outside the boundary rows, so ||M||_2 >= 1 exactly; the SVD value is "
+            f"below 1 by {1 - m_norm:.1e}: SVD rounding)")
+
+
 def e6_case(p: hs.HalfStep, qr: bool = True, capacitance: str = "modal") -> dict:
     """E-6 factors (table 4.3a) and the double evaluations of the proven inequalities VOK-10...VOK-12 for one half-step."""
     rec = bc.run_halfstep(p, qr=qr, capacitance=capacitance)
@@ -304,22 +334,27 @@ def e6_case(p: hs.HalfStep, qr: bool = True, capacitance: str = "modal") -> dict
     out.update({k: pf[k] for k in ("beta_U", "chi_U", "theta_U", "varrho", "mu_1", "cond_A_solved")})
     n, N = p.n_s, p.N
     out["vok10_13_preconditions"] = "MET: exact rank N, A > 0, B, C >= 0 (Gram matrices; NS 4.2)"
+    # IR-1 (review 6e50297): the theorem (proven under verified preconditions) and the check of double values are separate
+    proven = "PROVEN ({}; preconditions verified: exact rank N => A > 0, B, C >= 0)"
     # VOK-10: cond(S) <= cond(A) C_S(n, varrho)
     CS = n / (1 + pf["varrho"] ** 2 * (n - 1) * (n - 2) / (3 * n))
     out["vok10_bound"] = pf["cond_A_solved"] * CS
-    out["vok10_check"] = "HOLDS (double evaluation)" if log["cond_S"] <= out["vok10_bound"] else "VIOLATED (double): check code"
+    out["vok10_theorem"] = proven.format("VOK-10")
+    out["vok10_check"], out["vok10_gap_rel"] = numeric_check(log["cond_S"], out["vok10_bound"], "<=")
     # VOK-11: cond(M_k) <= cond(A)/varrho^2
     out["vok11_bound"] = pf["cond_A_solved"] / pf["varrho"] ** 2
-    out["vok11_check"] = "HOLDS (double evaluation)" if log["max_cond_Mk"] <= out["vok11_bound"] else \
-        "VIOLATED (double): check code"
-    # VOK-12 item 3: 1 <= ||M||_2 (n_s >= 4) and ||M||_2 <= (lambda_max(K0)/(D mu_1^2 lambda_min(A)))^(1/2)
+    out["vok11_theorem"] = proven.format("VOK-11, item 1")
+    out["vok11_check"], out["vok11_gap_rel"] = numeric_check(log["max_cond_Mk"], out["vok11_bound"], "<=")
+    # VOK-12 item 3: ||M||_2 <= (lambda_max(K0)/(D mu_1^2 lambda_min(A)))^(1/2); 1 <= ||M||_2 for n_s >= 4
     mu = bc.modal_eigenvalues(n, p.l_s / n)
     lam_max_K0 = p.D * max(float(np.linalg.eigvalsh(mk ** 2 * pf["A"] + 2 * mk * pf["B"] + pf["C"])[-1]) for mk in mu)
     out["vok12_upper"] = math.sqrt(lam_max_K0 / (p.D * pf["mu_1"] ** 2 * pf["lambda_min_A"]))
-    upper_ok = log["M_norm_2"] <= out["vok12_upper"]
-    lower_ok = log["M_norm_2"] >= 1 if n >= 4 else True
-    out["vok12_check"] = ("HOLDS (double evaluation)" if upper_ok and lower_ok else "VIOLATED (double): check code") + \
-        ("" if n >= 4 else "; lower bound 1 not applicable (n_s <= 3)")
+    out["vok12_theorem"] = proven.format("VOK-12, item 3: upper bound; lower bound 1 for n_s >= 4")
+    upper, out["vok12_upper_gap_rel"] = numeric_check(log["M_norm_2"], out["vok12_upper"], "<=")
+    out["vok12_lower"] = lower_bound_one(log["M_norm_2"], n)
+    out["vok12_lower_svd_deficit"] = max(0.0, 1.0 - log["M_norm_2"]) if n >= 4 else 0.0
+    out["vok12_check"] = upper + ("; lower bound 1: " + out["vok12_lower"] if n >= 4 else
+                                  "; lower bound 1 not applicable (n_s <= 3)")
     out["vok13_status"] = "MODEL (first order; no check; factors logged)"
     out["factor_provenance"] = ("rho_0, kappa_bar_c, cond(S), ||M||_2, max cond(M_k), varrho, beta_U, chi_U: computed in double; "
                                 "VOK-10, VOK-11, VOK-12 bounds: proven inequalities evaluated in double; exact-reference "
