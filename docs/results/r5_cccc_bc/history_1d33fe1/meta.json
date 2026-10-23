@@ -1,0 +1,19 @@
+{
+ "study": "R5-V CCCC QA research prototype B-C (self-checks; no thresholds, no Q3 calibration)",
+ "python": "3.13.15",
+ "platform": "Windows-10-10.0.19045-SP0",
+ "numpy": "2.5.4",
+ "scipy": "1.18.1",
+ "seconds": 8,
+ "columns": {
+  "lambda_low_hex / _down": "certified lower bound of lambda_min(K) of the system solved (certify_lambda_min)",
+  "bound_abs_bc_hex / _up": "certified upper bound of ||s_BC - s*||_2 (error_bound)",
+  "rel_to_exact_bc_hex / _up": "certified upper bound of ||s_BC - s*||_2/||s*||_2 = b/(L - b), L > b",
+  "rel_to_exact_ac_hex / _up": "the same for R-AC with refinement",
+  "bc_ac_certified_consistent, bc_rh_certified_consistent": "exact check ||s_BC - s_ref|| <= b_BC + b_ref (must be True)",
+  "cond_A_before_QR, cond_A_after_QR, cond_S, min_eig_sym_S, max_cond_Mk, kappa_c": "OBSERVATION (NS 5.1 log; E-6 preparation)",
+  "orthonormality_defect_up": "exact max|h_f U~^T U~ - I| rounded up (QR control), value only",
+  "eta_bc, bc_minus_ac_rel, bc_minus_rh_rel, seconds": "OBSERVATION"
+ },
+ "git_commit": "9d2e487e9d1705a2861f9b7a36457e2992c09c28"
+}
