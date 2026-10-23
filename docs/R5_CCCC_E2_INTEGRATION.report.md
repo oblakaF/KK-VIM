@@ -2,7 +2,8 @@
 
 **Роль:** Integrator. **Цели:** G3.4, G4. **Дата:** 2026-10-24.
 **Ветка:** `integration/r5-cccc-e2-instrument` от `main` @ `7645fa7bec2d3c5a01df77806a2f5c2387b45c20` (PR #29).
-**Вердикт:** **INTEGRATION_PASS** — техническая интеграция исследовательского инструмента.
+**Вердикт:** **INTEGRATION_PASS_FINAL** — техническая интеграция исследовательского инструмента. Первая интеграция — `40aa2f3`
+(INTEGRATION_PASS); финальная синхронизация с дополнением Reviewer `dd5a0d4` — разд. 2а.
 
 Это не квалификация Q3. Нет новых порогов CCCC, нормативных допусков, решений D-051 и далее, разрешения рабочего решателя.
 Q3 не запускался.
@@ -12,8 +13,10 @@ Q3 не запускался.
 | Объект | SHA | Статус |
 |---|---|---|
 | Источник QA `qa/r5-cccc-e2-ie3a-address` | `37bdf89a998e1d95291507ec0dc0bb01b8ad8140` | исправления ИЕ-3а, Н-а…Н-в |
-| Финальная ветка Reviewer `review/r5-cccc-e2-ie3a-final` | `b1278fc489a1560ff337d55ec9ed6abfe6749683` | **ADDRESS_PASS** (`docs/R5_CCCC_E2_INSTRUMENT.ie3a-final.md`) |
+| Финальная ветка Reviewer `review/r5-cccc-e2-ie3a-final` | `b1278fc489a1560ff337d55ec9ed6abfe6749683` → актуально `dd5a0d4308d6823ec0b853ad0cf333976b19b392` | **ADDRESS_PASS** (`docs/R5_CCCC_E2_INSTRUMENT.ie3a-final.md`); вердикт `dd5a0d4` тот же |
 | CI на `b1278fc` | — | SUCCESS — по сообщению владельца; Integrator CI не наблюдает (разд. 3, п. 12) |
+| CI Reviewer на `dd5a0d4` | прогон `39997458680` | SUCCESS — по сообщению владельца |
+| CI интеграционной ветки на `40aa2f3` | прогон `39997921846` | SUCCESS — по сообщению владельца |
 
 `b1278fc` — прямой потомок `37bdf89`. Сверх QA он добавляет только документ рецензии `R5_CCCC_E2_INSTRUMENT.ie3a-final.md`.
 
@@ -33,22 +36,35 @@ Q3 не запускался.
 - **Промежуточные ветки повторно не вливались.** Все пять — предки `b1278fc`.
 - Rebase, squash и cherry-pick не применялись.
 
+## 2а. Финальная синхронизация (дополнение Reviewer `dd5a0d4`)
+
+| Коммит | Роль | Содержание |
+|---|---|---|
+| `dd5a0d4` | Reviewer | дополнение к заключительной сверке: прогон CI `39942107985` (данные владельца) и явная проверка неизменности эталонов Q1b и B-C; вердикт **ADDRESS_PASS** не изменён |
+
+- `dd5a0d4` — прямой потомок уже интегрированного `b1278fc` (единственный коммит `b1278fc..dd5a0d4`, родитель `b1278fc`).
+- `git diff b1278fc dd5a0d4` затрагивает только `docs/R5_CCCC_E2_INSTRUMENT.ie3a-final.md` (+15/−6). Модуль и тесты Е-2 не менялись.
+- Влит в существующую ветку `--no-ff`: merge `09ebe0d91490ae44afc38000e10f0e75faa5b286`, родители `40aa2f3` и `dd5a0d4`; конфликтов нет.
+- Diff `40aa2f3..09ebe0d` — только `R5_CCCC_E2_INSTRUMENT.ie3a-final.md`, побайтно равный `dd5a0d4`.
+- Повторной интеграции с нуля и повторной рецензии не было.
+- Дублирующая ветка `integration/r5-cccc-e2` @ `cf0eb28` не вливалась и не удалялась.
+
 ## 3. Проверки
 
 | № | Проверка | Результат |
 |---|---|---|
 | 1 | Состав | 7 новых файлов; изменённых и удалённых нет (разд. 4) |
-| 2 | Побайтная сохранность | Все 7 файлов равны `b1278fc`. Шесть из них равны и `37bdf89` (QA); седьмой — документ Reviewer |
+| 2 | Побайтная сохранность | Все 7 файлов равны `dd5a0d4`, шесть из них — и `37bdf89` (QA). Седьмой — документ Reviewer. До синхронизации все 7 были равны `b1278fc` |
 | 3 | Независимость от рабочего `kkvim` | Импортов `kkvim` в инструменте и тестах нет. Используются стандартная библиотека, `numpy` и `kkvim_reference.r5_cccc_{d2, halfstep}`; тесты дополнительно используют `r5_cccc_bc`. `threadpoolctl` необязателен и нужен только для записи происхождения. Тест `test_instrument_does_not_import_the_main_solver` проверяет `sys.modules` в отдельном процессе. `tests/test_package_independence.py` — 14 passed |
 | 4 | Неизменность Q1b, B-C, решений и спецификаций | `git diff 7645fa7 HEAD` даёт 0 строк по файлам: `src/kkvim`, `tests/kkvim`, `scripts`, `docs/results`; модули и тесты `r5_cccc_halfstep`, `r5_cccc_bc`, `r5_cccc_d2`; `MATH_SPEC.md`; `DECISIONS.md` (D-049, D-050); `ROADMAP.md`; `OPEN_QUESTIONS.md`; `*NUMERICAL_SPEC*`; `*PREQUAL*`; `pyproject.toml`; `uv.lock`; `.github`; `.githooks`. `STATUS.md` изменён только технической отметкой Integrator (разд. 5) |
 | 5 | Совместимость с Q1b и B-C | Е-2 построен на `5bcc09d`. Модули и тесты Q1b, B-C и `r5_cccc_d2` в HEAD побайтно равны этой редакции. Методика — `R5_CCCC_ROUNDOFF_PREQUAL_DRAFT.md` @ `96914c9`; в `main` файл побайтно равен этой редакции. Все пути, упомянутые в файлах Е-2, существуют в HEAD |
-| 6 | Тесты Е-2 | **100 passed, 4 skipped** — как в отчёте Reviewer `b1278fc`. Пропуски — только случаи с расширенным `long double`; на этой платформе `numpy.longdouble` совпадает с binary64 (nmant = 52) |
-| 7 | Тесты Q1b | `test_r5_cccc_halfstep.py` — **91 passed** |
-| 8 | Тесты B-C | `test_r5_cccc_bc.py` — **99 passed** |
-| 9 | Полный pytest (Windows 10, CPython 3.14.8) | **3419 passed, 35 skipped**, 0 failed (107 с); равен ориентиру Reviewer и сумме 3319 + 100 passed, 31 + 4 skipped. Новые пропуски — только 4 случая Е-2 с `long double`. Прежние 31: `mpmath` не установлен, тяжёлые прогоны выключены флагом, `long double` в R3 |
+| 6 | Тесты Е-2 | **100 passed, 4 skipped** — как в отчёте Reviewer `b1278fc`/`dd5a0d4`; повторено на итоговом дереве. Пропуски — только случаи с расширенным `long double`; на этой платформе `numpy.longdouble` совпадает с binary64 (nmant = 52) |
+| 7 | Тесты Q1b | `test_r5_cccc_halfstep.py` — **91 passed** (повторено на итоговом дереве) |
+| 8 | Тесты B-C | `test_r5_cccc_bc.py` — **99 passed** (повторено на итоговом дереве) |
+| 9 | Полный pytest (Windows 10, CPython 3.14.8) | **3419 passed, 35 skipped**, 0 failed — на `7474ffc` (107 с) и повторно на итоговом дереве после `09ebe0d` (99 с); равен ориентиру Reviewer и сумме 3319 + 100 passed, 31 + 4 skipped. Новые пропуски — только 4 случая Е-2 с `long double`. Прежние 31: `mpmath` не установлен, тяжёлые прогоны выключены флагом, `long double` в R3 |
 | 10 | Воспроизводимость тестов | Два независимых прогона `test_r5_cccc_e2.py` дали одинаковые исходы для всех 104 случаев (`-rA`, без кэша pytest). Е-2 не пишет файлов данных, поэтому сверять CSV не нужно. CSV Q1b и B-C с историческими редакциями `history_b72515b/`, `history_aed5ba4/`, `history_1d33fe1/` не изменены |
-| 11 | `uv lock --check`, `git diff --check` | без замечаний |
-| 12 | CI | Integrator не наблюдает: авторизованного `gh` нет (AGENTS.md, разд. 6). CI `b1278fc` — SUCCESS по сообщению владельца. CI интеграционной ветки подтверждает владелец |
+| 11 | `uv lock --check`, `git diff --check` | без замечаний (повторено на итоговом дереве) |
+| 12 | CI | Integrator не наблюдает: авторизованного `gh` нет (AGENTS.md, разд. 6). По сообщениям владельца — SUCCESS: `b1278fc`; Reviewer `dd5a0d4` (прогон `39997458680`); интеграционная ветка `40aa2f3` (прогон `39997921846`). CI на итоговом SHA подтверждает владелец |
 
 ## 4. Состав
 
@@ -57,7 +73,7 @@ Q3 не запускался.
 | Инструмент | `src/kkvim_reference/r5_cccc_e2.py` | QA `37bdf89` |
 | Тесты | `tests/reference/test_r5_cccc_e2.py` (104 случая) | QA `37bdf89` |
 | Отчёты QA | `R5_CCCC_E2_INSTRUMENT_PREP.report.md`, `R5_CCCC_E2_INSTRUMENT.address-fix.md` | QA `37bdf89` |
-| Рецензии | `R5_CCCC_E2_INSTRUMENT.independent-review.md` (`907de22`), `.final-address.md` (`f5f85e1`), `.ie3a-final.md` (`b1278fc`) | Reviewer |
+| Рецензии | `R5_CCCC_E2_INSTRUMENT.independent-review.md` (`907de22`), `.final-address.md` (`f5f85e1`), `.ie3a-final.md` (`b1278fc`, дополнение `dd5a0d4`) | Reviewer |
 
 От Integrator: этот отчёт и техническая отметка в `docs/STATUS.md`.
 
@@ -80,5 +96,5 @@ Q3 не запускался.
 
 ## 6. PR
 
-PR и merge в `main` выполняются отдельно, по разрешению владельца. Diff ветки относительно `main`: 8 новых файлов (7 из источника
+PR и merge в `main` выполняются отдельно, по разрешению владельца. Работа Integrator над Е-2 завершена. Diff ветки относительно `main`: 8 новых файлов (7 из источника
 и этот отчёт) и отметка в `STATUS.md`.
