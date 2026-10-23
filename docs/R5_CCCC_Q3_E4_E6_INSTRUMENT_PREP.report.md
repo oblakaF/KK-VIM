@@ -72,7 +72,7 @@
 
 ## 2. Тесты
 
-`tests/reference/test_r5_cccc_q3_e4e6.py` — **94 теста** (52 исходных без изменений и 42 адресных по ИИ-1), все проходят (≈ 11 с).
+`tests/reference/test_r5_cccc_q3_e4e6.py` — **98 тестов** (52 исходных без изменений и 46 адресных по ИИ-1), все проходят (≈ 11 с).
 
 | Тест | Что проверяет |
 |---|---|
@@ -194,7 +194,7 @@ uv run python scripts/r5_cccc_q3_e4e6_pilot.py        # docs/results/r5_cccc_q3_
 
 | Проверка | Результат |
 |---|---|
-| `tests/reference/test_r5_cccc_q3_e4e6.py` | 52 passed; после ИИ-1 — 94 passed |
+| `tests/reference/test_r5_cccc_q3_e4e6.py` | 52 passed; после ИИ-1 — 98 passed |
 | полный `pytest`, Python 3.13.15 | 3371 passed, 31 skipped |
 | полный `pytest`, Python 3.14.8 (отдельное окружение) | 3371 passed, 31 skipped |
 | `uv lock --check`, `git diff --check`, самотест hook | без изменений; чисто; пройден |
@@ -244,9 +244,11 @@ uv run python scripts/r5_cccc_q3_e4e6_pilot.py        # docs/results/r5_cccc_q3_
    - Значение SVD ниже 1 — округление SVD. Статус: «HOLDS (exact witness …)»; недостача 1 − ‖M‖₂ записывается
      (`vok12_lower_svd_deficit`, наблюдение).
    - При n_s ≤ 3 — `NOT_APPLICABLE`.
-4. **Тесты (42 новых):**
+4. **Тесты (46 новых):**
    - `test_ir1_reviewer_counterexamples` — все 4 контрпримера Reviewer: l_y = 1000 без QR и с QR, l_y = 3000, N = 2, l_y = 300 с QR.
-     SVD по-прежнему даёт < 1, а статус — HOLDS (exact witness);
+     классификация верна при любом значении SVD (< 1 — свидетель, ≥ 1 — double);
+   - `test_ir1_svd_below_one_is_classified_deterministically` (4 случая) — значение SVD 1 − 2u задаётся подменой `r5_cccc_bc.m_norm`,
+     поэтому ветвь свидетеля проверяется на любой платформе;
    - `test_ir1_unified_rule_small_n_s` — n_s = 3, 4, 5 × N = 1–3 × QR и без × l_y = 1 и 1000, 36 случаев: теоремы PROVEN, проверки
      HOLDS или UNRESOLVED_ROUNDING, VIOLATED нигде;
    - `test_ir1_numeric_check_rule` — правило, включая большой разрыв 2,0, который остаётся виден;
@@ -270,9 +272,15 @@ uv run python scripts/r5_cccc_q3_e4e6_pilot.py        # docs/results/r5_cccc_q3_
 
 | Проверка | Результат |
 |---|---|
-| `tests/reference/test_r5_cccc_q3_e4e6.py` | 94 passed |
-| полный `pytest`, Python 3.13.15 | 3413 passed, 31 skipped |
-| полный `pytest`, Python 3.14.8 (отдельное окружение) | 3413 passed, 31 skipped |
+| `tests/reference/test_r5_cccc_q3_e4e6.py` | 98 passed |
+| полный `pytest`, Python 3.13.15 | 3417 passed, 31 skipped |
+| полный `pytest`, Python 3.14.8 (отдельное окружение) | 3417 passed, 31 skipped |
 | `uv lock --check`, `git diff --check`, самотест hook | без изменений; чисто; пройден |
+
+**Второй коммит (отклонение от «один commit»).** Первый коммит `b5f29014` прошёл локально (Windows), но упал в CI на трёх
+конфигурациях. Логи CI без авторизации недоступны. Единственное платформенно зависимое утверждение среди новых тестов —
+`M_norm_2 < 1` в контрпримерах: значение SVD при ‖M‖₂ = 1 зависит от ядра BLAS (1 − 2u здесь, возможно 1 на других CPU).
+Утверждение заменено проверкой классификации при любом значении; ветвь «SVD < 1» проверяется детерминированно подменой
+`m_norm`. Код инструмента во втором коммите не менялся. Force push не выполнялся.
 
 **Вердикт: READY_FOR_FINAL_CONFIRMATION.** Следующий шаг — короткая сверка Reviewer ИИ-1, ИИ-2.

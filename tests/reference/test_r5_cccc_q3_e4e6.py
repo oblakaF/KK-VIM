@@ -143,10 +143,25 @@ def test_ir1_reviewer_counterexamples(ly, N, qr):
     """Reviewer: n_s = 4, the SVD gives ||M||_2 = 1 - 2u although ||M||_2 >= 1 exactly (VOK-12, item 3). Now: theorem PROVEN, lower
     bound HOLDS by the exact witness, never VIOLATED."""
     f = q.e6_case(hs.HalfStep(1.0, 10, ly, 4, "Y", hs.start_set(10, N)), qr=qr)
-    assert f["M_norm_2"] < 1  # the counterexample is still reproduced by the SVD
+    # the SVD value at ||M||_2 = 1 depends on the BLAS kernel (1 - 2u on the Reviewer's machine, possibly 1 elsewhere): the
+    # classification must be right for either value
     assert f["vok12_theorem"].startswith("PROVEN")
-    assert f["vok12_lower"].startswith("HOLDS (exact witness")
-    assert f["vok12_lower_svd_deficit"] == 1 - f["M_norm_2"]
+    if f["M_norm_2"] < 1:
+        assert f["vok12_lower"].startswith("HOLDS (exact witness")
+        assert f["vok12_lower_svd_deficit"] == 1 - f["M_norm_2"]
+    else:
+        assert f["vok12_lower"] == "HOLDS (double evaluation)" and f["vok12_lower_svd_deficit"] == 0.0
+    assert f["vok12_check"].startswith("HOLDS") and not any("VIOLATED" in str(v) for v in f.values())
+
+
+@pytest.mark.parametrize("N, qr", [(1, False), (1, True), (2, True), (3, False)])
+def test_ir1_svd_below_one_is_classified_deterministically(monkeypatch, N, qr):
+    """The Reviewer's situation on every platform: the SVD returns 1 - 2u for ||M||_2 (forced by replacing r5_cccc_bc.m_norm);
+    the lower bound stays HOLDS by the exact witness, never VIOLATED."""
+    monkeypatch.setattr(bc, "m_norm", lambda Y0, S, rows: (1 - 2.0**-52, "dense"))
+    f = q.e6_case(hs.HalfStep(1.0, 10, 1000.0, 4, "Y", hs.start_set(10, N)), qr=qr)
+    assert f["M_norm_2"] == 1 - 2.0**-52
+    assert f["vok12_lower"].startswith("HOLDS (exact witness") and f["vok12_lower_svd_deficit"] == 2.0**-52
     assert f["vok12_check"].startswith("HOLDS") and not any("VIOLATED" in str(v) for v in f.values())
 
 
