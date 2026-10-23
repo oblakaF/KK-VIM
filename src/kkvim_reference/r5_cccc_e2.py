@@ -23,21 +23,25 @@ Provenance (versions, BLAS, platform, call, digests) is recorded with every meas
 
 Premises of the rounding model (roundoff document 0.4; review 907de22, IE-1...IE-3). VOK-4 and VOK-5 are bounds UNDER P-1...P-5;
 the exact comparisons are normative only where the premises are established for the operations that formed w^:
-- P-2 (no overflow): established iff w^ is finite (an overflow produces +-inf in round-to-nearest and cannot disappear in later
-  additions or FMA; inf - inf gives NaN). Otherwise OUTSIDE_P2: no error e, no VOK-4/VOK-5 check, no double path (iv).
+- P-2 (no overflow): established iff w^ is finite. This uses P-1, rounding to nearest (N-b, review f5f85e1): an overflow then
+  produces +-inf, which cannot disappear in later additions or FMA (inf - inf gives NaN); with rounding towards zero an overflow
+  would give +-DBL_MAX and the conclusion would not hold. Otherwise OUTSIDE_P2: no error e, no VOK-4/VOK-5 check, no double path (iv).
 - P-3 (no underflow), threshold 2^-1022 (smallest normal binary64): ``p3_premise``. All inputs normal or zero, and for every k and
   nonzero pair e(X_ik) + e(Y_jk) >= -918 (e = exponent, |x| in [2^e, 2^(e+1))) => P3_CONFIRMED. Proof (own derivation, level B):
   the exact product X_ik Y_jk is a multiple of 2^(e(X)+e(Y)-104) >= G := 2^-1022; sums of multiples of G are multiples of G, and
   rounding a multiple of G to the nearest double gives a multiple of G (either the result is exact, or its ulp is >= G); so every
   value of any evaluation order, with or without FMA, is 0 or has magnitude >= G - never subnormal. If this cannot be shown:
-  OUTSIDE_P3 when an operation with a nonzero subnormal exact result certainly occurred (a nonzero subnormal input; a nonzero
-  subnormal w^_ij; a node whose only nonzero product is below 2^-1022 - with N = 1 that is the product itself), otherwise
+  OUTSIDE_P3 when an operation with a nonzero subnormal exact result certainly occurred (a nonzero subnormal w^_ij; a node whose
+  only nonzero product is below 2^-1022 - with N = 1 that is the product itself) and, as a CONSERVATIVE restriction of the domain
+  (N-a, review f5f85e1), for any nonzero subnormal input - even when no subnormal operation actually occurs (e.g. the subnormal
+  entry meets only zeros of the other factor), otherwise
   UNRESOLVED_PREMISES (potential subnormal intermediates; possible exact sums of the products are listed). The exact
   comparisons remain available as OBSERVATION (``vok4_violations``, ``vok5_holds``); the normative results are ``vok4_status``,
   ``vok5_status``: HOLDS / VIOLATED only under P3_CONFIRMED, else the premise status.
 - P-4, P-5: N <= 3 (no fast multiplication of length <= 3; N u < 1).
-The input domain (IE-3) is checked in ``FieldInputs``: l_x, l_y, D finite and > 0, n_x, n_y integers >= 3, X, Y real numeric
-arrays exactly representable in float64.
+The input domain (IE-3) is checked in ``FieldInputs``: l_x, l_y, D finite and > 0 with the exact value of the argument equal to a
+binary64 number (any int, float, numpy.integer, numpy.floating, including numpy.longdouble; IE-3a), n_x, n_y integers >= 3, X, Y
+real numeric arrays exactly representable in float64, not masked arrays.
 """
 
 import contextlib
@@ -83,14 +87,22 @@ def _positive_real(name: str, v) -> float:
         raise ValueError(f"{name} is outside the double range: {v!r}") from None
     if not math.isfinite(f) or f <= 0:
         raise ValueError(f"{name} must be finite and > 0 (plate a x b, D > 0; NS 2.2), got {v!r}")
-    if isinstance(v, (int, np.integer)) and Fraction(f) != Fraction(int(v)):
-        raise ValueError(f"{name} is not exactly representable as a double: {v!r}")
+    # IE-3a (review f5f85e1): the EXACT value of the argument must equal the double, for every accepted type (numpy.longdouble may be
+    # wider than binary64); no silent rounding, and no acceptance when the exact value cannot be determined
+    try:
+        exact = Fraction(int(v)) if isinstance(v, (int, np.integer)) else Fraction(*v.as_integer_ratio())
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        raise ValueError(f"{name}: the exact value of {type(v).__name__} cannot be determined; not accepted") from None
+    if Fraction.from_float(f) != exact:
+        raise ValueError(f"{name} is not exactly representable as a double (binary64): {v!r}")
     return f
 
 
 def _real_array(name: str, a) -> np.ndarray:
     """A real numeric array converted EXACTLY to a read-only C-contiguous float64 copy; complex, bool, object, str are refused
-    (IE-3: no silent conversion)."""
+    (IE-3: no silent conversion). A numpy.ma.MaskedArray is refused: converting it would drop the mask silently (N-c)."""
+    if isinstance(a, np.ma.MaskedArray):
+        raise ValueError(f"{name} must not be a masked array (numpy.ma.MaskedArray): the mask would be lost silently")
     arr = np.asarray(a)
     if arr.dtype.kind not in "fiu":
         raise ValueError(f"{name} must be a real numeric array (float or integer), got dtype {arr.dtype}")

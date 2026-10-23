@@ -324,3 +324,91 @@ def test_n4_sqrt_interval_subnormal_and_large():
         lo, hi = e2.sqrt_interval(x)
         assert lo * lo <= x <= hi * hi and 0 < lo < hi
         assert (hi - lo) / lo <= Fraction(1, 2**63)
+
+
+# --- review f5f85e1: IE-3a (exact scalar parameters), N-c (masked arrays) ----------------------------------------------------
+
+EXTENDED_LONGDOUBLE = np.finfo(np.longdouble).nmant > 52
+
+
+def _inputs_with(**kwargs):
+    args = {"X": np.ones((3, 1)), "Y": np.ones((3, 1)), "lx": 1.0, "nx": 4, "ly": 1.0, "ny": 4, "D": 1.0}
+    args.update(kwargs)
+    return e2.FieldInputs(**args)
+
+
+@pytest.mark.skipif(not EXTENDED_LONGDOUBLE, reason="numpy.longdouble is binary64 on this platform (nmant = 52): no value of it "
+                                                    "is wider than a double, the IE-3a counterexample cannot be formed")
+@pytest.mark.parametrize("field", ["lx", "ly", "D"])
+def test_ie3a_extended_longdouble_is_refused(field):
+    """IE-3a: 1 + 2^-60 in an extended long double would be rounded silently to 1.0; it is refused."""
+    value = np.longdouble(1) + np.longdouble(2) ** -60
+    assert value != np.longdouble(1.0)  # the value really is wider than binary64 here
+    with pytest.raises(ValueError):
+        _inputs_with(**{field: value})
+
+
+@pytest.mark.parametrize("value", [1.5, np.float16(0.5), np.float32(0.25), np.float64(1.3), np.longdouble(0.75), np.longdouble(1.3),
+                                   3, np.int64(7), np.uint16(9), 2**53])
+@pytest.mark.parametrize("field", ["lx", "ly", "D"])
+def test_ie3a_exactly_representable_values_are_accepted(field, value):
+    """float, numpy float16/32/64, longdouble holding a binary64 value, and integers: accepted, stored as the same exact value."""
+    inp = _inputs_with(**{field: value})
+    stored = getattr(inp, field)
+    assert isinstance(stored, float)
+    exact = Fraction(int(value)) if isinstance(value, (int, np.integer)) else Fraction(*value.as_integer_ratio())
+    assert Fraction(stored) == exact
+
+
+@pytest.mark.parametrize("value", [2**53 + 1, 10**400, np.uint64(2**63 + 1), np.int64(2**62 + 1)])
+@pytest.mark.parametrize("field", ["lx", "D"])
+def test_ie3a_inexact_integers_are_refused(field, value):
+    with pytest.raises(ValueError):
+        _inputs_with(**{field: value})
+
+
+@pytest.mark.skipif(not EXTENDED_LONGDOUBLE, reason="numpy.longdouble is binary64 on this platform: no extended value exists")
+def test_ie3a_extended_longdouble_out_of_range_or_inexact_is_refused():
+    for value in (np.longdouble(2) ** 1100, np.longdouble(2) ** -1100, np.longdouble(1) / np.longdouble(3)):
+        with pytest.raises(ValueError):
+            _inputs_with(lx=value)
+
+
+def test_ie3a_domain_checks_still_hold():
+    """Geometry and stiffness: zero, negative, infinite, NaN, bool, str, complex are refused as before; valid input is accepted."""
+    for field in ("lx", "ly", "D"):
+        for bad in (0.0, -1.0, float("inf"), float("nan"), True, "1.0", 1 + 0j, np.float32("nan")):
+            with pytest.raises(ValueError):
+                _inputs_with(**{field: bad})
+    assert _inputs_with().lx == 1.0
+
+
+def test_nc_masked_arrays_are_refused():
+    """N-c: a masked array would lose its mask silently in the conversion; it is refused for X and Y."""
+    masked = np.ma.masked_array(np.array([[1.0], [1e300], [1.0]]), mask=[[False], [True], [False]])
+    with pytest.raises(ValueError):
+        e2.FieldInputs(masked, np.ones((3, 1)), 1.0, 4, 1.0, 4)
+    with pytest.raises(ValueError):
+        e2.FieldInputs(np.ones((3, 1)), masked, 1.0, 4, 1.0, 4)
+    with pytest.raises(ValueError):
+        e2.FieldInputs(np.ma.masked_array(np.ones((3, 1))), np.ones((3, 1)), 1.0, 4, 1.0, 4)  # even without masked entries
+
+
+class _WiderThanDouble(float):
+    """A float whose reported exact value is wider than its double (as an extended long double would be): platform-independent
+    check of the IE-3a logic, which compares the exact value of the argument with the double."""
+
+    def as_integer_ratio(self):
+        return (2**60 + 1, 2**60)
+
+
+class _UnknownExactValue(float):
+    def as_integer_ratio(self):
+        raise TypeError("no exact value")
+
+
+def test_ie3a_logic_on_every_platform():
+    with pytest.raises(ValueError, match="not exactly representable"):
+        _inputs_with(lx=_WiderThanDouble(1.0))
+    with pytest.raises(ValueError, match="cannot be determined"):
+        _inputs_with(D=_UnknownExactValue(1.0))

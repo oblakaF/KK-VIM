@@ -64,3 +64,36 @@
 4. **Проверено:** разд. 3.
 5. **Не подтверждено:** разд. 4.
 6. **Следующий шаг:** адресная сверка Reviewer ИЕ-1…ИЕ-3.
+
+## 6. Закрытие ИЕ-3а и уточнений Н-а, Н-б, Н-в (по заключению `f5f85e1`)
+
+Основа: `review/r5-cccc-e2-final-address` @ `f5f85e15a60225ec8f5335b53f190e6aa5aa5445`. Ветка: `qa/r5-cccc-e2-ie3a-address`.
+Менялись **только проверки входных данных, docstring, тесты и этот документ**. Не менялись:
+- точное UVᵀ, рациональные нормы и интервалы;
+- П-2/П-3;
+- тесты и модули Q1b и B-C;
+- `kkvim`, постановка и спецификации.
+
+| № | Исправление | Тесты |
+|---|---|---|
+| **ИЕ-3а** | `_positive_real`: после `f = float(v)` и проверки конечности и знака точное значение аргумента сравнивается с `Fraction.from_float(f)`. Точное значение: `Fraction(int(v))` для `int`/`numpy.integer`, `Fraction(*v.as_integer_ratio())` для `float`/`numpy.floating`, включая `numpy.longdouble`. Несовпадение — `ValueError` («not exactly representable as a double (binary64)»); если точное значение определить нельзя — `ValueError` («cannot be determined»). Область допустимых параметров та же: lₓ, l_y, D конечны, > 0 и точно представимы в binary64 | `test_ie3a_extended_longdouble_is_refused` (1 + 2⁻⁶⁰ в long double; выполняется, если `np.finfo(np.longdouble).nmant > 52`, иначе пропуск с объяснением); `test_ie3a_extended_longdouble_out_of_range_or_inexact_is_refused` (2¹¹⁰⁰, 2⁻¹¹⁰⁰, 1/3; то же условие); `test_ie3a_logic_on_every_platform` (подкласс `float` с более широким точным значением и с неопределимым значением — проверка логики на любой платформе); `test_ie3a_exactly_representable_values_are_accepted` (float, float16/32/64, longdouble с binary64-значением, int, numpy-целые, 2⁵³; 30 случаев); `test_ie3a_inexact_integers_are_refused` (2⁵³ + 1, 10⁴⁰⁰, uint64 2⁶³ + 1, int64 2⁶² + 1); `test_ie3a_domain_checks_still_hold` |
+| Н-а | Docstring: субнормальный вход классифицируется `OUTSIDE_P3` как **консервативное ограничение области**, даже когда субнормальной операции фактически не было (например, против нулей другого множителя) | — (редакционное) |
+| Н-б | Docstring: вывод «конечное ŵ ⇒ нет переполнения» опирается на П-1 (округление к ближайшему); при округлении к нулю переполнение дало бы ±DBL_MAX | — (редакционное) |
+| Н-в | `_real_array` отклоняет `numpy.ma.MaskedArray` (`ValueError`): маска иначе терялась бы молча | `test_nc_masked_arrays_are_refused` (X, Y, массив без замаскированных элементов) |
+
+**Платформы.**
+- Здесь (Windows, numpy 2.5.4) `np.finfo(np.longdouble).nmant = 52`: long double совпадает с binary64, и 4 теста расширенной точности
+  пропускаются с объяснением.
+- Логика ИЕ-3а проверяется на любой платформе тестом с подклассом `float`.
+- В CI матрица включает `ubuntu-latest` (x86-64, long double 80 бит, nmant = 63): там тесты расширенной точности выполняются.
+
+**Проверки.**
+
+| Проверка | Результат |
+|---|---|
+| `tests/reference/test_r5_cccc_e2.py` | 100 passed, 4 skipped (59 прежних + 45 новых случаев; пропуски — только расширенный long double на этой платформе) |
+| полный `pytest`, Python 3.13.15 | 3419 passed, 35 skipped |
+| полный `pytest`, Python 3.14.8 (отдельное окружение) | 3419 passed, 35 skipped |
+| `uv lock --check`, `git diff --check`, самотест hook | без изменений; чисто; пройден |
+
+**Вердикт: READY_FOR_FINAL_CONFIRMATION.** Следующий шаг — короткая сверка Reviewer только ИЕ-3а и Н-а…Н-в.
