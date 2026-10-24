@@ -1,6 +1,8 @@
 # Проект решения D-051 — R5-V CCCC, этап Q1
 
-**Статус проекта:** **PROPOSED** — подготовлен Integrator. В `docs/DECISIONS.md` не внесён, в `docs/STATUS.md` Q1 PASS не записан.
+**Статус проекта:** **ПЕРЕНЕСЁН** (2026-10-25): разд. 1 внесён в `docs/DECISIONS.md` как принятое D-051, разд. 2 — в
+`docs/STATUS.md`; CI `main` [`40132202612`](https://github.com/oblakaF/KK-VIM/actions/runs/40132202612) — SUCCESS (проверено SUPERVISOR). Ниже — исходный текст проекта
+(PROPOSED, BLOCKED_ON_MAIN_CI) без изменений; при расхождении действует запись в `docs/DECISIONS.md`.
 **Цели:** G3.4, G4. **Дата подготовки:** 2026-10-25. **Ветка:** `integration/r5-cccc-q1-acceptance` от `main` @ `019640cf019b96f6823f36d1e5aa0eaafeb61d68`.
 
 **Почему проект, а не запись.** Задание владельца ставит запись D-051 в зависимость от финального CI `main`:
