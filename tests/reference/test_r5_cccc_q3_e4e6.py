@@ -140,29 +140,32 @@ ALLOWED_CHECK = ("HOLDS (double evaluation)", "UNRESOLVED_ROUNDING")
 
 @pytest.mark.parametrize("ly, N, qr", [(1000.0, 1, False), (1000.0, 1, True), (3000.0, 1, False), (300.0, 2, True)])
 def test_ir1_reviewer_counterexamples(ly, N, qr):
-    """Reviewer: n_s = 4, the SVD gives ||M||_2 = 1 - 2u although ||M||_2 >= 1 exactly (VOK-12, item 3). Now: theorem PROVEN, lower
-    bound HOLDS by the exact witness, never VIOLATED."""
+    """Reviewer: n_s = 4, the SVD gives ||M||_2 = 1 - 2u although ||M||_2 >= 1 exactly (VOK-12, item 3). The theorem is PROVEN (exact
+    witness); the check of the double value is UNRESOLVED_ROUNDING with the gap when the value is below 1 (IR-1a: the cause is not
+    claimed), HOLDS otherwise; never VIOLATED."""
     f = q.e6_case(hs.HalfStep(1.0, 10, ly, 4, "Y", hs.start_set(10, N)), qr=qr)
     # the SVD value at ||M||_2 = 1 depends on the BLAS kernel (1 - 2u on the Reviewer's machine, possibly 1 elsewhere): the
     # classification must be right for either value
-    assert f["vok12_theorem"].startswith("PROVEN")
+    assert f["vok12_theorem"].startswith("PROVEN") and "exact witness" in f["vok12_theorem"]
     if f["M_norm_2"] < 1:
-        assert f["vok12_lower"].startswith("HOLDS (exact witness")
-        assert f["vok12_lower_svd_deficit"] == 1 - f["M_norm_2"]
+        assert f["vok12_lower"].startswith("UNRESOLVED_ROUNDING") and f["vok12_lower_gap_rel"] == 1 - f["M_norm_2"]
+        assert f["vok12_check"].startswith("UNRESOLVED_ROUNDING")
     else:
-        assert f["vok12_lower"] == "HOLDS (double evaluation)" and f["vok12_lower_svd_deficit"] == 0.0
-    assert f["vok12_check"].startswith("HOLDS") and not any("VIOLATED" in str(v) for v in f.values())
+        assert f["vok12_lower"] == "HOLDS (double evaluation)" and f["vok12_lower_gap_rel"] == 0.0
+        assert f["vok12_check"].startswith("HOLDS")
+    assert not any("VIOLATED" in str(v) or "SVD rounding" in str(v) for v in f.values())
 
 
 @pytest.mark.parametrize("N, qr", [(1, False), (1, True), (2, True), (3, False)])
 def test_ir1_svd_below_one_is_classified_deterministically(monkeypatch, N, qr):
-    """The Reviewer's situation on every platform: the SVD returns 1 - 2u for ||M||_2 (forced by replacing r5_cccc_bc.m_norm);
-    the lower bound stays HOLDS by the exact witness, never VIOLATED."""
+    """The Reviewer's situation on every platform: the SVD returns 1 - 2u for ||M||_2 (forced by replacing r5_cccc_bc.m_norm).
+    IR-1a: the theorem stays PROVEN; the check is UNRESOLVED_ROUNDING with the gap 2^-52, the cause not claimed; never VIOLATED."""
     monkeypatch.setattr(bc, "m_norm", lambda Y0, S, rows: (1 - 2.0**-52, "dense"))
     f = q.e6_case(hs.HalfStep(1.0, 10, 1000.0, 4, "Y", hs.start_set(10, N)), qr=qr)
-    assert f["M_norm_2"] == 1 - 2.0**-52
-    assert f["vok12_lower"].startswith("HOLDS (exact witness") and f["vok12_lower_svd_deficit"] == 2.0**-52
-    assert f["vok12_check"].startswith("HOLDS") and not any("VIOLATED" in str(v) for v in f.values())
+    assert f["M_norm_2"] == 1 - 2.0**-52 and f["vok12_theorem"].startswith("PROVEN")
+    assert f["vok12_lower"].startswith("UNRESOLVED_ROUNDING") and f["vok12_lower_gap_rel"] == 2.0**-52
+    assert f["vok12_check"].startswith("UNRESOLVED_ROUNDING")
+    assert not any("VIOLATED" in str(v) or "SVD rounding" in str(v) for v in f.values())
 
 
 @pytest.mark.parametrize("ny", [3, 4, 5])
@@ -179,8 +182,9 @@ def test_ir1_unified_rule_small_n_s(ny, N, qr, ly):
     assert f["vok10_check"].startswith("HOLDS") or f["vok10_gap_rel"] > 0
     if ny == 3:
         assert f["vok12_lower"].startswith("NOT_APPLICABLE") and "not applicable" in f["vok12_check"]
-    else:
-        assert f["vok12_lower"].startswith("HOLDS")
+    else:  # IR-1a: HOLDS for a value >= 1, UNRESOLVED_ROUNDING with the gap for a value below 1 (platform-dependent SVD)
+        expected = "HOLDS" if f["M_norm_2"] >= 1 else "UNRESOLVED_ROUNDING"
+        assert f["vok12_lower"].startswith(expected) and f["vok12_lower_gap_rel"] == max(0.0, 1 - f["M_norm_2"])
     assert not any("VIOLATED" in str(v) for v in f.values())
 
 
@@ -198,11 +202,13 @@ def test_ir1_numeric_check_rule():
 
 
 def test_ir1_lower_bound_rule_and_witness():
-    """lower_bound_one: n_s <= 3 not applicable; below 1 for n_s >= 4 -> exact witness. The witness: in the operator
-    M = I - W Z^T every column outside the boundary rows is the unit vector itself (checked on a random W)."""
-    assert q.lower_bound_one(0.92, 3).startswith("NOT_APPLICABLE")
-    assert q.lower_bound_one(1.0, 4) == "HOLDS (double evaluation)"
-    assert q.lower_bound_one(1 - 2.0**-52, 4).startswith("HOLDS (exact witness")
+    """lower_bound_one (IR-1a): n_s <= 3 not applicable; for n_s >= 4 the double value is checked by numeric_check (below 1 ->
+    UNRESOLVED_ROUNDING with the gap). The witness of the THEOREM: in the operator M = I - W Z^T every column outside the boundary
+    rows is the unit vector itself (checked on a random W)."""
+    assert q.lower_bound_one(0.92, 3)[0].startswith("NOT_APPLICABLE")
+    assert q.lower_bound_one(1.0, 4) == ("HOLDS (double evaluation)", 0.0)
+    status, gap = q.lower_bound_one(1 - 2.0**-52, 4)
+    assert status.startswith("UNRESOLVED_ROUNDING") and gap == 2.0**-52 and "SVD rounding" not in status
     N, m = 2, 3  # n_s = 4
     rows = bc.boundary_rows(N, m)
     W = np.random.default_rng(1).standard_normal((N * m, 2 * N))
@@ -210,3 +216,34 @@ def test_ir1_lower_bound_rule_and_witness():
     M[:, rows] -= W
     outside = [k for k in range(N * m) if k not in rows]
     assert outside and all(np.array_equal(M[:, k], np.eye(N * m)[:, k]) for k in outside)
+
+
+
+# --- review 485708f, IR-1a: the lower bound check of the double value ---------------------------------------------------------
+
+@pytest.mark.parametrize("value, lower_prefix, gap", [(0.5, "UNRESOLVED_ROUNDING", 0.5), (1 - 2.0**-52, "UNRESOLVED_ROUNDING", 2.0**-52),
+                                                      (1.0, "HOLDS (double evaluation)", 0.0), (1.5, "HOLDS (double evaluation)", 0.0)])
+def test_ir1a_lower_bound_check_of_the_computed_value(monkeypatch, value, lower_prefix, gap):
+    """||M||_2 forced to 0.5, 1 - 2^-52, 1, 1.5 (n_s = 4, dense branch): the THEOREM stays PROVEN by the exact witness; the CHECK of the
+    double value is UNRESOLVED_ROUNDING with the gap for a value below 1 (0.5 is not hidden and not attributed to the SVD) and
+    HOLDS otherwise; the combined vok12_check starts with HOLDS only if both checks hold; never VIOLATED."""
+    monkeypatch.setattr(bc, "m_norm", lambda Y0, S, rows: (value, "dense"))
+    f = q.e6_case(hs.HalfStep(1.0, 10, 1000.0, 4, "Y", hs.start_set(10, 2)), qr=True)
+    assert f["M_norm_2"] == value and f["vok12_theorem"].startswith("PROVEN") and "exact witness" in f["vok12_theorem"]
+    assert f["vok12_lower"].startswith(lower_prefix) and f["vok12_lower_gap_rel"] == gap
+    assert f["vok12_upper_gap_rel"] == 0.0 and f["vok12_check"].startswith("HOLDS" if gap == 0 else "UNRESOLVED_ROUNDING")
+    if value == 0.5:
+        assert "5.000e-01" in f["vok12_lower"] and "5.000e-01" in f["vok12_check"]
+    assert not any("VIOLATED" in str(v) or "SVD rounding" in str(v) for v in f.values())
+
+
+@pytest.mark.parametrize("value", [0.5, 1.0, 1e30])
+def test_ir1a_combined_status_is_consistent_with_both_checks(monkeypatch, value):
+    """vok12_check starts with HOLDS iff the upper and the lower check both start with HOLDS (an upper contradiction, forced by a
+    huge value, also makes the combined status UNRESOLVED_ROUNDING)."""
+    monkeypatch.setattr(bc, "m_norm", lambda Y0, S, rows: (value, "dense"))
+    f = q.e6_case(hs.HalfStep(1.0, 10, 1.0, 5, "Y", hs.start_set(10, 3)), qr=False)
+    upper_ok = f["vok12_upper_gap_rel"] == 0.0
+    lower_ok = f["vok12_lower"].startswith("HOLDS")
+    assert f["vok12_check"].startswith("HOLDS") == (upper_ok and lower_ok)
+    assert (value == 1e30) == (not upper_ok) and (value == 0.5) == (not lower_ok)

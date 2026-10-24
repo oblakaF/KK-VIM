@@ -303,17 +303,19 @@ def numeric_check(value: float, bound: float, sense: str) -> tuple[str, float]:
             "the evaluation error; diagnostic, not a violation of the theorem)"), gap
 
 
-def lower_bound_one(m_norm: float, n_s: int) -> str:
-    """VOK-12, item 3, lower bound ||M||_2 >= 1 for n_s >= 4, for the COMPUTED operator M = I - W Z^T (any W): N (n_s - 1) > 2N, so
-    there is an unknown k outside the 2N boundary rows; Z^T e_k = 0 and M e_k = e_k EXACTLY, hence ||M||_2 >= 1 exactly (in the dense
-    branch the matrix formed has the column e_k unchanged; in the subspace branch the value is max(1, .) by construction). An SVD value
-    below 1 is therefore the rounding of the SVD, not a violation."""
+LOWER_BOUND_WITNESS = ("lower bound 1 for n_s >= 4 by the exact witness: for M = I - W Z^T (any W) there is a row k outside the 2N "
+                       "boundary rows, Z^T e_k = 0 and M e_k = e_k exactly")
+
+
+def lower_bound_one(m_norm: float, n_s: int) -> tuple[str, float]:
+    """CHECK of the double value of ||M||_2 against the lower bound 1 of VOK-12, item 3 (IR-1a, review 485708f). The bound itself is a
+    theorem for n_s >= 4 (``LOWER_BOUND_WITNESS``; status in ``vok12_theorem``). The computed value is compared by the same rule as
+    every other bound (``numeric_check``): >= 1 -> HOLDS (double evaluation); < 1 -> UNRESOLVED_ROUNDING with the gap 1 - value. The
+    cause of a value below 1 is NOT established (rounding of the SVD or a defect of the implementation: no rigorous bound of the SVD
+    error is available), so none is claimed. n_s <= 3: NOT_APPLICABLE. Returns (status, gap)."""
     if n_s <= 3:
-        return "NOT_APPLICABLE (n_s <= 3: span Z may be the whole space)"
-    if m_norm >= 1:
-        return "HOLDS (double evaluation)"
-    return (f"HOLDS (exact witness: M e_k = e_k for a row k outside the boundary rows, so ||M||_2 >= 1 exactly; the SVD value is "
-            f"below 1 by {1 - m_norm:.1e}: SVD rounding)")
+        return "NOT_APPLICABLE (n_s <= 3: span Z may be the whole space)", 0.0
+    return numeric_check(m_norm, 1.0, ">=")
 
 
 def e6_case(p: hs.HalfStep, qr: bool = True, capacitance: str = "modal") -> dict:
@@ -349,12 +351,14 @@ def e6_case(p: hs.HalfStep, qr: bool = True, capacitance: str = "modal") -> dict
     mu = bc.modal_eigenvalues(n, p.l_s / n)
     lam_max_K0 = p.D * max(float(np.linalg.eigvalsh(mk ** 2 * pf["A"] + 2 * mk * pf["B"] + pf["C"])[-1]) for mk in mu)
     out["vok12_upper"] = math.sqrt(lam_max_K0 / (p.D * pf["mu_1"] ** 2 * pf["lambda_min_A"]))
-    out["vok12_theorem"] = proven.format("VOK-12, item 3: upper bound; lower bound 1 for n_s >= 4")
+    out["vok12_theorem"] = proven.format("VOK-12, item 3: upper bound; " + (LOWER_BOUND_WITNESS if n >= 4 else
+                                                                             "lower bound 1 not applicable for n_s <= 3"))
     upper, out["vok12_upper_gap_rel"] = numeric_check(log["M_norm_2"], out["vok12_upper"], "<=")
-    out["vok12_lower"] = lower_bound_one(log["M_norm_2"], n)
-    out["vok12_lower_svd_deficit"] = max(0.0, 1.0 - log["M_norm_2"]) if n >= 4 else 0.0
-    out["vok12_check"] = upper + ("; lower bound 1: " + out["vok12_lower"] if n >= 4 else
-                                  "; lower bound 1 not applicable (n_s <= 3)")
+    out["vok12_lower"], out["vok12_lower_gap_rel"] = lower_bound_one(log["M_norm_2"], n)
+    tail = "; lower bound 1: " + out["vok12_lower"] if n >= 4 else "; lower bound 1 not applicable (n_s <= 3)"
+    resolved = upper.startswith("HOLDS") and (n <= 3 or out["vok12_lower"].startswith("HOLDS"))
+    # IR-1a: the combined status starts with HOLDS only if every numerical check of VOK-12 holds
+    out["vok12_check"] = upper + tail if resolved else f"UNRESOLVED_ROUNDING (upper bound: {upper}{tail})"
     out["vok13_status"] = "MODEL (first order; no check; factors logged)"
     out["factor_provenance"] = ("rho_0, kappa_bar_c, cond(S), ||M||_2, max cond(M_k), varrho, beta_U, chi_U: computed in double; "
                                 "VOK-10, VOK-11, VOK-12 bounds: proven inequalities evaluated in double; exact-reference "
