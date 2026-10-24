@@ -1,0 +1,10 @@
+n,formula,max_abs_arg_error_up,max_norm_part_over_u_up,max_arg_part_over_u_up,max_sin_part_over_u_up,max_product_part_over_u_up,max_total_over_u_up,orthogonality_contains_identity,orthogonality_max_width_up
+3,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",2.296729e-16,1.347648e-2,8.445470e-1,3.970579e-1,2.090929e-1,5.646239e-1,True,3.483520e-47
+4,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",9.184851e-17,4.353762e-1,4.136490e-1,4.457405e-1,3.842851e-1,1.000001e+0,True,2.286294e-47
+7,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",1.049698e-16,2.081875e-1,4.553335e-1,2.475082e-1,2.466948e-1,8.958281e-1,True,4.118418e-47
+16,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",3.368553e-16,2.176881e-1,1.052113e+0,2.228703e-1,2.413423e-1,1.102878e+0,True,4.106526e-47
+32,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",3.368553e-16,0.000000e+00,7.439557e-1,1.575931e-1,0.000000e+00,7.679944e-1,True,3.966100e-47
+64,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",3.368553e-16,1.088441e-1,5.260561e-1,1.114352e-1,1.206712e-1,5.514387e-1,True,5.275529e-47
+128,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",3.368553e-16,0.000000e+00,3.719779e-1,7.879652e-2,0.000000e+00,3.839972e-1,,
+256,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",3.368553e-16,5.442203e-2,2.630281e-1,5.571756e-2,6.161066e-2,2.859287e-1,,
+512,"math.sqrt(2.0/n) * np.sin(k * math.pi / n) (r5_cccc_bc.solve_bc, psi_k(1))",3.368553e-16,0.000000e+00,1.859890e-1,3.951692e-2,0.000000e+00,1.919986e-1,,
