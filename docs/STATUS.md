@@ -686,6 +686,20 @@ D-026); идентификатор не переиспользуется (INDEX.
 
 ## Текущая задача
 
+**Техническая отметка 25.10.2026 (R5-V Q1 — READY_FOR_OWNER_ACCEPTANCE; Q1 не принят).** В ту же ветку
+`integration/r5-cccc-q3-instruments` влиты:
+- сертифицированный эталон DST-I `r5_cccc_dst_cert.py` с 50 тестами и пилотом (QA `2c32391`, Reviewer `9f30a5d` —
+  PASS_WITH_OPEN_LIMITATIONS);
+- итоговый аудит `docs/R5_CCCC_Q1_FINAL_GATE.audit.md` (`04cf548`: DST_CERT_PASS с условием У-П3; Q1_READY_FOR_OWNER_ACCEPTANCE).
+
+Отчёт — `docs/R5_CCCC_Q3_INSTRUMENTS_INTEGRATION.report.md`, разд. 10. Решение о Q1 принимает владелец после merge в `main`.
+Е-4/Е-6 перенесён в последующий этап подготовки Q3 (уточнение владельца 25.10). Q2 не PASS; Q3 не запускался. Сохраняются:
+- c_DST — с условием У-П3;
+- c_R = 22 — условная модель;
+- кандидат ≤ 4u для D2-9 не квалифицирован;
+- N ≥ 2 — RESEARCH_ONLY / NOT_QUALIFIED;
+- R4 и R5 — IN_PROGRESS.
+
 **Техническая отметка 24.10.2026 (R5-V — исследовательские инструменты Q3, этап 1; не кампания Q3).** В ветке
 `integration/r5-cccc-q3-instruments` объединены Е-2 (`e5f4f78`) и последовательности / энергия / D2-9: `r5_cccc_sequence.py`,
 `r5_cccc_energy.py`, `r5_cccc_d2_poly.py`, 30 тестов, журнал пилота (QA `2afc635`, Reviewer `adf4877` — PASS_WITH_OPEN_LIMITATIONS).
