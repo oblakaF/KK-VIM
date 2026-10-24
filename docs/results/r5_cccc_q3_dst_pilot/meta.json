@@ -1,0 +1,13 @@
+{
+ "study": "pilot of the certified DST-I reference (G-3 / OK-7); not the E-5 campaign",
+ "python": "3.14.8",
+ "platform": "Windows-10-10.0.19045-SP0",
+ "numpy": "2.5.4",
+ "scipy": "1.18.1",
+ "bits": 160,
+ "time_limit_per_case_s": 120.0,
+ "seconds": 1,
+ "path_under_test": "r5_cccc_bc.dst = scipy.fft.dst(type=1, norm='ortho')",
+ "printing": "*_up rounded up, *_down rounded down (decimal, directed); other numbers OBSERVATION",
+ "git_commit_base": "7645fa7bec2d3c5a01df77806a2f5c2387b45c20"
+}
