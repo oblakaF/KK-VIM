@@ -686,6 +686,13 @@ D-026); идентификатор не переиспользуется (INDEX.
 
 ## Текущая задача
 
+**Техническая отметка 24.10.2026 (R5-V — исследовательские инструменты Q3, этап 1; не кампания Q3).** В ветке
+`integration/r5-cccc-q3-instruments` объединены Е-2 (`e5f4f78`) и последовательности / энергия / D2-9: `r5_cccc_sequence.py`,
+`r5_cccc_energy.py`, `r5_cccc_d2_poly.py`, 30 тестов, журнал пилота (QA `2afc635`, Reviewer `adf4877` — PASS_WITH_OPEN_LIMITATIONS).
+Отчёт — `docs/R5_CCCC_Q3_INSTRUMENTS_INTEGRATION.report.md`. Н-1…Н-6 — неблокирующие ограничения. c_R = 22 — условная модель пути.
+Е-4/Е-6 — этап 2, после ADDRESS_PASS_FOR_INTEGRATION. N ≥ 2 — RESEARCH_ONLY / NOT_QUALIFIED; пороги CCCC не утверждены; Q3 не
+запускался; программирование CCCC в `kkvim` не разрешено; R4 и R5 — IN_PROGRESS.
+
 **Техническая отметка 24.10.2026 (R5-V — инструмент Е-2 включён; не квалификация Q3).** В ветке `integration/r5-cccc-e2-instrument`
 объединён независимый исследовательский инструмент Е-2 — ошибка образования поля W = U Vᵀ (`src/kkvim_reference/r5_cccc_e2.py`,
 104 теста). Происхождение: QA `3aaa80e`…`37bdf89`; Reviewer `907de22`, `f5f85e1`, `b1278fc` (ADDRESS_PASS; дополнение `dd5a0d4`). Отчёт —
