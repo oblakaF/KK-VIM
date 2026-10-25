@@ -11,17 +11,20 @@ converts them to the base units m and Pa for the solver (``backend.units``; GUI_
 Method parameters (from kkvim, the single source of their defaults):
 - N = 1 — R3 (``run_rectangle_physical``): tol_∞, tol_E, s_min, s_max and the strict mode of
   NUMERICAL_SPEC.md 11.2 and 11.4;
-- N = 2–3 — R4 (``run_coupled``): the mode (D-048 research with stopping, research with a fixed number
-  of half-steps, normative D-047), the DST path (fft; dense only up to n = 40, D-048.6) and the number
-  of half-steps. The tolerances of R4 are fixed by D-048 and are not editable.
+- N = 2–3 — R4 (``run_coupled``): the mode, the DST path (fft; dense only while max(n_x, n_y) <= 40,
+  D-048.6) and the number of half-steps. The tolerances of R4 are fixed by D-048 and are not editable.
+  The mode is normative D-047 (``research_mode=False``) unless the research continuation through a QR is
+  chosen explicitly (D-048.5): with stopping on stabilization or with a fixed number of half-steps.
+  A change of N resets the choice to normative, so that a research run is never started implicitly.
 """
 
 from dataclasses import dataclass, field, replace
 
 from kkvim_gui import placeholders
 from kkvim_gui.backend import units
-from kkvim_gui.backend.kkvim_adapter import DEFAULTS, N_AVAILABLE
-from kkvim_gui.backend.request import R4_MODES, R4_NORMATIVE, R4_RESEARCH_FIXED, R4_RESEARCH_STOP, TRANSFORMS, RunRequest
+from kkvim_gui.backend.kkvim_adapter import DEFAULTS, N_AVAILABLE, dense_problem
+from kkvim_gui.backend.request import (R4_MODES, R4_NORMATIVE, R4_RESEARCH_FIXED, R4_RESEARCH_MODES, R4_RESEARCH_STOP,
+                                      TRANSFORMS, RunRequest)
 from kkvim_gui.model.numbers import parse_number
 
 POSITIVE = "Значение должно быть больше нуля."
@@ -60,9 +63,13 @@ SUPPORTS = ("SSSS", "CCCC")  # CCCC is shown as not implemented
 THEORY = "Кирхгоф–Ляв"
 N_VALUES = (1, 2, 3, 4, 5, 6)  # 4-6 are shown as not implemented (D-047: N = 2-3)
 R4_MODE_TEXT = {
+    R4_NORMATIVE: "Нормативный D-047: только s = 1, далее NOT_QUALIFIED",
     R4_RESEARCH_STOP: "Исследовательский D-048: остановка по стабилизации поля",
     R4_RESEARCH_FIXED: "Исследовательский: фиксированное число полушагов (дополнение к D-048)",
-    R4_NORMATIVE: "Нормативный D-047: только s = 1, далее NOT_QUALIFIED",
+}
+RESEARCH_RULE_TEXT = {  # stopping of the research continuation; shown only while it is chosen
+    R4_RESEARCH_STOP: "Остановка по стабилизации поля (D-048.3)",
+    R4_RESEARCH_FIXED: "Фиксированное число полушагов (дополнение к D-048)",
 }
 
 
@@ -132,7 +139,14 @@ class SetupState:
             raise ValueError(f"unknown R4 mode {choices['r4_mode']!r}")
         if "transform" in choices and choices["transform"] not in TRANSFORMS:
             raise ValueError(f"unknown transform {choices['transform']!r}")
+        if "N" in choices and choices["N"] != self.N and "r4_mode" not in choices:
+            choices["r4_mode"] = R4_NORMATIVE  # no implicit research continuation after a change of N (D-048.5)
         return replace(self, **choices)
+
+    @property
+    def research(self):
+        """True only if the research continuation through a QR is chosen explicitly (D-048.5)."""
+        return self.r4_mode in R4_RESEARCH_MODES
 
     def active_fields(self):
         """Fields that take part in a run of the current N, in form order."""
@@ -149,6 +163,10 @@ def validate(state):
             errors[key] = error
     if state.supports != "SSSS":
         errors["supports"] = UNSUPPORTED
+    if state.N != 1 and "n_x" not in errors and "n_y" not in errors:
+        dense = dense_problem(state.transform, _value(state, "n_x"), _value(state, "n_y"))
+        if dense:
+            errors["transform"] = dense
     return errors
 
 

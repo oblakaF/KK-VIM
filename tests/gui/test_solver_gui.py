@@ -4,14 +4,19 @@
 - statuses of the library and PROVISIONAL / NOT_QUALIFIED of R4 are shown unchanged;
 - the analysis window draws the solver arrays (field, sections, values, history, energy) and exports them;
 - input rejected by kkvim is never computed; a second run cannot start while one is active;
+- N = 2-3 run in the normative mode D-047 (research_mode=False) unless the research continuation is switched on
+  explicitly (D-048.5); a change of N switches it off;
+- dense outside max(n_x, n_y) <= 40 (D-048.6) is refused in the form, before a run, with the reason shown;
 - an error run with a field opens only as diagnostics of an unfinished run;
 - the demonstration backend exists only with demo=True and stays marked TEST DATA.
 """
 
+import dataclasses
 import json
 
 import numpy as np
 import pytest
+from PySide6.QtCore import QPoint, Qt
 
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
@@ -20,11 +25,13 @@ pytest.importorskip("pyqtgraph")
 import kkvim.coupled_run as cr  # noqa: E402
 import kkvim.rectangle_run as rr  # noqa: E402
 from kkvim.linear_solver import ERROR_LINEAR_SOLVE, LinearSolveError  # noqa: E402
+from kkvim.rectangle import validated_rectangle_input  # noqa: E402
 
 from kkvim_gui.analysis.window import SOLVER_TABS, AnalysisWindow  # noqa: E402
 from kkvim_gui.app import GuiApplication  # noqa: E402
 from kkvim_gui.backend import kkvim_adapter  # noqa: E402
 from kkvim_gui.backend.process import CRASH, INPUT, OK  # noqa: E402
+from kkvim_gui.backend.request import R4_NORMATIVE, R4_RESEARCH_FIXED, R4_RESEARCH_STOP  # noqa: E402
 from kkvim_gui.model.runs import RunManager  # noqa: E402
 from kkvim_gui.model.setup_state import N_VALUES, SetupState, to_request  # noqa: E402
 from kkvim_gui.session import Session  # noqa: E402
@@ -70,6 +77,11 @@ def small(state=None, N=1, **texts):
     return state.with_choice(N=N)
 
 
+def research(N=2, mode=R4_RESEARCH_STOP, **texts):
+    """N = 2-3 with the research continuation chosen explicitly (D-048.5)."""
+    return small(N=N, **texts).with_choice(r4_mode=mode)
+
+
 # --- dispatcher -----------------------------------------------------------------------------------------
 
 @pytest.fixture
@@ -95,7 +107,7 @@ def test_solver_run_returns_the_library_result_and_writes_the_protocol(manager, 
 
 
 def test_r4_run_is_marked_provisional_not_qualified_everywhere(manager):
-    state = small(N=3)
+    state = research(N=3)
     run = manager.start(state, to_request(state))
     assert any(MARK in t for _, _, t in run.important)       # already at the start
     manager.tick()
@@ -117,6 +129,17 @@ def test_only_one_run_and_stop_terminates_the_process(qapp):
     manager.stop(run.run_id)
     assert run._process.terminated and run.status == "stopped" and not run.has_results
     assert manager.active is None
+
+
+def test_the_dispatcher_refuses_a_rejected_request_without_a_process(qapp):
+    created = []
+    manager = RunManager(process_factory=lambda request: created.append(request) or Scripted(request))
+    dense = small(N=2, n_x="40", n_y="41")                 # the form refuses dense here; the dispatcher must too
+    for state, request in ((small(nu="1"), to_request(small(nu="1"))),
+                           (dense, dataclasses.replace(to_request(dense), transform="dense"))):
+        with pytest.raises(kkvim_adapter.AdapterInputError):
+            manager.start(state, request)
+    assert created == [] and manager.runs == [] and manager.active is None
 
 
 @pytest.mark.parametrize(("message", "text"), [
@@ -163,9 +186,10 @@ def run_from_form(qtbot, gui, state):
 
 def test_r4_from_the_form_to_figures_history_and_export(qtbot, gui, tmp_path):
     w = gui.main_window
-    run = run_from_form(qtbot, gui, small(N=2))
+    run = run_from_form(qtbot, gui, research(N=2))
     o = run.outcome
     assert run.status == "finished" and o.status == cr.PROVISIONAL_FIELD_STABILIZED and o.mark == MARK
+    assert dict(o.parameters)["research_mode"] is True and any("D-048.4" in n for n in o.notes)
     rv = w.run_view
     assert MARK in rv.status_accept.text() and cr.PROVISIONAL_FIELD_STABILIZED in rv.status_stop.text()
     assert rv.details_tag.text() == MARK and MARK in rv.summary_text.text()
@@ -185,6 +209,8 @@ def test_r4_from_the_form_to_figures_history_and_export(qtbot, gui, tmp_path):
     assert placed.left() == pytest.approx(-hx / 2) and placed.right() == pytest.approx(o.x[-1] + hx / 2)
     assert placed.top() == pytest.approx(-hy / 2) and placed.bottom() == pytest.approx(o.y[-1] + hy / 2)
     assert rv.status_stop.property("status") != "success"      # a stabilization of R4 is not shown as success
+    assert "не сходимость" in rv.status_stop.text() and "не сходимость" in a.status_stop.text()
+    assert a.status_stop.property("status") != "success"
     a.fields.quantity.set_current("w_bar")
     np.testing.assert_array_equal(a.fields.figure.image.image, o.w_bar)
     e = o.extremum()
@@ -226,8 +252,8 @@ def test_input_rejected_by_kkvim_is_not_computed(qtbot, gui):
     assert w.runs.runs == [] and w.state == "setup"        # ... but the library check refuses the run
     assert "ERROR_INPUT" in w.setup_view.check_text.text()
     w.setup_model._set(small(N=2, **{"n_x": "48", "n_y": "48"}).with_choice(transform="dense"))
-    w.setup_view.try_run()
-    assert w.runs.runs == [] and "D-048.6" in w.setup_view.check_text.text()
+    assert w.setup_view.try_run() is False                 # refused by the form (D-048.6), before the run
+    assert w.runs.runs == [] and "D-048.6" in w.setup_view.errors_transform.text()
 
 
 def test_cccc_and_n_4_6_are_shown_as_not_implemented(qtbot, gui):
@@ -244,9 +270,82 @@ def test_r4_parameters_are_shown_only_for_n_2_3(qtbot, gui):
     sv = gui.main_window.setup_view
     assert sv.tol_E.isVisibleTo(sv) and not sv.half_steps.isVisibleTo(sv)
     sv.N.setCurrentIndex(2)
-    assert not sv.tol_E.isVisibleTo(sv) and sv.half_steps.isVisibleTo(sv) and sv.r4_mode.isVisibleTo(sv)
+    assert not sv.tol_E.isVisibleTo(sv) and sv.half_steps.isVisibleTo(sv) and sv.research.isVisibleTo(sv)
     assert sv.r4_note.isVisibleTo(sv) and MARK in sv.r4_note.text.text()
-    assert gui.main_window.setup_model.state.r4_mode == "research_stop"
+    assert gui.main_window.setup_model.state.r4_mode == R4_NORMATIVE
+
+
+# --- N = 2-3: research continuation only on explicit choice (D-048.5) -----------------------------------
+
+def choose_N(sv, N):
+    sv.N.setCurrentIndex(N_VALUES.index(N))
+
+
+def test_research_is_switched_on_only_explicitly_and_reset_by_n(qtbot, gui):
+    sv, model = gui.main_window.setup_view, gui.main_window.setup_model
+    for N in (2, 3):
+        choose_N(sv, N)
+        assert model.state.r4_mode == R4_NORMATIVE and to_request(model.state).research_mode is False
+        assert not sv.research.isChecked() and not sv.research_rule.isEnabled()
+        assert "Нормативный D-047" in sv.r4_mode_text.text()
+    sv.research_rule.setCurrentIndex(1)                    # the rule alone does not switch research on
+    assert model.state.r4_mode == R4_NORMATIVE
+    qtbot.mouseClick(sv.research, Qt.MouseButton.LeftButton, pos=QPoint(8, sv.research.height() // 2))
+    assert sv.research.isChecked() and sv.research_rule.isEnabled()
+    assert model.state.r4_mode == R4_RESEARCH_FIXED and to_request(model.state).research_mode is True
+    assert "Исследовательский" in sv.r4_mode_text.text()
+    sv.research_rule.setCurrentIndex(0)
+    assert model.state.r4_mode == R4_RESEARCH_STOP and "исследовательский D-048" in dict(model.summary())["Метод"]
+    for N in (2, 1, 3):                                    # every change of N switches research off
+        sv.research.setChecked(True)
+        assert model.state.research
+        choose_N(sv, N)
+        assert model.state.r4_mode == R4_NORMATIVE, N
+        assert not sv.research.isChecked() and not sv.research_rule.isEnabled()
+        assert sv.research_rule.currentData() == R4_RESEARCH_STOP
+    sv.research.setChecked(True)
+    sv.research.setChecked(False)
+    assert model.state.r4_mode == R4_NORMATIVE
+
+
+def test_normative_run_from_the_form_keeps_not_qualified(qtbot, gui):
+    w = gui.main_window
+    w.setup_model._set(small(N=2))
+    assert not w.setup_view.research.isChecked()
+    run = run_from_form(qtbot, gui, w.setup_model.state)
+    o = run.outcome
+    assert o.status == cr.NOT_QUALIFIED and o.s == 1 and o.mark == MARK         # D-047 after the first half-step
+    assert dict(o.parameters)["research_mode"] is False
+    rv = w.run_view
+    assert cr.NOT_QUALIFIED in rv.status_stop.text() and rv.status_stop.property("status") != "success"
+    assert MARK in rv.status_accept.text()
+    _, D = validated_rectangle_input(1.0, 1.5, 0.01, 2.1e11, 0.3, 5000.0, 24, 36)
+    direct = cr.run_coupled(1.0, 1.5, D, 5000.0, 24, 36, 2, transform="fft", half_steps=100)  # library default
+    assert direct.status == o.status and np.array_equal(direct.field(), o.w)
+
+
+# --- dense only while max(n_x, n_y) <= 40 (D-048.6) -----------------------------------------------------
+
+@pytest.mark.parametrize(("size", "allowed"), [((40, 40), True), ((40, 41), False), ((41, 40), False),
+                                               ((40, 160), False)])
+def test_dense_is_refused_in_the_form_before_a_run(qtbot, gui, size, allowed):
+    w = gui.main_window
+    sv = w.setup_view
+    w.setup_model._set(small(N=2, n_x=str(size[0]), n_y=str(size[1])).with_text("half_steps", "3"))
+    assert not sv.errors_transform.isVisibleTo(sv)          # fft: no limit
+    sv.transform.setCurrentIndex(sv.transform.findData("dense"))
+    assert w.setup_model.state.transform == "dense"
+    if not allowed:                                         # shown at once, under the choice
+        assert sv.errors_transform.isVisibleTo(sv) and "max(n_x, n_y) ≤ 40" in sv.errors_transform.text()
+        assert f"n_x = {size[0]}, n_y = {size[1]}" in sv.errors_transform.text()
+        assert not sv.run_button.isEnabled() and "Преобразование DST" in sv.check_text.text()
+        assert sv.try_run() is False and w.runs.runs == [] and w.state == "setup"
+        sv.transform.setCurrentIndex(sv.transform.findData("fft"))   # back to fft: allowed again
+        assert not sv.errors_transform.isVisibleTo(sv) and sv.run_button.isEnabled()
+        return
+    assert not sv.errors_transform.isVisibleTo(sv) and sv.run_button.isEnabled()
+    run = run_from_form(qtbot, gui, w.setup_model.state)
+    assert run.request.transform == "dense" and run.outcome.status == cr.NOT_QUALIFIED
 
 
 def test_error_with_a_field_opens_only_as_diagnostics(qtbot, qapp, tmp_path, monkeypatch):

@@ -27,11 +27,11 @@ from kkvim.rectangle import validated_rectangle_input
 from kkvim.rectangle_run import halfstep_report, run_rectangle_physical
 
 from kkvim_gui.backend.outcome import ORIGIN_SOLVER, Column, RunOutcome, frozen_copy
-from kkvim_gui.backend.request import R4_NORMATIVE, R4_RESEARCH_FIXED, R4_RESEARCH_STOP, RunRequest
+from kkvim_gui.backend.request import R4_MODES, R4_NORMATIVE, R4_RESEARCH_FIXED, RunRequest
 
 MARK = coupled_run.MARK  # "PROVISIONAL / NOT_QUALIFIED"
 N_AVAILABLE = (1, *coupled_run.N_SOLVE)  # 1: R3; 2-3: R4 (D-047)
-DENSE_N_MAX = 40  # D-048.6: dense is admissible only up to n = 40; fft is the main path
+DENSE_N_MAX = 40  # D-048.6: dense is admissible only up to max(n_x, n_y) = 40; fft is the main path
 
 # Defaults of the solvers, read from kkvim (single source)
 DEFAULTS = {
@@ -41,7 +41,7 @@ DEFAULTS = {
     "s_max": controller.S_MAX,
     "half_steps": coupled_run.S_MAX,
     "transform": "fft",
-    "r4_mode": R4_RESEARCH_STOP,
+    "r4_mode": R4_NORMATIVE,  # research_mode=False unless chosen explicitly (D-048.3, D-048.5)
 }
 R4_FIXED = {
     "tol_inf": coupled_run.TOL_INF, "tol_E": coupled_run.TOL_E, "s_min": coupled_run.S_MIN,
@@ -103,12 +103,24 @@ class AdapterInputError(ValueError):
     """Input rejected before the computation (by kkvim's own checks or a GUI scope rule)."""
 
 
+def dense_problem(transform, n_x, n_y) -> str | None:
+    """Message if ``transform`` leaves the scope of D-048.6, else None.
+
+    dense is admissible only while both sizes are within the audited range: max(n_x, n_y) <= 40.
+    The single rule of the GUI: the form, ``check_request``, the dispatcher and the computing process use it.
+    """
+    if transform != "dense" or max(n_x, n_y) <= DENSE_N_MAX:
+        return None
+    return (f"Преобразование dense допустимо только при max(n_x, n_y) ≤ {DENSE_N_MAX} (D-048.6); "
+            f"задано n_x = {n_x}, n_y = {n_y}. Выберите fft — основной путь DST")
+
+
 def check_request(request: RunRequest) -> list[str]:
     """Problems of the input found before a computation; [] if the request may be started.
 
     Physical input, sides and grid sizes are checked by ``validated_rectangle_input`` of kkvim (the
     same function the solvers call); the GUI adds only the scope rules it must not let pass: SSSS
-    (CCCC is not implemented), N in 1-3 (D-047), dense only up to n = 40 (D-048.6).
+    (CCCC is not implemented), N in 1-3 (D-047), dense only while max(n_x, n_y) <= 40 (D-048.6).
     """
     problems = []
     if request.supports not in CAPABILITIES["supports"]:
@@ -121,11 +133,11 @@ def check_request(request: RunRequest) -> list[str]:
     except PhysicalInputError as exc:
         problems.append(f"Ввод отклонён решателем (ERROR_INPUT): {exc}")
     if request.N in coupled_run.N_SOLVE:
-        if request.r4_mode not in (R4_RESEARCH_STOP, R4_RESEARCH_FIXED, R4_NORMATIVE):
+        if request.r4_mode not in R4_MODES:
             problems.append(f"Неизвестный режим R4: {request.r4_mode!r}")
-        if request.transform == "dense" and max(request.n_x, request.n_y) > DENSE_N_MAX:
-            problems.append(f"Преобразование dense допустимо только при n_x, n_y ≤ {DENSE_N_MAX} (D-048.6); "
-                            "основной путь — fft")
+        dense = dense_problem(request.transform, request.n_x, request.n_y)
+        if dense:
+            problems.append(dense)
     return problems
 
 
@@ -154,11 +166,15 @@ def execute(request: RunRequest) -> RunOutcome:
 
 
 def run_coupled_for(request: RunRequest, D: float):
-    """``run_coupled`` with the mode of the request; arguments only, nothing else."""
-    research = request.r4_mode in (R4_RESEARCH_STOP, R4_RESEARCH_FIXED)
+    """``run_coupled`` with the mode of the request; arguments only, nothing else.
+
+    ``research_mode`` is True only for an explicitly chosen research mode (D-048.5); the normative mode passes
+    the library default (False) and returns NOT_QUALIFIED after s = 1 (D-047, D-048.3).
+    """
     return coupled_run.run_coupled(request.a, request.b, D, request.q, request.n_x, request.n_y, request.N,
                                    transform=request.transform, half_steps=request.half_steps,
-                                   research_mode=research, stop_on_stabilization=request.r4_mode != R4_RESEARCH_FIXED)
+                                   research_mode=request.research_mode,
+                                   stop_on_stabilization=request.stop_on_stabilization)
 
 
 # ---- R3 ------------------------------------------------------------------------------------------
@@ -241,6 +257,9 @@ def outcome_from_r4(request: RunRequest, D: float, run) -> RunOutcome:
     notes = [f"Все величины R4 — {MARK}"]
     if request.r4_mode == R4_NORMATIVE:
         notes.append("Нормативный режим D-047: продолжение после s = 1 через QR не квалифицировано")
+    else:
+        notes.append("Исследовательское продолжение через QR включено явно (D-048.5). PROVISIONAL_FIELD_STABILIZED — "
+                     "стабилизация поля конечной задачи, а не доказанная сходимость (D-048.4)")
     if request.r4_mode == R4_RESEARCH_FIXED:
         notes.append("Фиксированное число полушагов (дополнение к D-048 от 2026-10-18): "
                      "стабилизация регистрируется, но не останавливает расчёт")

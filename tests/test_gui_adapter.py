@@ -1,7 +1,9 @@
 """GUI backend adapter: the GUI calls kkvim unchanged and copies its results (GUI_DESIGN.md, 3.3-3.6). Qt-free.
 
 - N = 1 is ``run_rectangle_physical``; N = 2-3 is ``validated_rectangle_input`` then ``run_coupled`` with the
-  research mode only when it was chosen explicitly;
+  research mode only when it was chosen explicitly: the default is ``research_mode=False`` (D-048.3, D-048.5),
+  and a change of N resets an explicit choice;
+- dense only while max(n_x, n_y) <= 40 (D-048.6), checked by one rule in the form, the adapter and the process;
 - the outcome equals the direct API call of the same process bitwise (status, D, history, field);
 - the GUI never changes the solver arrays, and its copies are read-only;
 - statuses and reasons of the library are kept unchanged; every R4 result carries PROVISIONAL / NOT_QUALIFIED;
@@ -11,6 +13,7 @@
 
 import csv
 import json
+import multiprocessing
 import time
 
 import numpy as np
@@ -22,9 +25,9 @@ from kkvim.linear_solver import ERROR_LINEAR_SOLVE, LinearSolveError
 from kkvim.rectangle import validated_rectangle_input
 
 from kkvim_gui.backend import export, kkvim_adapter, units
-from kkvim_gui.backend.process import CRASH, INPUT, OK, SolverProcess
+from kkvim_gui.backend.process import CRASH, INPUT, OK, SolverProcess, compute
 from kkvim_gui.backend.request import R4_NORMATIVE, R4_RESEARCH_FIXED, R4_RESEARCH_STOP, RunRequest
-from kkvim_gui.model.setup_state import SetupState, to_request
+from kkvim_gui.model.setup_state import SetupState, to_request, validate
 
 STEEL = dict(entered=(), a=1.0, b=1.5, t=0.01, E=2.1e11, nu=0.3, q=1000.0, n_x=24, n_y=36)
 R3_DEFAULTS = dict(tol_inf=cr.TOL_INF, tol_E=1e-8, s_min=3, s_max=100)
@@ -103,6 +106,89 @@ def test_negative_E_and_t_give_a_positive_D_but_are_rejected():
     assert (-2.1e11) * (-0.01) ** 3 > 0  # the reason for the explicit check
     assert kkvim_adapter.check_request(r4(E=-2.1e11, t=-0.01))
     assert kkvim_adapter.check_request(r4(transform="dense", n_x=40, n_y=40)) == []
+
+
+# --- N = 2-3: research continuation only on explicit choice (D-048.3, D-048.5) ---------------------------
+
+def spy_run_coupled(monkeypatch):
+    seen, original = [], cr.run_coupled
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(cr, "run_coupled", spy)
+    return seen
+
+
+def test_the_default_of_n_2_3_is_research_mode_false(monkeypatch):
+    assert kkvim_adapter.DEFAULTS["r4_mode"] == R4_NORMATIVE
+    req = RunRequest(**STEEL, N=2, transform="fft", half_steps=100)        # no mode given
+    assert req.r4_mode == R4_NORMATIVE and req.research_mode is False
+    seen = spy_run_coupled(monkeypatch)
+    out = kkvim_adapter.execute(req)
+    assert seen[0]["research_mode"] is False and seen[0]["stop_on_stabilization"] is True
+    assert out.status == cr.NOT_QUALIFIED and out.s == 1 and out.mark == cr.MARK    # D-047 after s = 1
+    assert dict(out.parameters)["research_mode"] is False
+
+
+@pytest.mark.parametrize("N", [2, 3])
+def test_choosing_n_2_3_in_the_form_does_not_enable_research(monkeypatch, N):
+    state = SetupState().with_text("n_x", "24").with_text("n_y", "36").with_choice(N=N)
+    assert state.r4_mode == R4_NORMATIVE and not state.research
+    req = to_request(state)
+    assert req.r4_mode == R4_NORMATIVE and req.research_mode is False
+    seen = spy_run_coupled(monkeypatch)
+    out = kkvim_adapter.execute(req)
+    assert seen[0]["research_mode"] is False and out.status == cr.NOT_QUALIFIED and out.s == 1
+
+
+@pytest.mark.parametrize("mode", [R4_RESEARCH_STOP, R4_RESEARCH_FIXED])
+def test_a_change_of_n_resets_the_research_choice(mode):
+    chosen = SetupState().with_choice(N=2).with_choice(r4_mode=mode)
+    assert chosen.research and to_request(chosen).research_mode is True     # an explicit choice is kept ...
+    assert chosen.with_text("n_x", "48").with_choice(transform="fft", N=2).r4_mode == mode  # ... while N stays
+    for N in (3, 1):
+        reset = chosen.with_choice(N=N)
+        assert reset.r4_mode == R4_NORMATIVE and not reset.research          # ... and is reset by a change of N
+        assert to_request(reset.with_choice(N=2)).research_mode is False
+    assert SetupState().with_choice(N=3, r4_mode=mode).r4_mode == mode       # both in one explicit choice
+
+
+# --- dense only while max(n_x, n_y) <= 40 (D-048.6) ------------------------------------------------------
+
+DENSE_CASES = [((40, 40), True), ((40, 41), False), ((41, 40), False), ((40, 160), False), ((160, 40), False)]
+
+
+@pytest.mark.parametrize(("size", "allowed"), DENSE_CASES)
+def test_dense_scope_is_checked_on_both_sizes(monkeypatch, size, allowed):
+    n_x, n_y = size
+    req = r4(mode=R4_NORMATIVE, transform="dense", n_x=n_x, n_y=n_y, half_steps=3)
+    message = kkvim_adapter.dense_problem("dense", n_x, n_y)
+    assert (message is None) == allowed
+    assert kkvim_adapter.dense_problem("fft", n_x, n_y) is None                # fft is not limited
+    state = (SetupState().with_text("n_x", str(n_x)).with_text("n_y", str(n_y)).with_choice(N=2)
+             .with_choice(transform="dense"))
+    assert validate(state).get("transform") == message                         # the form, before Run
+    assert kkvim_adapter.check_request(req) == ([] if allowed else [message])
+    if allowed:
+        seen = spy_run_coupled(monkeypatch)
+        out = kkvim_adapter.execute(req)
+        assert seen[0]["transform"] == "dense" and out.status == cr.NOT_QUALIFIED
+        return
+    assert "max(n_x, n_y) ≤ 40" in message and f"n_x = {n_x}, n_y = {n_y}" in message and "fft" in message
+    monkeypatch.setattr(cr, "run_coupled", lambda *a, **k: pytest.fail("dense outside D-048.6 was computed"))
+    with pytest.raises(kkvim_adapter.AdapterInputError, match="D-048.6"):
+        kkvim_adapter.execute(req)
+    parent, child = multiprocessing.Pipe(duplex=False)
+    compute(req, child)                                                         # the body of the computing process
+    kind, payload = parent.recv()
+    assert kind == INPUT and "D-048.6" in payload
+
+
+def test_dense_does_not_concern_n_1():
+    state = SetupState().with_text("n_x", "160").with_text("n_y", "80").with_choice(transform="dense")
+    assert "transform" not in validate(state) and to_request(state).transform is None
 
 
 # --- results equal the direct API ------------------------------------------------------------------------

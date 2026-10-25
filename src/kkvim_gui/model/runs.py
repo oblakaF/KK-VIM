@@ -23,6 +23,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from kkvim_gui import placeholders
 from kkvim_gui.backend import export
+from kkvim_gui.backend.kkvim_adapter import AdapterInputError, check_request
 from kkvim_gui.backend.outcome import ORIGIN_DEMO, ORIGIN_SOLVER
 from kkvim_gui.backend.process import CRASH, INPUT, OK, SolverProcess
 from kkvim_gui.backend.units import base_unit
@@ -172,7 +173,14 @@ class RunManager(QObject):
     # Solver -----------------------------------------------------------------------------------------
 
     def start(self, snapshot, request):
-        """Start the solver in a separate process for a request that passed ``check_request``."""
+        """Start the solver in a separate process for a request that passed ``check_request``.
+
+        The check is repeated here: a rejected request raises ``AdapterInputError`` and no process is created
+        (the computing process checks it once more before calling kkvim).
+        """
+        problems = check_request(request)
+        if problems:
+            raise AdapterInputError("; ".join(problems))
         run = self._new_run(snapshot, "КК-ВИМ", ORIGIN_SOLVER, "Расчёт в отдельном процессе", request=request)
         solver = "R3 (run_rectangle_physical)" if request.N == 1 else "R4 (run_coupled)"
         run.log("ИНФО", "Формальная проверка ввода и проверка ввода решателем выполнены")

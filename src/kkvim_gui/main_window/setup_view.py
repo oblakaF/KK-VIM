@@ -36,10 +36,10 @@ from PySide6.QtWidgets import (
 )
 
 from kkvim_gui.backend.kkvim_adapter import CAPABILITIES, DENSE_N_MAX, N_AVAILABLE, R4_FIXED
-from kkvim_gui.backend.request import R4_MODES, TRANSFORMS
+from kkvim_gui.backend.request import R4_NORMATIVE, R4_RESEARCH_MODES, R4_RESEARCH_STOP, TRANSFORMS
 from kkvim_gui.main_window.plate_scheme import PlateScheme
 from kkvim_gui.model.setup_model import SetupModel
-from kkvim_gui.model.setup_state import FIELDS, N_VALUES, R4_MODE_TEXT, UNSUPPORTED, validate_field
+from kkvim_gui.model.setup_state import FIELDS, N_VALUES, R4_MODE_TEXT, RESEARCH_RULE_TEXT, UNSUPPORTED, validate_field
 from kkvim_gui.session import Session
 from kkvim_gui.widgets.common import (
     Card,
@@ -78,8 +78,18 @@ R4_NOTE = (
     "N = 2–3 — исследовательский решатель R4 (D-047, D-048). Все результаты — PROVISIONAL / NOT_QUALIFIED. "
     f"Допуски фиксированы D-048: tol_∞ = {R4_FIXED['tol_inf']:g}, tol_E = {R4_FIXED['tol_E']:g}, "
     f"s_min = {R4_FIXED['s_min']}, s_max = {R4_FIXED['s_max']}, η_max = {R4_FIXED['eta_max']:g}. "
-    f"Путь DST: fft — основной; dense — только при n ≤ {DENSE_N_MAX} (D-048.6)."
+    f"Путь DST: fft — основной; dense — только при max(n_x, n_y) ≤ {DENSE_N_MAX} (D-048.6). "
+    "По умолчанию — нормативный режим D-047 (research_mode=False): после s = 1 — NOT_QUALIFIED. "
+    "Исследовательское продолжение через QR включается только флажком (D-048.5) и сбрасывается при смене N."
 )
+RESEARCH_TEXT = "Исследовательское продолжение через QR (D-048.5)"
+RESEARCH_TOOLTIP = (
+    "Выключено — нормативный режим D-047: research_mode=False, после s = 1 — NOT_QUALIFIED.\n"
+    "Включено — research_mode=True: политика остановки D-048.3; результат PROVISIONAL / NOT_QUALIFIED; "
+    "PROVISIONAL_FIELD_STABILIZED — стабилизация поля конечной задачи, не доказанная сходимость (D-048.4).\n"
+    "Выбор сбрасывается при смене N."
+)
+TRANSFORM_LABEL = "Преобразование DST"
 LOCK_BANNER = (
     "Выполняется расчёт. Изменение параметров временно заблокировано. "
     "Просмотр и копирование доступны"
@@ -179,7 +189,7 @@ class SetupView(QWidget):
         set_help(self.theory, "param.theory")
         self.N = QComboBox()
         for n in N_VALUES:
-            text = {1: "1 — R3, принятый", 2: "2 — R4, исследование", 3: "3 — R4, исследование"}.get(
+            text = {1: "1 — R3, принятый", 2: "2 — R4, NOT_QUALIFIED", 3: "3 — R4, NOT_QUALIFIED"}.get(
                 n, f"{n} — не реализовано")
             self.N.addItem(text, n)
         _disable_items(self.N, [n in N_AVAILABLE for n in N_VALUES])
@@ -198,19 +208,26 @@ class SetupView(QWidget):
         self.strict = QCheckBox("Строгий режим (11.4)")
         self.strict.setChecked(st.strict)
         self.strict.setToolTip("tol_∞/100 и max(tol_E/100, 10·ε_floor) — NUMERICAL_SPEC.md 11.2, 11.4")
-        self.r4_mode = QComboBox()
-        for key in R4_MODES:
-            self.r4_mode.addItem(R4_MODE_TEXT[key], key)
-        self.r4_mode.setCurrentIndex(R4_MODES.index(st.r4_mode))
+        self.research = QCheckBox(RESEARCH_TEXT)
+        self.research.setChecked(st.research)
+        self.research.setToolTip(RESEARCH_TOOLTIP)
+        self.research_rule = QComboBox()
+        for key in R4_RESEARCH_MODES:
+            self.research_rule.addItem(RESEARCH_RULE_TEXT[key], key)
+        self.research_rule.setCurrentIndex(R4_RESEARCH_MODES.index(st.r4_mode) if st.research else 0)
+        self.research_rule.setEnabled(st.research)
+        self.research_rule.setToolTip("Правило остановки исследовательского продолжения; доступно только при "
+                                      "включённом исследовательском режиме")
+        self.r4_mode_text = label(R4_MODE_TEXT[st.r4_mode], "secondary")
+        self.r4_mode_text.setWordWrap(True)
         self.transform = QComboBox()
         for key in TRANSFORMS:
-            self.transform.addItem({"fft": "fft — основной путь", "dense": f"dense — только n ≤ {DENSE_N_MAX}"}[key], key)
+            self.transform.addItem({"fft": "fft — основной путь", "dense": f"dense — max(n_x, n_y) ≤ {DENSE_N_MAX}"}[key], key)
         self.transform.setCurrentIndex(TRANSFORMS.index(st.transform))
-        for combo in (self.N, self.r4_mode, self.transform):
+        for combo in (self.N, self.research_rule, self.transform):
             # long item texts must not widen the method block beyond the page (no horizontal scroll)
             combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
             combo.setMinimumContentsLength(16)
-        self.r4_mode.setToolTip("\n".join(R4_MODE_TEXT.values()))
         self.half_steps = UnitField(t["half_steps"])
         self.half_steps.setToolTip(f"Предел полушагов; не больше s_max = {R4_FIXED['s_max']} (D-048.3). В режиме "
                                    "фиксированного числа — точное число полушагов")
@@ -233,8 +250,9 @@ class SetupView(QWidget):
             ("Мин. полушагов s_min", self.s_min, None, "r3"),
             ("Макс. полушагов s_max", self.s_max, None, "r3"),
             ("Режим остановки", self.strict, None, "r3"),
-            ("Режим R4", self.r4_mode, None, "r4"),
-            ("Преобразование DST", self.transform, None, "r4"),
+            ("Режим R4", self.research, None, "r4"),
+            ("Остановка исследования", self.research_rule, None, "r4"),
+            (TRANSFORM_LABEL, self.transform, None, "r4"),
             ("Полушагов (предел)", self.half_steps, None, "r4"),
         ):
             cell = QWidget()
@@ -247,6 +265,11 @@ class SetupView(QWidget):
             if key is not None:
                 self.errors[key] = error_label()
                 box.addWidget(self.errors[key])
+            if w is self.research:
+                box.addWidget(self.r4_mode_text)
+            if w is self.transform:
+                self.errors_transform = error_label()
+                box.addWidget(self.errors_transform)
             box.addStretch(1)
             self._method_cells.append(cell)
             self._cells_by_scope[scope].append(cell)
@@ -337,13 +360,22 @@ class SetupView(QWidget):
         self.supports.changed.connect(lambda key: self.model.set_choice(supports=key))
         self.N.currentIndexChanged.connect(lambda i: self.model.set_choice(N=self.N.itemData(i)))
         self.strict.toggled.connect(lambda on: self.model.set_choice(strict=on))
-        self.r4_mode.currentIndexChanged.connect(lambda i: self.model.set_choice(r4_mode=self.r4_mode.itemData(i)))
+        self.research.toggled.connect(self._on_research)
+        self.research_rule.currentIndexChanged.connect(self._on_research_rule)
         self.transform.currentIndexChanged.connect(
             lambda i: self.model.set_choice(transform=self.transform.itemData(i)))
         self.model.changed.connect(self.refresh)
         self.refresh()
 
     # Model binding and validation
+    def _on_research(self, on):
+        """The research continuation is chosen only by this explicit switch (D-048.5)."""
+        self.model.set_choice(r4_mode=self.research_rule.currentData() if on else R4_NORMATIVE)
+
+    def _on_research_rule(self, index):
+        if self.research.isChecked():
+            self.model.set_choice(r4_mode=self.research_rule.itemData(index))
+
     def _on_text(self, key, text):
         self.model.set_text(key, text)
         if key in self.shown_errors:  # re-check only fields already shown as invalid
@@ -367,8 +399,18 @@ class SetupView(QWidget):
             self.N.setCurrentIndex(N_VALUES.index(st.N))
         if self.strict.isChecked() != st.strict:
             self.strict.setChecked(st.strict)
-        if self.r4_mode.currentData() != st.r4_mode:
-            self.r4_mode.setCurrentIndex(R4_MODES.index(st.r4_mode))
+        # the model is the source: showing it must not choose a mode back (no implicit research run)
+        rule = st.r4_mode if st.research else R4_RESEARCH_STOP  # the choice is reset with the mode
+        for w in (self.research, self.research_rule):
+            w.blockSignals(True)
+        self.research.setChecked(st.research)
+        self.research_rule.setCurrentIndex(R4_RESEARCH_MODES.index(rule))
+        for w in (self.research, self.research_rule):
+            w.blockSignals(False)
+        self.research_rule.setEnabled(st.research and not self.locked)
+        self.r4_mode_text.setText(R4_MODE_TEXT[st.r4_mode])
+        self.r4_mode_text.setProperty("role", "figureMark" if st.research else "secondary")
+        repolish(self.r4_mode_text)
         if self.transform.currentData() != st.transform:
             self.transform.setCurrentIndex(TRANSFORMS.index(st.transform))
         for name, text in self.model.summary():
@@ -386,6 +428,10 @@ class SetupView(QWidget):
         if "supports" in self.shown_errors and st.supports == "SSSS":
             self._show_error("supports", None)
             self._update_status()
+        transform_error = self.model.errors().get("transform")  # a choice: shown at once (D-048.6)
+        if transform_error != self.shown_errors.get("transform"):
+            self._show_error("transform", transform_error)
+            self._update_status()
 
     def check_field(self, key):
         _, error = validate_field(key, self.model.state.texts[key])
@@ -398,13 +444,15 @@ class SetupView(QWidget):
         for key in self.fields:
             self._show_error(key, errors.get(key))
         self._show_error("supports", errors.get("supports"))
+        self._show_error("transform", errors.get("transform"))
         self._update_status()
         return errors
 
     def _show_error(self, key, error):
-        if key == "supports":
-            self.errors_supports.setText(error or "")
-            self.errors_supports.setVisible(bool(error))
+        if key in ("supports", "transform"):
+            text = self.errors_supports if key == "supports" else self.errors_transform
+            text.setText(error or "")
+            text.setVisible(bool(error))
             if error:
                 self.shown_errors[key] = error
             else:
@@ -438,8 +486,9 @@ class SetupView(QWidget):
                 f.unit_combo.setEnabled(not locked)
         for b in self.supports.buttons.values():
             b.setEnabled(not locked)
-        for w in (self.theory, self.N, self.load_uniform, self.strict, self.r4_mode, self.transform):
+        for w in (self.theory, self.N, self.load_uniform, self.strict, self.research, self.transform):
             w.setEnabled(not locked)
+        self.research_rule.setEnabled(not locked and self.model.state.research)
         self._update_status()
 
     def _update_status(self):
@@ -453,8 +502,9 @@ class SetupView(QWidget):
             self.run_button.setEnabled(False)
             return
         if n:
-            key = next((k for k in self.fields if k in self.shown_errors), "supports")
-            first = FIELDS[key].label if key in FIELDS else "Граничные условия"
+            key = next(k for k in (*self.fields, "supports", "transform") if k in self.shown_errors)
+            first = FIELDS[key].label if key in FIELDS else {"supports": "Граничные условия",
+                                                             "transform": TRANSFORM_LABEL}[key]
             self.check_text.setText(f"⚠  Исправьте поля: {n} (первое — «{first}»). Расчёт не запускается.")
             self.check_text.setProperty("role", "fieldError")
         else:
@@ -476,6 +526,10 @@ class SetupView(QWidget):
             self.scroll.ensureWidgetVisible(button, 16, 48)
             button.setFocus(Qt.FocusReason.OtherFocusReason)
             return button
+        if "transform" in self.shown_errors:
+            self.scroll.ensureWidgetVisible(self.transform, 16, 48)
+            self.transform.setFocus(Qt.FocusReason.OtherFocusReason)
+            return self.transform
         return None
 
     def show_solver_problems(self, problems):

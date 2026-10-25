@@ -11,7 +11,8 @@ from dataclasses import asdict, dataclass
 R4_RESEARCH_STOP = "research_stop"  # research_mode=True, stop_on_stabilization=True (D-048.3-4)
 R4_RESEARCH_FIXED = "research_fixed"  # research_mode=True, stop_on_stabilization=False (addendum to D-048)
 R4_NORMATIVE = "normative"  # research_mode=False (D-047): NOT_QUALIFIED after s = 1
-R4_MODES = (R4_RESEARCH_STOP, R4_RESEARCH_FIXED, R4_NORMATIVE)
+R4_MODES = (R4_NORMATIVE, R4_RESEARCH_STOP, R4_RESEARCH_FIXED)  # the first is the default
+R4_RESEARCH_MODES = (R4_RESEARCH_STOP, R4_RESEARCH_FIXED)  # continuation through a QR only on explicit choice (D-048.5)
 TRANSFORMS = ("fft", "dense")  # D-048.6: fft is the main path
 
 
@@ -34,10 +35,20 @@ class RunRequest:
     s_min: int | None = None
     s_max: int | None = None
     strict: bool = False
-    # N = 2-3 (R4)
-    r4_mode: str | None = None
+    # N = 2-3 (R4); research continuation is never the default (D-048.3, D-048.5)
+    r4_mode: str = R4_NORMATIVE
     transform: str | None = None
     half_steps: int | None = None
+
+    @property
+    def research_mode(self) -> bool:
+        """``research_mode`` of ``run_coupled``: True only for an explicitly chosen research mode."""
+        return self.r4_mode in R4_RESEARCH_MODES
+
+    @property
+    def stop_on_stabilization(self) -> bool:
+        """``stop_on_stabilization`` of ``run_coupled``: False only for the fixed number of half-steps."""
+        return self.r4_mode != R4_RESEARCH_FIXED
 
     def as_dict(self) -> dict:
         d = asdict(self)

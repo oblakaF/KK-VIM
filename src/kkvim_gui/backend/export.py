@@ -90,7 +90,8 @@ def manifest(outcome: RunOutcome, run_meta: dict | None = None, log=(), files=No
             "N": r.N,
             "grid": {"n_x": r.n_x, "n_y": r.n_y},
             "method": _plain({key: getattr(r, key) for key in (
-                ("tol_inf", "tol_E", "s_min", "s_max", "strict") if r.N == 1 else ("r4_mode", "transform", "half_steps"))}),
+                ("tol_inf", "tol_E", "s_min", "s_max", "strict") if r.N == 1 else
+                ("r4_mode", "research_mode", "stop_on_stabilization", "transform", "half_steps"))}),
         },
         "solver": {"stage": outcome.solver, "call": outcome.call, "parameters": _plain(dict(outcome.parameters))},
         "statuses": {

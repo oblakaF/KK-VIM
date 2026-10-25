@@ -29,17 +29,25 @@
 - затем ограничения области, которые GUI не пропускает:
   - только SSSS: CCCC не реализован;
   - N = 1–3;
-  - `dense` только при n ≤ 40 (D-048.6).
+  - `dense` только при max(n_x, n_y) ≤ 40 (D-048.6): проверяются обе размерности, в том числе прямоугольные сетки
+    (40×40 — допустимо; 40×41, 41×40, 40×160 — отказ).
 
-Отклонённый ввод не вычисляется.
+Отклонённый ввод не вычисляется. Правило dense — одна функция `kkvim_adapter.dense_problem`. Её применяют:
+- форма: сообщение под выбором «Преобразование DST» появляется сразу, «Выполнить расчёт» недоступна;
+- `check_request`;
+- диспетчер `RunManager.start`: процесс не создаётся;
+- вычислительный процесс: `execute` до вызова `kkvim`.
 
-**Режимы R4** выбираются явно и передаются в `run_coupled` без подмены:
+**Режимы R4** передаются в `run_coupled` без подмены. По умолчанию — нормативный режим D-047 (`research_mode=False`, D-048.3).
+Исследовательское продолжение через QR (D-048.5) включается только флажком «Исследовательское продолжение через QR».
+Правило остановки исследования выбирается только при включённом флажке. Любая смена N сбрасывает выбор в нормативный режим,
+поэтому исследовательский расчёт не запускается неявно.
 
 | Режим в GUI | Аргументы `run_coupled` | Итог |
 |---|---|---|
-| Исследовательский D-048 (по умолчанию) | `research_mode=True, stop_on_stabilization=True` | PROVISIONAL_FIELD_STABILIZED / MAX_HALF_STEPS / остановки защит |
-| Фиксированное число полушагов | `research_mode=True, stop_on_stabilization=False` | RESEARCH_LIMIT_REACHED / MAX_HALF_STEPS |
-| Нормативный D-047 | `research_mode=False` | NOT_QUALIFIED (или HALF_STEP_LIMIT_REACHED) после s = 1 |
+| Нормативный D-047 (по умолчанию; флажок выключен) | `research_mode=False` | NOT_QUALIFIED (или HALF_STEP_LIMIT_REACHED) после s = 1 |
+| Исследовательский D-048: остановка по стабилизации (флажок включён) | `research_mode=True, stop_on_stabilization=True` | PROVISIONAL_FIELD_STABILIZED / MAX_HALF_STEPS / остановки защит |
+| Исследовательский: фиксированное число полушагов (флажок включён) | `research_mode=True, stop_on_stabilization=False` | RESEARCH_LIMIT_REACHED / MAX_HALF_STEPS |
 
 Допуски R4 (tol_∞, tol_E, s_min, s_max, η_max, K_RESEARCH) фиксированы решением D-048 и не редактируются. Для N = 1 доступны
 tol_∞, tol_E, s_min, s_max и строгий режим NUMERICAL_SPEC.md 11.2 и 11.4; значения по умолчанию берутся из `kkvim`.
