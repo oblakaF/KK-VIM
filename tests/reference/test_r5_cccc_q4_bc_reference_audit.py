@@ -5,8 +5,10 @@ reproducibility. QA research tool."""
 
 import ast
 import csv
+import ctypes
 import importlib.util
 import json
+import platform
 import subprocess
 import sys
 from decimal import Decimal
@@ -15,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import scipy
 
 from kkvim_reference import r5_cccc_halfstep as hs
 from kkvim_reference import r5_cccc_q3_e4e6 as e46
@@ -194,15 +197,98 @@ def test_q3_e4_unchanged_since_the_campaign():
     assert now == then
 
 
-def test_one_q3_certified_point_is_reproduced_and_resolved():
-    """The pair 47 x 53, N = 2, X, with QR (s = 1): B-C reproduces the Q3 row, the new interval intersects the Q3 interval."""
+Q3_CORE = "Haswell"  # runtime OpenBLAS kernel on the Q3 processor (Intel64 Family 6 Model 183); not recorded in the Q3 meta.json
+
+
+def _openblas_core() -> str | None:
+    """Runtime kernel of the NumPy OpenBLAS (DYNAMIC_ARCH: chosen by the CPU or OPENBLAS_CORETYPE); None if not determinable."""
+    try:
+        lib = ctypes.CDLL(str(min((Path(np.__file__).resolve().parents[1] / "numpy.libs").glob("libscipy_openblas64_*"))))
+        f = lib.scipy_openblas_get_corename64_
+        f.restype = ctypes.c_char_p
+        return f().decode()
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
+def _in_q3_environment() -> bool:
+    """The double B-C solution (numpy LAPACK QR/solve, BLAS products) depends on the BLAS kernel and build: the Q3 row is reproduced
+    bitwise only in the environment of the Q3 campaign (its meta.json: OS, machine, processor, NumPy, SciPy, BLAS) with its kernel."""
+    meta = json.loads((ra.Q3_DIR / "meta.json").read_text(encoding="utf-8"))
+    blas = np.show_config(mode="dicts")["Build Dependencies"]["blas"]
+    return (platform.system() == meta["platform"].split("-")[0] and platform.machine() == meta["machine"]
+            and platform.processor() == meta["processor"] and np.__version__ == meta["numpy"] and scipy.__version__ == meta["scipy"]
+            and f"{blas['name']} {blas['version']}" == meta["blas"] and _openblas_core() == Q3_CORE)
+
+
+def _exact_band_ldl(band: dict, n: int, pb: int, shift=Fraction(0), rhs=None):
+    """Exact (rational) symmetric Gaussian elimination of the band of K - shift I without pivoting: the pivots and, with ``rhs``, the
+    exact solution. All pivots > 0 <=> K - shift I is positive definite. Test path, independent of the decimal reference and of B-C."""
+    U = dict(band)
+    for i in range(n):
+        U[(i, i)] = U.get((i, i), Fraction(0)) - shift
+    y = None if rhs is None else list(rhs)
+    piv = []
+    for k in range(n):
+        piv.append(U[(k, k)])
+        if piv[-1] <= 0:
+            return piv, None
+        for i in range(k + 1, min(n, k + pb + 1)):
+            f = U.get((k, i), 0) / piv[-1]
+            if f:
+                for j in range(i, min(n, k + pb + 1)):
+                    U[(i, j)] = U.get((i, j), Fraction(0)) - f * U.get((k, j), 0)
+                if y is not None:
+                    y[i] -= f * y[k]
+    if y is None:
+        return piv, None
+    x = [Fraction(0)] * n
+    for i in range(n - 1, -1, -1):
+        x[i] = (y[i] - sum(U.get((i, j), 0) * x[j] for j in range(i + 1, min(n, i + pb + 1)))) / U[(i, i)]
+    return piv, x
+
+
+def test_one_q3_certified_point_is_reproduced_and_resolved(monkeypatch):
+    """The pair 47 x 53, N = 2, X, with QR (s = 1), Q3 budget NOT_MET.
+
+    Every environment: the exact system and the lambda_low certificate are checked independently (exact LDL^T of K - lambda_low I),
+    x* is solved exactly (residual 0), the reference lies within its bound of x*, the exact error of THIS B-C solution lies in both new
+    intervals, the budget 1/100 holds with the printed directed values. Only in the Q3 environment: B-C reproduces the Q3 row bitwise
+    and the new intervals intersect the Q3 intervals (elsewhere B-C gives another double solution, whose error the Q3 interval does not
+    enclose by construction)."""
     with open(ra.Q3_E4, encoding="utf-8") as f:
         row = next(r for r in csv.DictReader(f) if r["grid"] == "1x1:47x53" and r["s"] == "1" and r["N"] == "2"
                    and r["direction"] == "X" and r["qr"] == "True")
+    assert row["budget_set"].startswith("NOT_MET") and row["budget_field"].startswith("NOT_MET")
+    recs, refs = [], []
+    real_run, real_refine = ra.bc.run_halfstep, ra.refine
+    monkeypatch.setattr(ra.bc, "run_halfstep", lambda *a, **k: recs.append(real_run(*a, **k)) or recs[-1])
+    monkeypatch.setattr(ra, "refine", lambda *a, **k: refs.append(real_refine(*a, **k)) or refs[-1])
     p = halfstep(1.0, 47, 1.0, 53, "X", 2)
     out = ra.analyse_point(p, True, row, False)
-    assert out["q3_reproduced"] and out["q3_set_interval_intersects"] and out["q3_field_interval_intersects"]
-    assert row["budget_set"].startswith("NOT_MET") and out["budget_set"] == "SATISFIED"
+    assert out["result"] == "RESOLVED (both norms)" and out["budget_set"] == "SATISFIED" and out["budget_field"] == "SATISFIED"
+    assert out["coefficients_equal_q3"] and out["band_equal_q1b"] and out["refine_converged"]
+    # independent exact path on the solved set of this run
+    ps = recs[-1].solved
+    N, m = ps.N, ps.n_s - 1
+    n, pb = N * m, 3 * N - 1
+    coef = ra.exact_coefficients(ps)
+    band = ra.exact_band(ps, coef)
+    rows, b = ra.band_rows(band, n), ra.rhs_exact(ps, coef)
+    lam = Fraction(out["lambda_low"])
+    assert 0 < lam <= ra.gershgorin_up(rows) and all(d > 0 for d in _exact_band_ldl(band, n, pb, shift=lam)[0])
+    _, x_star = _exact_band_ldl(band, n, pb, rhs=b)
+    assert not any(ra.residual(rows, b, x_star))
+    D = lambda key: Fraction(Decimal(out[key]))  # noqa: E731
+    assert ra.norm2_sq([a - c for a, c in zip(refs[-1][0], x_star, strict=True)]) <= D("ref_bound_2_up") ** 2
+    s_bc = ra.to_node_term([Fraction(float(v)) for v in recs[-1].bc.s], N, m)
+    e = [a - c for a, c in zip(s_bc, x_star, strict=True)]
+    eK2 = -sum(a * r for a, r in zip(e, ra.residual(rows, b, s_bc), strict=True))  # e^T K e = -e^T r, since K e = -r
+    assert D("set_error_2_down") ** 2 <= ra.norm2_sq(e) <= D("set_error_2_up") ** 2
+    assert D("field_error_a_down") ** 2 <= Fraction(ps.l_s) / ps.n_s * eK2 <= D("field_error_a_up") ** 2
+    assert 100 * D("ref_bound_2_up") <= D("set_error_2_down") and 100 * D("ref_bound_field_a_up") <= D("field_error_a_down")
+    if _in_q3_environment():
+        assert out["q3_reproduced"] and out["q3_set_interval_intersects"] and out["q3_field_interval_intersects"]
 
 
 def test_ci_profile_is_deterministic(tmp_path):
