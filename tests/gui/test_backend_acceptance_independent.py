@@ -803,3 +803,284 @@ def test_qt_stop_terminates_the_real_process(window, qtbot):
     assert run.status == "stopped" and run.outcome is None and not child.is_alive()
     assert not run.has_results and not run.has_diagnostic_field and window.runs.active is None
     assert not view.locked and view.run_button.isEnabled()
+
+
+# =================================================================================================================
+# 7. What the analysis window shows (addendum of 2026-10-26: field, axes, nodes, extremum, centre, units, history,
+#    energy test, statuses and marks). The expected values come from the direct API call written here and from the
+#    PR #24 control data; the GUI number format is restated from GUI_DESIGN.md, 11 (decimal comma, 6,7·10⁻⁴).
+# =================================================================================================================
+
+DISPLAY_CASES = ["r3_square", "r3_rect_b2a", "r3_rect_a2b", "r3_rect_r5_unequal", "r3_negative_q", "r4_n2_research",
+                 "r4_n3_research_rect", "r4_n3_research_fixed", "r4_n2_normative"]
+SUP = str.maketrans("0123456789-+", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺")
+# displayed history column (header text) -> column of the control history CSV of PR #24
+R3_SHOWN = {"ε^∞": "eps_inf", "ε^E": "eps_E", "Π_h, N·m": "P", "Энергетический тест": "energy_status",
+            "ΔP, N·m": "delta_P", "Q, N·m": "Q", "τ, N·m": "tau", "w̄ в центре": "w_bar_centre"}
+R4_SHOWN = {"ε^∞": "eps_inf", "ε^E": "eps_E", "max|w|, m": "w_max", "Π_h, N·m": "P", "Энергетический тест": "energy_status",
+            "ΔP, N·m": "delta_P", "Q, N·m": "Q", "τ, N·m": "tau", "m_s": "m_s", "η_N (невязка)": "eta_N"}
+
+
+def iface(value, digits=6):
+    """Interface number format (GUI_DESIGN.md, 11), restated independently of kkvim_gui.analysis.results.fmt."""
+    text = f"{float(value):.{digits}g}"
+    if "e" in text:
+        mantissa, exponent = text.split("e")
+        text = f"{mantissa}·10{str(int(exponent)).translate(SUP)}"
+    return text.replace(".", ",")
+
+
+def direct_field(name):
+    """(D, w, s) of the direct API call (not the adapter)."""
+    c = control()["cases"][name]
+    if c["spec"]["model"] == "R3":
+        result = direct_api(name)
+        return result.D, result.run.last_field(), result.run.s
+    D, run = direct_api(name)
+    return D, run.field(), run.s
+
+
+def analysis_window(qtbot, outcome):
+    from datetime import datetime
+
+    from kkvim_gui.analysis.window import AnalysisWindow
+    from kkvim_gui.session import Session
+
+    run = SimpleNamespace(run_id=1, started=datetime(2026, 10, 26, 12, 0, 0), _elapsed_final=1.0, outcome=outcome,
+                          is_demo=False)
+    window = AnalysisWindow(Session(settings=None), (("a", "1 m"),), run=run)
+    qtbot.addWidget(window)
+    return window
+
+
+def label_texts(widget):
+    from PySide6.QtWidgets import QLabel
+
+    return [w.text() for w in widget.findChildren(QLabel)]
+
+
+def figures_of(window):
+    tabs = (window.overview.field, window.fields.figure, window.sections.fig_x, window.sections.fig_y,
+            window.history.figure, window.energy.figure)
+    return [f for f in tabs if f is not None]
+
+
+def check_field_display(window, outcome, name, w, x, y):
+    """Field image: the solver array (mm), axis 0 = x to the right, axis 1 = y upwards, pixel (i, j) centred on node."""
+    import pyqtgraph as pg
+    from PySide6.QtCore import QPointF
+
+    from kkvim_gui.figures.text import fig_text
+
+    inp = control()["cases"][name]["input"]
+    lang = window.session.figure_language
+    i_ext, j_ext = np.unravel_index(int(np.argmax(np.abs(w))), w.shape)
+    nodes = {(0, 0), (len(x) - 1, 0), (0, len(y) - 1), (len(x) - 1, len(y) - 1), (int(i_ext), int(j_ext)),
+             (len(x) // 2, len(y) // 2)}
+    assert pg.getConfigOption("imageAxisOrder") == "col-major"  # image[i, j] is drawn at (x_i, y_j)
+    for fig in (window.overview.field, window.fields.figure):
+        img = fig.image
+        assert np.array_equal(img.image, w * 1000.0)  # w in mm, the solver array itself (not transposed)
+        assert (img.width(), img.height()) == (len(x), len(y)) == w.shape
+        vb = fig.plot.getViewBox()
+        assert not vb.xInverted() and not vb.yInverted()
+        for i, j in nodes:
+            p = img.mapToParent(QPointF(i + 0.5, j + 0.5))
+            assert abs(p.x() - x[i]) <= 1e-12 * inp["a"] and abs(p.y() - y[j]) <= 1e-12 * inp["b"], (i, j)
+        assert tuple(img.levels) == (float(w.min()) * 1000.0, float(w.max()) * 1000.0)
+        assert fig.plot.getAxis("bottom").labelText == fig_text(lang, "axis.x")
+        assert fig.plot.getAxis("left").labelText == fig_text(lang, "axis.y")
+    assert window.fields.figure.bar.axis.labelText == fig_text(lang, "colorbar.w")
+    window.fields.quantity.changed.emit("w_bar")
+    assert np.array_equal(window.fields.figure.image.image, outcome.w_bar)
+    assert window.fields.figure.bar.axis.labelText == fig_text(lang, "colorbar.wbar")
+
+
+@needs_qt
+@pytest.mark.parametrize("name", DISPLAY_CASES)
+def test_analysis_window_field_axes_nodes_and_boundary(qtbot, name):
+    c = control()["cases"][name]
+    outcome = kkvim_adapter.execute(case_request(name))
+    D, w, s = direct_field(name)
+    x, y, _ = control_grid(c["files"]["w_csv"])
+    assert np.array_equal(outcome.w, w) and outcome.D == D and outcome.s == s  # GUI data = direct API (same run here)
+    assert np.all(w[0, :] == 0) and np.all(w[-1, :] == 0) and np.all(w[:, 0] == 0) and np.all(w[:, -1] == 0)
+    window = analysis_window(qtbot, outcome)
+    check_field_display(window, outcome, name, w, x, y)
+    # sections: w(x) along the node row and w(y) along the node column of the extremum, in mm
+    e = outcome.extremum()
+    xs, ws = window.sections.curve_x.getData()
+    assert np.array_equal(xs, x) and np.array_equal(ws, w[:, e["j"]] * 1000.0)
+    ys, ws = window.sections.curve_y.getData()
+    assert np.array_equal(ys, y) and np.array_equal(ws, w[e["i"], :] * 1000.0)
+
+
+@needs_qt
+@pytest.mark.parametrize("name", DISPLAY_CASES)
+def test_analysis_window_extremum_sign_coordinates_centre_and_units(qtbot, name):
+    from PySide6.QtCore import Qt
+
+    c = control()["cases"][name]
+    inp = c["input"]
+    outcome = kkvim_adapter.execute(case_request(name))
+    _, w, _ = direct_field(name)
+    x, y, _ = control_grid(c["files"]["w_csv"])
+    w_bar = outcome.w_bar
+    peak = np.max(np.abs(w))
+    candidates = {tuple(int(v) for v in ij) for ij in np.argwhere(np.abs(w) == peak)}
+    e = outcome.extremum()
+    i, j = e["i"], e["j"]
+    assert (i, j) in candidates and e["w"] == w[i, j] and np.sign(e["w"]) == np.sign(inp["q"])
+    window = analysis_window(qtbot, outcome)
+    overview, inspector = label_texts(window.overview), label_texts(window.fields)
+    assert f"{iface(w[i, j] * 1000.0)} mm  ({iface(w[i, j])} m)" in overview  # signed, mm and m
+    assert f"x = {iface(x[i])} m, y = {iface(y[j])} m (i = {i}, j = {j})" in overview
+    assert f"{iface(w_bar[i, j])}  (w̄ = wD/(qa⁴), MATH_SPEC 2.5)" in overview
+    assert f"w = {iface(w[i, j] * 1000.0)} mm" in inspector and f"w̄ = {iface(w_bar[i, j])}" in inspector
+    assert f"x = {iface(x[i])} m, y = {iface(y[j])} m" in inspector
+    # every node of the values table: (i, j, x, y, w mm, w m, w̄) are the stored values
+    model = window.values.model
+    ny = len(y)
+    assert model.rowCount() == w.size and [model.headerData(k, Qt.Orientation.Horizontal) for k in range(7)] == [
+        "i", "j", "x, m", "y, m", "w, mm", "w, m", "w̄"]
+    got = np.array([[model.data(model.index(r, k), Qt.ItemDataRole.UserRole) for k in range(7)] for r in range(w.size)])
+    ii, jj = np.divmod(np.arange(w.size), ny)
+    assert np.array_equal(got[:, 0], ii) and np.array_equal(got[:, 1], jj)
+    assert np.array_equal(got[:, 2], x[ii]) and np.array_equal(got[:, 3], y[jj])
+    assert np.array_equal(got[:, 4], w[ii, jj] * 1000.0) and np.array_equal(got[:, 5], w[ii, jj])
+    assert np.array_equal(got[:, 6], w_bar[ii, jj])
+    # the centre is a node when n_x and n_y are even
+    if inp["n_x"] % 2 == 0 and inp["n_y"] % 2 == 0:
+        ic, jc = inp["n_x"] // 2, inp["n_y"] // 2
+        assert x[ic] == inp["a"] / 2 and y[jc] == inp["b"] / 2
+        r = ic * ny + jc
+        assert model.data(model.index(r, 5), Qt.ItemDataRole.UserRole) == w[ic, jc]
+        assert model.data(model.index(r, 4), Qt.ItemDataRole.DisplayRole) == iface(w[ic, jc] * 1000.0, 10)
+        if c["spec"]["model"] == "R3":  # the history column "w̄ в центре" of the last half-step is the centre node
+            assert outcome.history[-1]["w_bar_centre"] == w_bar[ic, jc]
+        if inp["n_x"] == inp["n_y"] and inp["a"] == inp["b"]:  # square SSSS plate: the largest |w| is at the centre
+            assert (ic, jc) in candidates
+
+
+@needs_qt
+@pytest.mark.parametrize("name", DISPLAY_CASES)
+def test_analysis_window_history_energy_and_unresolved(qtbot, name):
+    from PySide6.QtCore import Qt
+
+    c = control()["cases"][name]
+    outcome = kkvim_adapter.execute(case_request(name))
+    hist = control_history(c["files"]["history_csv"])
+    window = analysis_window(qtbot, outcome)
+    model = window.history.model
+    headers = [model.headerData(k, Qt.Orientation.Horizontal) for k in range(model.columnCount())]
+    shown = R3_SHOWN if c["spec"]["model"] == "R3" else R4_SHOWN
+    assert set(shown) <= set(headers) and model.rowCount() == len(hist) == outcome.s
+    status_col = headers.index("Энергетический тест")
+    for r, h in enumerate(hist):
+        text = model.data(model.index(r, status_col), Qt.ItemDataRole.DisplayRole)
+        assert text == h["energy_status"] or (h["energy_status"] == "" and text == "—")  # verbatim, UNRESOLVED kept
+    last = hist[-1]["energy_status"] or "—"
+    energy_texts = label_texts(window.energy)
+    assert last in energy_texts  # "Энергетический тест последнего полушага"
+    if last != "PASS":
+        assert "PASS" not in energy_texts
+    if same_environment():
+        for title, key in shown.items():
+            k = headers.index(title)
+            for r, h in enumerate(hist):
+                value = model.data(model.index(r, k), Qt.ItemDataRole.UserRole)
+                expected = None if h[key] == "" else (h[key] if key == "energy_status" else float(h[key]))
+                assert value == expected, (title, r)
+        s = [int(h["s"]) for h in hist]
+        for key in ("eps_inf", "eps_E"):
+            pairs = [(a, float(h[key])) for a, h in zip(s, hist, strict=True) if h[key] != "" and float(h[key]) > 0]
+            curve = window.history.curves[key]  # data given to the curve (the axis is logarithmic)
+            xs, ys = ([], []) if curve.xData is None else (list(curve.xData), list(curve.yData))  # empty: no point
+            assert xs == [p[0] for p in pairs] and ys == [p[1] for p in pairs]
+        curve = window.energy.curve
+        assert list(curve.xData) == s and list(curve.yData) == [float(h["P"]) for h in hist]
+
+
+@needs_qt
+@pytest.mark.parametrize("name", DISPLAY_CASES)
+def test_analysis_window_statuses_and_marks(qtbot, name):
+    import re
+
+    c = control()["cases"][name]
+    outcome = kkvim_adapter.execute(case_request(name))
+    window = analysis_window(qtbot, outcome)
+    texts = label_texts(window)
+    r4 = c["spec"]["model"] == "R4"
+    for fig in figures_of(window):
+        assert fig.mark.isHidden() is (not r4) and (MARK in fig.mark.text()) is r4
+    assert (MARK in window.data_note.text()) is r4 and window.header.badge.isHidden() is (not r4)
+    assert window.status_run.property("status") == "success"
+    if r4:
+        assert window.status_accept.property("status") == "warning" and MARK in window.status_accept.text()
+        assert window.status_stop.property("status") != "success" and "CONVERGED" not in " ".join(texts)
+    else:
+        assert c["expected_status"] == "CONVERGED" and window.status_stop.property("status") == "success"
+        assert not any("PROVISIONAL" in t for t in texts)
+    for t in texts:  # convergence is never claimed for R4; every mention carries a negation
+        for m in re.finditer(r"сходимост", t):
+            assert not r4 or re.search(r"не (доказанн\w+ )?$", t[max(0, m.start() - 20):m.start()]), t
+
+
+@needs_qt
+def test_analysis_window_of_a_failed_run_is_diagnostics_only(qtbot, monkeypatch):
+    from kkvim_gui.figures.text import fig_text
+
+    _inject_r3_linear_failure(monkeypatch)
+    outcome = kkvim_adapter.execute(case_request("r3_rect_r5_unequal"))
+    assert outcome.diagnostic_only and outcome.s == 2
+    window = analysis_window(qtbot, outcome)
+    for lang in ("ru", "en"):  # both figure languages of the session (marks are retranslated)
+        window.session.set_figure_language(lang)
+        for fig in figures_of(window):
+            assert not fig.mark.isHidden() and fig_text(window.session.figure_language, "mark.diagnostic") in fig.mark.text()
+    assert window.status_run.property("status") == "error" and ERROR_LINEAR_SOLVE in window.status_run.text()
+    assert window.status_stop.property("status") == "error" and not window.header.badge.isHidden()
+    assert any("ДИАГНОСТИКА" in t and "не результат" in t for t in label_texts(window))
+    assert "Расчёт выполнен" not in window.status_run.text()
+
+
+@needs_qt
+@pytest.mark.parametrize("name, research", [("r3_negative_q", False), ("r4_n3_research_rect", True)])
+def test_real_application_opens_the_analysis_of_the_run_from_the_run_view(qtbot, tmp_path, name, research):
+    """The real path: form -> run button -> computing process -> "Открыть анализ результатов" -> GuiApplication."""
+    from PySide6.QtCore import Qt
+
+    from kkvim_gui.app import GuiApplication
+    from kkvim_gui.session import Session
+
+    c = control()["cases"][name]
+    app = GuiApplication(Session(settings=None), protocol_dir=tmp_path / "runs")
+    main = app.main_window
+    qtbot.addWidget(main)
+    main.set_state("setup")
+    try:
+        _type_case(main.setup_view, c["input"], c["spec"]["N"], c["input"].get("transform", "fft"),
+                   c["input"].get("half_steps"))
+        if research:
+            main.setup_view.research.setChecked(True)
+        run = _run_and_wait(qtbot, main)
+        assert run.status == "finished" and run.outcome.status == c["expected_status"]
+        assert main.run_view.analysis_button.isEnabled()
+        qtbot.mouseClick(main.run_view.analysis_button, Qt.MouseButton.LeftButton)
+        assert len(app.analysis_windows) == 1
+        window = app.analysis_windows[0]
+        qtbot.addWidget(window)
+        assert window.outcome is run.outcome
+        _, w, s = direct_field(name)
+        x, y, _ = control_grid(c["files"]["w_csv"])
+        assert run.s == s and np.array_equal(run.outcome.w, w)  # the real process = the direct call here
+        check_field_display(window, run.outcome, name, w, x, y)
+        e = run.outcome.extremum()
+        assert np.sign(e["w"]) == np.sign(c["input"]["q"])
+        assert f"{iface(e['w'] * 1000.0)} mm  ({iface(e['w'])} m)" in label_texts(window.overview)
+        for fig in figures_of(window):
+            assert (MARK in fig.mark.text()) is research
+    finally:
+        for win in list(app.analysis_windows):
+            win.close()
+        main.runs.shutdown()
