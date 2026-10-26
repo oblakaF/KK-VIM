@@ -1,0 +1,126 @@
+{
+ "study": "R5-V Q3 pre-qualification measurements E-1...E-9 (QA references; not a qualification)",
+ "profile": "full",
+ "workers": 10,
+ "git_commit": "9f6c90b541227a26fd62c030f7c9d8ae94b7e2ea",
+ "git_dirty": true,
+ "python": "3.13.15",
+ "platform": "Windows-10-10.0.19045-SP0",
+ "machine": "AMD64",
+ "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+ "numpy": "2.5.4",
+ "scipy": "1.18.1",
+ "blas": "scipy-openblas 0.3.34.106.0",
+ "fft": "scipy.fft (pocketfft) DST-I, norm='ortho'",
+ "threads": {
+  "OPENBLAS_NUM_THREADS": "1",
+  "OMP_NUM_THREADS": "1",
+  "MKL_NUM_THREADS": "1"
+ },
+ "cpu_count": 24,
+ "ram_mb": 32456.7,
+ "ftz_daz_selftest": "subnormal result and input preserved in a 1 x 1 matmul of this run; a self-test of one call, not a proof of the IEEE mode of every kernel",
+ "seed": 20261025,
+ "c_R_path_count": 22,
+ "e46_exact_limit": 36,
+ "seconds_total": 7075,
+ "resource_rule_PL_6_3": {
+  "peak_job_mb": 6213.9,
+  "limit_mb_50pct_ram": 16228.35,
+  "within_limit": true,
+  "longest_job_s": 3177.58,
+  "factorization_limit_s": 1800
+ },
+ "sample": {
+  "ratios": [
+   "1",
+   "2",
+   "3",
+   "5",
+   "1/2",
+   "1/3",
+   "1/5"
+  ],
+  "pairs": [
+   [
+    40,
+    64
+   ],
+   [
+    64,
+    40
+   ],
+   [
+    47,
+    53
+   ],
+   [
+    160,
+    32
+   ],
+   [
+    32,
+    160
+   ]
+  ],
+  "chain": [
+   32,
+   64,
+   128,
+   256,
+   512
+  ],
+  "chain_limit": {
+   "1": 512,
+   "2": 512,
+   "3": 256,
+   "5": 256,
+   "1/2": 512,
+   "1/3": 256,
+   "1/5": 256
+  },
+  "e5_main": [
+   32,
+   64,
+   128,
+   256,
+   512
+  ],
+  "e5_extended": [
+   16,
+   1024,
+   2048
+  ],
+  "exact_tier": [
+   [
+    1.0,
+    8,
+    1.3,
+    7
+   ],
+   [
+    1.0,
+    10,
+    0.6,
+    9
+   ],
+   [
+    1.0,
+    12,
+    1.0,
+    13
+   ]
+  ]
+ },
+ "counts": {
+  "seq": 984,
+  "e2": 984,
+  "e3": 270,
+  "e4": 476,
+  "e5": 56,
+  "e6": 476,
+  "e8": 984
+ },
+ "printing": "*_up rounded up and *_down rounded down to 17 significant digits; other floats repr (exact double)",
+ "arrays": "scratch\\r5_cccc_q3_prequalification\\arrays"
+}
