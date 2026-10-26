@@ -1,0 +1,35 @@
+{
+ "points": 476,
+ "q3_reproduced": "476/476",
+ "coefficients_equal_q3": "476/476",
+ "band_equal_q1b": "476/476",
+ "refine_converged": "476/476",
+ "q3_set_interval_intersects": "476/476",
+ "q3_field_interval_intersects": "476/476",
+ "exact_ref_within_bound": "54/54",
+ "exact_bc_error_in_interval": "54/54",
+ "rh_consistent": "222/222",
+ "certificate_missing": 0,
+ "budget_set_satisfied": 476,
+ "budget_field_satisfied": 476,
+ "resolved_both": 476,
+ "precision_used": {
+  "40": 476,
+  "80": 0,
+  "160": 0
+ },
+ "by_group": {
+  "chain": {
+   "points": 186,
+   "resolved_both": 186
+  },
+  "exact_tier (OBSERVATION)": {
+   "points": 30,
+   "resolved_both": 30
+  },
+  "pairs": {
+   "points": 260,
+   "resolved_both": 260
+  }
+ }
+}
