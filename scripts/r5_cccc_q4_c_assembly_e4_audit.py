@@ -34,9 +34,11 @@ regularization. Modal factorization success and the prototype's diagnostics (con
 
 Errors (each in the set 2-norm and in the K-norm, the field a-norm being h_s^(1/2) ||.||_K; P-S1):
 - total: s - x* (s = OLD, NEW or CONTROL); interval [d - b, d + b], d = ||s - x||, b the reference bound;
-- assembly: x*_c - x*, x*_c the exact solution of the system with the coefficients (A^, B^, C^, F^) of that solution taken exactly,
-  matrices by their exact symmetric parts (``frac_coef``; correction after the first run, report 4) (the same certified solver);
-  modal: s - x*_c (B-C error relative to its own rounded coefficients, incl. the antisymmetric part of B^, C^);
+- auxiliary split s - x* = (s - x_c_sym) + (x_c_sym - x*) (report 2.1, review ae4d083 I-1): x_c_sym is the exact solution of the
+  AUXILIARY SYMMETRIZED system K^_SYM built from the exact symmetric parts (M^ + M^T)/2 of the computed coefficients and F^
+  (``frac_coef``; the same certified solver) - NOT the exact solution of the full non-symmetric system K^_FULL that B-C solves;
+  "assembly" = x_c_sym - x* (symmetric parts of the rounded coefficients); "modal" (column name kept) = s - x_c_sym, a MIXED part:
+  the modal solution error of B-C relative to K^_FULL plus the effect of the antisymmetric parts of B^, C^ (rounding of the assembly);
 - relative values use the certified bounds of ||x*||.
 Budget (D-049.6, item 4) for EVERY quantitative comparison separately, in its norm: 100 * (reference bound) <= guaranteed lower bound
 of the measured difference (already reduced by the reference bounds); otherwise that comparison is UNRESOLVED.
@@ -273,10 +275,11 @@ def diff_interval(ra, u_vec, v_vec, ru, rv, bu2, bv2, buK, bvK):
 
 
 def frac_coef(A, B, C, F):
-    """Exact SYMMETRIC parts (M + M^T)/2 of the binary64 coefficient matrices and F exactly. The band assembly of an SPD system
-    (and the Q1b certificate) uses one triangle per node block and both at the neighbouring blocks, so a non-symmetric M^ (B^ of the
-    prototype is not exactly symmetric) must be symmetrized explicitly; the antisymmetric part, which B-C sees through the LU solve
-    of the full modal blocks, is thereby attributed to the modal part (correction of this tool, report 4)."""
+    """Exact SYMMETRIC parts (M + M^T)/2 of the binary64 coefficient matrices and F exactly: the auxiliary system K^_SYM. The
+    band assembly of an SPD system (and the Q1b certificate) uses one triangle per node block and both at the neighbouring blocks, so
+    a non-symmetric M^ (B^ of the prototype is not exactly symmetric) must be symmetrized explicitly (report 4). K^_SYM is not the
+    system K^_FULL that B-C solves; the effect of the antisymmetric part, which B-C sees through the LU solve of the full modal blocks,
+    falls into the mixed part s - x_c_sym (report 2.1)."""
     N = len(F)
     sym = lambda M: [[(Fraction(float(M[i, k])) + Fraction(float(M[k, i]))) / 2 for k in range(N)] for i in range(N)]  # noqa: E731
     return sym(A), sym(B), sym(C), [Fraction(float(x)) for x in F]
