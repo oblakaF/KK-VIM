@@ -1,0 +1,25 @@
+{
+ "rows": 984,
+ "pass": 984,
+ "fail_ids": [],
+ "inclusion_exact": "984/984",
+ "Gamma_up_holds": "984/984",
+ "equals_audit_path_A": "984/984",
+ "q3_gamma_exact_is_an_endpoint": "984/984",
+ "q3_gamma_exact_is_nearest": "984/984",
+ "equals_energy_path": "57/57",
+ "given_consistent": "984/984",
+ "interval_degenerate": "0/984",
+ "by_sign": {
+  "positive": 540,
+  "negative": 444,
+  "zero": 0,
+  "subnormal range": 0
+ },
+ "min_abs_gamma": 2.3560294540791002e-35,
+ "max_abs_gamma": 1.4217157247855874e-19,
+ "max_rel_excess_Gamma_up": 2.1599602678175093e-16,
+ "max_exact_digits": 381,
+ "npz_sha256_equal_to_gamma_audit": true,
+ "verdict": "PASS"
+}
