@@ -1,0 +1,59 @@
+{
+ "points": 476,
+ "complete": 476,
+ "c3plus_inequality": {
+  "PASS": 476,
+  "FAIL": 0,
+  "NOT_APPLICABLE": 0
+ },
+ "old_matches_reference_audit": "476/476",
+ "precision_used": {
+  "40": 476,
+  "80": 0,
+  "160": 0
+ },
+ "bc_status_OLD": {
+  "INDEPENDENT_GIVEN_SET": 476
+ },
+ "C_spd_OLD": "476/476",
+ "budget_OLD_set": "476/476",
+ "budget_OLD_field": "476/476",
+ "budget_OLD_assembly_set": "476/476",
+ "budget_OLD_assembly_field": "476/476",
+ "budget_OLD_modal_set": "476/476",
+ "budget_OLD_modal_field": "476/476",
+ "bc_status_NEW": {
+  "INDEPENDENT_GIVEN_SET": 476
+ },
+ "C_spd_NEW": "476/476",
+ "budget_NEW_set": "476/476",
+ "budget_NEW_field": "476/476",
+ "budget_NEW_assembly_set": "476/476",
+ "budget_NEW_assembly_field": "476/476",
+ "budget_NEW_modal_set": "476/476",
+ "budget_NEW_modal_field": "476/476",
+ "bc_status_CONTROL": {
+  "INDEPENDENT_GIVEN_SET": 476
+ },
+ "C_spd_CONTROL": "476/476",
+ "budget_CONTROL_set": "476/476",
+ "budget_CONTROL_field": "476/476",
+ "budget_CONTROL_assembly_set": "476/476",
+ "budget_CONTROL_assembly_field": "476/476",
+ "budget_CONTROL_modal_set": "476/476",
+ "budget_CONTROL_modal_field": "476/476",
+ "NEW_vs_OLD_set": {
+  "BETTER": 471,
+  "EQUAL": 1,
+  "WORSE": 4,
+  "OVERLAP": 0
+ },
+ "NEW_vs_OLD_field": {
+  "BETTER": 426,
+  "EQUAL": 1,
+  "WORSE": 49,
+  "OVERLAP": 0
+ },
+ "c3plus_max_ratio": 0.1465631310319217,
+ "c3plus_max_fro_ratio": 0.13595040836842018
+}
