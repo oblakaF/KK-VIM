@@ -159,3 +159,15 @@ def test_ci_profile_is_deterministic(tmp_path):
     assert outs[0] == outs[1]
     rows = list(csv.DictReader(outs[0].decode("utf-8").splitlines()))
     assert len(rows) == 6 and all(r["c3plus_inequality"] == "PASS" and r["result"] == "COMPLETE" for r in rows)
+
+
+def test_rounded_coefficient_system_uses_the_symmetric_parts():
+    """B^ of the prototype is not exactly symmetric; the reference of its rounded system must use (B^ + B^T)/2 (tool correction)."""
+    p = halfstep(hs.start_set(64, 3), nx=64, ny=64, direction="X")
+    rec = bc.run_halfstep(hs.HalfStep(1.0, 64, 1.0, 64, "X", hs.start_set(64, 3)), qr=True)
+    A, B, C, F = bc.bc_coefficients(rec.solved)
+    cA, cB, cC, cF = ca.frac_coef(A, B, C, F)
+    for M in (cA, cB, cC):
+        assert all(M[i][k] == M[k][i] for i in range(3) for k in range(3))
+    assert cB[0][1] == (Fraction(float(B[0, 1])) + Fraction(float(B[1, 0]))) / 2
+    assert p is not None

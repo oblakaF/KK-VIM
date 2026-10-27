@@ -34,8 +34,9 @@ regularization. Modal factorization success and the prototype's diagnostics (con
 
 Errors (each in the set 2-norm and in the K-norm, the field a-norm being h_s^(1/2) ||.||_K; P-S1):
 - total: s - x* (s = OLD, NEW or CONTROL); interval [d - b, d + b], d = ||s - x||, b the reference bound;
-- assembly: x*_c - x*, x*_c the exact solution of the system with the coefficients (A^, B^, C^, F^) of that solution taken exactly
-  (the same certified solver); modal: s - x*_c (B-C error relative to its own rounded coefficients);
+- assembly: x*_c - x*, x*_c the exact solution of the system with the coefficients (A^, B^, C^, F^) of that solution taken exactly,
+  matrices by their exact symmetric parts (``frac_coef``; correction after the first run, report 4) (the same certified solver);
+  modal: s - x*_c (B-C error relative to its own rounded coefficients, incl. the antisymmetric part of B^, C^);
 - relative values use the certified bounds of ||x*||.
 Budget (D-049.6, item 4) for EVERY quantitative comparison separately, in its norm: 100 * (reference bound) <= guaranteed lower bound
 of the measured difference (already reduced by the reference bounds); otherwise that comparison is UNRESOLVED.
@@ -272,10 +273,13 @@ def diff_interval(ra, u_vec, v_vec, ru, rv, bu2, bv2, buK, bvK):
 
 
 def frac_coef(A, B, C, F):
+    """Exact SYMMETRIC parts (M + M^T)/2 of the binary64 coefficient matrices and F exactly. The band assembly of an SPD system
+    (and the Q1b certificate) uses one triangle per node block and both at the neighbouring blocks, so a non-symmetric M^ (B^ of the
+    prototype is not exactly symmetric) must be symmetrized explicitly; the antisymmetric part, which B-C sees through the LU solve
+    of the full modal blocks, is thereby attributed to the modal part (correction of this tool, report 4)."""
     N = len(F)
-    return ([[Fraction(float(A[i, k])) for k in range(N)] for i in range(N)],
-            [[Fraction(float(B[i, k])) for k in range(N)] for i in range(N)],
-            [[Fraction(float(C[i, k])) for k in range(N)] for i in range(N)], [Fraction(float(x)) for x in F])
+    sym = lambda M: [[(Fraction(float(M[i, k])) + Fraction(float(M[k, i]))) / 2 for k in range(N)] for i in range(N)]  # noqa: E731
+    return sym(A), sym(B), sym(C), [Fraction(float(x)) for x in F]
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
