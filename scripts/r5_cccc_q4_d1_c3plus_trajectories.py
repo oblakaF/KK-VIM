@@ -18,7 +18,9 @@ Trajectory (fixed here; the order is the approved one, nothing of it is new):
 
 Order of one half-step (NS 5.1; D-049.2, item 3; the same functions as ``r5_cccc_bc.run_halfstep``, but the solve uses C-3+):
 1. rank diagnostic of the given set: exact rank (rational, no threshold); s = 1: the proven conditions of D-049.3, item 3 on the start
-   grid (independence N <= floor(n_x/2), exact formulas 2N < n_x); s >= 2, N >= 2: the field diagnostic of w^(s-1) (rho_N, kappa_rep,
+   grid (independence N <= floor(n_x/2), exact formulas 2N < n_x) - statements about the EXACT T_N, applied only when the given set
+   is bitwise hs.start_set(n_x, N) and the companion is 0 (``run_step`` refuses any other input at s = 1; the stored doubles of T_N
+   are not claimed dependent by the theorem); s >= 2, N >= 2: the field diagnostic of w^(s-1) (rho_N, kappa_rep,
    cond(A) before QR; r5_cccc_sequence._rank_diagnostic, OBSERVATION). A PROVEN dependence (exact rank < N, or N > floor(n_x/2) at
    s = 1) stops the trajectory BEFORE QR (S-1 only for a proven dependence, D-049.5, item 2). Otherwise the numerical rank decision is
    UNRESOLVED (no approved criterion; no S-2, no K, c_rank, c_d, tau_set, no rank reduction, no regularisation) and the run goes on as
@@ -28,16 +30,25 @@ Order of one half-step (NS 5.1; D-049.2, item 3; the same functions as ``r5_cccc
 3. diagnostics of the prototype (values only): cond(A) before QR = cond(R)^2, cond(A) after QR, exact orthonormality defect, angle
    between span(U~) and span(G);
 4. C-3+ of the SOLVED set (after QR if QR was applied): ``c3plus`` of PR #40, C = h X^T X + (2/h^3)(g_1 g_1^T + g_m g_m^T),
-   X = rd(Z_3 G)/h^2. Premises P-1...P-5 (RO 0.4) are checked one by one (``c3plus_premises``; premises_c3plus() covers only a part of
-   P-2/P-3): P-1 round-to-nearest probes and P-3 FTZ/DAZ probes in this thread before the assembly and after the solve; P-2/P-3 on every
-   intermediate (premises_c3plus, plus h, h^2, h^3, 2/h^3, C_L, E and the decomposition C = fl(C_L + E)); P-5 k u < 1, k = m_f + 13;
-   P-4 (classical dot products in BLAS) cannot be checked by the tool and is recorded as an ASSUMPTION. The inequality of theorem C-3+
-   |C^_ij - C_ij| <= gamma_k sqrt(C_ii C_jj) (and the Frobenius form) is then checked EXACTLY against the exact C of the stored set.
-   A premise not established -> UNRESOLVED_C3PLUS_PREMISE, NO solve, the trajectory stops (no switch to the OLD C, no CONTROL);
-   a violated inequality with established premises -> FAIL_C3PLUS_THEOREM, the trajectory stops;
-5. B-C solve of the solved set with ONLY C replaced (``replaced_c`` of PR #40; A, B, F and the modal algorithm are the prototype's):
-   a spy records what solve_bc actually consumed (one call, the solved set, A, B, F bitwise the prototype's, C bitwise the C-3+ matrix);
-   the runtime wrapper is restored in ``finally`` and runs under a lock (no concurrent B-C call through this tool);
+   X = rd(Z_3 G)/h^2. Premises P-1...P-5 (RO 0.4) are classified one by one (``c3plus_premises``; premises_c3plus() covers only a
+   part of P-2/P-3) as ESTABLISHED (checked), ASSUMED (an explicitly accepted model) or UNRESOLVED (a check failed): P-1
+   round-to-nearest probes and the FTZ/DAZ probes of P-3 in this thread before the assembly and after the solve (they show the mode at
+   the moments of probing); P-2/P-3 on every intermediate (premises_c3plus, plus h, h^2, h^3, 2/h^3, C_L, E and the decomposition
+   C = fl(C_L + E)); P-5 k u < 1, k = m_f + 13, exactly; P-4 (classical dot products in BLAS) cannot be checked by the tool: it is
+   ASSUMED, never declared established. The summary is ESTABLISHED_CONDITIONAL_ON_P4 (P-1, P-2, P-3, P-5 established; P-4 assumed)
+   or UNRESOLVED. The inequality of theorem C-3+ |C^_ij - C_ij| <= gamma_k sqrt(C_ii C_jj) (and the Frobenius form) is then checked
+   EXACTLY for THIS assembled matrix on THIS input (the stored doubles) against the exact C - a check of one matrix, not a proof or a
+   refutation of the universal theorem, which holds under all of P-1...P-5.
+   A premise UNRESOLVED -> UNRESOLVED_C3PLUS_PREMISE, NO solve, the trajectory stops (no switch to the OLD C, no CONTROL);
+   a violated inequality with P-1, P-2, P-3, P-5 established and P-4 assumed -> FAIL_C3PLUS_BOUND_CHECK, the trajectory stops (not an
+   unconditional refutation of the theorem: P-4 is not verified);
+5. B-C solve of the solved set with ONLY C replaced (``solve_with_c``; A, B, F and the modal algorithm are the prototype's): the
+   UNCHANGED code object of bc.solve_bc is executed as a new function with a PRIVATE globals dictionary (types.FunctionType; a copy of
+   the namespace of r5_cccc_bc taken at import) in which only the name ``bc_coefficients`` is bound to a local function of this call:
+   it calls the prototype's bc_coefficients and replaces C by the C-3+ matrix. Nothing global is replaced (bc.solve_bc and
+   bc.bc_coefficients keep their identity; no monkey-patch, no lock), so concurrent ordinary bc.solve_bc calls in other threads use the
+   prototype's C. The local function records what the call consumed (one call, made by the code of solve_bc with the private globals,
+   the solved set, A, B, F bitwise the prototype's, C bitwise the C-3+ matrix);
 6. residual eta_QA (exact R-HP residual of the original operator with D4; UNRESOLVED for 0/0 at q = 0);
 7. rank diagnostic of the new field w^(s) = U~ V^T: exact rank of V; N >= 2: rho_N etc. (OBSERVATION);
 8. transformation for s + 1:
@@ -46,15 +57,22 @@ Order of one half-step (NS 5.1; D-049.2, item 3; the same functions as ``r5_cccc
    - N >= 2: next given = V (the B-C solved factor, untransformed), next companion = U~; the QR of V is step 2 of half-step s + 1.
 
 Statuses of a half-step (no thresholds): OK; STOP_BEFORE_QR (proven dependence, S-1); STOP_ZERO_FIELD; PROTECTIVE_STOP (QR factor or
-solved set exactly singular, B-C factorization failed); UNRESOLVED_C3PLUS_PREMISE; FAIL_C3PLUS_THEOREM; FAIL_TOOL (only-C replacement
-not confirmed, broken input link, exception). N >= 2 is RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED (D-049.5, D-054.5).
+solved set exactly singular, B-C factorization failed); UNRESOLVED_C3PLUS_PREMISE; FAIL_C3PLUS_BOUND_CHECK; FAIL_TOOL (only-C
+replacement not confirmed, broken input link, exception). N >= 2 is RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED (D-049.5, D-054.5).
 
 Journal (``write_journal``): journal.json (meta + one record per half-step) and arrays.npz (keys ``s{s}_{name}``) with the given set
 and companion as received, R, the solved set, the transformed companion, the C-3+ matrix, the B-C solved factor and the next input
 (next_given, next_companion), so that the input of s + 1 can be restored independently. Fields before and after QR and before and
-after I-4 are recorded separately (sha256 of fl(X Y^T)). Provenance: git commit and status, git blob ids of the tool and of the used
-modules (checked against the base d537941), Python, NumPy, SciPy, BLAS, platform, BLAS thread variables. Bitwise reproducibility is
-claimed only on the same platform, BLAS build and thread settings, never across BLAS platforms (D-025; AGENTS.md 4).
+after I-4 are recorded separately (sha256 of fl(X Y^T)). Provenance: git commit and status, git blob ids of the tool and of the
+listed used modules (compared with the base d537941; a difference is recorded, it does not stop the run), the project modules loaded
+in the process that are NOT in the list (provenance NOT_CHECKED), Python, NumPy, SciPy (versions only), BLAS build, platform, and the
+values of the BLAS thread environment variables as found (the tool does not set them; they are not the effective BLAS thread count,
+which is not verified). Bitwise reproducibility is claimed only on the same platform, BLAS build and thread settings, never across
+BLAS platforms (D-025; AGENTS.md 4).
+
+Guard against D1: the command line refuses the D1 grids and output under docs/. This is a guard of the command line only, NOT a
+mechanism that prevents a D1 run: the Python API (run_trajectory, run_step) has no such guard (D1_START = BLOCKED is an owner's
+decision, not enforced by this tool).
 
 Independent check of small half-steps (``independent_check``; R-H, exact system; BR 4; D-053.4): on the SAME solved set (after QR)
 the exact system (exact coefficients of the stored doubles, h = l/n exact) is solved in rational arithmetic; the Q1b certificate
@@ -75,31 +93,32 @@ import os
 import platform
 import subprocess
 import sys
-import threading
 import time
+import types
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
 
+import numpy as np
+import scipy
+
+from kkvim_reference import r5_cccc_bc as bc
+from kkvim_reference import r5_cccc_halfstep as hs
+from kkvim_reference import r5_cccc_sequence as seq
+
+# recorded as found in the environment (the tool does not set them; not the effective BLAS thread count)
 THREAD_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
-for _k in THREAD_VARS:
-    os.environ[_k] = "1"  # as the Q3/Q4 tools: one BLAS thread (effective when NumPy is not imported yet, i.e. as a script)
-
-import numpy as np  # noqa: E402
-import scipy  # noqa: E402
-
-from kkvim_reference import r5_cccc_bc as bc  # noqa: E402
-from kkvim_reference import r5_cccc_halfstep as hs  # noqa: E402
-from kkvim_reference import r5_cccc_sequence as seq  # noqa: E402
-
 ROOT = Path(__file__).resolve().parents[1]
 C_ASSEMBLY = ROOT / "scripts" / "r5_cccc_q4_c_assembly_e4_audit.py"
 BASE_COMMIT = "d537941e9fd7f5b3218dc4db919ee7f3f0ccf6fc"
-# git blob ids at BASE_COMMIT of the modules this tool uses read-only (LF content; ``git rev-parse d537941:<path>``)
+# git blob ids at BASE_COMMIT of the project modules this tool uses read-only, directly or through their imports (LF content;
+# ``git rev-parse d537941:<path>``); other project modules loaded in the process are reported as NOT_CHECKED (``loaded_modules_check``)
 USED_MODULES = {
+    "src/kkvim_reference/__init__.py": "661a7c6e7771cca2d95485b2a7e3c1affa8e7f1b",
     "src/kkvim_reference/r5_cccc_bc.py": "1303c7d301cd8e5f799813795eb8fe1c5f5ed10c",
     "src/kkvim_reference/r5_cccc_halfstep.py": "619e63926015e6214ee923b27424fca977519113",
     "src/kkvim_reference/r5_cccc_sequence.py": "a175b5071bfa376042b62815781adba3701a902b",
+    "src/kkvim_reference/r5_cccc_energy.py": "a2085bebf3d3879d3ccae26118c78f26c5e5a21c",
     "src/kkvim_reference/r5_cccc_d2.py": "a910fd291fdafdb1b8a6d568dd7b4bf589409758",
     "src/kkvim_reference/r5_cccc_q3_e4e6.py": "1282a02cf7433ec7fb8d9db6673e1ee944ef345a",
     "scripts/r5_cccc_q4_c_assembly_e4_audit.py": "89b009b463324775e139d4781f60ab3665e60aa3",
@@ -111,19 +130,27 @@ EXACT_CHECK_MAX_UNKNOWNS = 64  # cost limit of the rational solve in ``independe
 RH_MAX_NODES = 4096  # R-H only for (n_x - 1)(n_y - 1) <= 4096, as in BR 4
 
 OK = "OK"
-STOP_START = "STOP_BEFORE_QR: S-1, start set dependent (N > floor(n_x/2), D-049.3 item 3)"
+STOP_START = ("STOP_BEFORE_QR: S-1, start set T_N dependent (N > floor(n_x/2), D-049.3 item 3; proven for the exact T_N, not a "
+              "statement about the stored doubles)")
 STOP_DEPENDENT = "STOP_BEFORE_QR: S-1, given set exactly dependent (exact rank < N; D-049.5 item 2)"
 STOP_ZERO = "STOP_ZERO_FIELD: computed factor exactly 0 (N = 1, I-4 undefined)"
 PROTECTIVE = "PROTECTIVE_STOP"
 UNRES_PREMISE = "UNRESOLVED_C3PLUS_PREMISE"
-FAIL_THEOREM = "FAIL_C3PLUS_THEOREM: inequality violated with established premises"
+FAIL_THEOREM = ("FAIL_C3PLUS_BOUND_CHECK: the exact check of the C-3+ inequality for this assembled C on this input is violated, with "
+                "P-1, P-2, P-3, P-5 established and P-4 assumed; not an unconditional refutation of the theorem (P-4 not verified)")
+PREMISES_OK = "ESTABLISHED_CONDITIONAL_ON_P4"
+PREMISES_OK_SUMMARY = "P-1, P-2, P-3, P-5 established; P-4 assumed (accepted model, not proven)"
+BOUND_CHECK_SCOPE = ("exact check of the inequality of theorem C-3+ for this assembled matrix C on this input (the stored doubles); "
+                     "not a proof or a refutation of the universal theorem, which holds under P-1...P-5; here P-4 is assumed")
+D1_GUARD = ("the command line refuses the D1 grids and output under docs/; the Python API has no such guard - not a mechanism that "
+            "prevents a D1 run (D1_START = BLOCKED is the owner's decision)")
 FAIL_TOOL = "FAIL_TOOL"
 UNRESOLVED = "UNRESOLVED"
 RESEARCH = ("RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED (D-049.5, D-054.5): QR without a qualified numerical rank decision; QR is not "
             "a proof of preservation of the true rank (O4 UNRESOLVED)")
 DATA_STATUS = "QA tool data (OBSERVATION); NOT D1 data, not part of the D1 sample (protocol 10, 12; D1_START = BLOCKED)"
 
-# D1 sample grids (protocol 2.2, 2.3, 3): refused by the command line (D1_START = BLOCKED)
+# D1 sample grids (protocol 2.2, 2.3, 3): refused by the command line only (D1_GUARD; D1_START = BLOCKED)
 D1_GRIDS = frozenset([
     (50, 50), (100, 100), (200, 200), (400, 400), (48, 72), (100, 150), (200, 300), (400, 600), (48, 32), (96, 64), (198, 132),
     (396, 264), (48, 120), (100, 250), (200, 500), (400, 1000), (50, 20), (100, 40), (200, 80), (400, 160), (40, 160), (80, 320),
@@ -134,7 +161,8 @@ D1_GRIDS = frozenset([
 
 
 def _ca():
-    """C-3+ audit of PR #40 (c3plus, premises_c3plus, check_c3plus, spd_exact, replaced_c); read-only use."""
+    """C-3+ audit of PR #40 (c3plus, premises_c3plus, check_c3plus, spd_exact); read-only use. Its replaced_c (a global
+    replacement of bc.bc_coefficients) is NOT used by this tool (``solve_with_c``)."""
     if not hasattr(_ca, "mod"):
         spec = importlib.util.spec_from_file_location("r5_cccc_q4_c_assembly_e4_audit", C_ASSEMBLY)
         mod = importlib.util.module_from_spec(spec)
@@ -143,8 +171,21 @@ def _ca():
     return _ca.mod
 
 
-_BC_COEFFICIENTS = bc.bc_coefficients  # the prototype's own function, captured at import
-_BC_LOCK = threading.Lock()
+def _prototype_function(name: str):
+    """bc.<name> as DEFINED in r5_cccc_bc.py; refused if the module attribute is a replacement when this tool is imported."""
+    f = getattr(bc, name)
+    code = getattr(f, "__code__", None)
+    if not (isinstance(f, types.FunctionType) and f.__module__ == bc.__name__ and f.__qualname__ == name and code is not None
+            and Path(code.co_filename).resolve() == Path(bc.__file__).resolve()):
+        raise RuntimeError(f"bc.{name} is not the function defined in {bc.__file__} (replaced when this tool was imported)")
+    return f
+
+
+_BC_COEFFICIENTS = _prototype_function("bc_coefficients")  # the prototype's own functions, captured at import
+_BC_SOLVE = _prototype_function("solve_bc")
+_BC_NAMESPACE = types.MappingProxyType(dict(vars(bc)))  # read-only snapshot of the namespace of r5_cccc_bc at import
+ISOLATION = ("unchanged code object of bc.solve_bc run with a private globals dictionary of the call (types.FunctionType); only "
+             "the name bc_coefficients bound to a local function (prototype's A, B, F; C -> C-3+); no global replacement, no lock")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -219,6 +260,23 @@ def used_modules_check() -> dict:
             for rel, blob in USED_MODULES.items()}
 
 
+def loaded_modules_check() -> dict:
+    """Project files loaded as modules in this process that are not in USED_MODULES (and are not this tool): NOT_CHECKED."""
+    out = {}
+    for m in list(sys.modules.values()):
+        f = getattr(m, "__file__", None)
+        if not f:
+            continue
+        try:
+            rel = Path(f).resolve().relative_to(ROOT)
+        except ValueError:
+            continue
+        if rel.parts and rel.parts[0] not in (".venv", "venv") and rel.as_posix() not in USED_MODULES \
+                and Path(f).resolve() != Path(__file__).resolve():
+            out[rel.as_posix()] = "NOT_CHECKED (no base blob recorded in the tool)"
+    return out
+
+
 # ---------------------------------------------------------------------------------------------------------------------------------
 # premises of C-3+ (RO 0.4: P-1...P-5)
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -249,20 +307,25 @@ def _subnormal_or_nonfinite(name: str, a) -> str | None:
 
 
 def c3plus_premises(solved: hs.HalfStep, parts: dict, probe: dict) -> dict:
-    """P-1...P-5 for the C-3+ code of PR #40 on the solved set, item by item (module docstring, step 4)."""
+    """P-1...P-5 for the C-3+ code of PR #40 on the solved set, item by item (module docstring, step 4). Each premise is ESTABLISHED
+    (checked here), ASSUMED (P-4 only: an explicitly accepted model, never declared established) or UNRESOLVED (a check failed). The
+    summary ``status`` is ESTABLISHED_CONDITIONAL_ON_P4 when P-1, P-2, P-3, P-5 are established, otherwise UNRESOLVED."""
     ca = _ca()
     out = {}
-    bad = [k for k in ("nearest_python", "nearest_numpy", "nearest_matmul") if not probe[k]]
-    out["P-1"] = "HOLD (round to nearest: Python, NumPy, matmul probes)" if not bad else f"FAIL: P-1 probe {', '.join(bad)}"
-    p2p3 = ca.premises_c3plus(parts)  # finite / subnormal Y3, X, g1, gm, C; Gram and corner products
+    p1 = [f"P-1: probe {k}" for k in ("nearest_python", "nearest_numpy", "nearest_matmul") if not probe[k]]
+    p2, p3 = [], []
+    r = ca.premises_c3plus(parts)  # finite / subnormal Y3, X, g1, gm, C; Gram and corner products
+    if r is not None:
+        (p2 if r.startswith("P-2") else p3).append(r)
     h = solved.l_f / solved.n_f
     h2 = h * h
     h3 = h2 * h
-    reasons = [] if p2p3 is None else [p2p3]
     for name, v in (("h", h), ("h^2", h2), ("h^3", h3), ("2/h^3", parts["s"])):
         r = _subnormal_or_nonfinite(name, v)
-        if r is not None or v == 0:
-            reasons.append(r or f"P-3: {name} = 0")
+        if r is not None:
+            (p2 if r.startswith("P-2") else p3).append(r)
+        elif v == 0:
+            p3.append(f"P-3: {name} = 0")
     with np.errstate(over="ignore", under="ignore", invalid="ignore"):  # the same operations as c3plus, to see the intermediates
         CL = h * (parts["X"].T @ parts["X"])
         E = parts["s"] * (np.outer(parts["g1"], parts["g1"]) + np.outer(parts["gm"], parts["gm"]))
@@ -270,22 +333,29 @@ def c3plus_premises(solved: hs.HalfStep, parts: dict, probe: dict) -> dict:
     for name, v in (("C_L", CL), ("E", E)):
         r = _subnormal_or_nonfinite(name, v)
         if r is not None:
-            reasons.append(r)
+            (p2 if r.startswith("P-2") else p3).append(r)
     out["decomposition_C_eq_fl_CL_plus_E"] = bool(np.array_equal(Csum, parts["C"]))
-    if not out["decomposition_C_eq_fl_CL_plus_E"]:
-        reasons.append("P-2/P-3: C differs from fl(C_L + E) recomputed (intermediates not seen)")
+    if not out["decomposition_C_eq_fl_CL_plus_E"]:  # the intermediates of C are not seen: neither P-2 nor P-3 is established
+        p2.append("P-2: C differs from fl(C_L + E) recomputed (intermediates not seen)")
+        p3.append("P-3: C differs from fl(C_L + E) recomputed (intermediates not seen)")
     if not (probe["no_ftz"] and probe["no_daz"]):
-        reasons.append("P-3: FTZ/DAZ probe")
-    out["P-2/P-3"] = "HOLD" if not reasons else "; ".join(reasons)
+        p3.append("P-3: FTZ/DAZ probe")
     k = solved.n_f - 1 + K_EXTRA
     out["k"] = k
-    out["P-5"] = "HOLD (k u < 1)" if k * U < 1 else "FAIL: P-5 k u >= 1"
-    out["P-4"] = "ASSUMED [STAND.]: classical dot products in BLAS (not checkable by the tool)"
-    failed = [out["P-1"]] if out["P-1"].startswith("FAIL") else []
-    failed += reasons
-    failed += [out["P-5"]] if out["P-5"].startswith("FAIL") else []
-    out["status"] = "ESTABLISHED (P-1, P-2, P-3, P-5 checked; P-4 assumed)" if not failed else "NOT_ESTABLISHED"
-    out["reasons"] = failed
+    p5 = [] if k * U < 1 else ["P-5: k u >= 1"]
+    established = {"P-1": "ESTABLISHED (round to nearest: Python, NumPy, matmul probes, at the moments of probing)",
+                   "P-2": "ESTABLISHED (no overflow: all intermediates finite, Gram and corner sums below DBL_MAX)",
+                   "P-3": "ESTABLISHED (no subnormal intermediate, no underflow of Gram or corner products; FTZ/DAZ probes)",
+                   "P-5": "ESTABLISHED (k u < 1, exact)"}
+    failed = {"P-1": p1, "P-2": p2, "P-3": p3, "P-5": p5}
+    for name, reasons in failed.items():
+        out[name] = established[name] if not reasons else "UNRESOLVED: " + "; ".join(reasons)
+    out["P-4"] = "ASSUMED: classical dot products in BLAS (accepted model [STAND.]; not checkable by the tool, not proven)"
+    out["classes"] = {name: ("ESTABLISHED" if not failed[name] else "UNRESOLVED") for name in ("P-1", "P-2", "P-3", "P-5")}
+    out["classes"]["P-4"] = "ASSUMED"
+    out["reasons"] = [x for name in ("P-1", "P-2", "P-3", "P-5") for x in failed[name]]
+    out["status"] = PREMISES_OK if not out["reasons"] else UNRESOLVED
+    out["summary"] = PREMISES_OK_SUMMARY if not out["reasons"] else "not all of P-1, P-2, P-3, P-5 established; P-4 assumed"
     return out
 
 
@@ -294,35 +364,40 @@ def c3plus_premises(solved: hs.HalfStep, parts: dict, probe: dict) -> dict:
 # ---------------------------------------------------------------------------------------------------------------------------------
 
 def solve_with_c(solved: hs.HalfStep, C: np.ndarray):
-    """bc.solve_bc on the solved set with ONLY C replaced (``replaced_c`` of PR #40). A spy between the wrapper and solve_bc records
-    what solve_bc consumed. Under a lock; the prototype's function is restored in ``finally`` (also on an exception)."""
-    ca = _ca()
-    with _BC_LOCK:
-        if bc.bc_coefficients is not _BC_COEFFICIENTS:
-            raise RuntimeError("bc.bc_coefficients is already replaced (nested or concurrent use)")
-        A0, B0, C0, F0 = _BC_COEFFICIENTS(solved)
-        calls = []
-        with ca.replaced_c(C):
-            inner = bc.bc_coefficients
+    """bc.solve_bc on the solved set with ONLY C replaced and NO global replacement (module docstring, step 5). The unchanged code
+    object of solve_bc runs as a new function whose globals are a private copy of the r5_cccc_bc namespace (taken at import) in which
+    only ``bc_coefficients`` is the local function of this call. Nothing shared is written: bc.solve_bc, bc.bc_coefficients and the
+    module namespace keep their identity, other threads (and nested calls) are not affected. The local function records what the call
+    consumed."""
+    C_new = np.array(C, dtype=float, copy=True)
+    A0, B0, C0, F0 = _BC_COEFFICIENTS(solved)
+    namespace = dict(_BC_NAMESPACE)
+    calls = []
 
-            def spy(p):
-                res = inner(p)
-                calls.append((p, res))
-                return res
+    def bc_coefficients_c3plus(p):
+        A, B, _, F = _BC_COEFFICIENTS(p)
+        caller = sys._getframe(1)
+        calls.append({"p": p, "A": A, "B": B, "C": C_new, "F": F, "caller_is_solve_bc_code": caller.f_code is _BC_SOLVE.__code__,
+                      "caller_globals_private": caller.f_globals is namespace})
+        return A, B, C_new, F
 
-            bc.bc_coefficients = spy
-            try:
-                sol = bc.solve_bc(solved)
-            finally:
-                bc.bc_coefficients = inner
-        restored = bc.bc_coefficients is _BC_COEFFICIENTS
+    namespace["bc_coefficients"] = bc_coefficients_c3plus
+    isolated = types.FunctionType(_BC_SOLVE.__code__, namespace, _BC_SOLVE.__name__, _BC_SOLVE.__defaults__, _BC_SOLVE.__closure__)
+    isolated.__kwdefaults__ = _BC_SOLVE.__kwdefaults__
+    sol = isolated(solved)
+    private_only_c = bool(namespace.keys() == _BC_NAMESPACE.keys()
+                          and all(namespace[k] is _BC_NAMESPACE[k] for k in namespace if k != "bc_coefficients"))
     if len(calls) == 1:
-        p, (A, B, Cu, F) = calls[0]
-        only_c = bool(p is solved and np.array_equal(A, A0) and np.array_equal(B, B0) and np.array_equal(F, F0)
-                      and np.array_equal(Cu, C))
+        c = calls[0]
+        only_c = bool(c["p"] is solved and c["caller_is_solve_bc_code"] and c["caller_globals_private"]
+                      and np.array_equal(c["A"], A0) and np.array_equal(c["B"], B0) and np.array_equal(c["F"], F0)
+                      and np.array_equal(c["C"], C))
     else:
         only_c = False
-    info = {"only_C_replaced": only_c and restored, "bc_coefficients_calls": len(calls), "wrapper_restored": restored,
+    same_code = isolated.__code__ is _BC_SOLVE.__code__
+    info = {"only_C_replaced": bool(only_c and private_only_c and same_code), "bc_coefficients_calls": len(calls),
+            "solve_isolation": ISOLATION, "solve_bc_code_is_prototype": same_code,
+            "private_globals_differ_only_in_bc_coefficients": private_only_c,
             "A_sha": array_sha(A0), "B_sha": array_sha(B0), "F_sha": array_sha(F0), "C_old_sha": array_sha(C0),
             "C_old_equals_C3plus_bitwise": bool(np.array_equal(C0, C))}
     return sol, info
@@ -368,7 +443,9 @@ def run_step(cfg: TrajectoryConfig, s: int, given: np.ndarray, companion: np.nda
     rec["prev_field"] = "ZERO (w^(s-1) = 0 exactly, H-7)" if prev_zero else "nonzero"
     rec["prev_field_before_QR_sha"] = array_sha(_field(direction, given, companion))
     if s == 1:
-        rec["start_set"] = "T_N, sin^2 basis (hs.start_set; D-049.3 item 1)"
+        if not (np.array_equal(given, hs.start_set(n_f, N)) and prev_zero):  # the start theorem is about T_N only (D-049.3)
+            raise ValueError("s = 1 accepts only the start set T_N = hs.start_set(n_x, N) with a zero companion (D-049.3, H-7)")
+        rec["start_set"] = "T_N, sin^2 basis (hs.start_set; D-049.3 item 1); given bitwise hs.start_set(n_x, N), companion 0"
         rec["start_independence_condition"] = f"N <= floor(n_x/2): {N} <= {n_f // 2} -> {N <= n_f // 2}"
         rec["start_exact_formulas_condition"] = f"2N < n_x: {2 * N} < {n_f} -> {2 * N < n_f}"
         if N > n_f // 2:
@@ -413,19 +490,21 @@ def run_step(cfg: TrajectoryConfig, s: int, given: np.ndarray, companion: np.nda
     prem = c3plus_premises(solved, parts, probe_before)
     rec["C_assembly"] = "C-3+ (scripts/r5_cccc_q4_c_assembly_e4_audit.py::c3plus, PR #40) on the solved set"
     rec["C_assembled_on_solved_set_sha"] = array_sha(np.asarray(solved.given))
-    rec["c3plus_premises"] = {k: v for k, v in prem.items() if k not in ("status", "reasons")}
+    rec["c3plus_premises"] = {k: v for k, v in prem.items() if k not in ("status", "summary", "reasons")}
     rec["c3plus_premises_status"] = prem["status"]
+    rec["c3plus_premises_summary"] = prem["summary"]
     rec["fp_probe_before"] = probe_before
     arrays["C3plus"] = parts["C"]
     rec["C3plus_sha"] = array_sha(parts["C"])
-    if prem["status"] != "ESTABLISHED (P-1, P-2, P-3, P-5 checked; P-4 assumed)":
+    if prem["status"] != PREMISES_OK:
         return _stop(rec, arrays, f"{UNRES_PREMISE}: " + "; ".join(prem["reasons"]))
     coeffs = hs.exact_coefficients(solved)
     chk = ca.check_c3plus(parts["C"], coeffs[2], prem["k"])
-    rec["c3plus_theorem_exact"] = "PASS" if (chk["elementwise"] and chk["frobenius"]) else "FAIL"
-    rec["c3plus_theorem_max_ratio_obs"] = math.sqrt(float(chk["max_ratio_sq"]))  # max |dC_ij|/(gamma_k sqrt(C_ii C_jj)), OBSERVATION
+    rec["c3plus_bound_check_exact"] = "PASS" if (chk["elementwise"] and chk["frobenius"]) else "FAIL"
+    rec["c3plus_bound_check_scope"] = BOUND_CHECK_SCOPE
+    rec["c3plus_bound_max_ratio_obs"] = math.sqrt(float(chk["max_ratio_sq"]))  # max |dC_ij|/(gamma_k sqrt(C_ii C_jj)), OBSERVATION
     rec["c3plus_C_spd_exact"] = bool(ca.spd_exact(parts["C"]))
-    if rec["c3plus_theorem_exact"] != "PASS":
+    if rec["c3plus_bound_check_exact"] != "PASS":
         return _stop(rec, arrays, FAIL_THEOREM)
     # --- 5. B-C with only C replaced
     sol, info = solve_with_c(solved, parts["C"])
@@ -439,7 +518,8 @@ def run_step(cfg: TrajectoryConfig, s: int, given: np.ndarray, companion: np.nda
         return _stop(rec, arrays, f"{UNRES_PREMISE}: P-1/P-3 probe after the solve failed")
     if sol.s is None:
         return _stop(rec, arrays, f"{PROTECTIVE}: B-C status {sol.status}")
-    rec["C_assembly_applied"] = "C-3+ (confirmed: solve_bc consumed exactly the C-3+ matrix, A, B, F of the prototype)"
+    rec["C_assembly_applied"] = ("C-3+ (confirmed: the isolated call of the code of solve_bc consumed exactly the C-3+ matrix and "
+                                 "A, B, F of the prototype)")
     for k in ("cond_S", "cond_S_modal", "cond_S_rows", "cond_A", "max_cond_Mk", "min_eig_Mk", "rho_0", "kappa_bar_c", "M_norm_2"):
         rec[f"bc_{k}"] = sol.diagnostics.get(k)
     m = n_s - 1
@@ -618,11 +698,18 @@ def _blas_info() -> dict:
 
 
 def provenance() -> dict:
+    used = used_modules_check()
+    changed = [rel for rel, v in used.items() if not v["unchanged"]]
     return {"git_commit": git("rev-parse", "HEAD"), "git_status_porcelain": git("status", "--porcelain").splitlines(),
-            "base_commit": BASE_COMMIT, "tool_blob": git_blob_id(Path(__file__)), "used_modules": used_modules_check(),
+            "base_commit": BASE_COMMIT, "tool_blob": git_blob_id(Path(__file__)), "used_modules": used,
+            "used_modules_status": ("listed modules: blob = base" if not changed else "CHANGED against the base: " + ", ".join(changed))
+                                   + "; recorded, the run is not stopped; packages (NumPy, SciPy, BLAS): versions only, not checked",
+            "loaded_project_modules_not_checked": loaded_modules_check(),
             "python": sys.version.split()[0], "numpy": np.__version__, "scipy": scipy.__version__, "blas": _blas_info(),
             "platform": platform.platform(), "machine": platform.machine(), "processor": platform.processor(),
-            "threads_env": {k: os.environ.get(k) for k in THREAD_VARS},
+            "blas_thread_env_vars_as_found": {k: os.environ.get(k) for k in THREAD_VARS},
+            "blas_threads_effective": "NOT_VERIFIED (the values above are environment variables, not the effective thread count)",
+            "solve_isolation": ISOLATION, "d1_guard": D1_GUARD,
             "reproducibility": "bitwise only on the same platform, BLAS build and thread settings; not across BLAS platforms "
                                "(D-025; AGENTS.md 4)"}
 
@@ -641,6 +728,7 @@ def write_journal(tr: Trajectory, out: Path) -> dict:
     np.savez(out / "arrays.npz", **npz)
     cfg = tr.config
     meta = {"tool": "R5-V Q4 OP-8: own B-C trajectories with the C-3+ assembly (QA research tool)", "data_status": DATA_STATUS,
+            "d1_guard": D1_GUARD,
             "config": {k: getattr(cfg, k) for k in ("lx", "nx", "ly", "ny", "N", "D", "q", "s_max")}, "first": "Y",
             "trajectory_id": cfg.trajectory_id, "status": tr.status, "half_steps": len(tr.records),
             "arrays_npz": "arrays.npz", "arrays_sha256": {k: array_sha(v) for k, v in npz.items()},

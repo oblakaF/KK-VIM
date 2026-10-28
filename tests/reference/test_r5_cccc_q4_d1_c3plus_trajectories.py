@@ -6,11 +6,11 @@ half-steps, the journal and the restoration of the next input, the wrapper resto
 the used modules. Small deterministic configurations only; no D1 run."""
 
 import ast
-import contextlib
 import importlib.util
 import json
 import subprocess
 import sys
+import threading
 from fractions import Fraction
 from pathlib import Path
 
@@ -153,76 +153,292 @@ def test_c3plus_is_assembled_on_the_solved_set_after_qr(cfg, monkeypatch):
         if cfg.N >= 2:
             assert not np.array_equal(seen[k], arr["given_in"])  # after QR, not the set before QR
         assert np.array_equal(arr["C3plus"], orig(_halfstep(cfg, k + 1, arr["solved_set"]))["C"])
-        assert rec["c3plus_theorem_exact"] == "PASS" and rec["c3plus_C_spd_exact"] is True
-        assert rec["c3plus_premises_status"].startswith("ESTABLISHED") and rec["c3plus_premises"]["P-4"].startswith("ASSUMED")
+        assert rec["c3plus_bound_check_exact"] == "PASS" and rec["c3plus_C_spd_exact"] is True
+        assert rec["c3plus_bound_check_scope"] == tj.BOUND_CHECK_SCOPE and "not a proof or a refutation" in tj.BOUND_CHECK_SCOPE
+        assert rec["c3plus_premises_status"] == tj.PREMISES_OK == "ESTABLISHED_CONDITIONAL_ON_P4"
+        assert rec["c3plus_premises_summary"] == tj.PREMISES_OK_SUMMARY
+        assert rec["c3plus_premises"]["classes"] == {"P-1": "ESTABLISHED", "P-2": "ESTABLISHED", "P-3": "ESTABLISHED",
+                                                     "P-5": "ESTABLISHED", "P-4": "ASSUMED"}
+        assert rec["c3plus_premises"]["P-4"].startswith("ASSUMED") and "not proven" in rec["c3plus_premises"]["P-4"]
         assert rec["C_assembly_applied"].startswith("C-3+")
-        # the B-C solution is the prototype's solve_bc with only C replaced (recomputed independently here)
+        # the B-C solution is the prototype's solve_bc with only C replaced (recomputed independently here, single thread, by the
+        # global replacement replaced_c of PR #40 - used in this test only, not by the tool)
         solved = _halfstep(cfg, k + 1, arr["solved_set"])
         with ca.replaced_c(arr["C3plus"]):
             sol = bc.solve_bc(solved)
         assert np.array_equal(sol.s, arr["V_bc"].T.reshape(-1))
 
 
-@pytest.mark.parametrize("cfg", [CFG1, CFG3])
+@pytest.mark.parametrize("cfg", [CFG1, CFG2, CFG3])
 def test_only_c_is_replaced(cfg):
+    """E (Б-1): A, B, F bitwise those of the prototype's own path; only C replaced; the code of solve_bc is the prototype's."""
     tr = tj.run_trajectory(cfg)
     for k, (rec, arr) in enumerate(zip(tr.records, tr.arrays)):
         solved = _halfstep(cfg, k + 1, arr["solved_set"])
         A, B, C_old, F = bc.bc_coefficients(solved)
-        assert rec["only_C_replaced"] is True and rec["bc_coefficients_calls"] == 1 and rec["wrapper_restored"] is True
+        assert rec["only_C_replaced"] is True and rec["bc_coefficients_calls"] == 1 and rec["solve_isolation"] == tj.ISOLATION
+        assert rec["solve_bc_code_is_prototype"] is True and rec["private_globals_differ_only_in_bc_coefficients"] is True
         assert (rec["A_sha"], rec["B_sha"], rec["F_sha"], rec["C_old_sha"]) == tuple(tj.array_sha(x) for x in (A, B, F, C_old))
-    assert bc.bc_coefficients is tj._BC_COEFFICIENTS
+        assert rec["C_old_equals_C3plus_bitwise"] is False and tj.array_sha(arr["C3plus"]) != rec["C_old_sha"]
+    assert bc.bc_coefficients is tj._BC_COEFFICIENTS and bc.solve_bc is tj._BC_SOLVE
 
 
-def test_a_replacement_that_changes_a_is_detected(monkeypatch):
-    @contextlib.contextmanager
-    def bad(C_new):
-        orig = bc.bc_coefficients
+def test_a_drift_of_a_inside_the_call_is_detected(monkeypatch):
+    calls = {"n": 0}
+    orig = tj._BC_COEFFICIENTS
 
-        def w(p):
-            A, B, _, F = orig(p)
-            return 2.0 * A, B, C_new, F
+    def drifting(p):  # the second call (the one inside the isolated solve_bc) returns another A
+        calls["n"] += 1
+        A, B, C, F = orig(p)
+        return (2.0 * A if calls["n"] == 2 else A), B, C, F
 
-        bc.bc_coefficients = w
-        try:
-            yield
-        finally:
-            bc.bc_coefficients = orig
-
-    monkeypatch.setattr(ca, "replaced_c", bad)
-    tr = tj.run_trajectory(CFG2)
+    monkeypatch.setattr(tj, "_BC_COEFFICIENTS", drifting)
+    tr = tj.run_trajectory(CFG1)
     assert tr.records[0]["status"].startswith(tj.FAIL_TOOL) and tr.records[0]["only_C_replaced"] is False
     assert len(tr.records) == 1 and tr.status.startswith("STOPPED at s = 1")
 
 
-def test_wrapper_is_restored_on_exception_and_not_nested(monkeypatch):
-    solved = _halfstep(CFG2, 1, bc.orthonormalise(_halfstep(CFG2, 1, hs.start_set(8, 2)))[0])
-    C = ca.c3plus(solved)["C"]
+# --- Б-1. isolated C-3+ solve: no global replacement; external B-C calls keep the prototype's C ----------------------------------
 
-    def raising(p, capacitance="modal"):
-        raise RuntimeError("injected")
+TIMEOUT = 120  # seconds; only against a hang of the test, not a numerical tolerance
 
-    monkeypatch.setattr(bc, "solve_bc", raising)
+
+def _solved_c3(cfg=CFG2):
+    p = _halfstep(cfg, 1, hs.start_set(cfg.nx, cfg.N))
+    solved = _halfstep(cfg, 1, bc.orthonormalise(p)[0]) if cfg.N >= 2 else p
+    return solved, ca.c3plus(solved)["C"]
+
+
+def _c3plus_reference(solved, C):
+    """Single-thread reference: solve_bc with only C replaced by replaced_c of PR #40 (used in the tests only, not by the tool)."""
+    with ca.replaced_c(C):
+        return bc.solve_bc(solved).s.copy()
+
+
+def _bc_namespace_identity():
+    return {k: id(v) for k, v in vars(bc).items()}
+
+
+def _inside_isolated_call():
+    return sys._getframe(2).f_code.co_name == "bc_coefficients_c3plus"  # caller of the hook is the tool's local function
+
+
+def test_prototype_functions_keep_their_identity_during_the_call():
+    """Б-1 A: bc.bc_coefficients, bc.solve_bc and the module namespace never change during the tool's calls (checked at every Python
+    call event of this thread by a profile function) and after them."""
+    solved, C = _solved_c3()
+    before = _bc_namespace_identity()
+    events, bad = [0], []
+
+    def prof(frame, event, arg):
+        if event == "call":
+            events[0] += 1
+            if bc.bc_coefficients is not tj._BC_COEFFICIENTS or bc.solve_bc is not tj._BC_SOLVE:
+                bad.append(frame.f_code.co_name)
+
+    sys.setprofile(prof)
+    try:
+        sol, info = tj.solve_with_c(solved, C)
+        res = tj.run_step(CFG2, 1, hs.start_set(8, 2), np.zeros((9, 2)))
+    finally:
+        sys.setprofile(None)
+    assert events[0] > 50 and not bad
+    assert info["only_C_replaced"] is True and res.record["status"] == tj.OK
+    assert _bc_namespace_identity() == before
+
+
+def test_tool_source_has_no_global_replacement():
+    """Б-1 A, N-4: the tool assigns into no module namespace and no environment variable, calls no replaced_c, uses no lock."""
+    src = SCRIPT.read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    modules = {"bc", "hs", "seq", "np", "scipy", "os", "sys", "ca", "types"}
+    stores = []
+    for n in ast.walk(tree):
+        targets = n.targets if isinstance(n, ast.Assign) else [n.target] if isinstance(n, (ast.AugAssign, ast.AnnAssign)) else []
+        for t in targets:
+            base = t
+            while isinstance(base, (ast.Attribute, ast.Subscript)):
+                base = base.value
+            if t is not base and isinstance(base, ast.Name) and base.id in modules:
+                stores.append(ast.unparse(t))
+    calls = [ast.unparse(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)]
+    assert not stores
+    env_mutators = ("os.environ.setdefault", "os.environ.update", "os.environ.pop", "os.environ.clear", "os.putenv", "os.unsetenv")
+    assert not [c for c in calls if c in ("setattr", "delattr") or c.endswith("replaced_c") or c in env_mutators]
+    assert not [n for n in ast.walk(tree) if isinstance(n, ast.Global)]
+    assert "import threading" not in src and "Lock(" not in src
+
+
+def test_concurrent_external_bc_calls_get_the_prototype_c(monkeypatch):
+    """Б-1 Б, В, Ж: an external thread calls the ordinary bc.solve_bc WHILE the tool is inside its isolated solve (the overlap is
+    forced by barriers, not left to the scheduler). The external results are bitwise the prototype's (its own C), the tool's results
+    are the C-3+ ones; the tool's solution is confirmed by the certified small reference (independent_check)."""
+    solved, C = _solved_c3()
+    other = hs.HalfStep(1.0, 10, 1.0, 12, "Y", hs.start_set(10, 2))
+    ref_same, ref_other = bc.solve_bc(solved).s.copy(), bc.solve_bc(other).s.copy()
+    ref_c3 = _c3plus_reference(solved, C)
+    assert not np.array_equal(ref_same, ref_c3)
+    orig, proto = tj._BC_COEFFICIENTS, bc.bc_coefficients
+    start, end = threading.Barrier(2, timeout=TIMEOUT), threading.Barrier(2, timeout=TIMEOUT)
+
+    def pausing(p):  # inside the tool's isolated call: the external thread runs all its calls of this round, then the tool goes on
+        res = orig(p)
+        if _inside_isolated_call():
+            start.wait()
+            end.wait()
+        return res
+
+    monkeypatch.setattr(tj, "_BC_COEFFICIENTS", pausing)
+    rounds, per_round = 5, 10
+    ext = {"calls": 0, "wrong": 0, "identity": True, "errors": []}
+
+    def external():
+        try:
+            for _ in range(rounds):
+                start.wait()
+                for _ in range(per_round):
+                    for p, ref in ((solved, ref_same), (other, ref_other)):
+                        ext["identity"] &= bc.bc_coefficients is proto and bc.solve_bc is tj._BC_SOLVE
+                        s = bc.solve_bc(p).s
+                        ext["calls"] += 1
+                        ext["wrong"] += not np.array_equal(s, ref)
+                end.wait()
+        except Exception as exc:  # reported below
+            ext["errors"].append(repr(exc))
+
+    th = threading.Thread(target=external, daemon=True)
+    th.start()
+    results = [tj.solve_with_c(solved, C) for _ in range(rounds)]
+    th.join(TIMEOUT)
+    assert not th.is_alive() and not ext["errors"]
+    assert ext["calls"] == rounds * per_round * 2 and ext["wrong"] == 0 and ext["identity"]
+    for sol, info in results:
+        assert info["only_C_replaced"] is True and np.array_equal(sol.s, ref_c3)
+    m = solved.n_s - 1
+    ic = tj.independent_check(CFG2, 1, {"solved_set": solved.given, "V_bc": results[0][0].s.reshape(2, m).T})
+    assert ic["status"] == "CONSISTENT"
+    print(f"\nconcurrency: {rounds} forced overlaps, {ext['calls']} external solve_bc calls, wrong {ext['wrong']}; "
+          f"tool calls with C-3+ {sum(np.array_equal(s.s, ref_c3) for s, _ in results)}/{rounds} (OBSERVATION)")
+
+
+def test_tool_unaffected_while_an_external_call_is_inside_bc_solve(monkeypatch):
+    """Б-1 Б: the reverse overlap - the external thread is paused INSIDE bc.solve_bc (in its bc_coefficients) while the tool solves;
+    a foreign global replacement installed by this test is not used by the tool, and the external call gets the prototype's C."""
+    solved, C = _solved_c3()
+    ref_same, ref_c3 = bc.solve_bc(solved).s.copy(), _c3plus_reference(solved, C)
+    proto = bc.bc_coefficients
+    start, end = threading.Barrier(2, timeout=TIMEOUT), threading.Barrier(2, timeout=TIMEOUT)
+    main_calls = []
+
+    def external_pause(p):  # a foreign global replacement (this test's), returns the prototype's values
+        if threading.current_thread() is threading.main_thread():
+            main_calls.append(p)
+            return proto(p)
+        res = proto(p)
+        start.wait()
+        end.wait()
+        return res
+
+    monkeypatch.setattr(bc, "bc_coefficients", external_pause)
+    out = {}
+    th = threading.Thread(target=lambda: out.setdefault("s", bc.solve_bc(solved).s.copy()), daemon=True)
+    th.start()
+    start.wait()
+    sol, info = tj.solve_with_c(solved, C)  # the external call is now inside bc.solve_bc
+    end.wait()
+    th.join(TIMEOUT)
+    assert not th.is_alive() and np.array_equal(out["s"], ref_same)
+    assert info["only_C_replaced"] is True and np.array_equal(sol.s, ref_c3) and not main_calls
+
+
+def test_overlap_test_detects_a_global_replacement():
+    """Control of the test design (not of the tool): with the same forced overlap, a GLOBAL replacement (replaced_c of PR #40, the
+    mechanism of 70f3407) gives the external call the C-3+ result - the overlap test above would detect the old defect."""
+    solved, C = _solved_c3()
+    ref_same, ref_c3 = bc.solve_bc(solved).s.copy(), _c3plus_reference(solved, C)
+    start, end = threading.Barrier(2, timeout=TIMEOUT), threading.Barrier(2, timeout=TIMEOUT)
+    out = {}
+
+    def external():
+        start.wait()
+        out["s"] = bc.solve_bc(solved).s.copy()
+        end.wait()
+
+    th = threading.Thread(target=external, daemon=True)
+    th.start()
+    with ca.replaced_c(C):
+        start.wait()
+        end.wait()
+    th.join(TIMEOUT)
+    assert np.array_equal(out["s"], ref_c3) and not np.array_equal(out["s"], ref_same)
+    assert bc.bc_coefficients is tj._BC_COEFFICIENTS
+
+
+def test_exception_inside_the_isolated_call_changes_no_global_state(monkeypatch):
+    """Б-1 Г: an exception inside the isolated call (injected, and a natural one from the code of solve_bc) leaves the prototype's
+    namespace unchanged; the next calls are correct."""
+    solved, C = _solved_c3()
+    ref_same, ref_c3 = bc.solve_bc(solved).s.copy(), _c3plus_reference(solved, C)
+    before = _bc_namespace_identity()
+    orig = tj._BC_COEFFICIENTS
+
+    def raising(p):
+        if _inside_isolated_call():
+            raise RuntimeError("injected inside the isolated call")
+        return orig(p)
+
+    monkeypatch.setattr(tj, "_BC_COEFFICIENTS", raising)
     with pytest.raises(RuntimeError, match="injected"):
         tj.solve_with_c(solved, C)
-    assert bc.bc_coefficients is tj._BC_COEFFICIENTS
-    assert tj._BC_LOCK.acquire(blocking=False)
-    tj._BC_LOCK.release()
     tr = tj.run_trajectory(CFG2)
     assert tr.records[0]["status"].startswith(tj.FAIL_TOOL + ": exception RuntimeError") and len(tr.records) == 1
-    assert bc.bc_coefficients is tj._BC_COEFFICIENTS
+    assert _bc_namespace_identity() == before and bc.bc_coefficients is orig
     monkeypatch.undo()
-    monkeypatch.setattr(bc, "bc_coefficients", lambda p: tj._BC_COEFFICIENTS(p))  # a foreign replacement is refused
-    with pytest.raises(RuntimeError, match="already replaced"):
-        tj.solve_with_c(solved, C)
+    with pytest.raises(ValueError):  # a natural exception in the code of solve_bc: C of a wrong shape
+        tj.solve_with_c(solved, np.ones((3, 3)))
+    assert _bc_namespace_identity() == before
+    sol, info = tj.solve_with_c(solved, C)
+    assert info["only_C_replaced"] is True and np.array_equal(sol.s, ref_c3) and np.array_equal(bc.solve_bc(solved).s, ref_same)
+
+
+def test_nested_and_repeated_calls(monkeypatch):
+    """Б-1 Д: a call nested inside the isolated call (same thread) completes without a hang, both results are correct; repeated
+    calls give bitwise the same result and record."""
+    solved, C = _solved_c3()
+    solved1, C1 = _solved_c3(CFG1)
+    ref, ref1 = _c3plus_reference(solved, C), _c3plus_reference(solved1, C1)
+    orig = tj._BC_COEFFICIENTS
+    state, nested = {"armed": True}, []
+
+    def nesting(p):
+        if state["armed"] and _inside_isolated_call():
+            state["armed"] = False
+            nested.append(tj.solve_with_c(solved1, C1))
+        return orig(p)
+
+    monkeypatch.setattr(tj, "_BC_COEFFICIENTS", nesting)
+    box = {}
+    th = threading.Thread(target=lambda: box.setdefault("r", tj.solve_with_c(solved, C)), daemon=True)
+    th.start()
+    th.join(TIMEOUT)
+    assert not th.is_alive()  # no deadlock
+    sol, info = box["r"]
+    assert info["only_C_replaced"] is True and np.array_equal(sol.s, ref)
+    ((sol1, info1),) = nested
+    assert info1["only_C_replaced"] is True and np.array_equal(sol1.s, ref1)
+    monkeypatch.undo()
+    reps = [tj.solve_with_c(solved, C) for _ in range(3)]
+    assert all(np.array_equal(s.s, ref) and i == reps[0][1] for s, i in reps)
+    assert bc.bc_coefficients is tj._BC_COEFFICIENTS and bc.solve_bc is tj._BC_SOLVE
 
 
 # --- E. a failed premise of C-3+ gives UNRESOLVED, never OLD ------------------------------------------------------------------
 
 def _no_solve(monkeypatch):
     def boom(*a, **k):
-        raise AssertionError("solve_bc called although a premise is not established")
+        raise AssertionError("B-C solve called although a premise is not established")
 
+    monkeypatch.setattr(tj, "solve_with_c", boom)
     monkeypatch.setattr(bc, "solve_bc", boom)
 
 
@@ -234,13 +450,30 @@ def test_injected_premise_failure_stops_without_old(monkeypatch):
     assert rec["status"].startswith(tj.UNRES_PREMISE) and "P-3: injected" in rec["status"]
     assert "V_bc" not in arr and "next_given" not in arr and len(tr.records) == 1
     assert "bc_status" not in rec and "C_assembly_applied" not in rec
+    assert rec["c3plus_premises_status"] == tj.UNRESOLVED and rec["c3plus_premises"]["classes"]["P-3"] == "UNRESOLVED"
+    assert rec["c3plus_premises"]["classes"]["P-4"] == "ASSUMED" and rec["c3plus_premises"]["P-3"].startswith("UNRESOLVED")
+
+
+def _status_of_premises(rec):
+    return rec["c3plus_premises_status"], rec["c3plus_premises"]["classes"]
 
 
 def test_natural_subnormal_premise_failure(monkeypatch):
     _no_solve(monkeypatch)
-    given = hs.start_set(8, 1) * 2.0**-1000  # X^2 below 2^-1022: Gram products may underflow
-    res = tj.run_step(CFG1, 1, given, np.zeros((9, 1)))
+    given = hs.start_set(10, 1) * 2.0**-1000  # s = 2 (X): X^2 below 2^-1022, Gram products may underflow
+    res = tj.run_step(CFG1, 2, given, np.ones((7, 1)))
     assert res.record["status"].startswith(tj.UNRES_PREMISE) and "P-3" in res.record["status"] and res.next_given is None
+    status, classes = _status_of_premises(res.record)
+    assert status == tj.UNRESOLVED and classes["P-3"] == "UNRESOLVED" and classes["P-4"] == "ASSUMED"
+
+
+def test_natural_overflow_premise_failure(monkeypatch):
+    """P-2 failing naturally (N-6): a given set of size 1e300 makes the Gram sum overflow; no solve, P-2 UNRESOLVED."""
+    _no_solve(monkeypatch)
+    res = tj.run_step(CFG1, 2, hs.start_set(10, 1) * 1e300, np.ones((7, 1)))
+    assert res.record["status"].startswith(tj.UNRES_PREMISE) and "P-2" in res.record["status"]
+    status, classes = _status_of_premises(res.record)
+    assert status == tj.UNRESOLVED and classes["P-2"] == "UNRESOLVED" and classes["P-4"] == "ASSUMED"
 
 
 def test_rounding_probe_failure(monkeypatch):
@@ -250,13 +483,48 @@ def test_rounding_probe_failure(monkeypatch):
     monkeypatch.setattr(tj, "fp_environment_probe", lambda: {**good, "nearest_numpy": False})
     tr = tj.run_trajectory(CFG1)
     assert tr.records[0]["status"].startswith(tj.UNRES_PREMISE) and "P-1" in tr.records[0]["status"]
+    assert _status_of_premises(tr.records[0])[1]["P-1"] == "UNRESOLVED"
 
 
-def test_theorem_violation_with_premises_is_fail(monkeypatch):
+def test_probe_failure_after_the_solve(monkeypatch):
+    """N-6: the P-1/P-3 probe after the solve fails -> UNRESOLVED, the trajectory stops, no next input."""
+    good = tj.fp_environment_probe()
+    seen = {"n": 0}
+
+    def second_fails():
+        seen["n"] += 1
+        return good if seen["n"] == 1 else {**good, "no_daz": False}
+
+    monkeypatch.setattr(tj, "fp_environment_probe", second_fails)
+    tr = tj.run_trajectory(CFG1)
+    assert tr.records[0]["status"] == f"{tj.UNRES_PREMISE}: P-1/P-3 probe after the solve failed" and len(tr.records) == 1
+    assert "next_given" not in tr.arrays[0]
+
+
+def test_bound_violation_is_a_conditional_fail(monkeypatch):
+    """Б-2: a violated inequality is FAIL with P-1, P-2, P-3, P-5 established and P-4 ASSUMED - not an unconditional refutation."""
     _no_solve(monkeypatch)
     monkeypatch.setattr(ca, "check_c3plus", lambda C, Cx, k: {"elementwise": False, "frobenius": True, "max_ratio_sq": Fraction(4)})
     tr = tj.run_trajectory(CFG1)
-    assert tr.records[0]["status"] == tj.FAIL_THEOREM and len(tr.records) == 1
+    rec = tr.records[0]
+    assert rec["status"] == tj.FAIL_THEOREM and len(tr.records) == 1 and rec["c3plus_bound_check_exact"] == "FAIL"
+    assert "P-4 assumed" in tj.FAIL_THEOREM and "not an unconditional refutation" in tj.FAIL_THEOREM
+    assert "with established premises" not in tj.FAIL_THEOREM
+    assert rec["c3plus_premises_status"] == tj.PREMISES_OK and rec["c3plus_premises"]["classes"]["P-4"] == "ASSUMED"
+
+
+def test_p4_is_never_declared_established(tmp_path, runs):
+    """Б-2: in the code constants and in the JSON journal P-4 is ASSUMED only; the summary is conditional on P-4."""
+    tj.write_journal(runs[2], tmp_path)
+    data = json.loads((tmp_path / "journal.json").read_text(encoding="utf-8"))
+    for rec in data["steps"]:
+        prem = rec["c3plus_premises"]
+        assert prem["classes"]["P-4"] == "ASSUMED" and prem["P-4"].startswith("ASSUMED")
+        assert rec["c3plus_premises_status"] == "ESTABLISHED_CONDITIONAL_ON_P4" and "P-4 assumed" in rec["c3plus_premises_summary"]
+    text = (tmp_path / "journal.json").read_text(encoding="utf-8")
+    assert '"P-4": "ESTABLISHED' not in text and "P-4 established" not in text
+    src = SCRIPT.read_text(encoding="utf-8")
+    assert "with established premises" not in src and '"ESTABLISHED (P-1, P-2, P-3, P-5 checked' not in src
 
 
 # --- F. exact dependence before QR; zero load and zero field ------------------------------------------------------------------
@@ -272,6 +540,63 @@ def test_exact_dependence_stops_before_qr(monkeypatch):
     assert not calls and set(res.arrays) == {"given_in", "companion_in"}
     start = tj.run_trajectory(tj.TrajectoryConfig(1.0, 5, 1.0, 7, 3))  # N = 3 > floor(5/2): proven dependence of T_N (D-049.3)
     assert start.records[0]["status"] == tj.STOP_START and not calls
+    assert "proven for the exact T_N" in tj.STOP_START and "not a statement about the stored doubles" in tj.STOP_START
+
+
+def test_start_theorem_is_applied_to_t_n_only():
+    """N-2: run_step(s = 1) accepts only T_N = hs.start_set(n_x, N) with a zero companion; any other input is refused."""
+    t = hs.start_set(8, 2)
+    for given, comp in ((t * 2.0, np.zeros((9, 2))), (t[:, ::-1], np.zeros((9, 2))), (t, np.ones((9, 2)))):
+        with pytest.raises(ValueError, match="T_N"):
+            tj.run_step(CFG2, 1, given, comp)
+    with pytest.raises(ValueError, match="T_N"):  # the start theorem (N > floor(n_x/2)) is not applied to another set
+        tj.run_step(tj.TrajectoryConfig(1.0, 5, 1.0, 7, 3), 1, hs.start_set(5, 3) * 3.0, np.zeros((6, 3)))
+    res = tj.run_step(CFG2, 1, t, np.zeros((9, 2)))
+    assert res.record["status"] == tj.OK and res.record["start_set"].endswith("companion 0")
+
+
+def test_protective_stop_after_qr(monkeypatch):
+    """N-6: an exactly singular R after QR gives PROTECTIVE_STOP (a protection after QR, not the stop before QR of D-049.5)."""
+    orig = bc.orthonormalise
+
+    def singular_r(p):
+        Ut, R = orig(p)
+        R = R.copy()
+        R[-1, -1] = 0.0
+        return Ut, R
+
+    monkeypatch.setattr(bc, "orthonormalise", singular_r)
+    tr = tj.run_trajectory(CFG2)
+    assert tr.records[0]["status"].startswith(tj.PROTECTIVE) and len(tr.records) == 1 and "C3plus" not in tr.arrays[0]
+
+
+def test_protective_stop_on_a_failed_bc_factorization(monkeypatch):
+    """N-6: B-C factorization failure (no solution) gives PROTECTIVE_STOP; nothing is passed on."""
+    real = tj.solve_with_c
+
+    def failed(solved, C):
+        _, info = real(solved, C)
+        return bc.BCSolution(hs.FACTORIZATION_FAILED), info
+
+    monkeypatch.setattr(tj, "solve_with_c", failed)
+    tr = tj.run_trajectory(CFG2)
+    assert tr.records[0]["status"] == f"{tj.PROTECTIVE}: B-C status {hs.FACTORIZATION_FAILED}" and len(tr.records) == 1
+
+
+def test_broken_input_link_is_fail_tool(monkeypatch):
+    """N-6: if the input of s is not bitwise the next input of s - 1, the trajectory stops with FAIL_TOOL."""
+    real = tj.run_step
+
+    def tampered(cfg, s, given, companion):
+        res = real(cfg, s, given, companion)
+        if s == 2:
+            res.arrays["given_in"] = res.arrays["given_in"] * (1.0 + 2.0**-52)
+        return res
+
+    monkeypatch.setattr(tj, "run_step", tampered)
+    tr = tj.run_trajectory(CFG2)
+    assert len(tr.records) == 2 and tr.records[1]["input_link_bitwise"] is False
+    assert tr.records[1]["status"] == f"{tj.FAIL_TOOL}: input of s is not the B-C result of s - 1"
 
 
 def test_zero_load_and_zero_field():
@@ -328,10 +653,16 @@ def test_journal_restores_the_next_input(tmp_path, runs):
     z = tj.load_arrays(tmp_path)
     assert data["meta"]["data_status"].startswith("QA tool data") and "NOT D1 data" in data["meta"]["data_status"]
     prov = data["meta"]["provenance"]
-    for k in ("git_commit", "tool_blob", "numpy", "scipy", "platform", "blas", "threads_env"):
+    for k in ("git_commit", "tool_blob", "numpy", "scipy", "platform", "blas", "blas_thread_env_vars_as_found"):
         assert k in prov
-    assert "not across BLAS platforms" in prov["reproducibility"]
+    assert prov["blas_threads_effective"].startswith("NOT_VERIFIED") and "threads_env" not in prov
+    assert "not across BLAS platforms" in prov["reproducibility"] and prov["solve_isolation"] == tj.ISOLATION
     assert all(v["unchanged"] for v in prov["used_modules"].values())
+    assert "src/kkvim_reference/r5_cccc_energy.py" in prov["used_modules"]  # N-5: imported through r5_cccc_sequence
+    assert prov["used_modules_status"].startswith("listed modules: blob = base") and "not checked" in prov["used_modules_status"]
+    assert all(v.startswith("NOT_CHECKED") for v in prov["loaded_project_modules_not_checked"].values())
+    assert not set(prov["loaded_project_modules_not_checked"]) & set(tj.USED_MODULES)
+    assert "not a mechanism that prevents a D1 run" in data["meta"]["d1_guard"] == prov["d1_guard"]
     assert len(data["steps"]) == 4 and meta["arrays_sha256"] == {k: tj.array_sha(v) for k, v in z.items()}
     for s in range(1, 4):
         g, c = z[f"s{s}_next_given"], z[f"s{s}_next_companion"]
@@ -361,6 +692,13 @@ def test_command_line_runs_small_and_refuses_d1(tmp_path):
     assert not (tmp_path / "d1").exists()
 
 
+def test_command_line_refuses_output_under_docs(capsys):
+    """N-6: the command line does not write under docs/ (checked before any computation)."""
+    target = ROOT / "docs" / "op8_tool_output_must_not_exist"
+    assert tj.main(["run", "--lx", "1", "--nx", "8", "--ly", "1", "--ny", "10", "--N", "1", "--out", str(target)]) == 2
+    assert "not written under docs/" in capsys.readouterr().err and not target.exists()
+
+
 # --- protection: no import of the working kkvim, used modules unchanged ------------------------------------------------------
 
 def test_no_import_of_the_working_kkvim():
@@ -369,10 +707,12 @@ def test_no_import_of_the_working_kkvim():
     names += [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
     assert not [m for m in names if m == "kkvim" or m.startswith("kkvim.")]
     code = ("import importlib.util, sys; s = importlib.util.spec_from_file_location('t', sys.argv[1]);"
-            " m = importlib.util.module_from_spec(s); s.loader.exec_module(m); m._ca();"
-            " print(sorted(k for k in sys.modules if k == 'kkvim' or k.startswith('kkvim.')))")
+            " m = importlib.util.module_from_spec(s); s.loader.exec_module(m); m._ca(); m.run_trajectory(m.TrajectoryConfig("
+            "1.0, 8, 1.25, 10, 2, s_max=2), independent=True);"
+            " print(sorted(k for k in sys.modules if k == 'kkvim' or k.startswith('kkvim.')));"
+            " print(sorted(m.loaded_modules_check()))")
     res = subprocess.run([sys.executable, "-c", code, str(SCRIPT)], cwd=ROOT, capture_output=True, text=True, timeout=300)
-    assert res.returncode == 0 and res.stdout.strip() == "[]", res.stderr[-2000:]
+    assert res.returncode == 0 and res.stdout.split("\n")[:2] == ["[]", "[]"], (res.stdout, res.stderr[-2000:])  # N-5: all listed
 
 
 def test_used_modules_and_data_unchanged():
