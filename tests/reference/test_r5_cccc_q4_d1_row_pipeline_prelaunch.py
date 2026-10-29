@@ -3,22 +3,30 @@
 Small non-D1 configurations only (T1 of the frozen control expectations: 8 x 10 on 1 x 1.25, N = 1). Checked: the full path from an
 OP-8 journal to the classification; exact dP and tau' at the boundary with the Z-3 counterexamples; no false PASS with an incomplete
 certificate; E1/E2, E_DIAG and the strict sign of resolvability; real detectors; binding, hash chain and reproduction in a separate
-process; the D0 regression against the published EQ / QA-EB rows; the guard against the D1 campaign.
+process; the D0 regression against the published EQ / QA-EB rows (portable checks on every platform, the bitwise
+comparison where the computational path is shown identical to the recorded one); the guard against the D1 campaign.
 """
 
 import ast
+import contextlib
+import copy
 import csv
+import ctypes
 import importlib.util
 import json
 import math
+import os
+import platform
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
 import pytest
+import scipy
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "scripts" / "r5_cccc_q4_d1_row_pipeline_prelaunch.py"
@@ -203,29 +211,545 @@ def test_binary_representation_is_kept():
     assert pl.parse_recorded(pl.ftext(f)) == f
 
 
-# --- D0 regression (published EQ and QA-EB rows; bitwise on the platform of their run) -------------------------------------------
+# --- D0 regression (published EQ and QA-EB rows) ----------------------------------------------------------------------------------
+# Protocol 7, area D0: a repeat gives the published values bitwise, otherwise UNRESOLVED. D-025 / AGENTS.md 4: bitwise equality is
+# required only with a fixed order of the arithmetic operations. The regression is split in two checks:
+#  - portable (every platform): composition and identifiers of the sample, the input of s = 1, premises P-a...P-f and the status of
+#    the certificate of the recomputed rows (whole pipeline: OP-8 journal, binding, OP-8 re-run, reproduction in a separate process),
+#    exact dP and tau', the directed bounds (gamma contract, B_E_up >= B_E), E1/E2 and the strict sign; the published rows on their
+#    own values. Values of two machines are never compared with each other, and no tolerance is used;
+#  - bitwise (recomputed against published values): a row equal bitwise is reproduced on any path; a difference is a FAIL only on a
+#    computational path shown identical to the recorded path of the published runs (_d0_path_identity); otherwise that comparison is
+#    NOT_VERIFIED (protocol 7: UNRESOLVED, not FAIL) and the check is skipped with the reason. sys.platform alone fixes no path.
 
-@pytest.mark.skipif(sys.platform != "win32", reason="published D0 values are bound to the Windows platform of their run (D-025)")
-def test_d0_regression_bitwise():
+D0_IDS = ("chain|1x1:64x64|N1|Y|s1", "chain|1x3:32x96|N1|Y|s1", "chain|1x0.333333:96x32|N1|Y|s1", "pairs|1x1:40x64|N1|Y|s1",
+          "pairs|1x1:64x40|N1|Y|s1", "pairs|1x1:47x53|N1|Y|s1", "chain|1x2:32x64|N1|Y|s1", "chain|1x0.5:64x32|N1|Y|s1",
+          "chain|1x1:32x32|N1|Y|s1")
+D0_RESULTS = ROOT / "docs" / "results"
+D0_META = {"Q3": D0_RESULTS / "r5_cccc_q3_prequalification" / "meta.json",
+           "QA-EB": D0_RESULTS / "r5_cccc_q4_energy_error_bound" / "meta.json",
+           "EQ": D0_RESULTS / "r5_cccc_q4_energy_bc" / "meta.json"}
+# (component of the recomputed row, published run, column): the six components of the former test and gamma_up
+D0_BITWISE = (("P_hat_p", "QA-EB", "P_hat_prev"), ("P_hat_s", "QA-EB", "P_hat_s"), ("Q_hat", "QA-EB", "Q_hat"),
+              ("B_E_up", "QA-EB", "B_E_up"), ("Gamma_up", "EQ", "Gamma_up"), ("gamma_down", "EQ", "gamma_down"),
+              ("gamma_up", "EQ", "gamma_up"))
+D0_PUBLISHED_FLAGS = {"QA-EB": {"status": "VERIFIED", "q3_state_reproduced_bitwise": "True", "B_E_finite": "True", "E_s_le_B_E": "True"},
+                      "EQ": {"status": "COMPLETE", "q3_state_reproduced_bitwise": "True", "gamma_inclusion_exact": "True",
+                             "Gamma_up_holds": "True"}}
+# parameters that fix the arithmetic path of a D0 row: OS build (C runtime), processor model (CPU dispatch of NumPy and the OpenBLAS
+# core selection), NumPy and SciPy builds, NumPy's OpenBLAS build and file, the cores actually used by NumPy's and SciPy's OpenBLAS
+# (read from the loaded libraries) and their thread counts, the NumPy variables that restrict its CPU dispatch
+D0_PATH_KEYS = ("platform", "machine", "processor", "numpy", "scipy", "numpy_blas", "numpy_blas_library", "numpy_blas_core",
+                "scipy_blas_core", "blas_threads", "numpy_cpu_env")
+NPY_CPU_ENV = ("NPY_DISABLE_CPU_FEATURES", "NPY_ENABLE_CPU_FEATURES")
+OPENBLAS = ((np, "64_"), (scipy, ""))  # NumPy's ILP64 and SciPy's LP64 scipy-openblas (symbol suffixes), as in QA-EB blas_info
+
+
+def _openblas(pkg, suffix: str):
+    """(ctypes library, file name) of the scipy-openblas bundled with ``pkg`` (wheel layout <pkg>.libs), or (None, reason)."""
+    libs = Path(pkg.__file__).resolve().parent.parent / f"{pkg.__name__}.libs"
+    found = sorted(libs.glob("*openblas*")) if libs.is_dir() else []
+    if len(found) != 1:
+        return None, f"{len(found)} OpenBLAS libraries in {libs.name}"
+    try:
+        lib = ctypes.CDLL(str(found[0]))
+        for name in ("get_corename", "get_num_threads", "set_num_threads"):
+            getattr(lib, f"scipy_openblas_{name}{suffix}")
+    except (OSError, AttributeError) as exc:
+        return None, f"{found[0].name}: {exc}"
+    return lib, found[0].name
+
+
+def _openblas_state(pkg, suffix: str) -> dict:
+    lib, name = _openblas(pkg, suffix)
+    if lib is None:
+        return {"library": None, "core": None, "threads": None, "error": name}
+    core = getattr(lib, f"scipy_openblas_get_corename{suffix}")
+    core.restype = ctypes.c_char_p
+    threads = getattr(lib, f"scipy_openblas_get_num_threads{suffix}")
+    threads.restype = ctypes.c_int
+    return {"library": name, "core": core().decode(), "threads": threads()}
+
+
+@contextlib.contextmanager
+def _one_blas_thread():
+    """One OpenBLAS thread in NumPy's and SciPy's library of this process, as recorded for the published runs; the former counts are
+    restored afterwards. A library that cannot be set keeps its count (the path is then not identical)."""
+    saved = []
+    for pkg, suffix in OPENBLAS:
+        lib, _ = _openblas(pkg, suffix)
+        if lib is None:
+            continue
+        get, put = getattr(lib, f"scipy_openblas_get_num_threads{suffix}"), getattr(lib, f"scipy_openblas_set_num_threads{suffix}")
+        get.restype, put.argtypes = ctypes.c_int, [ctypes.c_int]
+        saved.append((put, get()))
+        put(1)
+    try:
+        yield [n for _, n in saved]
+    finally:
+        for put, n in saved:
+            put(n)
+
+
+def _d0_current_path() -> dict:
+    """The path parameters of this process (D0_PATH_KEYS) and, under "info", further ones for the report only (not compared)."""
+    nb, sb = _openblas_state(np, "64_"), _openblas_state(scipy, "")
+    try:
+        b = np.show_config(mode="dicts")["Build Dependencies"]["blas"]
+        numpy_blas = f"{b['name']} {b['version']}"
+    except Exception:  # noqa: BLE001 - not readable: the parameter is then missing, never guessed
+        numpy_blas = None
+    try:
+        from numpy._core._multiarray_umath import __cpu_baseline__, __cpu_dispatch__
+        dispatch = {"baseline": list(__cpu_baseline__), "dispatch": list(__cpu_dispatch__)}
+    except ImportError:
+        dispatch = None
+    return {"platform": platform.platform(), "machine": platform.machine(), "processor": platform.processor() or None,
+            "numpy": np.__version__, "scipy": scipy.__version__, "numpy_blas": numpy_blas, "numpy_blas_library": nb["library"],
+            "numpy_blas_core": nb["core"], "scipy_blas_core": sb["core"],
+            "blas_threads": None if None in (nb["threads"], sb["threads"]) else (nb["threads"], sb["threads"]),
+            "numpy_cpu_env": {k: os.environ.get(k) for k in NPY_CPU_ENV},
+            "info": {"python": platform.python_version(), "sys_platform": sys.platform, "scipy_blas_library": sb["library"],
+                     "OPENBLAS_CORETYPE": os.environ.get("OPENBLAS_CORETYPE"), "numpy_cpu": dispatch}}
+
+
+def _d0_recorded_path(meta: dict | None = None) -> tuple[dict, list[str]]:
+    """The computational path recorded by the published D0 runs (Q3 fields, QA-EB energies and B_E, EQ gamma) in their meta.json. A
+    parameter the runs record differently, or do not record, is None and listed: no identity can be shown for it."""
+    m = {run: json.loads(Path(p).read_text(encoding="utf-8")) for run, p in (meta or D0_META).items()}
+    rec, problems = {}, []
+    for key in ("platform", "machine", "processor", "numpy", "scipy"):
+        vals = {run: mm.get(key) for run, mm in m.items()}
+        rec[key] = vals["Q3"] if None not in vals.values() and len(set(vals.values())) == 1 else None
+        if rec[key] is None:
+            problems.append(f"{key} recorded as {vals}")
+    eb = m["QA-EB"].get("blas_main") or {}
+    nb = eb.get("numpy_blas") or {}
+    rec["numpy_blas"] = f"{nb['name']} {nb['version']}" if nb.get("name") and nb.get("version") else None
+    if rec["numpy_blas"] is None or m["Q3"].get("blas") != rec["numpy_blas"]:
+        problems.append(f"NumPy BLAS recorded as {m['Q3'].get('blas')!r} (Q3) and {rec['numpy_blas']!r} (QA-EB)")
+        rec["numpy_blas"] = None
+    rec["numpy_blas_library"] = eb.get("library")
+    rec["numpy_blas_core"] = eb.get("core")  # read from the loaded library in the QA-EB run, which reproduced the Q3 state bitwise
+    # SciPy's OpenBLAS core is not recorded. It is taken equal to the recorded NumPy core: both libraries select the core by the same
+    # rule (OPENBLAS_CORETYPE, else the processor), and the processor is compared. An inference, not a record (QA report 12.8).
+    rec["scipy_blas_core"] = eb.get("core")
+    one = dict.fromkeys(("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"), "1")
+    env = {"Q3": m["Q3"].get("threads"), "QA-EB": m["QA-EB"].get("threads_env"), "EQ": m["EQ"].get("threads")}
+    rec["blas_threads"] = (1, 1) if all(v == one for v in env.values()) and eb.get("threads") == 1 else None
+    if rec["blas_threads"] is None:
+        problems.append(f"BLAS threads recorded as {env}, measured {eb.get('threads')!r}")
+    # NumPy's CPU dispatch is not recorded: fixed by the processor model and the NumPy build unless an NPY_*_CPU_FEATURES variable
+    # restricts it; these are taken as unset in the published runs (an inference, QA report 12.8)
+    rec["numpy_cpu_env"] = dict.fromkeys(NPY_CPU_ENV)
+    return rec, problems
+
+
+def _d0_path_identity(now: dict, rec: dict, problems=()) -> tuple[bool, list[str]]:
+    """Identical computational path only when every parameter of D0_PATH_KEYS is recorded, readable here and equal; otherwise
+    (False, the differences). sys.platform is not a parameter: equal on every Windows machine, it fixes neither kernel nor order."""
+    diff = [f"record: {p}" for p in problems]
+    for k in D0_PATH_KEYS:
+        if rec.get(k) is None:
+            diff.append(f"{k}: not recorded")
+        elif now.get(k) is None:
+            diff.append(f"{k}: not readable here")
+        elif now[k] != rec[k]:
+            diff.append(f"{k}: {now[k]!r} here, {rec[k]!r} recorded")
+    return not diff, diff
+
+
+def _d0_identity(d0: dict) -> tuple[bool, list[str]]:
+    """The path of the D0 computation, read before and after it, against the record."""
+    diff = []
+    for when in ("path", "path_after"):
+        diff += [x for x in _d0_path_identity(d0[when], d0["recorded"], d0["record_problems"])[1] if x not in diff]
+    return not diff, diff
+
+
+def _d0_bitwise_mismatches(case: dict) -> list[str]:
+    ga, row, out = pl.ga(), case["result"]["row"], []
+    for comp, run, col in D0_BITWISE:
+        if case.get(run) is None:
+            out.append(f"{comp}: no published {run} row")
+            continue
+        pub = ga.read_double(case[run][col]).hex()
+        if row.get(comp) != pub:
+            out.append(f"{comp}: computed {row.get(comp)}, published {pub}")
+    return out
+
+
+def _d0_bitwise_verdict(identical: bool, mismatches: list[str]) -> str:
+    """REPRODUCED: bitwise equal (on any path). FAIL: a difference on a path shown identical. NOT_VERIFIED: a difference on a path
+    not shown identical - the published value is neither confirmed nor refuted there (protocol 7: UNRESOLVED)."""
+    if not mismatches:
+        return "REPRODUCED"
+    return "FAIL" if identical else "NOT_VERIFIED"
+
+
+def _exact_tests(P_p, P_s, Q, G, B_E):
+    """dP, tau', E1, E2 and the strict sign of resolvability of binary64 components, in exact rationals (D-054.1 items 1, 3)."""
+    dP, tau = Fraction(P_p) - Fraction(P_s), Fraction(G) + Fraction(B_E)
+    return dP, tau, dP >= -tau, abs(dP - Fraction(Q)) <= tau, Fraction(Q) > tau
+
+
+def _d0_composition_defects(cases: list[dict]) -> list[str]:
+    bad = []
+    ids = [c["id"] for c in cases]
+    if ids != list(D0_IDS):
+        bad.append(f"the D0 sample is {ids}, not the published one {list(D0_IDS)}")
+    bad += [f"{c['id']}: no published {run} row" for c in cases for run in ("QA-EB", "EQ") if c.get(run) is None]
+    return bad
+
+
+def _d0_portable_defects(case: dict) -> list[str]:
+    """The checks of a D0 row that need no equality of values across machines; empty when all hold."""
+    ga, bad = pl.ga(), []
+    res, q, h, e = case["result"], case["Q3"], case.get("QA-EB"), case.get("EQ")
+    if h is None or e is None:
+        return [f"{case['id']}: no published QA-EB / EQ row"]
+    # identifiers; the input of s = 1 is T_1 with a zero companion on the grid of the Q3 row
+    if not ga.row_id(q) == h["id"] == e["id"] == case["id"]:
+        bad.append(f"identifiers differ: Q3 {ga.row_id(q)}, QA-EB {h['id']}, EQ {e['id']}, case {case['id']}")
+    sp = ga.spec_of(q)
+    j, arrays = pl.load_journal(case["journal"])
+    cfg = pl.config_of(j["meta"])
+    if (cfg.lx, cfg.nx, cfg.ly, cfg.ny, cfg.N) != (sp["lx"], sp["nx"], sp["ly"], sp["ny"], 1):
+        bad.append(f"the journal configuration {cfg} is not the grid of the Q3 row")
+    t1, zero = pl.hs.start_set(sp["nx"], 1), np.zeros((sp["ny"] - 1, 1))
+    given, comp_in = arrays["s1_given_in"], arrays["s1_companion_in"]
+    if given.shape != t1.shape or given.tobytes() != t1.tobytes() or comp_in.shape != zero.shape or comp_in.tobytes() != zero.tobytes():
+        bad.append("the input of s = 1 is not T_1 with a zero companion")
+    # the certificate of the recomputed row through the whole pipeline
+    states = {k: v["state"] for k, v in res["premises"].items()}
+    if states != dict.fromkeys(("P-a", "P-b", "P-c", "P-d", "P-e", "P-f"), "ESTABLISHED"):
+        bad.append(f"premises {states}")
+    if not (res.get("op8_rerun") or {}).get("reproduced") or res["reproduction"].get("bitwise_equal") is not True:
+        bad.append("OP-8 re-run or the reproduction in a separate process differs")
+    if res["contradictions"] or res["faults"] or res["row"]["contradictions"] or res["row"]["faults"]:
+        bad.append("contradictions or faults recorded")
+    bad += [f"row: {x}" for x in pl.row_self_consistency(res["row"])]
+    if res["status"] != "PASS" or res["classification"]["status"] != "PASS":
+        bad.append(f"status {res['status']} / {res['classification']['status']}, published rows PASS")
+    row, c = res["row"], res["classification"]
+    x = {k: float.fromhex(row[k]) for k in ("P_hat_p", "P_hat_s", "Q_hat", "Gamma_up", "B_E_up", "gamma_down", "gamma_up")}
+    dP, tau, e1, e2, resolvable = _exact_tests(x["P_hat_p"], x["P_hat_s"], x["Q_hat"], x["Gamma_up"], x["B_E_up"])
+    if Fraction(c["dP_exact"]) != dP or Fraction(c["tau_exact"]) != tau:
+        bad.append("dP or tau' is not the exact rational of the recorded components")
+    bad += [f"gamma contract: {v}" for v in pl.gamma_contract(Fraction(row["gamma_exact"]), x["gamma_down"], x["gamma_up"],
+                                                              x["Gamma_up"])]
+    if not Fraction(x["B_E_up"]) >= Fraction(row["B_E_exact"]):
+        bad.append("B_E_up is below the exact B_E")
+    if row["diagnostics"]["second_path_gamma"].get("consistent") is not True:
+        bad.append("the exact gamma of the second path is not consistent")
+    if not (e1 and e2 and c["e1"] is True and c["e2"] is True):
+        bad.append("E1 / E2 violated with established premises")
+    if not resolvable:
+        bad.append("Q^ is not > tau'")
+    # the published rows on their own values: flags, agreement of QA-EB and EQ, Gamma_up = max, E1/E2 and the strict sign
+    for run, flags in D0_PUBLISHED_FLAGS.items():
+        bad += [f"published {run} {k} = {case[run].get(k)!r}" for k, v in flags.items() if case[run].get(k) != v]
+    p = {k: ga.read_double(h[col]) for k, col in (("P_p", "P_hat_prev"), ("P_s", "P_hat_s"), ("Q", "Q_hat"), ("B_E", "B_E_up"))}
+    for k, col in (("P_p", "P_hat_prev"), ("P_s", "P_hat_s"), ("Q", "Q_hat")):
+        if ga.read_double(e[col]).hex() != p[k].hex():
+            bad.append(f"published {col}: QA-EB and EQ differ")
+    gd, gu, G = (ga.read_double(e[k]) for k in ("gamma_down", "gamma_up", "Gamma_up"))
+    if not (gd <= gu and G.hex() == max(abs(gd), abs(gu)).hex()):
+        bad.append("published Gamma_up is not max(|gamma_down|, |gamma_up|) of an ordered interval")
+    _, _, pe1, pe2, pres = _exact_tests(p["P_p"], p["P_s"], p["Q"], G, p["B_E"])
+    if not (pe1 and pe2 and pres):
+        bad.append("published row: E1 / E2 or the strict sign does not hold")
+    return bad
+
+
+@pytest.fixture(scope="module")
+def d0(tmp_path_factory):
+    """The nine published D0 rows recomputed through the pipeline (journal of s = 1, analyse) with one BLAS thread."""
     ga = pl.ga()
-    q3 = ga.read_q3_rows(ROOT / "docs" / "results" / "r5_cccc_q3_prequalification" / "sequences_e1_e7_e9.csv")
-    with open(ROOT / "docs" / "results" / "r5_cccc_q4_energy_error_bound" / "rows.csv", encoding="utf-8") as f:
-        qaeb = {r["id"]: r for r in csv.DictReader(f)}
-    with open(ROOT / "docs" / "results" / "r5_cccc_q4_energy_bc" / "rows.csv", encoding="utf-8") as f:
-        eqr = {r["id"]: r for r in csv.DictReader(f)}
+    q3 = ga.read_q3_rows(D0_RESULTS / "r5_cccc_q3_prequalification" / "sequences_e1_e7_e9.csv")
+    pub = {}
+    for run, name in (("QA-EB", "r5_cccc_q4_energy_error_bound"), ("EQ", "r5_cccc_q4_energy_bc")):
+        with open(D0_RESULTS / name / "rows.csv", encoding="utf-8") as f:
+            pub[run] = {r["id"]: r for r in csv.DictReader(f)}
     sel = [r for r in q3 if r["N"] == "1" and r["j_s"] == "1" and r["first"] == "Y" and int(r["nx"]) * int(r["ny"]) <= 4096]
-    assert len(sel) == 9
-    for r in sel:
-        sp, rid = ga.spec_of(r), ga.row_id(r)
-        cfg = pl.op8().TrajectoryConfig(sp["lx"], sp["nx"], sp["ly"], sp["ny"], 1, 1.0, 1.0, 1)
-        st = pl.op8().run_step(cfg, 1, pl.hs.start_set(sp["nx"], 1), np.zeros((sp["ny"] - 1, 1)))
-        row = pl.compute_row(cfg, 1, st.arrays["solved_set"], st.arrays["companion_solved"], st.arrays["V_bc"])
-        h, e = qaeb[rid], eqr[rid]
-        assert h["status"] == "VERIFIED"
-        assert row["P_hat_p"] == ga.read_double(h["P_hat_prev"]).hex() and row["P_hat_s"] == ga.read_double(h["P_hat_s"]).hex()
-        assert row["Q_hat"] == ga.read_double(h["Q_hat"]).hex() and row["B_E_up"] == ga.read_double(h["B_E_up"]).hex()
-        assert row["Gamma_up"] == ga.read_double(e["Gamma_up"]).hex() and row["gamma_down"] == ga.read_double(e["gamma_down"]).hex()
-        assert set(v["state"] for v in row["premises"].values()) == {"ESTABLISHED"} and row["contradictions"] == []
+    out, cases = tmp_path_factory.mktemp("d0"), []
+    threads_before = [_openblas_state(pkg, suffix)["threads"] for pkg, suffix in OPENBLAS]
+    with _one_blas_thread():
+        path = _d0_current_path()
+        for i, r in enumerate(sel):
+            sp, rid = ga.spec_of(r), ga.row_id(r)
+            cfg = pl.op8().TrajectoryConfig(sp["lx"], sp["nx"], sp["ly"], sp["ny"], 1, 1.0, 1.0, 1)
+            jd = pl.run_trajectory_journal(cfg, out / f"row{i}")
+            cases.append({"id": rid, "Q3": r, "QA-EB": pub["QA-EB"].get(rid), "EQ": pub["EQ"].get(rid), "journal": str(jd),
+                          "result": pl.analyse_journal(jd)[0]})
+        path_after = _d0_current_path()
+    rec, problems = _d0_recorded_path()
+    return {"cases": cases, "path": path, "path_after": path_after, "recorded": rec, "record_problems": problems,
+            "threads_before": threads_before}
+
+
+def _d0_case(d0, rid):
+    return copy.deepcopy(next(c for c in d0["cases"] if c["id"] == rid))
+
+
+def test_d0_regression_portable(d0):
+    assert _d0_composition_defects(d0["cases"]) == []
+    for case in d0["cases"]:
+        assert _d0_portable_defects(case) == [], case["id"]
+
+
+def test_d0_regression_bitwise(d0):
+    identical, why = _d0_identity(d0)
+    res = {c["id"]: (_d0_bitwise_verdict(identical, m), m) for c in d0["cases"] for m in [_d0_bitwise_mismatches(c)]}
+    assert not {k: m for k, (v, m) in res.items() if v == "FAIL"}, "D0 not reproduced bitwise on the recorded computational path"
+    open_ = {k: m for k, (v, m) in res.items() if v == "NOT_VERIFIED"}
+    if open_:
+        first = next(iter(open_.items()))
+        pytest.skip(f"D0 bitwise regression NOT_VERIFIED (protocol 7: UNRESOLVED) for {len(open_)} of {len(res)} rows; reproduced "
+                    f"bitwise: {len(res) - len(open_)}. Their values differ from the published ones on a computational path not shown "
+                    f"identical to the recorded one: {'; '.join(why)}. First: {first[0]}: {first[1][0]}")
+    assert all(v == "REPRODUCED" for v, _ in res.values()) and len(res) == len(D0_IDS)
+
+
+# --- D0: the path condition and the portable checks (negative tests) --------------------------------------------------------------
+
+def test_d0_recorded_path_is_usable(d0):
+    rec, problems = d0["recorded"], d0["record_problems"]
+    assert problems == [] and all(rec[k] is not None for k in D0_PATH_KEYS)
+    assert rec["numpy_blas_core"] == "Haswell" and rec["blas_threads"] == (1, 1) and rec["numpy_blas"].startswith("scipy-openblas")
+
+
+def test_d0_inconsistent_or_missing_record_gives_no_identity(d0, tmp_path):
+    meta = {}
+    for run, p in D0_META.items():
+        m = json.loads(p.read_text(encoding="utf-8"))
+        if run == "EQ":
+            m["processor"] = m["processor"] + " (other run)"
+        if run == "QA-EB":
+            m["blas_main"].pop("core")
+        meta[run] = tmp_path / f"{run}.json"
+        meta[run].write_text(json.dumps(m), encoding="utf-8")
+    rec, problems = _d0_recorded_path(meta)
+    assert rec["processor"] is None and rec["numpy_blas_core"] is None and any("processor" in x for x in problems)
+    ok, diff = _d0_path_identity(dict(d0["recorded"]), rec, problems)
+    assert not ok and "processor: not recorded" in diff and "numpy_blas_core: not recorded" in diff
+
+
+@pytest.mark.parametrize("key", D0_PATH_KEYS)
+def test_d0_every_path_parameter_is_needed(d0, key):
+    rec = d0["recorded"]
+    other = {"blas_threads": (24, 1), "numpy_cpu_env": {"NPY_DISABLE_CPU_FEATURES": "X86_V3", "NPY_ENABLE_CPU_FEATURES": None}}
+    assert _d0_path_identity(rec, rec) == (True, [])
+    ok, diff = _d0_path_identity({**rec, key: other.get(key, "other")}, rec)
+    assert not ok and len(diff) == 1 and diff[0].startswith(f"{key}:")
+    assert _d0_path_identity({**rec, key: None}, rec) == (False, [f"{key}: not readable here"])
+
+
+def test_d0_path_read_after_the_computation_counts(d0):
+    rec = d0["recorded"]
+    moved = {**d0, "path": dict(rec), "path_after": {**rec, "numpy_blas_core": "Sandybridge"}, "record_problems": []}
+    ok, diff = _d0_identity(moved)
+    assert not ok and diff == ["numpy_blas_core: 'Sandybridge' here, 'Haswell' recorded"]
+    assert _d0_identity({**moved, "path_after": dict(rec)}) == (True, [])
+
+
+def test_d0_win32_alone_is_not_an_identical_path(d0):
+    rec = d0["recorded"]
+    ok, diff = _d0_path_identity({"sys_platform": "win32"}, rec)
+    assert not ok and len(diff) == len(D0_PATH_KEYS)
+    # the fingerprint of the preflight (sys.platform, machine, processor, NumPy) equal, another OpenBLAS core: not identical
+    assert {"sys_platform", "machine", "processor", "numpy"} <= set(pl.pf().platform_fingerprint())
+    ok, diff = _d0_path_identity({**rec, "numpy_blas_core": "Sandybridge", "scipy_blas_core": "Sandybridge"}, rec)
+    assert not ok and [x.split(":")[0] for x in diff] == ["numpy_blas_core", "scipy_blas_core"]
+    # a Windows CI runner: another OS build and processor (its core is not established): not identical
+    runner = {**rec, "platform": "Windows-10-10.0.20348-SP0", "processor": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD"}
+    assert not _d0_path_identity(runner, rec)[0]
+
+
+def test_d0_platform_mismatch_is_not_a_false_fail(d0):
+    case = _d0_case(d0, "chain|1x3:32x96|N1|Y|s1")
+    # the value of GitHub Actions run 40946309468 (Windows, Python 3.13 and 3.14): 1 ULP from the published P_hat_s
+    assert case["QA-EB"]["P_hat_s"] == repr(float.fromhex("-0x1.7e08f45e0914ap-10"))
+    case["result"]["row"]["P_hat_s"] = "-0x1.7e08f45e09149p-10"
+    mism = _d0_bitwise_mismatches(case)
+    assert mism == ["P_hat_s: computed -0x1.7e08f45e09149p-10, published -0x1.7e08f45e0914ap-10"]
+    rec = d0["recorded"]
+    runner = {**rec, "platform": "Windows-10-10.0.20348-SP0", "processor": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD"}
+    assert _d0_bitwise_verdict(_d0_path_identity(runner, rec)[0], mism) == "NOT_VERIFIED"
+    assert _d0_bitwise_verdict(_d0_path_identity(rec, rec)[0], mism) == "FAIL"
+    # the portable checks do not depend on the path condition: the unchanged row keeps them all
+    assert _d0_portable_defects(_d0_case(d0, case["id"])) == []
+
+
+@pytest.mark.parametrize("comp, run, col", [("P_hat_p", "QA-EB", "P_hat_prev"), ("P_hat_s", "QA-EB", "P_hat_s"),
+                                             ("Q_hat", "QA-EB", "Q_hat"), ("B_E_up", "QA-EB", "B_E_up"), ("Gamma_up", "EQ", "Gamma_up"),
+                                             ("gamma_down", "EQ", "gamma_down"), ("gamma_up", "EQ", "gamma_up")])
+def test_d0_bitwise_is_strict_on_an_identical_path(d0, comp, run, col):
+    # the compared components listed here, not taken from D0_BITWISE: a component dropped from the comparison is then detected
+    case = _d0_case(d0, "chain|1x1:64x64|N1|Y|s1")
+    pub = pl.ga().read_double(case[run][col])
+    for v in (math.nextafter(pub, math.inf), math.nextafter(pub, -math.inf)) + ((-pub,) if pub == 0.0 else ()):
+        case["result"]["row"][comp] = v.hex()
+        mism = _d0_bitwise_mismatches(case)
+        assert len(mism) == 1 and mism[0].startswith(f"{comp}:")
+        assert _d0_bitwise_verdict(True, mism) == "FAIL" and _d0_bitwise_verdict(False, mism) == "NOT_VERIFIED"
+    case["result"]["row"][comp] = pub.hex()
+    assert _d0_bitwise_mismatches(case) == [] and _d0_bitwise_verdict(False, []) == "REPRODUCED"
+
+
+def _set_hex(field, f):
+    def edit(case):
+        row = case["result"]["row"]
+        row[field] = f(float.fromhex(row[field]), row).hex()
+    return edit
+
+
+def _set(path, value):
+    def edit(case):
+        d = case
+        for k in path[:-1]:
+            d = d[k]
+        d[path[-1]] = value
+    return edit
+
+
+def _input_not_t1(case):
+    j = Path(case["journal"])
+    d = j.parent / (j.name + "_input")
+    shutil.copytree(j, d)
+    arr = pl.op8().load_arrays(d)
+    arr["s1_given_in"] = arr["s1_given_in"].copy()
+    arr["s1_given_in"].flat[1] = math.nextafter(float(arr["s1_given_in"].flat[1]), math.inf)
+    np.savez(d / "arrays.npz", **arr)
+    case["journal"] = str(d)
+
+
+D0_VIOLATIONS = {
+    "Gamma_up below max(|gamma|)": (_set_hex("Gamma_up", lambda v, r: math.nextafter(v, 0.0)), "gamma contract"),
+    "interval above the exact gamma": (_set_hex("gamma_down", lambda v, r: float.fromhex(r["gamma_up"])), "gamma contract"),
+    "B_E_up below the exact B_E": (_set_hex("B_E_up", lambda v, r: float(Fraction(r["B_E_exact"])) / 2), "B_E_up is below"),
+    "E2 violated": (_set_hex("P_hat_s", lambda v, r: 2 * v), "E1 / E2"),
+    "dP not exact": (_set(["result", "classification", "dP_exact"], "1/3"), "not the exact rational"),
+    "tau not exact": (_set(["result", "classification", "tau_exact"], "0"), "not the exact rational"),
+    "premise not established": (_set(["result", "premises", "P-c"], {"state": "NOT_ESTABLISHED", "reason": "x"}), "premises"),
+    "OP-8 re-run differs": (_set(["result", "op8_rerun", "reproduced"], False), "OP-8 re-run"),
+    "reproduction differs": (_set(["result", "reproduction", "bitwise_equal"], False), "separate process"),
+    "status not PASS": (_set(["result", "status"], "UNRESOLVED_RESOLVABILITY"), "status"),
+    "component record inconsistent": (_set(["result", "row", "components", "Q"], 1.0), "row:"),
+    "second path of gamma inconsistent": (_set(["result", "row", "diagnostics", "second_path_gamma", "consistent"], False),
+                                          "second path"),
+    "input of s = 1 not T_1": (_input_not_t1, "not T_1"),
+    "published Gamma_up not max": (_set(["EQ", "Gamma_up"], "1.0"), "published Gamma_up"),
+    "published sources disagree": (_set(["EQ", "P_hat_s"], "-1.0"), "QA-EB and EQ differ"),
+    "published E2 violated": (lambda c: [_set([run, "Q_hat"], "1.0")(c) for run in ("QA-EB", "EQ")], "published row: E1 / E2"),
+    "published status": (_set(["QA-EB", "status"], "UNRESOLVED"), "published QA-EB status"),
+    "identifier": (_set(["id"], "chain|1x1:64x64|N1|Y|s2"), "identifiers differ"),
+}
+
+
+@pytest.mark.parametrize("name", list(D0_VIOLATIONS))
+def test_d0_portable_violation_is_detected(d0, name):
+    edit, expected = D0_VIOLATIONS[name]
+    case = _d0_case(d0, "chain|1x1:64x64|N1|Y|s1")
+    assert _d0_portable_defects(case) == []
+    edit(case)
+    bad = _d0_portable_defects(case)
+    assert bad and any(expected in x for x in bad), bad
+
+
+def test_d0_composition_is_checked(d0):
+    cases = d0["cases"]
+    assert _d0_composition_defects(cases) == []
+    assert _d0_composition_defects(cases[:-1]) and _d0_composition_defects(cases[1:] + cases[:1])
+    assert _d0_composition_defects([*cases[:-1], {**cases[-1], "EQ": None}]) != []
+
+
+@pytest.mark.skipif(platform.machine().lower() not in ("amd64", "x86_64"), reason="OpenBLAS cores of x86-64 only")
+@pytest.mark.parametrize("core", ["Haswell", "Sandybridge", "Prescott"])
+def test_d0_real_openblas_cores_in_a_child_process(d0, core, tmp_path):
+    """The two D0 tests with OPENBLAS_CORETYPE forced in a child process: another core never makes the bitwise check FAIL and leaves
+    the portable checks intact; on the recorded path the recorded core keeps the bitwise check strict and passing."""
+    xml = tmp_path / "d0.xml"
+    p = subprocess.run([sys.executable, "-m", "pytest", str(Path(__file__)), "-q", "-p", "no:cacheprovider", f"--junitxml={xml}",
+                        "-k", "test_d0_regression_portable or test_d0_regression_bitwise"], cwd=ROOT,
+                       env={**os.environ, "OPENBLAS_CORETYPE": core}, capture_output=True, text=True, timeout=1800)
+    if not xml.exists():
+        pytest.skip(f"the core {core} does not run on this processor (exit {p.returncode}): {p.stderr[-300:]}")
+    cases = {t.get("name"): t for t in ET.parse(xml).getroot().iter("testcase")}
+    outcome = {n: ("failed" if t.find("failure") is not None or t.find("error") is not None else
+                   "skipped" if t.find("skipped") is not None else "passed") for n, t in cases.items()}
+    assert outcome["test_d0_regression_portable"] == "passed" and p.returncode == 0, p.stdout[-2000:]
+    assert outcome["test_d0_regression_bitwise"] in ("passed", "skipped")
+    if _d0_identity(d0)[0]:  # this machine is the recorded path: the forced core decides
+        if core == d0["recorded"]["numpy_blas_core"]:
+            assert outcome["test_d0_regression_bitwise"] == "passed"
+        else:
+            msg = cases["test_d0_regression_bitwise"].find("skipped").get("message")
+            assert outcome["test_d0_regression_bitwise"] == "skipped" and "NOT_VERIFIED" in msg and "numpy_blas_core" in msg, msg
+
+
+def test_d0_blas_threads_restored_after_the_d0_computation(d0):
+    assert [_openblas_state(pkg, suffix)["threads"] for pkg, suffix in OPENBLAS] == d0["threads_before"]
+    if d0["path"]["blas_threads"] is not None:
+        assert d0["path"]["blas_threads"] == (1, 1) == d0["path_after"]["blas_threads"]
+
+
+def test_d0_path_condition_is_local_to_the_d0_checks():
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    cond = {"_d0_path_identity", "_d0_identity", "_d0_bitwise_verdict", "_one_blas_thread"}
+    users = {n.name for n in tree.body if isinstance(n, ast.FunctionDef) and n.name not in cond
+             and {x.id for x in ast.walk(n) if isinstance(x, ast.Name)} & cond}
+    assert users == {"d0", "test_d0_regression_bitwise", "test_d0_every_path_parameter_is_needed",
+                     "test_d0_win32_alone_is_not_an_identical_path", "test_d0_platform_mismatch_is_not_a_false_fail",
+                     "test_d0_bitwise_is_strict_on_an_identical_path", "test_d0_inconsistent_or_missing_record_gives_no_identity",
+                     "test_d0_real_openblas_cores_in_a_child_process", "test_d0_path_read_after_the_computation_counts"}
+    src = TOOL.read_text(encoding="utf-8")
+    assert "OPENBLAS_CORETYPE" not in src and "_d0_" not in src
+
+
+HISTORY_TESTS = tuple(f"tests/reference/{m}::{t}" for m, t in (
+    ("test_r5_cccc_q4_d1_controls_prelaunch.py", "test_expectations_committed_before_the_code"),
+    ("test_r5_cccc_q4_d1_controls_prelaunch.py", "test_expectations_history_check_fails_on_a_wrong_history"),
+    ("test_r5_cccc_q4_d1_controls_prelaunch.py", "test_expectations_history_check_fails_on_a_changed_file"),
+    ("test_r5_cccc_q4_d1_preflight.py", "test_manifest_tool_blob_is_the_historical_one"),
+    ("test_r5_cccc_q4_d1_preflight.py", "test_sha_inventory_blobs_at_the_base_commit"),
+    ("test_r5_cccc_q4_d1_preflight.py", "test_only_new_files_in_the_branch")))
+
+
+HISTORY_CASES = 8  # the parametrized wrong-history test has three cases
+
+
+def _history_verdict(shallow: bool, n: int, failed: list, skipped: list) -> str:
+    """PASS: all historical cases executed and passed. SKIP: a shallow clone, where they skip themselves with their reason and none
+    failed. FAIL otherwise - a missing case, a failure, or a skip in a full clone (there they must run)."""
+    if n != HISTORY_CASES or failed:
+        return "FAIL"
+    if skipped:
+        return "SKIP" if shallow else "FAIL"
+    return "PASS"
+
+
+def test_history_verdict():
+    assert _history_verdict(False, 8, [], []) == "PASS" and _history_verdict(True, 8, [], ["a"]) == "SKIP"
+    assert _history_verdict(False, 8, [], ["a"]) == "FAIL" and _history_verdict(True, 8, ["a"], []) == "FAIL"
+    assert _history_verdict(False, 7, [], []) == "FAIL" and _history_verdict(True, 7, [], ["a"]) == "FAIL"
+
+
+def test_historical_tests_of_a_and_b_still_run(tmp_path):
+    shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=ROOT, capture_output=True, text=True)
+    if shallow.returncode != 0:
+        pytest.skip("no git repository: the historical tests skip themselves")
+    xml = tmp_path / "h.xml"
+    p = subprocess.run([sys.executable, "-m", "pytest", *HISTORY_TESTS, "-q", "-p", "no:cacheprovider", f"--junitxml={xml}"],
+                       cwd=ROOT, capture_output=True, text=True, timeout=1800)
+    t = list(ET.parse(xml).getroot().iter("testcase"))
+    failed = [x.get("name") for x in t if x.find("failure") is not None or x.find("error") is not None]
+    skipped = [x.get("name") for x in t if x.find("skipped") is not None]
+    verdict = _history_verdict(shallow.stdout.strip() == "true", len(t), failed, skipped)
+    assert verdict != "FAIL", (len(t), failed, skipped, p.stdout[-2000:])
+    if verdict == "SKIP":
+        pytest.skip(f"shallow clone: {len(skipped)} historical tests skipped with their reason, none failed")
+    assert p.returncode == 0
 
 
 # --- 10. guard against the D1 campaign -------------------------------------------------------------------------------------------
