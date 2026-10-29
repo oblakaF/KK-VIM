@@ -28,13 +28,18 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 import shutil
 import sys
 import time
 from fractions import Fraction
 from pathlib import Path
 
-import numpy as np
+THREAD_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
+for _k in THREAD_VARS:
+    os.environ[_k] = "1"  # as in Q3, EQ, QA-EB, BR and the pipeline: one BLAS thread (set before NumPy is loaded; recorded)
+
+import numpy as np  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = ROOT / "tests" / "reference" / "r5_cccc_q4_d1_controls_prelaunch_expected.json"
