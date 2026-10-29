@@ -46,21 +46,79 @@ def test_expectations_are_frozen(tmp_path):
     assert ct.load_expected(crlf) == exp
 
 
-def test_expectations_committed_before_the_code():
+EXPECTED_COMMIT = "bc6cca9128d4e06f744dcdf053386cf9bb1d2dca"  # the expectations, fixed before the code (their own commit)
+CODE_COMMIT = "f2287662faf33ae473f3f53cc0f7faa7b80f575e"  # the first commit of the pipeline, adapter and harness
+EXPECTED_PATH = "tests/reference/r5_cccc_q4_d1_controls_prelaunch_expected.json"
+CODE_FILES = ("scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py", "scripts/r5_cccc_q4_d1_controls_prelaunch.py",
+              "scripts/r5_cccc_q4_d1_bc_reference_adapter.py", "tests/reference/test_r5_cccc_q4_d1_row_pipeline_prelaunch.py",
+              "tests/reference/test_r5_cccc_q4_d1_controls_prelaunch.py", "tests/reference/test_r5_cccc_q4_d1_bc_reference_adapter.py")
+
+
+def _git(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+
+
+def _require_history(*commits: str) -> None:
+    """The historical check needs the fixed commits (as in the preflight tests of PR #48). SKIP with the reason only without git or in
+    a shallow checkout (never a silent PASS); in a full clone a missing commit FAILS. CI checks out the full history."""
     if shutil.which("git") is None:
-        pytest.skip("git not available")
+        pytest.skip("git not available: historical check NOT performed")
+    if _git("rev-parse", "--git-dir").returncode:
+        pytest.skip("not a git checkout: historical check NOT performed")
+    missing = [c for c in commits if _git("cat-file", "-e", f"{c}^{{commit}}").returncode]
+    if not missing:
+        return
+    shallow = _git("rev-parse", "--is-shallow-repository")
+    if shallow.returncode == 0 and shallow.stdout.strip() == "true":
+        pytest.skip(f"shallow checkout without {missing}: historical check NOT performed (needs the full history, fetch-depth: 0)")
+    pytest.fail(f"full clone without the commits {missing}: the historical check cannot be performed")
 
-    def first_commit(path):
-        p = subprocess.run(["git", "log", "--diff-filter=A", "--format=%H", "--", path], cwd=ROOT, capture_output=True, text=True)
-        return p.stdout.split()[-1] if p.returncode == 0 and p.stdout.split() else None
 
-    e = first_commit("tests/reference/r5_cccc_q4_d1_controls_prelaunch_expected.json")
-    if e is None:
-        pytest.skip("history not available (shallow checkout)")
-    tree = subprocess.run(["git", "ls-tree", "-r", "--name-only", e], cwd=ROOT, capture_output=True, text=True).stdout.split()
-    for code in ("scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py", "scripts/r5_cccc_q4_d1_controls_prelaunch.py",
-                 "scripts/r5_cccc_q4_d1_bc_reference_adapter.py"):
-        assert code not in tree, code
+def check_expectations_history(expected_commit: str, code_commit: str) -> None:
+    """The fixed history (review N-1): the expectations commit is a proper ancestor of the code commit; its tree holds the expectations
+    and none of the code; the code commit holds the code; the expectations file is today bitwise the blob of that commit. Every git
+    error is a FAIL (never an empty check). Independent of HEAD: later commits and merges do not change it."""
+    assert expected_commit != code_commit
+    anc = _git("merge-base", "--is-ancestor", expected_commit, code_commit)
+    assert anc.returncode == 0, f"{expected_commit} is not an ancestor of {code_commit} (rc {anc.returncode}: {anc.stderr.strip()})"
+    trees = {}
+    for c in (expected_commit, code_commit):
+        t = _git("ls-tree", "-r", "--full-tree", "--name-only", c)  # paths from the top, whatever the cwd
+        assert t.returncode == 0 and t.stdout.strip(), f"ls-tree {c}: {t.stderr.strip()}"
+        trees[c] = set(t.stdout.split())
+    assert EXPECTED_PATH in trees[expected_commit], "the expectations are not in the expectations commit"
+    assert not [f for f in CODE_FILES if f in trees[expected_commit]], "code present in the expectations commit"
+    assert all(f in trees[code_commit] for f in CODE_FILES[:3]), "the code commit does not hold the code"
+    blob = _git("rev-parse", f"{expected_commit}:{EXPECTED_PATH}")
+    assert blob.returncode == 0, blob.stderr
+    assert blob.stdout.strip() == ct.pl().git_blob_id(EXPECTED), "the expectations file differs from the blob of its commit"
+
+
+def test_expectations_committed_before_the_code():
+    _require_history(EXPECTED_COMMIT, CODE_COMMIT)
+    check_expectations_history(EXPECTED_COMMIT, CODE_COMMIT)
+
+
+@pytest.mark.parametrize("expected_commit, code_commit, message", [
+    (CODE_COMMIT, EXPECTED_COMMIT, "is not an ancestor"),  # the order reversed
+    (CODE_COMMIT, "dfc019d87eddafb82e2683d877713e1ff3a55815", "code present in the expectations commit"),  # code before the code
+    ("16b5f69690610bd435ffeb7f51520ffa4fbd8e76", CODE_COMMIT, "are not in the expectations commit"),  # the commit before
+])
+def test_expectations_history_check_fails_on_a_wrong_history(expected_commit, code_commit, message):
+    """The check is not empty: a wrong history (as if the commits were in another order, held the code, or lacked the file) FAILS."""
+    _require_history(expected_commit, code_commit)
+    with pytest.raises(AssertionError) as exc:
+        check_expectations_history(expected_commit, code_commit)
+    assert message in str(exc.value)
+
+
+def test_expectations_history_check_fails_on_a_changed_file(monkeypatch, tmp_path):
+    _require_history(EXPECTED_COMMIT, CODE_COMMIT)
+    changed = tmp_path / "e.json"
+    changed.write_bytes(EXPECTED.read_bytes() + b" ")
+    monkeypatch.setattr(sys.modules[__name__], "EXPECTED", changed)
+    with pytest.raises(AssertionError, match="differs from the blob"):
+        check_expectations_history(EXPECTED_COMMIT, CODE_COMMIT)
 
 
 def test_controls_match_the_expectations(result):

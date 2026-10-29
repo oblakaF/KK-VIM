@@ -552,3 +552,506 @@ def test_i2_guard_of_the_internal_entry_and_the_command_line(d1_journal, tmp_pat
     assert p.returncode == 2 and "refused" in p.stderr and "D1" in p.stderr
     with pytest.raises(pl.D1Refused):
         pl.run_child({"kind": "journal", "journal": str(d1_journal), "s": 1})
+
+
+# --- integration gate review (N-2...N-5): integrity of the journal, the sequence and the certificate components --------------------
+
+def _rewrite(journal, dst, edit=None, arrays_edit=None, rehash=False):
+    """A copy of the journal with edits of journal.json and of arrays.npz. ``rehash``: the meta and record hashes are rewritten to the
+    edited arrays (a consistent rewrite: hashes alone no longer see it)."""
+    shutil.copytree(journal, dst)
+    j = json.loads((dst / "journal.json").read_text(encoding="utf-8"))
+    if arrays_edit is not None:
+        arr = pl.op8().load_arrays(dst)
+        arrays_edit(arr)
+        np.savez(dst / "arrays.npz", **arr)
+        if rehash:
+            sha = pl.op8().array_sha
+            j["meta"]["arrays_sha256"] = {k: sha(v) for k, v in arr.items()}
+            o = pl.op8()
+            for rec in j["steps"]:
+                s = rec["s"]
+                for name, key in pl.STEP_ARRAYS:
+                    if f"s{s}_{name}" in arr and key in rec:
+                        rec[key] = sha(arr[f"s{s}_{name}"])
+                g, c, V = arr[f"s{s}_solved_set"], arr[f"s{s}_companion_solved"], arr[f"s{s}_V_bc"]
+                rec["field_s_sha"] = sha(o._field(o.direction_of(s), g, V))
+                rec["prev_field_after_QR_sha"] = sha(o._field(o.direction_of(s), g, c))
+    if edit is not None:
+        edit(j)
+    (dst / "journal.json").write_text(json.dumps(j), encoding="utf-8")
+    return dst
+
+
+def _ulp(arr, key):
+    a = arr[key].copy()
+    a.flat[0] = math.nextafter(float(a.flat[0]), math.inf)
+    arr[key] = a
+
+
+def _next_input_rewrite(arr):
+    """The next input of s = 1 changed by 1 ulp and carried into s = 2 as OP-8 would (N = 1: solved set = given set, no QR)."""
+    _ulp(arr, "s1_next_given")
+    arr["s2_given_in"] = arr["s1_next_given"].copy()
+    arr["s2_solved_set"] = arr["s1_next_given"].copy()
+
+
+def _compute(journal, s, **kw):
+    cfg, given, comp, V = _row_arrays(journal, s)
+    return pl.compute_row(cfg, s, given, comp, V, **kw)
+
+
+@pytest.fixture
+def inproc_child(monkeypatch):
+    """The separate process replaced by a fresh in-process computation of the same specification (same serialisation): the
+    reproduction stays a real recomputation; used where the subject is the journal, not the process boundary (speed)."""
+    def child(spec, timeout=1800):
+        pl.guard_config(pl.spec_config(spec))
+        return json.loads(json.dumps(pl._row_job(spec), default=pl._json_default))
+
+    monkeypatch.setattr(pl, "run_child", child)
+
+
+# N-2: canonical C-3+ record, with and without the OP-8 re-run ----------------------------------------------------------------------
+
+def test_n2_the_op8_record_is_canonical(journal):
+    j, _ = pl.load_journal(journal)
+    for rec in j["steps"]:
+        assert set(rec["c3plus_premises"]) == pl.C3PLUS_RECORD_KEYS and rec["c3plus_premises"]["classes"] == pl.C3PLUS_CLASSES
+        assert pl.c3plus_record_defects(rec) == []
+        c, bad = pl.c3plus_status(rec, None)
+        assert bad == [] and c["P-4"] == c["P-4_recorded"] == "ASSUMED" and c["applicability"].startswith("CONDITIONAL_ON_P4")
+
+
+def _classes(j, f):
+    f(j["steps"][1]["c3plus_premises"]["classes"])
+
+
+N2_EDITS = {
+    "P-4 PROVEN": (lambda j: _classes(j, lambda c: c.__setitem__("P-4", "PROVEN")), "P-4 recorded as 'PROVEN'"),
+    "P-1 UNRESOLVED": (lambda j: _classes(j, lambda c: c.__setitem__("P-1", "UNRESOLVED")), "P-1 recorded as 'UNRESOLVED'"),
+    "P-2 missing": (lambda j: _classes(j, lambda c: c.pop("P-2")), "are not P-1...P-5"),
+    "foreign class key": (lambda j: _classes(j, lambda c: c.__setitem__("P-6", "ESTABLISHED")), "are not P-1...P-5"),
+    "foreign record key": (lambda j: j["steps"][1]["c3plus_premises"].__setitem__("P-4_proof", "x"), "foreign keys ['P-4_proof']"),
+    "record key missing": (lambda j: j["steps"][1]["c3plus_premises"].pop("k"), "missing keys ['k']"),
+    "status UNRESOLVED": (lambda j: j["steps"][1].__setitem__("c3plus_premises_status", "UNRESOLVED"), "status 'UNRESOLVED'"),
+    "status ESTABLISHED": (lambda j: j["steps"][1].__setitem__("c3plus_premises_status", "ESTABLISHED"), "status 'ESTABLISHED'"),
+    "summary": (lambda j: j["steps"][1].__setitem__("c3plus_premises_summary", "P-1...P-5 established"), "summary"),
+    "text contradicts class": (lambda j: j["steps"][1]["c3plus_premises"].__setitem__("P-3", "UNRESOLVED: P-3: subnormal"),
+                               "text of P-3"),
+    "decomposition not seen": (lambda j: j["steps"][1]["c3plus_premises"].__setitem__("decomposition_C_eq_fl_CL_plus_E", False),
+                               "decomposition"),
+    "k": (lambda j: j["steps"][1]["c3plus_premises"].__setitem__("k", 3), "k = 3"),
+    "C-3+ check FAIL": (lambda j: j["steps"][1].__setitem__("c3plus_bound_check_exact", "FAIL"), "exact C-3+ check"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(N2_EDITS))
+def test_n2_record_check_alone_without_the_rerun(journal, name):
+    """The record check alone (no OP-8 re-run): every non-canonical record is a П-а defect with its own reason."""
+    j, _ = pl.load_journal(journal)
+    j = json.loads(json.dumps(j))
+    edit, text = N2_EDITS[name]
+    edit(j)
+    c, bad = pl.c3plus_status(j["steps"][1], None)
+    assert any(text in x for x in bad), (name, bad)
+    assert c["P-4"] == "ASSUMED" and c["applicability"].startswith("NOT_ESTABLISHED")  # never raised, never established
+
+
+@pytest.mark.parametrize("name", ["P-4 PROVEN", "P-1 UNRESOLVED", "P-2 missing", "foreign class key", "status UNRESOLVED"])
+@pytest.mark.parametrize("rerun", [True, False])
+def test_n2_corrupted_record_never_passes(journal, tmp_path, name, rerun):
+    edit, text = N2_EDITS[name]
+    d = _rewrite(journal, tmp_path / "j", edit)
+    r = pl.analyse({"kind": "journal", "journal": str(d), "s": 2, "rerun_op8": rerun})
+    assert r["status"] == "UNRESOLVED_CERTIFICATE" and r["classification"]["reason_premises"] == ["P-a"]
+    assert r["premises"]["P-a"]["state"] == "NOT_ESTABLISHED" and text in r["premises"]["P-a"]["reason"]
+    assert (r["op8_rerun"] is not None) is rerun and r["c3plus"]["P-4"] == "ASSUMED"
+    if name == "P-4 PROVEN":
+        assert r["c3plus"]["P-4_recorded"] == "PROVEN"  # the recorded value is kept apart, never adopted
+    # the corrupted record of s = 2 also breaks s = 3 (predecessor), never s = 1
+    r3 = pl.analyse({"kind": "journal", "journal": str(d), "s": 3, "rerun_op8": rerun}, reproduce=False)
+    assert "predecessor s = 2: C-3+ premise record" in r3["premises"]["P-a"]["reason"]
+    r1 = pl.analyse({"kind": "journal", "journal": str(d), "s": 1}, reproduce=False)
+    assert "C-3+" not in r1["premises"]["P-a"]["reason"]
+
+
+@pytest.mark.parametrize("field", ["classes", "k"])
+def test_n2_recorded_and_reproduced_classes_differ(journal, monkeypatch, field):
+    """A canonical record and an OP-8 re-run classifying differently (classes), or differing only in another field of the C-3+
+    record (k): seen only by the comparison with the re-run (the record check alone passes). Without the re-run (rerun_op8 False)
+    there is nothing to compare: П-а NOT_CHECKABLE, never PASS."""
+    real = pl.op8().run_step
+
+    def other(*a, **k):
+        res = real(*a, **k)
+        res.record["c3plus_premises"] = json.loads(json.dumps(res.record["c3plus_premises"]))
+        if field == "classes":
+            res.record["c3plus_premises"]["classes"]["P-3"] = "UNRESOLVED"
+        else:
+            res.record["c3plus_premises"]["k"] += 1
+        return res
+
+    monkeypatch.setattr(pl.op8(), "run_step", other)
+    r = pl.analyse({"kind": "journal", "journal": str(journal), "s": 1}, reproduce=False)
+    reason = r["premises"]["P-a"]["reason"]
+    assert "C-3+ premises of the OP-8 re-run differ from the record" in reason and "C-3+ premise record:" not in reason
+    assert r["status"] == "UNRESOLVED_CERTIFICATE" and r["c3plus"]["applicability"].startswith("NOT_ESTABLISHED")
+    monkeypatch.setattr(pl.op8(), "run_step", real)
+    r = pl.analyse({"kind": "journal", "journal": str(journal), "s": 1, "rerun_op8": False})
+    assert r["premises"]["P-a"]["state"] == "NOT_CHECKABLE" and "rerun_op8 = False" in r["premises"]["P-a"]["reason"]
+    assert r["status"] == "UNRESOLVED_CERTIFICATE" and r["op8_rerun"] is None and r["reproduction"]["bitwise_equal"] is True
+
+
+# N-3: the sequence ---------------------------------------------------------------------------------------------------------------
+
+def _stop_s2(j):
+    j["steps"][1]["status"] = "STOP_ZERO_FIELD: synthetic stop"
+
+
+def _drop_s2(j):
+    del j["steps"][1]
+    j["meta"]["half_steps"] = 2
+
+
+def _swap(j):
+    j["steps"][1], j["steps"][2] = j["steps"][2], j["steps"][1]
+
+
+def _stopped_end_completed(j):
+    del j["steps"][2]
+    j["steps"][1]["status"] = "PROTECTIVE_STOP: synthetic"
+    j["meta"]["half_steps"] = 2  # the meta status still says COMPLETED
+
+
+def _dup(j):
+    j["steps"].insert(2, json.loads(json.dumps(j["steps"][1])))
+    j["meta"]["half_steps"] = 4
+
+
+CERT, UNR = "UNRESOLVED_CERTIFICATE", "UNRESOLVED"
+N3_JOURNALS = {  # edit, arrays edit, rehash, expected statuses of s = 1, 2, 3, text in the reasons of s = 3
+    "stopped s = 2, record s = 3 kept": (_stop_s2, None, False, (CERT, UNR, UNR), "record after the stop"),
+    "s = 2 absent (gap)": (_drop_s2, None, False, (CERT, UNR, UNR), "out of the order"),
+    "order s = 1, 3, 2": (_swap, None, False, (CERT, UNR, UNR), "out of the order"),
+    "duplicate s = 2": (_dup, None, False, (CERT, CERT, UNR), "after the break of the order"),
+    "direction of s = 2": (lambda j: j["steps"][1].__setitem__("direction", "y"), None, False, (CERT,) * 3, "direction"),
+    "meta stop without a stopped record": (lambda j: j["meta"].__setitem__("status", "STOPPED at s = 2: x"), None, False,
+                                           (CERT,) * 3, "meta status"),
+    "meta half_steps": (lambda j: j["meta"].__setitem__("half_steps", 2), None, False, (CERT,) * 3, "meta half_steps"),
+    "meta COMPLETED with a stopped last record": (_stopped_end_completed, None, False, (CERT, UNR, UNR), "absent after the stop"),
+    "record chain s = 2": (lambda j: j["steps"][1].__setitem__("given_in_sha", "0" * 64), None, False, ("PASS", CERT, CERT),
+                           "record chain"),
+    "s = 1 V_bc 1 ulp (hash)": (None, lambda a: _ulp(a, "s1_V_bc"), False, (CERT,) * 3, "predecessor s = 1"),
+    "meta hash of s = 2 V_bc": (lambda j: j["meta"]["arrays_sha256"].__setitem__("s2_V_bc", "0" * 64), None, False,
+                                ("PASS", CERT, CERT), "predecessor s = 2: s2_V_bc: sha256 differs from the meta"),
+    "s = 1 C-3+ record": (lambda j: j["steps"][0]["c3plus_premises"]["classes"].__setitem__("P-4", "PROVEN"), None, False,
+                          (CERT,) * 3, "predecessor s = 1: C-3+ premise record"),
+    "s = 1 field hash of the record": (lambda j: j["steps"][0].__setitem__("field_s_sha", "0" * 64), None, False, (CERT,) * 3,
+                                       "predecessor s = 1: field_s_sha"),
+    "s = 1 next input consistently rewritten": (None, _next_input_rewrite, True, (CERT,) * 3,
+                                                "predecessor s = 1: next_given is not bitwise the OP-8 re-run"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(N3_JOURNALS))
+def test_n3_a_row_is_never_pass_on_a_broken_sequence(journal, tmp_path, inproc_child, name):
+    edit, aedit, rehash, want, text = N3_JOURNALS[name]
+    d = _rewrite(journal, tmp_path / "j", edit, aedit, rehash)
+    rows = pl.analyse_journal(d)
+    assert tuple(r["status"] for r in rows) == want, name
+    r3 = rows[2]
+    reasons = r3["premises"]["P-a"]["reason"] if r3["status"] == CERT else r3["classification"]["reasons"][0]
+    assert text in reasons, (name, reasons)
+    for r in rows:  # not executed -> UNRESOLVED, never computed; a binding fault -> П-а; never FAIL_COMPUTATION
+        assert r["status"] != "FAIL_COMPUTATION"
+        if r["status"] == UNR:
+            assert r.get("row") is None and r["classification"]["reason_premises"] == [] and r["not_executed_reason"]
+        if r["status"] == CERT:
+            assert r["classification"]["reason_premises"] == ["P-a"] and r["premises"]["P-a"]["state"] == "NOT_ESTABLISHED"
+
+
+def test_n3_predecessor_hash_binding_alone(journal, tmp_path):
+    """Without the OP-8 re-run the hash binding of the predecessor is the only channel for its corrupted array."""
+    d = _rewrite(journal, tmp_path / "j", None, lambda a: _ulp(a, "s1_V_bc"))
+    r = pl.analyse({"kind": "journal", "journal": str(d), "s": 2, "rerun_op8": False})
+    assert r["premises"]["P-a"]["state"] == "NOT_ESTABLISHED" and r["status"] == CERT
+    assert "predecessor s = 1: s1_V_bc: sha256 differs from the meta" in r["premises"]["P-a"]["reason"]
+
+
+def test_n3_standalone_row_after_a_stop_is_not_computed(journal, tmp_path, monkeypatch):
+    d = _rewrite(journal, tmp_path / "j", _stop_s2)
+
+    def no(*a, **k):
+        raise AssertionError("a row after the stop must not be computed")
+
+    monkeypatch.setattr(pl, "compute_row", no)
+    monkeypatch.setattr(pl, "run_child", no)
+    r = pl.analyse({"kind": "journal", "journal": str(d), "s": 3})
+    assert r["status"] == UNR and "record after the stop of the trajectory at s = 2" in r["classification"]["reasons"][0]
+    assert "STOP_ZERO_FIELD: synthetic stop" in r["not_executed_reason"]
+    r = pl.analyse({"kind": "journal", "journal": str(d), "s": 2})
+    assert r["status"] == UNR and r["not_executed_reason"] == "OP-8 half-step s = 2: STOP_ZERO_FIELD: synthetic stop"
+
+
+def test_n3_genuine_op8_stop_keeps_the_reason(tmp_path):
+    """A real stop of OP-8 (q = 0: the computed factor is exactly 0 at s = 1, STOP_ZERO_FIELD): a consistent journal; the stopped row
+    and the absent rows after it are not executed (UNRESOLVED), with the stop reason; nothing is attributed to a premise."""
+    cfg = pl.op8().TrajectoryConfig(1.0, 8, 1.25, 10, 1, 1.0, 0.0, 3)
+    jd = pl.run_trajectory_journal(cfg, tmp_path / "q0")
+    j, _ = pl.load_journal(jd)
+    st = pl.journal_structure(j)
+    assert st["reasons"] == [] and st["executed"] == [] and st["stop"]["s"] == 1
+    rows = pl.analyse_journal(jd)
+    assert [r["status"] for r in rows] == [UNR] * 3
+    assert rows[0]["not_executed_reason"].startswith("OP-8 half-step s = 1: STOP_ZERO_FIELD")
+    assert all("absent after the stop of the trajectory at s = 1 (STOP_ZERO_FIELD" in r["not_executed_reason"] for r in rows[1:])
+    assert rows[0]["c3plus"]["P-4"] == "ASSUMED" and rows[1]["c3plus"] is None  # P-4 as recorded by OP-8 at s = 1
+    back = json.loads(json.dumps(rows, default=pl._json_default))
+    assert back[0]["not_executed_reason"] == rows[0]["not_executed_reason"] and back[0]["record_status"].startswith("STOP_ZERO")
+
+
+def test_n3_correct_journals_keep_their_results(journal, rows):
+    """The new checks leave a correct journal as it was: the structure has no remark, the rows PASS with П-а established."""
+    j, arrays = pl.load_journal(journal)
+    assert pl.journal_structure(j) == {"executed": [1, 2, 3], "not_executed": {}, "stop": None, "reasons": []}
+    for s in (1, 2, 3):
+        assert pl.sequence_binding(j, arrays, s) == []
+    assert [r["status"] for r in rows] == ["PASS"] * 3
+    assert all(r["premises"]["P-a"]["state"] == "ESTABLISHED" and r["op8_rerun"]["reproduced"] for r in rows)
+    assert all(all(r["op8_rerun"]["arrays_equal"].values()) for r in rows)
+    assert all(r["row"]["gamma_contract"] == {"holds": True, "violations": []} for r in rows)
+    assert all(r["row"]["diagnostics"]["gamma_interval_tightness"]["tight"] is True for r in rows)
+
+
+def test_n3_consistent_rewrite_seen_by_the_rerun_or_by_external_hashes(journal, tmp_path, inproc_child):
+    """A rewrite of the next input of s = 1 consistent in arrays, meta and records: the hashes do not see it; the OP-8 re-run of the
+    predecessor does; without the re-run П-а is NOT_CHECKABLE (never PASS); a hash fixed outside the journal sees it too."""
+    clean2 = pl.analyse({"kind": "journal", "journal": str(journal), "s": 2}, reproduce=False)["row"]
+    d = _rewrite(journal, tmp_path / "j", None, _next_input_rewrite, rehash=True)
+    j, arrays = pl.load_journal(d)
+    assert all(v["ok"] for v in pl.bind_journal(j, arrays).values()) and pl.journal_structure(j)["reasons"] == []
+    r = pl.analyse({"kind": "journal", "journal": str(d), "s": 2})
+    assert "predecessor s = 1: next_given is not bitwise the OP-8 re-run" in r["premises"]["P-a"]["reason"]
+    r = pl.analyse({"kind": "journal", "journal": str(d), "s": 2, "rerun_op8": False})
+    assert r["premises"]["P-a"]["state"] == "NOT_CHECKABLE" and r["status"] == CERT
+    r = pl.analyse({"kind": "journal", "journal": str(d), "s": 2}, bound_values={"field_prev_sha": clean2["field_prev_sha"]})
+    assert "bound value field_prev_sha" in r["premises"]["P-a"]["reason"]
+
+
+# N-4: the annotation of a row that is not executed -----------------------------------------------------------------------------------
+
+NO_RECORD = "NOT_RECORDED (no C-3+ premise record in the record of the half-step)"
+
+
+@pytest.mark.parametrize("rec, p4", [
+    ({"status": "STOP_BEFORE_QR: S-1"}, NO_RECORD),
+    ({"status": "UNRESOLVED_C3PLUS_PREMISE: P-3", "c3plus_premises": {"P-1": "x"}}, NO_RECORD),
+    ({"status": "UNRESOLVED_C3PLUS_PREMISE: P-3", "c3plus_premises": {"classes": {"P-1": "ESTABLISHED", "P-3": "UNRESOLVED"}}},
+     "NOT_RECORDED (C-3+ premise record without P-4)"),
+    ({"status": "UNRESOLVED_C3PLUS_PREMISE: P-3", "c3plus_premises": {"classes": {"P-3": "UNRESOLVED", "P-4": "PROVEN"}}},
+     "INVALID_RECORD (P-4 recorded as 'PROVEN'; OP-8 records ASSUMED only)"),
+    ({"status": "UNRESOLVED_C3PLUS_PREMISE: P-3", "c3plus_premises_status": "UNRESOLVED",
+      "c3plus_premises": {"classes": {"P-3": "UNRESOLVED", "P-4": "ASSUMED"}}}, "ASSUMED"),
+])
+def test_n4_not_executed_row_states_only_what_its_record_says(rec, p4):
+    r = pl.not_executed(rec, 2)
+    assert r["status"] == UNR and r["c3plus"]["P-4"] == p4
+    assert r["c3plus"]["c3plus_premises_status"] == rec.get("c3plus_premises_status", "NOT_RECORDED")
+    assert r["not_executed_reason"] == f"OP-8 half-step s = 2: {rec['status']}" and r["record_status"] == rec["status"]
+    assert r["classification"]["reasons"][0].startswith(r["not_executed_reason"])
+    back = json.loads(json.dumps(r, default=pl._json_default))
+    assert back["c3plus"] == r["c3plus"] and back["not_executed_reason"] == r["not_executed_reason"]
+    assert pl.not_executed(None, 4)["c3plus"] is None
+
+
+# N-5: gamma, Gamma_up and their interval (accepted contract vs proposed narrowness) -----------------------------------------------
+
+def test_n5_gamma_contract_and_narrowness_units():
+    g = Fraction(1, 3)
+    gd, gu = pl.gi().directed(g)
+    G = max(abs(gd), abs(gu))
+    assert pl.gamma_contract(g, gd, gu, G) == [] and pl.gamma_interval_tight(g, gd, gu)
+    assert any("gamma_down" in x for x in pl.gamma_contract(g, gu, gu, G))  # gamma_down alone corrupted: above gamma
+    assert any("gamma_up =" in x for x in pl.gamma_contract(g, gd, gd, G))  # gamma_up alone corrupted: below gamma
+    assert any("Gamma_up" in x for x in pl.gamma_contract(g, gd, gu, min(abs(gd), abs(gu))))
+    assert any("Gamma_up" in x for x in pl.gamma_contract(g, gd, gu, 0.5))  # Gamma_up of another half-step
+    assert pl.gamma_contract(g, 0.0, 1.0, 1.0) == [] and not pl.gamma_interval_tight(g, 0.0, 1.0)  # widened: contract holds
+    assert pl.gamma_contract(-g, -1.0, 0.0, 1.0) == [] and pl.gamma_contract(Fraction(0), -0.0, 0.0, 0.0) == []
+    assert pl.gamma_interval_tight(Fraction(1, 4), 0.25, 0.25) and not pl.gamma_interval_tight(Fraction(1, 4), 0.25, 0.5)
+    assert pl.gamma_contract(g, math.nan, gu, G) and pl.gamma_contract(g, gd, gu, Fraction(1))
+    assert pl.gamma_contract(g, -math.inf, math.inf, math.inf) == []  # not finite: the classifier's fault of Gamma_up, not this
+
+
+def _corrupt_interval(monkeypatch, how, call=0):
+    """``directed`` corrupted on one call of compute_row only: call 0 is the interval of gamma, call 1 the rounding of B_E."""
+    real, calls = pl.gi().directed, []
+
+    def directed(x):
+        calls.append(x)
+        return how(*real(x)) if len(calls) - 1 == call else real(x)
+
+    monkeypatch.setattr(pl.gi(), "directed", directed)
+
+
+@pytest.mark.parametrize("name, how", [
+    ("gamma_down alone above gamma", lambda gd, gu: (gu, gu) if gd != gu else (math.nextafter(gu, math.inf), gu)),
+    ("gamma_up alone below gamma", lambda gd, gu: (gd, gd) if gd != gu else (gd, math.nextafter(gd, -math.inf))),
+    ("interval not containing gamma", lambda gd, gu: (2 * abs(gu) + 1, 4 * abs(gu) + 2)),
+])
+def test_n5_corrupted_interval_withholds_gamma_up(journal, monkeypatch, name, how):
+    clean = _compute(journal, 2)
+    assert clean["gamma_contract"]["holds"]
+    _corrupt_interval(monkeypatch, how)
+    row = _compute(journal, 2)
+    assert row["gamma_contract"]["holds"] is False and row["Gamma_up"] is None and row["components"]["Gamma_up"] is None
+    assert row["Gamma_up_withheld"] is not None and [f["stage"] for f in row["faults"]] == ["gamma_contract"]
+    # the second path (gamma_B = gamma) sees gamma_B outside the corrupted interval: the inclusion of its diagnostic is not redundant
+    assert [c["source"] for c in row["contradictions"]] == ["second_path_gamma"]
+    r = pl.assemble(row["components"], OK, faults=row["faults"])
+    assert r["status"] == CERT and r["tau_exact"] is None and r["reason_premises"] == []
+    assert r["source_undetermined"] and any("FAULT at stage gamma_contract" in x for x in r["reasons"])
+    # every other value of the row is the clean one: only the certificate component is withheld
+    assert all(row[k] == clean[k] for k in ("P_hat_p", "P_hat_s", "Q_hat", "B_E_up", "gamma_exact"))
+
+
+def test_n5_b_e_up_rounded_down_is_withheld(journal, monkeypatch):
+    """The other certificate component: B_E_up below the exact B_E (rounding down) is not an upper bound; withheld as a fault of B_E_up,
+    no premise attributed. The portable invariant of Z-5 checks the same on clean rows; this is the detector on the row."""
+    clean = _compute(journal, 2)
+    _corrupt_interval(monkeypatch, lambda d, u: (d, d), call=1)
+    row = _compute(journal, 2)
+    assert Fraction(float.fromhex(row["B_E_up_withheld"])) < Fraction(clean["B_E_exact"]) and row["B_E_up"] is None
+    assert [f["stage"] for f in row["faults"]] == ["B_E_up"] and row["gamma_contract"]["holds"]
+    r = pl.assemble(row["components"], OK, faults=row["faults"])
+    assert r["status"] == CERT and r["tau_exact"] is None and r["reason_premises"] == []
+
+
+def test_n5_gamma_up_of_another_half_step(journal, monkeypatch):
+    other = float.fromhex(_compute(journal, 1)["Gamma_up"])
+    monkeypatch.setattr(pl.gi(), "gamma_up", lambda d, u: other)
+    row = _compute(journal, 2)
+    assert row["Gamma_up"] is None and "is not max(|gamma_down|, |gamma_up|)" in row["faults"][0]["error"]
+    assert pl.assemble(row["components"], OK, faults=row["faults"])["status"] == CERT
+
+
+def test_n5_gamma_down_of_another_half_step(journal, monkeypatch):
+    """gamma_down of s = 1 with the gamma of s = 2: excluded from the contract when it lies above gamma_2; an interval that still
+    encloses gamma_2 is a widening (contract holds; narrowness, not normative, records it)."""
+    gd1 = float.fromhex(_compute(journal, 1)["gamma_down"])
+    g2 = Fraction(_compute(journal, 2)["gamma_exact"])
+    for down in (gd1, -abs(gd1) - 1.0, abs(float(g2)) + abs(gd1) + 1.0):
+        with monkeypatch.context() as m:
+            _corrupt_interval(m, lambda d, u, down=down: (down, u))
+            row = _compute(journal, 2)
+        if Fraction(down) > g2:
+            assert row["gamma_contract"]["holds"] is False and row["Gamma_up"] is None
+            assert pl.assemble(row["components"], OK, faults=row["faults"])["status"] == CERT
+        else:
+            assert row["gamma_contract"]["holds"] and row["diagnostics"]["gamma_interval_tightness"]["tight"] is False
+
+
+def test_n5_widened_interval_is_a_diagnostic_limitation_not_a_fail(journal, monkeypatch):
+    """The accepted contract (enclosure, max) holds for a widened interval: by the protocol it is no ground for FAIL or UNRESOLVED;
+    the narrowness RD/RU (a proposal pending OD-4) only records it."""
+    clean = _compute(journal, 2)
+    tight = clean["diagnostics"]["gamma_interval_tightness"]
+    assert tight["tight"] is True and tight["normative"] is False
+    _corrupt_interval(monkeypatch, lambda gd, gu: (gd - abs(gd), gu + abs(gu)))
+    row = _compute(journal, 2)
+    assert row["gamma_contract"]["holds"] and row["faults"] == [] and row["contradictions"] == []
+    assert row["diagnostics"]["gamma_interval_tightness"]["tight"] is False
+    assert Fraction(float.fromhex(row["Gamma_up"])) == 2 * Fraction(float.fromhex(clean["Gamma_up"]))
+    r = pl.assemble(row["components"], OK, faults=row["faults"])
+    assert r["status"] == "PASS" and Fraction(r["tau_exact"]) > Fraction(pl.assemble(clean["components"], OK)["tau_exact"])
+
+
+def test_n5_contradictory_gamma_hashes_break_p_a(journal, monkeypatch):
+    """A correct gamma with a contradictory hash: seen by the reproduction, by the self-consistency of the row and by a hash fixed
+    outside (bound value)."""
+    real = pl.run_child
+
+    def tampered(spec, timeout=1800):
+        job = real(spec, timeout)
+        job["row"]["gamma_exact_sha256"] = "0" * 64
+        return job
+
+    monkeypatch.setattr(pl, "run_child", tampered)
+    r = pl.analyse({"kind": "journal", "journal": str(journal), "s": 2})
+    assert "separate process: values differ: gamma_exact_sha256" in r["premises"]["P-a"]["reason"]
+    assert pl.row_self_consistency(r["row"]) == []
+    row = dict(r["row"], gamma_exact_sha256="0" * 64)
+    assert pl.row_self_consistency(row) == ["row not self-consistent: gamma_exact_sha256 is not the sha256 of gamma_exact"]
+    row = dict(r["row"], components={**r["row"]["components"], "Gamma_up": 1.0})
+    assert pl.row_self_consistency(row) == ["row not self-consistent: component Gamma_up is not the recorded Gamma_up"]
+    monkeypatch.setattr(pl, "run_child", real)
+    r = pl.analyse({"kind": "journal", "journal": str(journal), "s": 2}, bound_values={"gamma_exact_sha256": "f" * 64})
+    assert r["premises"]["P-a"]["state"] == "NOT_ESTABLISHED" and "bound value gamma_exact_sha256" in r["premises"]["P-a"]["reason"]
+
+
+def test_n5_self_consistency_alone_when_both_processes_agree(journal, monkeypatch):
+    """Both the primary and the separate process return the same contradictory row: the reproduction is equal, only the
+    self-consistency check sees it."""
+    def both(spec, timeout=1800):
+        job = json.loads(json.dumps(pl._row_job({k: v for k, v in spec.items() if k != "mode"}), default=pl._json_default))
+        job["row"]["gamma_exact_sha256"] = "0" * 64
+        return job
+
+    monkeypatch.setattr(pl, "run_child", both)
+    r = pl.analyse({"kind": "journal", "journal": str(journal), "s": 2, "mode": "round_up"})  # the primary through run_child too
+    assert r["reproduction"]["bitwise_equal"] is True
+    assert "row not self-consistent: gamma_exact_sha256" in r["premises"]["P-a"]["reason"] and r["status"] == CERT
+
+
+def test_n5_second_path_unavailable_is_a_diagnostic_limitation(journal, monkeypatch):
+    """Without the second path of gamma (cost limit or failure) the protocol status is unchanged (the second path is a channel of
+    OD-4 on a subsample of OD-11, not a premise); the limitation is recorded, never hidden."""
+    monkeypatch.setattr(pl, "SECOND_PATH_MAX_NODES", 0)
+    row = _compute(journal, 2)
+    sp = row["diagnostics"]["second_path_gamma"]
+    assert sp["performed"] is False and sp["consistent"] is None and sp["reason"].startswith("NOT_PERFORMED")
+    assert pl.assemble(row["components"], OK, faults=row["faults"])["status"] == "PASS"
+    # a wrong gamma with its own consistent interval is then seen by nothing: the accepted contract holds for it
+    row = _compute(journal, 2, mutation="gamma_sign_flip")
+    assert row["gamma_contract"]["holds"] and row["diagnostics"]["gamma_interval_tightness"]["tight"] and row["contradictions"] == []
+    assert pl.assemble(row["components"], OK, faults=row["faults"])["status"] == "PASS"
+
+
+# --- integrated: positive and negative end-to-end journals (task 6) -------------------------------------------------------------------
+
+ARRAY_NAMES = [name for name, _ in pl.STEP_ARRAYS]
+
+
+@pytest.mark.parametrize("rehash", [False, True])
+@pytest.mark.parametrize("k", [1, 2, 3])
+@pytest.mark.parametrize("name", ARRAY_NAMES)
+def test_integrated_every_array_corrupted_never_passes_from_its_step_on(journal, tmp_path, inproc_child, name, k, rehash):
+    """One array of half-step k changed by 1 ulp (a zero entry becomes the smallest subnormal), with the hashes left (seen by the hash
+    binding) or rewritten consistently (seen by the OP-8 re-run, the start, the chain): rows before k keep PASS, rows from k on are
+    never PASS (UNRESOLVED_CERTIFICATE through П-а only)."""
+    d = _rewrite(journal, tmp_path / "j", None, lambda a: _ulp(a, f"s{k}_{name}"), rehash)
+    rows = pl.analyse_journal(d)
+    got = [r["status"] for r in rows]
+    assert got == ["PASS"] * (k - 1) + ["UNRESOLVED_CERTIFICATE"] * (4 - k), (name, k, rehash, got)
+    assert all(r["premises"]["P-a"]["state"] == "NOT_ESTABLISHED" for r in rows[k - 1:])
+
+
+def test_integrated_second_configuration_end_to_end(tmp_path):
+    """T2 of the frozen expectations (12 x 9 on 1 x 0.75, N = 1, s = 1, 2): structure, sequence, canonical C-3+, gamma contract,
+    exact dP and tau', E1/E2 and the strict resolvability, П-а with the separate process; no contradiction, no fault."""
+    cfg = pl.op8().TrajectoryConfig(1.0, 12, 0.75, 9, 1, 1.0, 1.0, 2)
+    jd = pl.run_trajectory_journal(cfg, tmp_path / "t2")
+    j, arrays = pl.load_journal(jd)
+    assert pl.journal_structure(j)["reasons"] == [] and all(pl.c3plus_record_defects(r) == [] for r in j["steps"])
+    rows = pl.analyse_journal(jd)
+    assert [r["status"] for r in rows] == ["PASS", "PASS"]
+    for r in rows:
+        x, c = r["row"], r["classification"]
+        assert set(v["state"] for v in r["premises"].values()) == {"ESTABLISHED"} and r["reproduction"]["bitwise_equal"]
+        dP = Fraction(float.fromhex(x["P_hat_p"])) - Fraction(float.fromhex(x["P_hat_s"]))
+        tau = Fraction(float.fromhex(x["Gamma_up"])) + Fraction(float.fromhex(x["B_E_up"]))
+        Q = Fraction(float.fromhex(x["Q_hat"]))
+        assert Fraction(c["dP_exact"]) == dP and Fraction(c["tau_exact"]) == tau  # exact, from the recorded components
+        assert dP >= -tau and abs(dP - Q) <= tau and Q > tau and c["e1"] and c["e2"]
+        assert x["gamma_contract"]["holds"] and pl.row_self_consistency(x) == [] and r["contradictions"] == r["faults"] == []
+        assert Fraction(float.fromhex(x["B_E_up"])) >= Fraction(x["B_E_exact"])

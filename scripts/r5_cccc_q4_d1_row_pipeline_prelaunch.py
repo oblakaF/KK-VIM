@@ -41,13 +41,22 @@ identity on the exact products: gamma_B = Q~ - (Pi(w~_p) - Pi(w~_s)), path B of 
 the bounds of r5_cccc_energy (QA-EB 8). Each contradiction carries its source (second_path_gamma, theorem_E2, PropD, crosscheck_EN).
 Faults (an exception of a stage with no premise of protocol 4.1: gamma of path B1, the second path, the cross-check) are recorded with
 stage and source and listed among the reasons; no premise is attributed to them; a fault of path B1 leaves Gamma_up and tau' unbuilt.
+The accepted contract of Gamma_up (D-054.1 item 1: gamma_s in [gamma_down, gamma_up] exactly, Gamma_up = max(|gamma_down|,
+|gamma_up|) bitwise) is checked on the row; a violation is a fault of Gamma_up of the same kind (stage gamma_contract): Gamma_up is
+withheld, tau' not built. Likewise B_E_up must be >= the exact B_E (stage B_E_up). The narrowness RD/RU of the interval is a proposal, not D-054.1: diagnostic only, it changes no status.
 
 C-3+ (D-055.1): the premise record of the OP-8 half-step is carried with the row (``c3plus``); P-4 stays ASSUMED, the row status is
-computational consistency only, never applicability of the C-3+ theorem, accuracy of B-C or a proof of the model (``scope``).
+computational consistency only, never applicability of the C-3+ theorem, accuracy of B-C or a proof of the model (``scope``). The
+record of an executed half-step must be the canonical OP-8 one (``c3plus_record_defects``), with or without the OP-8 re-run;
+otherwise П-а is not established. Without the re-run (``rerun_op8`` False, API only) П-а is NOT_CHECKABLE.
 
-A half-step not executed by OP-8 (STOP_*, PROTECTIVE_STOP, UNRESOLVED_C3PLUS_PREMISE, FAIL_C3PLUS_BOUND_CHECK, FAIL_TOOL) or absent
-after a stop: the row is NOT executed -> UNRESOLVED with the reason (protocol 4.2), never FAIL_COMPUTATION. How C-3+ premises enter
-the row status is owner decision OD-8.
+Sequence (``journal_structure``, ``sequence_binding``): only the half-steps 1..k recorded in order and OK before the first stop are
+executed rows. A half-step not executed by OP-8 (STOP_*, PROTECTIVE_STOP, UNRESOLVED_C3PLUS_PREMISE, FAIL_C3PLUS_BOUND_CHECK,
+FAIL_TOOL), absent, recorded after a stop or out of order: the row is NOT executed -> UNRESOLVED with the reason (protocol 4.2), never
+computed, never FAIL_COMPUTATION; its C-3+ annotation is what its record states (P-4 never assumed). An executed row s is bound to its
+sequence as a part of П-а: structure of the journal, record chain, and every predecessor k < s executed, bound, canonical and (with
+the re-run) reproduced bitwise by OP-8; otherwise UNRESOLVED_CERTIFICATE. How C-3+ premises enter the row status is owner decision
+OD-8.
 
 Controls (scripts/r5_cccc_q4_d1_controls_prelaunch.py) use ``compute_row`` with a named injection or mutation (INJECTIONS,
 MUTATIONS); such rows are marked and never enter a campaign.
@@ -321,14 +330,55 @@ def assemble(components: dict, premises: dict, recorded: dict | None = None, fau
 # not built (tau' not built -> UNRESOLVED_CERTIFICATE, source UNDETERMINED); "diagnostic": no protocol value depends on it.
 FAULT_STAGES = {
     "gamma_B1": ("Gamma_up (gamma_s of path B1, QA-gamma3 gamma_b1)", "certificate: Gamma_up not built"),
+    "gamma_contract": ("Gamma_up (D-054.1 item 1: gamma_s in [gamma_down, gamma_up], Gamma_up = max(|gamma_down|, |gamma_up|))",
+                       "certificate: Gamma_up not built"),
+    "B_E_up": ("B_E_up (the upward binary64 of the exact B_E of theorem E-2; protocol 4.1: a strict upper bound)",
+               "certificate: B_E_up not built"),
     "gamma_second_path": ("second path of gamma (VOK-2 identity, path B of the gamma audit)", "diagnostic only"),
     "crosscheck_EN": ("own B_E ingredients against r5_cccc_energy (QA-EB 8)", "diagnostic only"),
 }
 
 
-def _fault(stage: str, exc: BaseException) -> dict:
+def _fault(stage: str, exc: BaseException | str) -> dict:
     source, effect = FAULT_STAGES[stage]
-    return {"stage": stage, "source": source, "effect": effect, "premise": None, "error": f"{type(exc).__name__}: {exc}"}
+    error = exc if isinstance(exc, str) else f"{type(exc).__name__}: {exc}"
+    return {"stage": stage, "source": source, "effect": effect, "premise": None, "error": error}
+
+
+def _le(lo: float, x: Fraction) -> bool:
+    """lo <= x exactly for a binary64 lo (-inf included; nan never)."""
+    return lo == -math.inf or (math.isfinite(lo) and Fraction(lo) <= x)
+
+
+def _ge(hi: float, x: Fraction) -> bool:
+    return hi == math.inf or (math.isfinite(hi) and Fraction(hi) >= x)
+
+
+def gamma_contract(gamma: Fraction, gd: float, gu: float, G: float) -> list[str]:
+    """The accepted contract of Gamma_up (D-054.1 item 1; GP 5.3 item 1): the interval encloses the exact gamma_s exactly and Gamma_up
+    is max(|gamma_down|, |gamma_up|) bitwise. Violations, empty when it holds. Narrowness of the interval is NOT part of it
+    (``gamma_interval_tight``)."""
+    bad = []
+    if not (isinstance(gd, float) and isinstance(gu, float) and isinstance(G, float)):
+        return [f"interval or Gamma_up not binary64 ({type(gd).__name__}, {type(gu).__name__}, {type(G).__name__})"]
+    if not _le(gd, gamma):
+        bad.append(f"gamma_down = {gd.hex()} is not <= the exact gamma_s")
+    if not _ge(gu, gamma):
+        bad.append(f"gamma_up = {gu.hex()} is not >= the exact gamma_s")
+    if G.hex() != max(abs(gd), abs(gu)).hex():
+        bad.append(f"Gamma_up = {G.hex()} is not max(|gamma_down|, |gamma_up|) = {max(abs(gd), abs(gu)).hex()}")
+    return bad
+
+
+def gamma_interval_tight(gamma: Fraction, gd: float, gu: float) -> bool:
+    """Diagnostic only: [gamma_down, gamma_up] is the tightest binary64 enclosure (RD, RU) of the exact gamma_s. Computed here without
+    the function under test (a representable gamma: gd = gu = gamma; otherwise gd < gamma < gu adjacent). The narrowness RD/RU is a
+    proposal (review F-3), NOT a criterion of D-054.1 / the protocol: a wide interval changes no status (OD-4)."""
+    if not (math.isfinite(gd) and math.isfinite(gu)):
+        return False
+    if Fraction(gd) == gamma == Fraction(gu):
+        return True
+    return Fraction(gd) < gamma < Fraction(gu) and math.nextafter(gd, math.inf) == gu
 
 
 def fault_text(f: dict) -> str:
@@ -411,6 +461,12 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
     if gamma is not None:
         gd, gu = gi().directed(gamma)
         G_up = gi().gamma_up(gd, gu)
+        broken = gamma_contract(gamma, gd, gu, G_up)
+        out["gamma_contract"] = {"holds": not broken, "violations": broken}
+        if broken:  # Gamma_up is not a certified bound of |gamma_s|: withheld, recorded as a fault of Gamma_up (no premise, 4.1)
+            out["Gamma_up_withheld"] = fhex(G_up)
+            faults.append(_fault("gamma_contract", "; ".join(broken)))
+            G_up = None
     out.update({"gamma_exact": ftext(gamma), "gamma_exact_sha256": fsha(gamma), "gamma_down": fhex(gd), "gamma_up": fhex(gu),
                 "Gamma_up": fhex(G_up)})
     # --- 5. premises: П-б U-1
@@ -501,6 +557,10 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
         BE_up = gi().directed(BE)[1]
         if not math.isfinite(BE_up):
             reasons["P-f"].append("B_E_up not finite in binary64")
+        elif Fraction(BE_up) < BE:  # not an upper bound of the exact B_E: withheld, a fault of B_E_up (no premise, as Gamma_up)
+            out["B_E_up_withheld"] = fhex(BE_up)
+            faults.append(_fault("B_E_up", f"B_E_up = {BE_up.hex()} is below the exact B_E"))
+            BE_up = None
     out.update({"B_E_exact": ftext(BE), "B_E_exact_sha256": fsha(BE), "B_E_up": fhex(BE_up)})
     # --- mode probe after the row, same thread
     pa = Q_.probe_mode()
@@ -529,6 +589,11 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
     else:
         diag["second_path_gamma"] = {"performed": False, "consistent": None,
                                      "reason": f"NOT_PERFORMED ((n_x - 1)(n_y - 1) > {SECOND_PATH_MAX_NODES}) or no gamma"}
+    if gamma is not None:
+        diag["gamma_interval_tightness"] = {
+            "tight": gamma_interval_tight(gamma, gd, gu), "normative": False,
+            "note": "RD/RU narrowness is a proposal (F-3), not D-054.1: a wide enclosing interval changes no status (OD-4); "
+                    "a wider Gamma_up only enlarges tau'"}
     if be is not None:
         diag["PropD_two_routes_ws"] = bool(be["PropD"])
         if not be["PropD"]:
@@ -567,7 +632,30 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
 
 
 REPRO_KEYS = ("field_prev_sha", "field_s_sha", "d_hat_sha", "P_hat_p", "P_hat_s", "Q_hat", "gamma_exact", "gamma_exact_sha256",
-              "gamma_down", "gamma_up", "Gamma_up", "B_E_exact", "B_E_exact_sha256", "B_E_up", "U3_grid_bits", "N7_applicable")
+              "gamma_down", "gamma_up", "Gamma_up", "Gamma_up_withheld", "gamma_contract", "B_E_up_withheld", "B_E_exact", "B_E_exact_sha256", "B_E_up",
+              "U3_grid_bits", "N7_applicable")
+SELF_CONSISTENT = (("gamma_exact", "gamma_exact_sha256"), ("B_E_exact", "B_E_exact_sha256"))
+COMPONENT_FIELDS = {"P_p": "P_hat_p", "P_s": "P_hat_s", "Q": "Q_hat", "Gamma_up": "Gamma_up", "B_E": "B_E_up"}
+
+
+def row_self_consistency(row: dict) -> list[str]:
+    """Internal consistency of a row as received (in-process or from a child): each exact value and its sha256, each component and
+    the hex field recorded for it. A contradiction is a binding fault of П-а (the row is not one computation), whatever the values."""
+    bad = []
+    for v, h in SELF_CONSISTENT:
+        try:
+            ok = (row.get(v) is None and row.get(h) is None) or (row.get(v) is not None and fsha(Fraction(row[v])) == row.get(h))
+        except (TypeError, ValueError, ZeroDivisionError):
+            ok = False
+        if not ok:
+            bad.append(f"row not self-consistent: {h} is not the sha256 of {v}")
+    comps = row.get("components") or {}
+    for k, f in COMPONENT_FIELDS.items():
+        c = comps.get(k)
+        c = float.fromhex(c) if isinstance(c, str) else c
+        if (None if c is None else fhex(c)) != row.get(f):
+            bad.append(f"row not self-consistent: component {k} is not the recorded {f}")
+    return bad
 
 
 def reproduced_values(row: dict) -> dict:
@@ -648,6 +736,201 @@ def bind_journal(j: dict, arrays: dict) -> dict:
     return out
 
 
+# --- C-3+ premise record of an executed half-step (D-055.1; review N-2) --------------------------------------------------------------
+
+C3PLUS_CLASSES = {"P-1": "ESTABLISHED", "P-2": "ESTABLISHED", "P-3": "ESTABLISHED", "P-4": "ASSUMED", "P-5": "ESTABLISHED"}
+C3PLUS_RECORD_KEYS = frozenset({"P-1", "P-2", "P-3", "P-4", "P-5", "classes", "k", "decomposition_C_eq_fl_CL_plus_E"})
+RERUN_ARRAYS = ("solved_set", "companion_solved", "C3plus", "V_bc", "next_given", "next_companion")
+
+
+def c3plus_record_defects(rec: dict) -> list[str]:
+    """Defects of the C-3+ premise record of a half-step the journal marks as executed (status OK), against the only record OP-8
+    writes before a solve (``run_step``): status PREMISES_OK with its summary, classes exactly {P-1, P-2, P-3, P-5: ESTABLISHED,
+    P-4: ASSUMED}, the texts of P-1...P-5 in agreement with the classes, exactly the keys of OP-8, the decomposition of C seen,
+    k = n_f - 1 + K_EXTRA and the exact C-3+ check PASS. Empty for the canonical record. P-4 is never read as more than ASSUMED."""
+    o = op8()
+    bad = []
+    st = rec.get("c3plus_premises_status")
+    if st != o.PREMISES_OK:
+        bad.append(f"status {st!r} on an executed half-step (OP-8 solves only with {o.PREMISES_OK})")
+    if rec.get("c3plus_premises_summary") != o.PREMISES_OK_SUMMARY:
+        bad.append(f"summary {rec.get('c3plus_premises_summary')!r} is not the one of {o.PREMISES_OK}")
+    prem = rec.get("c3plus_premises")
+    if not isinstance(prem, dict):
+        return bad + ["no C-3+ premise record (c3plus_premises)"]
+    keys = set(prem)
+    if keys != C3PLUS_RECORD_KEYS:
+        if keys - C3PLUS_RECORD_KEYS:
+            bad.append(f"foreign keys {sorted(keys - C3PLUS_RECORD_KEYS)}")
+        if C3PLUS_RECORD_KEYS - keys:
+            bad.append(f"missing keys {sorted(C3PLUS_RECORD_KEYS - keys)}")
+    classes = prem.get("classes")
+    if not isinstance(classes, dict):
+        bad.append(f"classes not recorded ({classes!r})")
+    else:
+        if set(classes) != set(C3PLUS_CLASSES):
+            bad.append(f"classes keys {sorted(map(str, classes))} are not P-1...P-5")
+        for p, want in C3PLUS_CLASSES.items():
+            if p in classes and classes[p] != want:
+                bad.append(f"{p} recorded as {classes[p]!r} (OP-8 solves only with {want})")
+    for p, want in C3PLUS_CLASSES.items():
+        text = prem.get(p)
+        if p in prem and not (isinstance(text, str) and text.startswith(want)):
+            bad.append(f"text of {p} {str(text)[:60]!r} contradicts the class {want}")
+    if "decomposition_C_eq_fl_CL_plus_E" in prem and prem["decomposition_C_eq_fl_CL_plus_E"] is not True:
+        bad.append("decomposition of C not seen while P-2, P-3 are recorded ESTABLISHED")
+    n_f = rec.get("n_f")
+    if "k" in prem and not (isinstance(n_f, int) and prem["k"] == n_f - 1 + o.K_EXTRA):
+        bad.append(f"k = {prem['k']!r} is not n_f - 1 + {o.K_EXTRA}")
+    if rec.get("c3plus_bound_check_exact") != "PASS":
+        bad.append(f"exact C-3+ check {rec.get('c3plus_bound_check_exact')!r} on an executed half-step (OP-8 solves only after PASS)")
+    return bad
+
+
+def _c3plus_of_record(rec: dict) -> dict:
+    """The C-3+ fields a re-run of OP-8 must reproduce exactly."""
+    return {k: rec.get(k) for k in ("c3plus_premises_status", "c3plus_premises_summary", "c3plus_premises", "c3plus_bound_check_exact")}
+
+
+# --- structure of the journal and the sequence s - 1 -> s (review N-3) ------------------------------------------------------------
+
+def journal_structure(j: dict) -> dict:
+    """The executed sequence of an OP-8 journal. OP-8 (``run_trajectory``) writes the half-steps s = 1, 2, ... in order and stops at
+    the first one that is not OK, writing nothing after it. ``executed``: the half-steps of the sequence (records 1..k in order, all
+    OK); ``not_executed``: s -> reason for the half-steps of the journal that are not a part of it (the stopped one, a record after
+    the stop, out of order, duplicate); ``stop``: the first not executed half-step; ``reasons``: violations of the structure, a
+    binding fault of П-а of every executed row of the journal (the journal is not the OP-8 one)."""
+    reasons, executed, not_exec, stop, broken = [], [], {}, None, None
+    meta = j.get("meta") if isinstance(j, dict) else None
+    steps = j.get("steps") if isinstance(j, dict) else None
+    if not isinstance(meta, dict) or not isinstance(steps, list) or not all(isinstance(r, dict) for r in steps):
+        return {"executed": [], "not_executed": {}, "stop": None, "reasons": ["journal is not {meta, steps: [records]}"]}
+    cfg = meta.get("config") or {}
+    o = op8()
+    for i, rec in enumerate(steps):
+        s = rec.get("s")
+        if not isinstance(s, int) or isinstance(s, bool):
+            reasons.append(f"record {i}: s = {s!r} is not an integer")
+            broken = i if broken is None else broken
+            continue
+        if stop is not None or broken is not None:
+            if stop is not None:
+                reasons.append(f"record s = {s} after the stop at s = {stop['s']} (OP-8 writes no record after a stop)")
+                text = f"record after the stop of the trajectory at s = {stop['s']} ({stop['status']})"
+            else:
+                reasons.append(f"record s = {s} after the break of the order at position {broken}")
+                text = f"record after the break of the order of the journal at position {broken}"
+            if s not in executed:
+                not_exec.setdefault(s, f"OP-8 half-step s = {s}: {text}: not a part of the executed sequence (journal inconsistent)")
+            continue
+        if s != i + 1:
+            reasons.append(f"record {i} has s = {s}, the sequence needs s = {i + 1} (order, gap or duplicate)")
+            broken = i
+            if s not in executed:
+                not_exec.setdefault(s, f"OP-8 half-step s = {s}: record out of the order of the sequence (position {i}): not a part "
+                                       "of the executed sequence (journal inconsistent)")
+            continue
+        if rec.get("direction") != o.direction_of(s):
+            reasons.append(f"record s = {s}: direction {rec.get('direction')!r} is not {o.direction_of(s)!r}")
+        if rec.get("trajectory_id") != meta.get("trajectory_id"):
+            reasons.append(f"record s = {s}: trajectory_id differs from the meta")
+        if rec.get("status") == o.OK:
+            for k in ("nx", "ny", "N"):
+                if rec.get(k) != cfg.get(k):
+                    reasons.append(f"record s = {s}: {k} = {rec.get(k)!r} differs from the configuration {cfg.get(k)!r}")
+            executed.append(s)
+        else:
+            stop = {"s": s, "status": str(rec.get("status"))}
+            not_exec[s] = f"OP-8 half-step s = {s}: {rec.get('status')}"
+    n = len(steps)
+    if meta.get("half_steps") != n:
+        reasons.append(f"meta half_steps = {meta.get('half_steps')!r}, the journal has {n} records")
+    s_max = cfg.get("s_max")
+    if isinstance(s_max, int) and n > s_max:
+        reasons.append(f"{n} records for s_max = {s_max}")
+    mst = str(meta.get("status"))
+    if stop is not None and stop["s"] == n and steps[-1].get("s") == n:
+        if not mst.startswith(f"STOPPED at s = {n}:"):
+            reasons.append(f"meta status {mst!r} is not the stop at s = {n}")
+    elif stop is None and not (n == s_max and mst.startswith("COMPLETED")):
+        reasons.append(f"meta status {mst!r} with {n} executed half-steps of s_max = {s_max}")
+    return {"executed": executed, "not_executed": not_exec, "stop": stop, "reasons": reasons}
+
+
+def _fields_of_record(rec: dict, arrays: dict, s: int) -> list[str]:
+    """The field hashes and the record-level chain of an executed record against its own arrays."""
+    o = op8()
+    bad = []
+    try:
+        d = o.direction_of(s)
+        g, c, V = arrays[f"s{s}_solved_set"], arrays[f"s{s}_companion_solved"], arrays[f"s{s}_V_bc"]
+        with np.errstate(all="ignore"):
+            if rec.get("field_s_sha") != o.array_sha(o._field(d, g, V)):
+                bad.append(f"s = {s}: field_s_sha of the record is not the field of its arrays")
+            if rec.get("prev_field_after_QR_sha") != o.array_sha(o._field(d, g, c)):
+                bad.append(f"s = {s}: prev_field_after_QR_sha of the record is not the field of its arrays")
+    except KeyError as exc:
+        bad.append(f"s = {s}: array {exc} of an executed half-step missing")
+    return bad
+
+
+def sequence_binding(j: dict, arrays: dict, s: int, rerun_op8: bool = True, cache: dict | None = None) -> list[str]:
+    """П-а of row s as a part of its sequence (review N-3): the journal structure; the record-level chain given_in_sha(k) =
+    next_given_sha(k - 1), companion_in_sha(k) = next_companion_sha(k - 1) up to k = s; every predecessor k = 1..s - 1 executed
+    (OK), bound (hashes, chain, start), with the canonical C-3+ record and field hashes; with ``rerun_op8``, OP-8 re-run on the bound
+    input of k reproduces status OK, the C-3+ record and all arrays of k (solved set, C, V_bc, next input) bitwise. A rewrite of the
+    journal consistent in arrays, meta and records is seen without the re-run only against hashes fixed outside (bound_values)."""
+    st = journal_structure(j)
+    out = [f"journal structure: {x}" for x in st["reasons"]]
+    by_s = {r.get("s"): r for r in j["steps"] if isinstance(r, dict)}
+    binding = bind_journal(j, arrays)
+    for k in range(2, s + 1):
+        cur, prev = by_s.get(k) or {}, by_s.get(k - 1) or {}
+        if cur.get("given_in_sha") != prev.get("next_given_sha") or cur.get("companion_in_sha") != prev.get("next_companion_sha"):
+            out.append(f"record chain: input hashes of s = {k} are not the next-input hashes of s = {k - 1}")
+    cfg = config_of(j["meta"])
+    for k in range(1, s):
+        if k not in st["executed"]:
+            out.append(f"predecessor s = {k} is not an executed half-step of the sequence")
+            continue
+        rec = by_s[k]
+        out += [f"predecessor s = {k}: {x}" for x in binding.get(k, {"reasons": ["not bound"]})["reasons"]]
+        out += [f"predecessor s = {k}: C-3+ premise record: {x}" for x in c3plus_record_defects(rec)]
+        out += [f"predecessor {x}" for x in _fields_of_record(rec, arrays, k)]
+        if not rerun_op8:
+            continue
+        key = None
+        if f"s{k}_given_in" in arrays and f"s{k}_companion_in" in arrays:
+            gk, ck = arrays[f"s{k}_given_in"], arrays[f"s{k}_companion_in"]
+            key = (k, gk.tobytes(), gk.shape, ck.tobytes(), ck.shape)
+        if key is None:
+            out.append(f"predecessor s = {k}: input arrays missing, OP-8 not re-run")
+            continue
+        if cache is not None and key in cache:
+            res = cache[key]
+        else:
+            try:
+                r = op8().run_step(cfg, k, arrays[f"s{k}_given_in"], arrays[f"s{k}_companion_in"])
+                res = {"status": r.record.get("status"), "c3plus": _c3plus_of_record(r.record),
+                       "arrays": {a: (r.arrays[a].tobytes(), r.arrays[a].shape) for a in RERUN_ARRAYS if a in r.arrays}}
+            except Exception as exc:  # recorded, never hidden
+                res = {"error": f"{type(exc).__name__}: {exc}"}
+            if cache is not None:
+                cache[key] = res
+        if "error" in res:
+            out.append(f"predecessor s = {k}: OP-8 re-run failed: {res['error']}")
+            continue
+        if res["status"] != op8().OK:
+            out.append(f"predecessor s = {k}: OP-8 re-run status {res['status']!r}, the record says OK")
+        if res["c3plus"] != _c3plus_of_record(rec):
+            out.append(f"predecessor s = {k}: C-3+ record differs from the OP-8 re-run")
+        for a in RERUN_ARRAYS:
+            got = arrays.get(f"s{k}_{a}")
+            if a not in res["arrays"] or got is None or (got.tobytes(), got.shape) != res["arrays"][a]:
+                out.append(f"predecessor s = {k}: {a} is not bitwise the OP-8 re-run")
+    return out
+
+
 # ---------------------------------------------------------------------------------------------------------------------------------
 # 7. separate process (П-а, second part)
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -679,12 +962,21 @@ def _inputs_from_spec(spec: dict):
         reasons += b[s]["reasons"]
         given, companion, V = arrays[f"s{s}_solved_set"], arrays[f"s{s}_companion_solved"], arrays[f"s{s}_V_bc"]
         if spec.get("rerun_op8", True):
-            res = op8().run_step(cfg, s, arrays[f"s{s}_given_in"], arrays[f"s{s}_companion_in"])
+            try:
+                res = op8().run_step(cfg, s, arrays[f"s{s}_given_in"], arrays[f"s{s}_companion_in"])
+            except Exception as exc:  # the bound input is not one OP-8 accepts (e.g. s = 1 not T_1): a binding fault, not a stop
+                rerun = {"status": f"OP-8 re-run raised {type(exc).__name__}: {str(exc)[-300:]}", "V_bc_sha": None,
+                         "c3plus_premises_status": None, "c3plus_premise_classes": None, "c3plus_record": None,
+                         "arrays_equal": {a: False for a in RERUN_ARRAYS}, "reproduced": False}
+                return cfg, s, given, companion, V, reasons, rerun
+            equal = {a: bool(a in res.arrays and f"s{s}_{a}" in arrays and res.arrays[a].shape == arrays[f"s{s}_{a}"].shape
+                             and res.arrays[a].tobytes() == arrays[f"s{s}_{a}"].tobytes()) for a in RERUN_ARRAYS}
             rerun = {"status": res.record.get("status"), "V_bc_sha": res.record.get("V_bc_sha"),
                      "c3plus_premises_status": res.record.get("c3plus_premises_status"),
                      "c3plus_premise_classes": (res.record.get("c3plus_premises") or {}).get("classes"),
+                     "c3plus_record": _c3plus_of_record(res.record), "arrays_equal": equal,
                      "reproduced": res.record.get("status") == op8().OK and "V_bc" in res.arrays
-                     and res.arrays["V_bc"].tobytes() == np.asarray(V).tobytes()}
+                     and res.arrays["V_bc"].tobytes() == np.asarray(V).tobytes() and all(equal.values())}
     else:
         cfg = op8().TrajectoryConfig(**spec["config"])
         guard_config(cfg)
@@ -752,32 +1044,52 @@ def c3plus_status(rec: dict | None, rerun: dict | None) -> tuple[dict, list[str]
     """C-3+ premises of the half-step as recorded by OP-8 (D-055.1, item 4): P-1, P-2, P-3, P-5 checked by OP-8, P-4 ASSUMED. The
     pipeline never raises P-4 above ASSUMED and never reads an energy check as a proof of the C-3+ theorem for this input. Returns
     (status, binding reasons): a record that is not the OP-8 one (P-4 not ASSUMED, premises not ESTABLISHED_CONDITIONAL_ON_P4 on an
-    executed half-step, the re-run of OP-8 classifying them differently) is a binding fault of П-а."""
+    executed half-step, the re-run of OP-8 classifying them differently) is a binding fault of П-а.
+    The record is checked against the canonical one (``c3plus_record_defects``) with or without the re-run; with the re-run the whole
+    C-3+ record (status, summary, classes, texts, k, decomposition, exact check) must be the re-run's. ``P-4`` of an executed row is
+    the model of the pipeline (ASSUMED, never raised); the recorded value is kept apart (``P-4_recorded``)."""
     if rec is None:
         return {"c3plus_premises_status": "NOT_APPLICABLE", "P-4": "NOT_APPLICABLE",
                 "applicability": "NOT_APPLICABLE: control arrays (no OP-8 half-step, no C-3+ assembly)"}, []
-    o = op8()
-    st, classes = rec.get("c3plus_premises_status"), (rec.get("c3plus_premises") or {}).get("classes")
-    bad = []
-    if not isinstance(classes, dict) or classes.get("P-4") != "ASSUMED":
-        bad.append(f"C-3+ premise record: P-4 recorded as {None if not isinstance(classes, dict) else classes.get('P-4')!r} "
-                   "(OP-8 records P-4 = ASSUMED only)")
-    if st != o.PREMISES_OK:
-        bad.append(f"C-3+ premise record: status {st!r} on an executed half-step (OP-8 solves only with {o.PREMISES_OK})")
-    if rerun is not None and (rerun.get("c3plus_premises_status") != st or rerun.get("c3plus_premise_classes") != classes):
+    st = rec.get("c3plus_premises_status")
+    prem = rec.get("c3plus_premises")
+    classes = prem.get("classes") if isinstance(prem, dict) else None
+    bad = [f"C-3+ premise record: {x}" for x in c3plus_record_defects(rec)]
+    if rerun is not None and (rerun.get("c3plus_premises_status") != st or rerun.get("c3plus_premise_classes") != classes
+                              or rerun.get("c3plus_record") != _c3plus_of_record(rec)):
         bad.append("C-3+ premises of the OP-8 re-run differ from the record")
     applicability = ("CONDITIONAL_ON_P4: P-1, P-2, P-3, P-5 established by OP-8 on this half-step, P-4 ASSUMED (accepted model, not "
                      "proven); the C-3+ theorem is not proven for this input" if not bad else
                      "NOT_ESTABLISHED: the C-3+ premise record is not the OP-8 one")
-    return {"c3plus_premises_status": st, "c3plus_premise_classes": classes, "P-4": "ASSUMED", "applicability": applicability,
-            "summary": rec.get("c3plus_premises_summary")}, bad
+    return {"c3plus_premises_status": st, "c3plus_premise_classes": classes, "P-4": "ASSUMED",
+            "P-4_recorded": classes.get("P-4", "NOT_RECORDED") if isinstance(classes, dict) else "NOT_RECORDED",
+            "record_defects": bad, "applicability": applicability, "summary": rec.get("c3plus_premises_summary")}, bad
 
 
-def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None, recorded: dict | None = None) -> dict:
+def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None, recorded: dict | None = None,
+            _seq_cache: dict | None = None) -> dict:
     """One row from a specification: {"kind": "journal", "journal": dir, "s": s} or {"kind": "arrays", "arrays_npz": path,
-    "arrays_sha256": {...}, "config": {...}, "s": s}, optional "injection", "mutation", "gamma_other", "mode".
-    The configuration is guarded first: a D1 grid or N != 1 is refused before any binding, re-run or child process (I-2)."""
+    "arrays_sha256": {...}, "config": {...}, "s": s}, optional "injection", "mutation", "gamma_other", "mode", "rerun_op8".
+    The configuration is guarded first: a D1 grid or N != 1 is refused before any binding, re-run or child process (I-2).
+    A journal row that is not an executed half-step of the sequence of its journal (stopped, absent, after a stop, out of order;
+    ``journal_structure``) is not executed -> UNRESOLVED, never computed; an executed row is bound to its sequence
+    (``sequence_binding``: predecessors, record chain, structure) as a part of П-а."""
     guard_config(spec_config(spec))
+    seq_reasons = []
+    if spec["kind"] == "journal":
+        s = spec["s"]
+        try:
+            j, arrays = load_journal(Path(spec["journal"]))
+            st = journal_structure(j)
+        except Exception as exc:  # an unreadable journal: the row is not executed, never PASS
+            return not_executed(None, s, reason=f"journal not readable: {type(exc).__name__}: {str(exc)[-300:]}")
+        rec = next((r for r in j["steps"] if isinstance(r, dict) and r.get("s") == s), None)
+        if s not in st["executed"]:
+            return not_executed(rec, s, reason=st["not_executed"].get(s) or _absent_reason(st, s))
+        try:
+            seq_reasons = sequence_binding(j, arrays, s, spec.get("rerun_op8", True), _seq_cache)
+        except Exception as exc:  # recorded, never hidden: the binding is then not established
+            seq_reasons = [f"sequence binding not checkable: {type(exc).__name__}: {str(exc)[-300:]}"]
     try:
         if spec.get("mode") is not None:
             primary = run_child(spec)
@@ -792,7 +1104,7 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
                 "reproduction": None, "premises": {}, "classification": res, "status": res["status"], "contradictions": [],
                 "faults": [], "op8_rerun": None, "c3plus": None, "scope": SCOPE, "exception": f"{type(exc).__name__}: {exc}"}
     row = primary["row"]
-    pa = list(primary["input_binding_reasons"])
+    pa = list(primary["input_binding_reasons"]) + seq_reasons + row_self_consistency(row)
     rec = None
     if spec["kind"] == "journal":
         j, _ = load_journal(Path(spec["journal"]))
@@ -803,7 +1115,9 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
             pa.append("the previous field formed here is not bitwise the field of the journal (prev_field_after_QR_sha)")
         rr = primary.get("op8_rerun")
         if rr is not None and not rr["reproduced"]:
-            pa.append(f"the OP-8 half-step re-run does not reproduce V_bc bitwise ({rr['status']})")
+            diff = sorted(a for a, v in (rr.get("arrays_equal") or {}).items() if not v)
+            pa.append(f"the OP-8 half-step re-run does not reproduce V_bc and the arrays of the record bitwise ({rr['status']}; "
+                      f"differing: {', '.join(diff) or 'V_bc'})")
     c3, c3_bad = c3plus_status(rec, primary.get("op8_rerun"))
     pa += c3_bad
     repro = None
@@ -826,6 +1140,9 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
     elif not reproduce:
         pa_state = {"state": NOT_CHECKABLE, "reason": "no reproduction in a separate process (П-а requires it)" +
                     ("; " + "; ".join(pa) if pa else "")}
+    elif spec["kind"] == "journal" and not spec.get("rerun_op8", True) and not pa:
+        pa_state = {"state": NOT_CHECKABLE, "reason": "OP-8 re-run disabled (rerun_op8 = False): V_bc and the sequence are bound only "
+                                                       "to the hashes the journal writes itself; a consistent rewrite is not seen"}
     else:
         pa_state = {"state": ESTABLISHED if not pa else NOT_ESTABLISHED, "reason": "; ".join(pa) if pa else
                     "inputs bound by sha256 (journal / construction, chain, start), fields bitwise the journal's, values reproduced "
@@ -839,32 +1156,52 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
             "c3plus": c3, "scope": {**SCOPE, "c3plus_applicability": c3["applicability"]}}
 
 
-def not_executed(rec: dict | None, s: int) -> dict:
-    """A half-step without a B-C solution of OP-8 (or absent): not executed -> UNRESOLVED (protocol 4.2), never FAIL_COMPUTATION."""
-    st = "absent (trajectory stopped before)" if rec is None else str(rec.get("status"))
-    note = " (status of C-3+ premises in the row: owner decision OD-8)" if "C3PLUS" in st else ""
-    res = pf().classify_row({"executed": False, "not_executed": {"reason": f"OP-8 half-step s = {s}: {st}{note}"}})
-    classes = None if rec is None else (rec.get("c3plus_premises") or {}).get("classes")
-    c3 = None if rec is None else {"c3plus_premises_status": rec.get("c3plus_premises_status"), "c3plus_premise_classes": classes,
-                                   "P-4": "ASSUMED" if classes else "NOT_REACHED (no C-3+ premise record)",
-                                   "applicability": "NOT_APPLICABLE: half-step not executed by OP-8"}
+def _p4_of_record(rec: dict) -> str:
+    """P-4 as the record states it (review N-4): never assumed for a half-step whose record does not carry it."""
+    prem = rec.get("c3plus_premises")
+    if not isinstance(prem, dict) or "classes" not in prem:
+        return "NOT_RECORDED (no C-3+ premise record in the record of the half-step)"
+    classes = prem["classes"]
+    if not isinstance(classes, dict) or "P-4" not in classes:
+        return "NOT_RECORDED (C-3+ premise record without P-4)"
+    if classes["P-4"] == "ASSUMED":
+        return "ASSUMED"
+    return f"INVALID_RECORD (P-4 recorded as {classes['P-4']!r}; OP-8 records ASSUMED only)"
+
+
+def _absent_reason(st: dict, s: int) -> str:
+    if st["stop"] is not None and s > st["stop"]["s"]:
+        return f"OP-8 half-step s = {s}: absent after the stop of the trajectory at s = {st['stop']['s']} ({st['stop']['status']})"
+    return f"OP-8 half-step s = {s}: absent (no record of it in the journal)"
+
+
+def not_executed(rec: dict | None, s: int, reason: str | None = None) -> dict:
+    """A half-step without a B-C solution of OP-8, absent, or not a part of the executed sequence of its journal: not executed ->
+    UNRESOLVED with the reason (protocol 4.2), never FAIL_COMPUTATION. The C-3+ annotation is the content of the record as written
+    (status, classes, P-4 as recorded, never assumed: review N-4) and the stop reason is kept."""
+    if reason is None:
+        reason = f"OP-8 half-step s = {s}: absent" if rec is None else f"OP-8 half-step s = {s}: {rec.get('status')}"
+    note = " (status of C-3+ premises in the row: owner decision OD-8)" if "C3PLUS" in reason else ""
+    res = pf().classify_row({"executed": False, "not_executed": {"reason": f"{reason}{note}"}})
+    c3 = None
+    if rec is not None:
+        prem = rec.get("c3plus_premises")
+        c3 = {"c3plus_premises_status": rec.get("c3plus_premises_status", "NOT_RECORDED"),
+              "c3plus_premise_classes": prem.get("classes") if isinstance(prem, dict) else None, "P-4": _p4_of_record(rec),
+              "applicability": "NOT_APPLICABLE: half-step not executed by OP-8"}
     return {"data_status": DATA_STATUS, "spec": {"s": s}, "status": res["status"], "classification": res, "contradictions": [],
-            "faults": [], "c3plus": c3, "scope": SCOPE}
+            "faults": [], "c3plus": c3, "scope": SCOPE, "not_executed_reason": reason,
+            "record_status": None if rec is None else rec.get("status")}
 
 
 def analyse_journal(jdir: Path, s_max: int | None = None, reproduce: bool = True) -> list[dict]:
+    """Rows s = 1..s_max of a journal in order; each through ``analyse`` (which decides executed / not executed from the structure
+    of the journal and binds an executed row to its sequence). Predecessor re-runs of OP-8 are shared between the rows."""
     cfg = spec_config({"kind": "journal", "journal": str(jdir)})
     guard_config(cfg)  # before the arrays are loaded or any half-step is analysed
-    j, _ = load_journal(Path(jdir))
-    by_s = {r["s"]: r for r in j["steps"]}
-    out = []
-    for s in range(1, (s_max or cfg.s_max) + 1):
-        rec = by_s.get(s)
-        if rec is None or rec.get("status") != op8().OK:
-            out.append(not_executed(rec, s))
-        else:
-            out.append(analyse({"kind": "journal", "journal": str(jdir), "s": s}, reproduce=reproduce))
-    return out
+    cache = {}
+    return [analyse({"kind": "journal", "journal": str(jdir), "s": s}, reproduce=reproduce, _seq_cache=cache)
+            for s in range(1, (s_max or cfg.s_max) + 1)]
 
 
 def run_trajectory_journal(cfg, out: Path) -> Path:
