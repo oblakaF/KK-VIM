@@ -18,6 +18,9 @@ docs/results/r5_cccc_q4_d1_prelaunch/control_ab_expected.json) are used read-onl
   control counts; with established premises E1/E2 must hold (E-2).
 - G (Г, negative): mutations of the computation with the channel declared in the expectations; a mutation detected by no channel is
   a gap (UNRESOLVED of the control), never PASS; channels proposed in OD-4 keep the control UNRESOLVED until the owner's decision.
+  Counted apart: mutations detected by their declared channel; agreement with the expectations; mutations without a channel (G-5:
+  B_E_independent_recount MISSING, OD-4 / OD-11) - their agreement with the expected gap is not a detection and is not counted.
+  The second-path channel counts only with the registered contradiction (source second_path_gamma), not the flag alone.
 - BR adapter on the clean rows (OBSERVATION; budget 1/100, otherwise UNRESOLVED).
 
 Usage (repository root): uv run python scripts/r5_cccc_q4_d1_controls_prelaunch.py run --out scratch/r5_q4_pipeline_controls
@@ -139,6 +142,10 @@ def _clean_ok(r: dict, ce: dict) -> tuple[bool, list[str]]:
     sp = _row(r)["diagnostics"].get("second_path_gamma", {}).get("consistent")
     if sp is not ce["second_path_gamma_consistent"]:
         bad.append(f"second path gamma {sp}")
+    if r.get("faults"):
+        bad.append(f"faults {r['faults']}")
+    if (r.get("c3plus") or {}).get("P-4") != "ASSUMED":  # a clean journal row: P-4 = ASSUMED, never raised (D-055.1)
+        bad.append(f"C-3+ P-4 {(r.get('c3plus') or {}).get('P-4')}")
     return not bad, bad
 
 
@@ -146,7 +153,8 @@ def _row_summary(r: dict) -> dict:
     c = r["classification"]
     return {"status": r["status"], "premises": _premise_states(r) if "premises" in r else None, "e1": c.get("e1"), "e2": c.get("e2"),
             "e_diag": c.get("e_diag"), "reason_premises": c.get("reason_premises"), "reasons": c.get("reasons"),
-            "rejected": c.get("rejected"), "contradictions": r.get("contradictions"),
+            "rejected": c.get("rejected"), "contradictions": r.get("contradictions"), "faults": r.get("faults"),
+            "c3plus": r.get("c3plus"),
             "second_path_gamma": _row(r)["diagnostics"].get("second_path_gamma"),
             "reproduction": r.get("reproduction"), "values": {k: _row(r).get(k) for k in
                                                               ("P_hat_p", "P_hat_s", "Q_hat", "Gamma_up", "B_E_up")},
@@ -292,10 +300,13 @@ def control_g(exp: dict, journals: dict, work: Path, clean: dict) -> dict:
         r = p.analyse(spec, recorded=recorded)
         cl = r["classification"]
         prem_ok = all(v == "ESTABLISHED" for v in _premise_states(r).values())
+        sources = sorted({x["source"] for x in r.get("contradictions", [])})
         fired = {"E1/E2": bool(prem_ok and r["status"] == FAIL),
-                 "second_path_gamma": _row(r)["diagnostics"].get("second_path_gamma", {}).get("consistent") is False,
+                 "second_path_gamma": (_row(r)["diagnostics"].get("second_path_gamma", {}).get("consistent") is False
+                                       and "second_path_gamma" in sources),  # the flag AND the registered contradiction
                  "boundary_definition": bool(cl.get("rejected"))}
         e = c["expected"]
+        effective = {k: _row(r).get(k) != _row(base).get(k) for k in ("gamma_exact", "Q_hat", "P_hat_p", "B_E_exact")}
         if "detected_by" in e:
             detected = fired[e["detected_by"]]
             status_ok = e.get("status") is None or r["status"] == e["status"]
@@ -303,14 +314,22 @@ def control_g(exp: dict, journals: dict, work: Path, clean: dict) -> dict:
             match = detected and status_ok and rej_ok
             outcome = (f"DETECTED by {e['detected_by']}" if detected else "NOT DETECTED by the declared channel: gap (UNRESOLVED)")
         else:
-            match = True  # G-5: no channel implemented; the expectation is the gap itself
-            outcome = "GAP: no implemented channel (UNRESOLVED of control G)" + (
-                f"; incidentally fired: {[k for k, v in fired.items() if v]}" if any(fired.values()) else "")
+            # G-5: no channel is implemented (B_E_independent_recount MISSING). Agreement with the expected gap is NOT a detection:
+            # match stays None (not counted), the case is a gap and keeps control G UNRESOLVED; the row status is reported as is.
+            match = None
+            outcome = ("GAP: no implemented channel (MISSING; UNRESOLVED of control G); row status " + r["status"] +
+                       ("" if any(effective.values()) else "; WARNING: the mutation changed no recorded value") +
+                       (f"; incidentally fired: {[k for k, v in fired.items() if v]}" if any(fired.values()) else ""))
         out.append({"id": c["id"], "mutation": mut, "channel": c["channel"], "channel_status": c["channel_status"], "fired": fired,
-                    "outcome": outcome, "actual": _row_summary(r), "match": bool(match)})
-    gaps = [x["id"] for x in out if x["outcome"].startswith("GAP") or "gap" in x["outcome"]]
+                    "contradiction_sources": sources, "mutation_effective": effective, "outcome": outcome,
+                    "actual": _row_summary(r), "detected": None if match is None else bool(detected), "match": match})
+    declared = [x for x in out if x["match"] is not None]
+    no_channel = [x["id"] for x in out if x["match"] is None]
+    gaps = no_channel + [x["id"] for x in declared if not x["detected"]]
     proposed = [x["id"] for x in out if x["channel_status"].startswith("PROPOSED")]
-    return {"cases": out, "matching": sum(x["match"] for x in out), "gaps": gaps, "channels_pending_OD4": proposed,
+    return {"cases": out, "total": len(out), "declared_channel": len(declared), "detected": sum(x["detected"] for x in declared),
+            "matching": sum(bool(x["match"]) for x in declared), "no_channel": no_channel, "gaps": gaps,
+            "channels_pending_OD4": proposed, "decisions_needed": ["OD-4 (channels G-1...G-4)", "OD-11 (separate recount of B_E: G-5)"],
             "control_status": "UNRESOLVED (gaps and channels pending OD-4)" if gaps or proposed else "PASS"}
 
 
@@ -353,7 +372,8 @@ def run_all(work: Path) -> dict:
                       "status": "PASS" if b["matching"] == b["executed"] and all(x["match"] for x in clean_res) else "MISMATCH"},
         "control_V": {"matching": f"{v['matching']}/{len(v['cases'])}", "status": "PASS" if v["matching"] == len(v["cases"]) else
                       "MISMATCH"},
-        "control_G": {"matching": f"{g['matching']}/{len(g['cases'])}", "status": g["control_status"], "gaps": g["gaps"],
+        "control_G": {"detected": f"{g['detected']}/{g['total']}", "matching_declared": f"{g['matching']}/{g['declared_channel']}",
+                      "no_channel": g["no_channel"], "status": g["control_status"], "gaps": g["gaps"],
                       "pending_OD4": g["channels_pending_OD4"]},
         "reference_adapter": [x["result"] for x in refs],
     }

@@ -26,7 +26,9 @@ Row (protocol 4.1) - half-step s of an OP-8 trajectory (journal.json + arrays.np
 6. dP = P^_p - P^_s and tau' = Gamma_up + B_E_up EXACTLY from the recorded components (protocol 4.1; Z-3). A dP or tau' recorded with
    the row is accepted only if it equals its definition exactly; otherwise the row is REJECTED before classification: the value is
    withheld, the classifier gives UNRESOLVED_CERTIFICATE with source UNDETERMINED, never PASS. A missing or not finite component is
-   never replaced by an assumed value: dP / tau' are then not built;
+   never replaced by an assumed value: dP / tau' are then not built. Input contract of a component: float, an int exact in
+   binary64, text in the float.hex() form ('0x...p...') or 'inf' / '-inf' / 'nan'; decimal text is never read as hexadecimal
+   digits. A component or a recorded value outside the contract is withheld and the row rejected (never converted);
 7. П-а (second part): the row is recomputed in a SEPARATE PROCESS from the same inputs (for a journal row the OP-8 half-step itself is
    re-run there: V_bc bitwise) and every reproduced value (binary64 by hex, exact rationals by p/q, array hashes, premise states) must
    be bitwise the same; values the row is bound to (``bound_values``) must be bitwise equal too. Otherwise П-а is not established;
@@ -36,7 +38,12 @@ Diagnostics (not premises; listed as contradictions, never hidden; they do not c
 identity on the exact products: gamma_B = Q~ - (Pi(w~_p) - Pi(w~_s)), path B of the gamma audit) equal to the gamma of path B1 and in
 [gamma_down, gamma_up] (cost limit (n_x - 1)(n_y - 1) <= SECOND_PATH_MAX_NODES, as the small-grid rule of protocol 5 item 9); Prop. D;
 |E_s| <= B_E (theorem E-2) with E_s = dP - Q^ + gamma_s exact when П-б...П-е hold; B_E <= K* R_Sigma and the own ingredients against
-the bounds of r5_cccc_energy (QA-EB 8).
+the bounds of r5_cccc_energy (QA-EB 8). Each contradiction carries its source (second_path_gamma, theorem_E2, PropD, crosscheck_EN).
+Faults (an exception of a stage with no premise of protocol 4.1: gamma of path B1, the second path, the cross-check) are recorded with
+stage and source and listed among the reasons; no premise is attributed to them; a fault of path B1 leaves Gamma_up and tau' unbuilt.
+
+C-3+ (D-055.1): the premise record of the OP-8 half-step is carried with the row (``c3plus``); P-4 stays ASSUMED, the row status is
+computational consistency only, never applicability of the C-3+ theorem, accuracy of B-C or a proof of the model (``scope``).
 
 A half-step not executed by OP-8 (STOP_*, PROTECTIVE_STOP, UNRESOLVED_C3PLUS_PREMISE, FAIL_C3PLUS_BOUND_CHECK, FAIL_TOOL) or absent
 after a stop: the row is NOT executed -> UNRESOLVED with the reason (protocol 4.2), never FAIL_COMPUTATION. How C-3+ premises enter
@@ -46,7 +53,9 @@ Controls (scripts/r5_cccc_q4_d1_controls_prelaunch.py) use ``compute_row`` with 
 MUTATIONS); such rows are marked and never enter a campaign.
 
 Not done here: N >= 2 (PRE_D1_RANK), blocks B, C, D, the separate recount of B_E (OD-11), the D1 rows and any campaign verdict.
-Guard (API and command line): the D1 grids of protocol 2.2, 2.3, 3, N != 1 and output under docs/ are refused. Data of this tool:
+Guard (API and command line): the D1 grids of protocol 2.2, 2.3, 3, N != 1 and output under docs/ are refused, before any binding,
+loading of arrays, re-run of an OP-8 half-step or child process (``analyse``, ``analyse_journal``, ``bind_journal``, ``compute_row``,
+``run_trajectory_journal``, the internal ``_row`` entry). Data of this tool:
 PRELAUNCH research observation, NOT D1 data, never D1_RESULT.
 
 Usage (repository root; small non-D1 configurations only):
@@ -61,6 +70,7 @@ import json
 import math
 import os
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -169,37 +179,70 @@ def fsha(x: Fraction | None) -> str | None:
     return None if x is None else hashlib.sha256(ftext(x).encode()).hexdigest()
 
 
+HEX_FLOAT = re.compile(r"[+-]?0x[0-9a-f]+(\.[0-9a-f]*)?p[+-]?[0-9]+", re.IGNORECASE)  # float.hex() form, the prefix 0x required
+NOT_FINITE_TEXT = ("inf", "+inf", "-inf", "infinity", "+infinity", "-infinity", "nan", "+nan", "-nan")
+
+
+class MalformedValue(ValueError):
+    """A recorded value or component outside the input contract: never converted, the row is rejected at the boundary."""
+
+
+def parse_hex_float(text: str) -> float:
+    """Text in the hexadecimal float form of float.hex() ('0x1.8p+1', '-0x0.0p+0', '0x0p+0'); anything else is refused (float.fromhex
+    alone reads '0.1' or '10' as hexadecimal digits). A finite text that overflows binary64 is refused, not rounded to inf."""
+    if not isinstance(text, str) or not HEX_FLOAT.fullmatch(text.strip()):
+        raise MalformedValue(f"not a hexadecimal float (float.hex form with 0x): {text!r}")
+    try:
+        return float.fromhex(text.strip())
+    except OverflowError as exc:
+        raise MalformedValue(f"hexadecimal float outside binary64: {text!r}") from exc
+
+
 def parse_recorded(v) -> Fraction:
-    """A recorded value: Fraction, int, float (exactly), 'p/q' or decimal text, or 'hex:<float.hex>'."""
+    """A recorded dP / tau': Fraction, int, finite float (exactly), 'p/q' or decimal text (exact rational), or 'hex:<float.hex()>'.
+    Not finite, malformed or of another type: MalformedValue."""
     if isinstance(v, bool):
-        raise TypeError("a boolean is not a value")
+        raise MalformedValue("a boolean is not a value")
     if isinstance(v, Fraction):
         return v
     if isinstance(v, int):
         return Fraction(v)
     if isinstance(v, float):
         if not math.isfinite(v):
-            raise ValueError("a recorded dP / tau' must be finite")
+            raise MalformedValue(f"a recorded dP / tau' must be finite: {v!r}")
         return Fraction(v)
     if isinstance(v, str):
         if v.startswith("hex:"):
-            return parse_recorded(float.fromhex(v[4:]))
-        return Fraction(v)
-    raise TypeError(f"unsupported recorded value {v!r}")
+            return parse_recorded(parse_hex_float(v[4:]))
+        try:
+            return Fraction(v)
+        except (ValueError, ZeroDivisionError) as exc:
+            raise MalformedValue(f"recorded value is not an exact rational text: {v!r}") from exc
+    raise MalformedValue(f"unsupported recorded value type {type(v).__name__}: {v!r}")
 
 
-def _float_of(v) -> float:
-    """A component: binary64 as float, hex text or 'inf' / 'nan' text."""
+def parse_component(v) -> float:
+    """A component (P^_p, P^_s, Q^, Gamma_up, B_E): a binary64 value. Accepted: float (inf / nan kept: a not finite certificate
+    value, handled by the classifier), an int exactly representable in binary64, text in the float.hex() form, or 'inf', '-inf',
+    'nan'. Decimal text, an int that binary64 would round, booleans and other types: MalformedValue (never converted)."""
     if isinstance(v, bool):
-        raise TypeError("a boolean is not a value")
-    if isinstance(v, (int, float)):
+        raise MalformedValue("a boolean is not a value")
+    if isinstance(v, float):
         return float(v)
+    if isinstance(v, int):
+        try:
+            f = float(v)
+        except OverflowError as exc:
+            raise MalformedValue(f"integer outside binary64: {v}") from exc
+        if Fraction(f) != v:
+            raise MalformedValue(f"integer not exactly representable in binary64 (would be rounded): {v}")
+        return f
     if isinstance(v, str):
         t = v.strip().lower()
-        if t.lstrip("+-") in ("inf", "infinity", "nan"):
+        if t in NOT_FINITE_TEXT:
             return float(t)
-        return float.fromhex(v)
-    raise TypeError(f"unsupported component {v!r}")
+        return parse_hex_float(v)
+    raise MalformedValue(f"unsupported component type {type(v).__name__}: {v!r}")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -209,25 +252,41 @@ def _float_of(v) -> float:
 COMPONENTS = ("P_p", "P_s", "Q", "Gamma_up", "B_E")
 
 
-def assemble(components: dict, premises: dict, recorded: dict | None = None) -> dict:
+def assemble(components: dict, premises: dict, recorded: dict | None = None, faults: list | None = None) -> dict:
     """Protocol 4.1 / Z-3: dP = P^_p - P^_s and tau' = Gamma_up + B_E exactly from the recorded binary64 components (a component
-    absent, None or not finite is never replaced; dP / tau' are then not built). A recorded dP or tau' must equal the definition
-    exactly, otherwise the row is rejected (the value withheld). Then classify_row (PR #48) with the components."""
+    absent, None or not finite is never replaced; dP / tau' are then not built). A component or a recorded value outside the input
+    contract (``parse_component``, ``parse_recorded``) is withheld and the row rejected. A recorded dP or tau' must equal the
+    definition exactly, otherwise the row is rejected (the value withheld). Then classify_row (PR #48) with the components.
+    ``faults``: computation faults of the row (stage, source, error); listed among the reasons, no premise attributed to them."""
     unknown = set(components) - set(COMPONENTS)
     if unknown:
         raise ValueError(f"unknown components {sorted(unknown)}")
-    c = {k: _float_of(v) for k, v in components.items() if v is not None}
+    rejections, c = [], {}
+    for k, v in components.items():
+        if v is None:
+            continue
+        try:
+            c[k] = parse_component(v)
+        except MalformedValue as exc:
+            rejections.append(f"component {k} withheld: {exc}")
 
     def fin(k):
         return k in c and math.isfinite(c[k])
 
     dP = Fraction(c["P_p"]) - Fraction(c["P_s"]) if fin("P_p") and fin("P_s") else None
     tau = Fraction(c["Gamma_up"]) + Fraction(c["B_E"]) if fin("Gamma_up") and fin("B_E") else None
-    rejections = []
     for name, built in (("dP", dP), ("tau", tau)):
         if recorded is None or recorded.get(name) is None:
             continue
-        r = parse_recorded(recorded[name])
+        try:
+            r = parse_recorded(recorded[name])
+        except MalformedValue as exc:
+            rejections.append(f"recorded {name} not accepted: {exc}")
+            if name == "dP":
+                dP = None
+            else:
+                tau = None
+            continue
         if built is None:
             rejections.append(f"recorded {name} given while its components are not all recorded finite values: not accepted")
         elif r != built:
@@ -244,9 +303,12 @@ def assemble(components: dict, premises: dict, recorded: dict | None = None) -> 
             inp[k] = c[k]
     res = pf().classify_row(inp)
     res = dict(res)
+    faults = list(faults or [])
     if rejections:
         res["reasons"] = list(res["reasons"]) + [f"REJECTED at the pipeline boundary: {x}" for x in rejections]
-    res.update({"rejected": bool(rejections), "rejections": rejections, "dP_exact": ftext(dP), "dP_sha256": fsha(dP),
+    if faults:
+        res["reasons"] = list(res["reasons"]) + [fault_text(f) for f in faults]
+    res.update({"rejected": bool(rejections), "rejections": rejections, "faults": faults, "dP_exact": ftext(dP), "dP_sha256": fsha(dP),
                 "tau_exact": ftext(tau), "tau_sha256": fsha(tau), "components_hex": {k: fhex(v) for k, v in c.items()}})
     return res
 
@@ -254,6 +316,28 @@ def assemble(components: dict, premises: dict, recorded: dict | None = None) -> 
 # ---------------------------------------------------------------------------------------------------------------------------------
 # 2.-5. the row computation (in the calling thread)
 # ---------------------------------------------------------------------------------------------------------------------------------
+
+# Stages that can fail with an exception without a premise of protocol 4.1 to attribute it to. "certificate": the component is then
+# not built (tau' not built -> UNRESOLVED_CERTIFICATE, source UNDETERMINED); "diagnostic": no protocol value depends on it.
+FAULT_STAGES = {
+    "gamma_B1": ("Gamma_up (gamma_s of path B1, QA-gamma3 gamma_b1)", "certificate: Gamma_up not built"),
+    "gamma_second_path": ("second path of gamma (VOK-2 identity, path B of the gamma audit)", "diagnostic only"),
+    "crosscheck_EN": ("own B_E ingredients against r5_cccc_energy (QA-EB 8)", "diagnostic only"),
+}
+
+
+def _fault(stage: str, exc: BaseException) -> dict:
+    source, effect = FAULT_STAGES[stage]
+    return {"stage": stage, "source": source, "effect": effect, "premise": None, "error": f"{type(exc).__name__}: {exc}"}
+
+
+def fault_text(f: dict) -> str:
+    return f"FAULT at stage {f['stage']} (source: {f['source']}; {f['effect']}; no premise attributed): {f['error']}"
+
+
+def _contra(source: str, text: str) -> dict:
+    return {"source": source, "text": text}
+
 
 def _prem(ok: bool, reasons: list[str], checkable: bool = True) -> dict:
     state = ESTABLISHED if ok else (NOT_ESTABLISHED if checkable else NOT_CHECKABLE)
@@ -280,6 +364,7 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
     N = given.shape[1]
     g = en.Grid(lx, nx, ly, ny, D=D, q=q)
     out = {"s": s, "direction": direction, "N": N, "injection": injection, "mutation": mutation}
+    faults = []
     reasons = {p: [] for p in PREMISES_COMPUTED}
     checkable = {p: True for p in PREMISES_COMPUTED}
     pb = Q_.probe_mode()
@@ -313,8 +398,9 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
     gamma = None
     try:
         gamma = gi().gamma_b1(lx, nx, ly, ny, direction, given, companion, V, D=D, q=q)
-    except (ValueError, ArithmeticError) as exc:
+    except (ValueError, ArithmeticError) as exc:  # Gamma_up is not built; recorded as a fault, no premise attributed (protocol 4.1)
         out["gamma_error"] = f"{type(exc).__name__}: {exc}"
+        faults.append(_fault("gamma_B1", exc))
     if gamma is not None and mutation == "gamma_sign_flip":
         gamma = -gamma
     if mutation == "gamma_from_step":
@@ -415,7 +501,7 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
         BE_up = gi().directed(BE)[1]
         if not math.isfinite(BE_up):
             reasons["P-f"].append("B_E_up not finite in binary64")
-    out.update({"B_E_exact_sha256": fsha(BE), "B_E_up": fhex(BE_up)})
+    out.update({"B_E_exact": ftext(BE), "B_E_exact_sha256": fsha(BE), "B_E_up": fhex(BE_up)})
     # --- mode probe after the row, same thread
     pa = Q_.probe_mode()
     out["mode_after_ok"], out["controlfp_after"] = pa["ok"], pa["controlfp"].get("word")
@@ -435,22 +521,24 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
             ok = gB == gamma and Fraction(gd) <= gB <= Fraction(gu)
             diag["second_path_gamma"] = {"performed": True, "consistent": bool(ok), "gamma_B_sha256": fsha(gB)}
             if not ok:
-                contra.append("second path of gamma (VOK-2 identity, path B) differs from the gamma used (path B1)")
+                contra.append(_contra("second_path_gamma", "second path of gamma (VOK-2 identity, path B) differs from the gamma used "
+                                      "(path B1) or lies outside [gamma_down, gamma_up]"))
         except (ValueError, ArithmeticError, OverflowError) as exc:
             diag["second_path_gamma"] = {"performed": False, "consistent": None, "reason": f"{type(exc).__name__}: {exc}"}
+            faults.append(_fault("gamma_second_path", exc))
     else:
         diag["second_path_gamma"] = {"performed": False, "consistent": None,
                                      "reason": f"NOT_PERFORMED ((n_x - 1)(n_y - 1) > {SECOND_PATH_MAX_NODES}) or no gamma"}
     if be is not None:
         diag["PropD_two_routes_ws"] = bool(be["PropD"])
         if not be["PropD"]:
-            contra.append("Prop. D: two routes of ||w^_s||_a^2 differ")
+            contra.append(_contra("PropD", "Prop. D: two routes of ||w^_s||_a^2 differ"))
     established = all(out["premises"][p]["state"] == ESTABLISHED for p in PREMISES_COMPUTED)
     if BE is not None and gamma is not None and math.isfinite(Pp) and math.isfinite(Ps) and math.isfinite(Qd):
         E_s = Fraction(Pp) - Fraction(Ps) - Fraction(Qd) + gamma
         diag["E_s_le_B_E"] = abs(E_s) <= BE
         if established and not diag["E_s_le_B_E"]:
-            contra.append("theorem E-2: |E_s| > B_E with П-б...П-е established")
+            contra.append(_contra("theorem_E2", "theorem E-2: |E_s| > B_E with П-б...П-е established"))
     try:
         mt = eq().model_terms(g, Xp, Yp, Xs, Ys)
         R = mt.pop("_R_Sigma")
@@ -468,23 +556,26 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
             diag["crosscheck_EN"] = {k: bool(v) for k, v in xc.items()}
             bad = [k for k, v in xc.items() if not v]
             if bad and established:
-                contra.append("own B_E ingredients against r5_cccc_energy: " + ", ".join(bad))
+                contra.append(_contra("crosscheck_EN", "own B_E ingredients against r5_cccc_energy: " + ", ".join(bad)))
     except (ValueError, ArithmeticError, OverflowError) as exc:
         diag["crosscheck_EN"] = f"NOT_AVAILABLE ({type(exc).__name__}: {exc})"
+        faults.append(_fault("crosscheck_EN", exc))
     out["diagnostics"] = diag
     out["contradictions"] = contra
+    out["faults"] = faults
     return out
 
 
 REPRO_KEYS = ("field_prev_sha", "field_s_sha", "d_hat_sha", "P_hat_p", "P_hat_s", "Q_hat", "gamma_exact", "gamma_exact_sha256",
-              "gamma_down", "gamma_up", "Gamma_up", "B_E_exact_sha256", "B_E_up", "U3_grid_bits", "N7_applicable")
+              "gamma_down", "gamma_up", "Gamma_up", "B_E_exact", "B_E_exact_sha256", "B_E_up", "U3_grid_bits", "N7_applicable")
 
 
 def reproduced_values(row: dict) -> dict:
-    """The values a second run must reproduce bitwise (text forms) and the premise states."""
+    """The values a second run must reproduce bitwise (text forms), the premise states, contradictions and faults."""
     out = {k: row.get(k) for k in REPRO_KEYS}
     out["premise_states"] = {p: row["premises"][p]["state"] for p in PREMISES_COMPUTED}
     out["contradictions"] = list(row["contradictions"])
+    out["faults"] = [{k: f[k] for k in ("stage", "error")} for f in row.get("faults", [])]
     out["second_path_gamma_consistent"] = row["diagnostics"].get("second_path_gamma", {}).get("consistent")
     return out
 
@@ -510,11 +601,22 @@ def config_of(meta: dict):
                                   float(c["q"]), int(c["s_max"]))
 
 
+def spec_config(spec: dict):
+    """The configuration of a row specification, read without loading or computing anything else (for the guard)."""
+    if spec.get("kind") == "journal":
+        with open(Path(spec["journal"]) / "journal.json", encoding="utf-8") as f:
+            return config_of(json.load(f)["meta"])
+    if spec.get("kind") == "arrays":
+        return op8().TrajectoryConfig(**spec["config"])
+    raise ValueError(f"unknown row specification kind {spec.get('kind')!r}")
+
+
 def bind_journal(j: dict, arrays: dict) -> dict:
     """Per half-step: hashes of its arrays against the meta and the record, the chain and the start (module docstring, 1)."""
     sha = op8().array_sha
     meta, steps = j["meta"], j["steps"]
     cfg = config_of(meta)
+    guard_config(cfg)
     listed = meta.get("arrays_sha256", {})
     whole = [] if set(listed) == set(arrays) else ["the arrays of arrays.npz differ from the list of the meta"]
     per_key = {k: f"{k}: sha256 differs from the meta" for k, v in arrays.items() if listed.get(k) != sha(v)}
@@ -566,9 +668,11 @@ def _inputs_from_spec(spec: dict):
     sha = op8().array_sha
     s = int(spec["s"])
     reasons, rerun = [], None
+    guard_config(spec_config(spec))  # before any loading, binding or re-run of a half-step (I-2)
     if spec["kind"] == "journal":
         j, arrays = load_journal(Path(spec["journal"]))
         cfg = config_of(j["meta"])
+        guard_config(cfg)
         b = bind_journal(j, arrays)
         if s not in b:
             raise ValueError(f"no half-step {s} in the journal")
@@ -577,12 +681,15 @@ def _inputs_from_spec(spec: dict):
         if spec.get("rerun_op8", True):
             res = op8().run_step(cfg, s, arrays[f"s{s}_given_in"], arrays[f"s{s}_companion_in"])
             rerun = {"status": res.record.get("status"), "V_bc_sha": res.record.get("V_bc_sha"),
+                     "c3plus_premises_status": res.record.get("c3plus_premises_status"),
+                     "c3plus_premise_classes": (res.record.get("c3plus_premises") or {}).get("classes"),
                      "reproduced": res.record.get("status") == op8().OK and "V_bc" in res.arrays
                      and res.arrays["V_bc"].tobytes() == np.asarray(V).tobytes()}
     else:
+        cfg = op8().TrajectoryConfig(**spec["config"])
+        guard_config(cfg)
         with np.load(spec["arrays_npz"]) as z:
             given, companion, V = z["given"], z["companion"], z["V"]
-        cfg = op8().TrajectoryConfig(**spec["config"])
         for name, a in (("given", given), ("companion", companion), ("V", V)):
             if spec["arrays_sha256"].get(name) != sha(a):
                 reasons.append(f"control input {name}: sha256 differs from the construction")
@@ -591,6 +698,7 @@ def _inputs_from_spec(spec: dict):
 
 def _row_job(spec: dict) -> dict:
     """The row in this process (child entry and in-process primary)."""
+    guard_config(spec_config(spec))
     mode = _set_mode(spec.get("mode"))
     cfg, s, given, companion, V, reasons, rerun = _inputs_from_spec(spec)
     go = parse_recorded(spec["gamma_other"]) if spec.get("gamma_other") is not None else None
@@ -614,6 +722,8 @@ def run_child(spec: dict, timeout: float = 1800) -> dict:
         sp.write_text(json.dumps(spec), encoding="utf-8")
         p = subprocess.run([sys.executable, str(ROOT / SELF), "_row", str(sp)], cwd=ROOT, capture_output=True, text=True,
                            timeout=timeout)
+    if p.returncode == 2 and "refused:" in p.stderr:
+        raise D1Refused(p.stderr.strip()[-500:])
     if p.returncode != 0:
         raise RuntimeError(f"child row failed ({p.returncode}): {p.stderr[-3000:]}")
     return json.loads(p.stdout.strip().splitlines()[-1])
@@ -632,9 +742,42 @@ def _comparable(job: dict) -> dict:
 # the row: binding, computation, reproduction, П-а, classification
 # ---------------------------------------------------------------------------------------------------------------------------------
 
+SCOPE = {"status": "computational consistency of the row (protocol 4.2: E1/E2, resolvability Q^ > tau'); not convergence, not the "
+                     "accuracy of B-C, not the rank, not a proof of the model (D-054.1, D-055.2)",
+         "bc_accuracy": "NOT_ESTABLISHED by the row (BR adapter: separate OBSERVATION, budget 1/100)",
+         "model": "NOT_PROVEN by the row"}
+
+
+def c3plus_status(rec: dict | None, rerun: dict | None) -> tuple[dict, list[str]]:
+    """C-3+ premises of the half-step as recorded by OP-8 (D-055.1, item 4): P-1, P-2, P-3, P-5 checked by OP-8, P-4 ASSUMED. The
+    pipeline never raises P-4 above ASSUMED and never reads an energy check as a proof of the C-3+ theorem for this input. Returns
+    (status, binding reasons): a record that is not the OP-8 one (P-4 not ASSUMED, premises not ESTABLISHED_CONDITIONAL_ON_P4 on an
+    executed half-step, the re-run of OP-8 classifying them differently) is a binding fault of П-а."""
+    if rec is None:
+        return {"c3plus_premises_status": "NOT_APPLICABLE", "P-4": "NOT_APPLICABLE",
+                "applicability": "NOT_APPLICABLE: control arrays (no OP-8 half-step, no C-3+ assembly)"}, []
+    o = op8()
+    st, classes = rec.get("c3plus_premises_status"), (rec.get("c3plus_premises") or {}).get("classes")
+    bad = []
+    if not isinstance(classes, dict) or classes.get("P-4") != "ASSUMED":
+        bad.append(f"C-3+ premise record: P-4 recorded as {None if not isinstance(classes, dict) else classes.get('P-4')!r} "
+                   "(OP-8 records P-4 = ASSUMED only)")
+    if st != o.PREMISES_OK:
+        bad.append(f"C-3+ premise record: status {st!r} on an executed half-step (OP-8 solves only with {o.PREMISES_OK})")
+    if rerun is not None and (rerun.get("c3plus_premises_status") != st or rerun.get("c3plus_premise_classes") != classes):
+        bad.append("C-3+ premises of the OP-8 re-run differ from the record")
+    applicability = ("CONDITIONAL_ON_P4: P-1, P-2, P-3, P-5 established by OP-8 on this half-step, P-4 ASSUMED (accepted model, not "
+                     "proven); the C-3+ theorem is not proven for this input" if not bad else
+                     "NOT_ESTABLISHED: the C-3+ premise record is not the OP-8 one")
+    return {"c3plus_premises_status": st, "c3plus_premise_classes": classes, "P-4": "ASSUMED", "applicability": applicability,
+            "summary": rec.get("c3plus_premises_summary")}, bad
+
+
 def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None, recorded: dict | None = None) -> dict:
     """One row from a specification: {"kind": "journal", "journal": dir, "s": s} or {"kind": "arrays", "arrays_npz": path,
-    "arrays_sha256": {...}, "config": {...}, "s": s}, optional "injection", "mutation", "gamma_other", "mode"."""
+    "arrays_sha256": {...}, "config": {...}, "s": s}, optional "injection", "mutation", "gamma_other", "mode".
+    The configuration is guarded first: a D1 grid or N != 1 is refused before any binding, re-run or child process (I-2)."""
+    guard_config(spec_config(spec))
     try:
         if spec.get("mode") is not None:
             primary = run_child(spec)
@@ -647,9 +790,10 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
                                                                                f"{str(exc)[-500:]}"}})
         return {"data_status": DATA_STATUS, "spec": {k: v for k, v in spec.items() if k != "arrays_sha256"}, "row": None,
                 "reproduction": None, "premises": {}, "classification": res, "status": res["status"], "contradictions": [],
-                "op8_rerun": None, "exception": f"{type(exc).__name__}: {exc}"}
+                "faults": [], "op8_rerun": None, "c3plus": None, "scope": SCOPE, "exception": f"{type(exc).__name__}: {exc}"}
     row = primary["row"]
     pa = list(primary["input_binding_reasons"])
+    rec = None
     if spec["kind"] == "journal":
         j, _ = load_journal(Path(spec["journal"]))
         rec = next(r for r in j["steps"] if r["s"] == spec["s"])
@@ -660,6 +804,8 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
         rr = primary.get("op8_rerun")
         if rr is not None and not rr["reproduced"]:
             pa.append(f"the OP-8 half-step re-run does not reproduce V_bc bitwise ({rr['status']})")
+    c3, c3_bad = c3plus_status(rec, primary.get("op8_rerun"))
+    pa += c3_bad
     repro = None
     if reproduce:
         try:
@@ -686,10 +832,11 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
                     "bitwise in a separate process"}
     premises = {"P-a": pa_state, **row["premises"]}
     comps = {k: (float.fromhex(v) if isinstance(v, str) else v) for k, v in row["components"].items()}
-    res = assemble(comps, premises, recorded)
+    res = assemble(comps, premises, recorded, faults=row.get("faults"))
     return {"data_status": DATA_STATUS, "spec": {k: v for k, v in spec.items() if k != "arrays_sha256"}, "row": row,
             "reproduction": repro, "premises": premises, "classification": res, "status": res["status"],
-            "contradictions": row["contradictions"], "op8_rerun": primary.get("op8_rerun")}
+            "contradictions": row["contradictions"], "faults": row.get("faults", []), "op8_rerun": primary.get("op8_rerun"),
+            "c3plus": c3, "scope": {**SCOPE, "c3plus_applicability": c3["applicability"]}}
 
 
 def not_executed(rec: dict | None, s: int) -> dict:
@@ -697,13 +844,18 @@ def not_executed(rec: dict | None, s: int) -> dict:
     st = "absent (trajectory stopped before)" if rec is None else str(rec.get("status"))
     note = " (status of C-3+ premises in the row: owner decision OD-8)" if "C3PLUS" in st else ""
     res = pf().classify_row({"executed": False, "not_executed": {"reason": f"OP-8 half-step s = {s}: {st}{note}"}})
-    return {"data_status": DATA_STATUS, "spec": {"s": s}, "status": res["status"], "classification": res, "contradictions": []}
+    classes = None if rec is None else (rec.get("c3plus_premises") or {}).get("classes")
+    c3 = None if rec is None else {"c3plus_premises_status": rec.get("c3plus_premises_status"), "c3plus_premise_classes": classes,
+                                   "P-4": "ASSUMED" if classes else "NOT_REACHED (no C-3+ premise record)",
+                                   "applicability": "NOT_APPLICABLE: half-step not executed by OP-8"}
+    return {"data_status": DATA_STATUS, "spec": {"s": s}, "status": res["status"], "classification": res, "contradictions": [],
+            "faults": [], "c3plus": c3, "scope": SCOPE}
 
 
 def analyse_journal(jdir: Path, s_max: int | None = None, reproduce: bool = True) -> list[dict]:
+    cfg = spec_config({"kind": "journal", "journal": str(jdir)})
+    guard_config(cfg)  # before the arrays are loaded or any half-step is analysed
     j, _ = load_journal(Path(jdir))
-    cfg = config_of(j["meta"])
-    guard_config(cfg)
     by_s = {r["s"]: r for r in j["steps"]}
     out = []
     for s in range(1, (s_max or cfg.s_max) + 1):
@@ -760,7 +912,13 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     if a.cmd == "_row":
         spec = json.loads(a.spec.read_text(encoding="utf-8"))
-        print(json.dumps(_row_job(spec), default=_json_default))
+        try:
+            guard_config(spec_config(spec))
+            job = _row_job(spec)
+        except D1Refused as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 2
+        print(json.dumps(job, default=_json_default))
         return 0
     try:
         cfg = op8().TrajectoryConfig(a.lx, a.nx, a.ly, a.ny, 1, a.D, a.q, a.s_max)
