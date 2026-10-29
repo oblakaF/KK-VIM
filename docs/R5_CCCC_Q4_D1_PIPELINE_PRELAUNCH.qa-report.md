@@ -27,8 +27,8 @@ QA-EB — `scripts/r5_cccc_q4_energy_bound_premises_audit.py`; EQ — `scripts/r
 |---|---|---|
 | `scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py` | 783 | конвейер строки N = 1 (задача А, Г) |
 | `scripts/r5_cccc_q4_d1_bc_reference_adapter.py` | 241 | эталон BR для фактического `V_bc` C-3⁺ (задача В) |
-| `scripts/r5_cccc_q4_d1_controls_prelaunch.py` | ≈ 390 | контроли A/Б/В/Г (задача Б) |
-| `tests/reference/test_r5_cccc_q4_d1_row_pipeline_prelaunch.py` | ≈ 275 | 17 тестов |
+| `scripts/r5_cccc_q4_d1_controls_prelaunch.py` | 385 | контроли A/Б/В/Г (задача Б) |
+| `tests/reference/test_r5_cccc_q4_d1_row_pipeline_prelaunch.py` | 259 | 17 тестов |
 | `tests/reference/test_r5_cccc_q4_d1_bc_reference_adapter.py` | 109 | 6 тестов |
 | `tests/reference/test_r5_cccc_q4_d1_controls_prelaunch.py` | 116 | 6 тестов |
 | `tests/reference/r5_cccc_q4_d1_controls_prelaunch_expected.json` | 1002 | ожидания (замороженные) |
