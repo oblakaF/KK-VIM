@@ -169,23 +169,43 @@ def _strip_platform_csv(text: str) -> list[dict]:
     return rows
 
 
-def _check_self_blob(built: dict, committed: dict) -> None:
-    assert _self_entry(built)["blob"] == pf.git_blob_id(TOOL)
-    if shutil.which("git") is None or subprocess.run(["git", "cat-file", "-e", MANIFEST_COMMIT], cwd=ROOT, capture_output=True).returncode:
-        return  # shallow checkout: the provenance of the committed blob is checked where the commit is available
-    b = subprocess.run(["git", "rev-parse", f"{MANIFEST_COMMIT}:{pf.SELF}"], cwd=ROOT, capture_output=True, text=True)
-    assert _self_entry(committed)["blob"] == b.stdout.strip()
+def _git(*args: str, cwd: Path = ROOT) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+
+
+def _require_history(*commits: str) -> None:
+    """Historical git checks need the fixed commits. SKIP with the reason only without git or in a shallow checkout (never a silent
+    PASS); in a full clone a missing commit FAILS (the check would otherwise be empty). CI checks out the full history."""
+    if shutil.which("git") is None:
+        pytest.skip("git not available: historical check NOT performed")
+    if _git("rev-parse", "--git-dir").returncode:
+        pytest.skip("not a git checkout: historical check NOT performed")
+    missing = [c for c in commits if _git("cat-file", "-e", f"{c}^{{commit}}").returncode]
+    if not missing:
+        return
+    shallow = _git("rev-parse", "--is-shallow-repository")
+    if shallow.returncode == 0 and shallow.stdout.strip() == "true":
+        pytest.skip(f"shallow checkout without {missing}: historical check NOT performed (needs the full history, fetch-depth: 0)")
+    pytest.fail(f"full clone without the commits {missing}: the historical check cannot be performed")
 
 
 def test_committed_manifest_is_reproduced(manifest, committed):
     same = pf._same_hash_platform(committed["hash_platform"])
     assert _strip_platform(manifest, same) == _strip_platform(committed, same)  # same platform: every input hash strictly
-    _check_self_blob(manifest, committed)
+    assert _self_entry(manifest)["blob"] == pf.git_blob_id(TOOL)  # committed blob: test_manifest_tool_blob_is_the_historical_one
     text = (OUT / "mandatory_rows.csv").read_text(encoding="utf-8")
     if same:
         assert text == pf.manifest_csv(manifest["mandatory_rows"])
     else:
         assert _strip_platform_csv(text) == _strip_platform_csv(pf.manifest_csv(manifest["mandatory_rows"]))
+
+
+def test_manifest_tool_blob_is_the_historical_one(committed):
+    """The committed manifest records the blob of the tool version that wrote it (MANIFEST_COMMIT), checked against git history."""
+    _require_history(MANIFEST_COMMIT)
+    b = _git("rev-parse", f"{MANIFEST_COMMIT}:{pf.SELF}")
+    assert b.returncode == 0 and b.stdout.strip(), b.stderr
+    assert _self_entry(committed)["blob"] == b.stdout.strip()
 
 
 def test_platform_dependent_hashes_are_the_only_ones_masked(committed):
@@ -265,18 +285,25 @@ def test_platform_dependent_hashes_are_the_only_ones_masked(committed):
 
 def test_sha_inventory_against_git(manifest):
     inv = manifest["sha_inventory"]
-    have = subprocess.run(["git", "cat-file", "-e", pf.BASE_COMMIT], cwd=ROOT, capture_output=True).returncode == 0
     for c in inv["components"] + inv["other_used_files"]:
         if not c.get("path"):
             continue
         assert c["blob"] == pf.git_blob_id(ROOT / c["path"])
-        if have and c["path"] != pf.SELF:
-            b = subprocess.run(["git", "rev-parse", f"{pf.BASE_COMMIT}:{c['path']}"], cwd=ROOT, capture_output=True, text=True)
-            assert b.stdout.strip() == c["blob"], c["path"]
     missing = {c["id"] for c in inv["components"] if c["state"] == "MISSING"}
     assert missing == {"classifier_campaign", "row_pipeline", "block_C_driver", "B_E_independent_recount", "control_V_harness",
                        "control_G_harness"}
     assert all(c["blob"] is None and c["path"] is None for c in inv["components"] if c["state"] == "MISSING")
+
+
+def test_sha_inventory_blobs_at_the_base_commit(manifest):
+    """The used files are the ones of BASE_COMMIT (git history; the tool itself is new in the branch)."""
+    _require_history(pf.BASE_COMMIT)
+    inv = manifest["sha_inventory"]
+    for c in inv["components"] + inv["other_used_files"]:
+        if c.get("path") and c["path"] != pf.SELF:
+            b = _git("rev-parse", f"{pf.BASE_COMMIT}:{c['path']}")
+            assert b.returncode == 0, (c["path"], b.stderr)
+            assert b.stdout.strip() == c["blob"], c["path"]
 
 
 def test_dependency_closure_contains_the_op8_list(manifest):
@@ -535,12 +562,70 @@ def test_tool_source_runs_no_campaign():
                     "bc", "hs", "en", "tj", "qa", "br")), f"module attribute written: {ast.unparse(t)}"
 
 
+# The preparation package as committed: both ends of the range are fixed, so the check does not depend on the current HEAD, on later
+# commits of main or on other branches merged later. PACKAGE_END_COMMIT is the last content commit of the package (QA editorial Z-2,
+# parent 16b5f69 = the PR #48 head with the CI fixes); later commits of PR #48 (the CI checkout depth, this test) are outside it.
+PACKAGE_END_COMMIT = "de0d8eecc07739d3a1dbd62dd6d2af454086a09a"
+PACKAGE_FILES = ("docs/R5_CCCC_Q4_D1_PRELAUNCH.qa-report.md",
+                 "docs/results/r5_cccc_q4_d1_prelaunch/control_ab_expected.json",
+                 "docs/results/r5_cccc_q4_d1_prelaunch/control_ab_results.json",
+                 "docs/results/r5_cccc_q4_d1_prelaunch/mandatory_rows.csv",
+                 "docs/results/r5_cccc_q4_d1_prelaunch/manifest.json",
+                 "docs/results/r5_cccc_q4_d1_prelaunch/resource_probes.json",
+                 "scripts/r5_cccc_q4_d1_preflight.py",
+                 "tests/reference/test_r5_cccc_q4_d1_preflight.py")
+
+
+def _check_package_range(base: str, end: str, files=PACKAGE_FILES, cwd: Path = ROOT) -> None:
+    """``base`` is an ancestor of ``end`` and ``git diff base end`` consists of exactly ``files``, each added (status A).
+    A git error, an empty diff, a missing object, a changed or deleted existing file and any other file fail."""
+    anc = _git("merge-base", "--is-ancestor", base, end, cwd=cwd)
+    assert anc.returncode == 0, f"{base} is not an ancestor of {end} (rc {anc.returncode}): {anc.stderr.strip()}"
+    d = _git("-c", "core.quotepath=false", "diff", "--no-renames", "--name-status", base, end, "--", cwd=cwd)
+    assert d.returncode == 0, f"git diff failed (rc {d.returncode}): {d.stderr.strip()}"
+    got = sorted(tuple(ln.split("\t", 1)) for ln in d.stdout.splitlines() if ln)
+    assert got, "empty diff: the package range contains no file"
+    want = sorted(("A", f) for f in files)
+    extra, absent = [x for x in got if x not in want], [x for x in want if x not in got]
+    assert not extra and not absent, f"not the package: unexpected {extra}; missing {absent}"
+
+
 def test_only_new_files_in_the_branch():
-    if shutil.which("git") is None or subprocess.run(["git", "cat-file", "-e", pf.BASE_COMMIT], cwd=ROOT).returncode:
-        pytest.skip("base commit not available")
-    d = subprocess.run(["git", "diff", "--name-status", pf.BASE_COMMIT, "--", "."], cwd=ROOT, capture_output=True, text=True).stdout
-    for ln in d.splitlines():
-        st, path = ln.split("\t", 1)
-        assert st == "A", ln
-        assert path in ("scripts/r5_cccc_q4_d1_preflight.py", "tests/reference/test_r5_cccc_q4_d1_preflight.py",
-                        "docs/R5_CCCC_Q4_D1_PRELAUNCH.qa-report.md") or path.startswith("docs/results/r5_cccc_q4_d1_prelaunch/"), ln
+    _require_history(pf.BASE_COMMIT, PACKAGE_END_COMMIT)
+    _check_package_range(pf.BASE_COMMIT, PACKAGE_END_COMMIT)
+
+
+def test_package_range_check_rejects_a_foreign_file(tmp_path):
+    """The range check is not vacuous: in a scratch repository a foreign file, a modified existing file, an empty range, a missing
+    object and a reversed range fail; the exact package passes."""
+    if shutil.which("git") is None:
+        pytest.skip("git not available")
+    r = tmp_path / "repo"
+    r.mkdir()
+    idn = ("-c", "user.name=t", "-c", "user.email=t@example.invalid")
+    assert _git("init", "-q", cwd=r).returncode == 0
+
+    def commit(paths: dict, msg: str) -> str:
+        for p, text in paths.items():
+            (r / p).parent.mkdir(parents=True, exist_ok=True)
+            (r / p).write_text(text, encoding="utf-8")
+        assert _git("add", "-A", cwd=r).returncode == 0
+        c = _git(*idn, "commit", "-q", "-m", msg, cwd=r)
+        assert c.returncode == 0, c.stderr
+        return _git("rev-parse", "HEAD", cwd=r).stdout.strip()
+
+    base = commit({"README.md": "base\n"}, "base")
+    pkg = commit({f: f"{f}\n" for f in PACKAGE_FILES}, "package")
+    _check_package_range(base, pkg, cwd=r)
+    foreign = commit({"scripts/foreign.py": "x = 1\n"}, "foreign file")
+    with pytest.raises(AssertionError, match="foreign"):
+        _check_package_range(base, foreign, cwd=r)
+    modified = commit({"README.md": "changed\n"}, "existing file changed")
+    with pytest.raises(AssertionError, match="README"):
+        _check_package_range(base, modified, cwd=r)
+    with pytest.raises(AssertionError, match="empty diff"):
+        _check_package_range(pkg, pkg, cwd=r)
+    with pytest.raises(AssertionError, match="not an ancestor"):
+        _check_package_range("0" * 40, pkg, cwd=r)
+    with pytest.raises(AssertionError, match="not an ancestor"):
+        _check_package_range(pkg, base, cwd=r)
