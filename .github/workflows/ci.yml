@@ -25,7 +25,11 @@ jobs:
       UV_PYTHON: ${{ matrix.python }}
       UV_PYTHON_DOWNLOADS: never
     steps:
+      # Full history: the historical tests (fixed commits, blobs of earlier tool versions)
+      # must run, not be skipped as in a shallow checkout.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
