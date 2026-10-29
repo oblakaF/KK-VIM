@@ -509,6 +509,62 @@ def exact_value(v) -> Fraction | None:
     raise TypeError(f"unsupported value {v!r}")
 
 
+MISSING_VALUE, NOT_FINITE_VALUE, FINITE_VALUE = "MISSING", "NOT_FINITE", "FINITE"
+UNDETERMINED = "UNDETERMINED"
+VALUE_LABELS = {"dP": "dP", "Q": "Q^", "tau": "tau'", "P_p": "P^_p", "P_s": "P^_s", "Gamma_up": "Gamma_up", "B_E": "B_E"}
+
+
+def _value_state(inp: dict, k: str) -> str:
+    """MISSING (absent or null), NOT_FINITE or FINITE."""
+    if inp.get(k) is None:
+        return MISSING_VALUE
+    return FINITE_VALUE if exact_value(inp[k]) is not None else NOT_FINITE_VALUE
+
+
+def value_faults(inp: dict, prem: dict) -> list[dict]:
+    """Faults of the recorded values and their source (protocol 4.1). Optional components of a row: P_p, P_s (P^), Gamma_up, B_E.
+
+    - not finite P^_p, P^_s or Q^ -> P-c (П-в: finiteness of P^_p, P^_s, Q^);
+    - not finite B_E, or B_E inapplicable (premise P-f recorded and not established) -> P-f (П-е);
+    - not finite Gamma_up -> source Gamma_up; protocol 4.1 lists no premise for it, so no premise is attributed;
+    - dP, Q^ or tau' missing or not finite without such a recorded cause -> source UNDETERMINED, no premise is attributed.
+    dP is the exact difference of P^_p and P^_s; tau' the exact sum of Gamma_up and B_E (protocol 4.1)."""
+    st = {k: _value_state(inp, k) for k in VALUE_LABELS}
+    out = []
+
+    def add(k, source, premise, note=None):
+        f = {"value": VALUE_LABELS[k], "state": st[k], "source": source, "premise": premise}
+        out.append({**f, "note": note} if note else f)
+
+    for k in ("P_p", "P_s"):
+        if st[k] == NOT_FINITE_VALUE:
+            add(k, "P_hat", "P-c")
+    if st["Gamma_up"] == NOT_FINITE_VALUE:
+        add("Gamma_up", "Gamma_up", None, "protocol 4.1 lists no premise P-a...P-f for Gamma_up")
+    if st["B_E"] == NOT_FINITE_VALUE:
+        add("B_E", "B_E", "P-f")
+    p_hat_bad = NOT_FINITE_VALUE in (st["P_p"], st["P_s"])
+    pf_rec = prem.get("P-f")
+    b_e_bad = st["B_E"] == NOT_FINITE_VALUE or (pf_rec is not None and pf_rec.get("state") != ESTABLISHED)
+    gamma_bad = st["Gamma_up"] == NOT_FINITE_VALUE
+    if st["dP"] != FINITE_VALUE:
+        add("dP", "P_hat", "P-c") if p_hat_bad else add("dP", UNDETERMINED, None)
+    if st["Q"] != FINITE_VALUE:
+        add("Q", "Q_hat", "P-c") if st["Q"] == NOT_FINITE_VALUE else add("Q", UNDETERMINED, None)
+    if st["tau"] != FINITE_VALUE:
+        if not (b_e_bad or gamma_bad):
+            add("tau", UNDETERMINED, None)
+        else:
+            if b_e_bad:
+                add("tau", "B_E", "P-f")
+            if gamma_bad:
+                add("tau", "Gamma_up", None, "protocol 4.1 lists no premise P-a...P-f for Gamma_up")
+            for c in ("Gamma_up", "B_E"):
+                if st[c] == MISSING_VALUE and not (c == "B_E" and b_e_bad):
+                    add("tau", UNDETERMINED, None, f"{c} not recorded: its part in tau' is not determined")
+    return out
+
+
 def classify_row(inp: dict) -> dict:
     """Status of one row, protocol 4.2 (the decision tree, in this order; exact comparisons, no tolerance)."""
     if not inp.get("executed", False):
@@ -533,28 +589,39 @@ def classify_row(inp: dict) -> dict:
         if state != ESTABLISHED:
             bad[p] = state
             reasons[p] = f"{p} ({PREMISE_NAMES[p]}): {state}: {why}"
+    faults = value_faults(inp, prem)
+    unattributed = []
+    for f in faults:  # a fault of a value with a known premise makes that premise not established (protocol 4.1)
+        text = f"{f['value']} {f['state']} (source {f['source']})" + (f": {f['note']}" if f.get("note") else "")
+        if f["premise"]:
+            p = f["premise"]
+            bad.setdefault(p, NOT_ESTABLISHED)
+            reasons[p] = reasons.get(p, f"{p} ({PREMISE_NAMES[p]}): {NOT_ESTABLISHED}") + f"; {text}"
+        else:
+            unattributed.append(f"no premise attributed: {text}")
+    undetermined = any(f["source"] == UNDETERMINED for f in faults)
     dP, Q, tau = (exact_value(inp.get(k)) for k in ("dP", "Q", "tau"))
-    if dP is None or Q is None or tau is None:
-        bad.setdefault("P-c", NOT_ESTABLISHED)
-        reasons["P-c"] = reasons.get("P-c", f"P-c ({PREMISE_NAMES['P-c']}): {NOT_ESTABLISHED}") + "; dP, Q^ or tau' missing or not finite"
+    if dP is None or Q is None or tau is None:  # 4.2 item 1: E1/E2 cannot be evaluated
         order = [p for p in PREMISES if p in bad]
         return {"status": UNRES_CERT, "e1": None, "e2": None, "e_diag": False, "reason_premises": order,
-                "reasons": [reasons[p] for p in order]}
+                "reasons": [reasons[p] for p in order] + unattributed, "value_faults": faults, "source_undetermined": undetermined}
     if tau < 0:
         raise ValueError("tau' < 0: tau' is a sum of upper bounds of absolute values")
     e1 = dP >= -tau  # E1, non-strict
     e2 = abs(dP - Q) <= tau  # E2, non-strict
-    if bad:  # 4.2 item 1: E1/E2 and resolvability are evaluated and recorded, not as verified
+    if bad or faults:  # 4.2 item 1: E1/E2 and resolvability are evaluated and recorded, not as verified
         order = [p for p in PREMISES if p in bad]
         return {"status": UNRES_CERT, "e1": e1, "e2": e2, "e_diag": not (e1 and e2), "resolvable_unverified": Q > tau,
-                "reason_premises": order, "reasons": [reasons[p] for p in order]}
+                "reason_premises": order, "reasons": [reasons[p] for p in order] + unattributed, "value_faults": faults,
+                "source_undetermined": undetermined}
     if not (e1 and e2):
         status = FAIL_COMPUTATION  # 4.2 item 2
     elif Q <= tau:
         status = UNRES_RESOLVABILITY  # 4.2 item 3 (strict sign of resolvability; Q = 0 included)
     else:
         status = PASS  # 4.2 item 4
-    return {"status": status, "e1": e1, "e2": e2, "e_diag": False, "reason_premises": [], "reasons": []}
+    return {"status": status, "e1": e1, "e2": e2, "e_diag": False, "reason_premises": [], "reasons": [], "value_faults": [],
+            "source_undetermined": False}
 
 
 def mandatory_index(rows: list[dict]) -> dict:

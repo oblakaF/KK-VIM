@@ -10,6 +10,7 @@ import ast
 import csv
 import hashlib
 import importlib.util
+import io
 import json
 import re
 import shutil
@@ -134,22 +135,124 @@ def test_input_hashes_reproducible(manifest, committed):
     assert [r["inputs"] for r in manifest["mandatory_rows"]] == [r["inputs"] for r in committed["mandatory_rows"]]
 
 
-def _strip_platform(m: dict) -> dict:
+PLATFORM_DEPENDENT = "<platform-dependent: start set T_N via numpy.sin (OD-12)>"
+MANIFEST_COMMIT = "30463a411f1a16544412c0da967f230be84d79fd"  # the tool version that wrote manifest.json (its blob is recorded there)
+_SHA = re.compile(r"[0-9a-f]{64}")
+
+
+def _self_entry(m: dict) -> dict:
+    return next(c for c in m["sha_inventory"]["components"] if c["path"] == pf.SELF)
+
+
+def _strip_platform(m: dict, same_platform: bool) -> dict:
+    """The manifest without the fields that may legitimately differ from the committed one:
+    - hash_platform (fingerprint of the machine) and the blob of this tool (it changes with each edit; checked against git apart);
+    - on another platform only: the hashes of the start sets T_N, which depend on numpy.sin: given_in_sha of the s = 1 rows and of the
+      blocked N = 3 probes. They must still be sha256 strings. Everything else (zero companion sets, dynamic links of s = 2, 3,
+      configurations, keys, the blob inventory, the BLOCKED state of the probes) is compared exactly."""
     m = json.loads(json.dumps(m))
-    m.pop("hash_platform")
-    for r in m["mandatory_rows"]:
-        if r["s"] == 1:
-            r["inputs"].pop("given_in_sha")
-            r["inputs"].pop("companion_in_sha")
+    m["hash_platform"] = None
+    _self_entry(m)["blob"] = None
+    if not same_platform:
+        for x in [r["inputs"] for r in m["mandatory_rows"] if r["s"] == 1] + m["blocked_probes_N23"]["probes"]:
+            assert _SHA.fullmatch(x["given_in_sha"]), x["given_in_sha"]
+            x["given_in_sha"] = PLATFORM_DEPENDENT
     return m
 
 
+def _strip_platform_csv(text: str) -> list[dict]:
+    rows = list(csv.DictReader(text.splitlines()))
+    for r in rows:
+        if r["s"] == "1":
+            assert _SHA.fullmatch(r["given_in_sha"]), r["given_in_sha"]
+            r["given_in_sha"] = PLATFORM_DEPENDENT
+    return rows
+
+
+def _check_self_blob(built: dict, committed: dict) -> None:
+    assert _self_entry(built)["blob"] == pf.git_blob_id(TOOL)
+    if shutil.which("git") is None or subprocess.run(["git", "cat-file", "-e", MANIFEST_COMMIT], cwd=ROOT, capture_output=True).returncode:
+        return  # shallow checkout: the provenance of the committed blob is checked where the commit is available
+    b = subprocess.run(["git", "rev-parse", f"{MANIFEST_COMMIT}:{pf.SELF}"], cwd=ROOT, capture_output=True, text=True)
+    assert _self_entry(committed)["blob"] == b.stdout.strip()
+
+
 def test_committed_manifest_is_reproduced(manifest, committed):
-    if pf._same_hash_platform(committed["hash_platform"]):
-        assert manifest == {**committed, "hash_platform": manifest["hash_platform"]}
-        assert (OUT / "mandatory_rows.csv").read_text(encoding="utf-8") == pf.manifest_csv(manifest["mandatory_rows"])
+    same = pf._same_hash_platform(committed["hash_platform"])
+    assert _strip_platform(manifest, same) == _strip_platform(committed, same)  # same platform: every input hash strictly
+    _check_self_blob(manifest, committed)
+    text = (OUT / "mandatory_rows.csv").read_text(encoding="utf-8")
+    if same:
+        assert text == pf.manifest_csv(manifest["mandatory_rows"])
     else:
-        assert _strip_platform(manifest) == _strip_platform(committed)
+        assert _strip_platform_csv(text) == _strip_platform_csv(pf.manifest_csv(manifest["mandatory_rows"]))
+
+
+def test_platform_dependent_hashes_are_the_only_ones_masked(committed):
+    """Models a manifest built on another platform: only the T_N hashes differ (as observed on the Linux CI)."""
+    import numpy as np
+
+    from kkvim_reference import r5_cccc_halfstep as hs
+
+    tj = pf._load(pf.OP8_TOOL, "_op8_test_platform")
+    assert pf._same_hash_platform(pf.platform_fingerprint())
+    assert not pf._same_hash_platform({**pf.platform_fingerprint(), "sys_platform": "linux"})
+    assert not pf._same_hash_platform({**pf.platform_fingerprint(), "numpy": "0.0"})
+    for r in committed["mandatory_rows"]:  # the zero companion set is platform independent: compared everywhere
+        if r["s"] == 1:
+            assert r["inputs"]["companion_in_sha"] == tj.array_sha(np.zeros((r["ny"] - 1, 1)))
+    if pf._same_hash_platform(committed["hash_platform"]):  # the masked hashes are those of numpy.sin start sets
+        r0 = committed["mandatory_rows"][0]
+        assert r0["inputs"]["given_in_sha"] == tj.array_sha(hs.start_set(r0["nx"], 1))
+        p0 = committed["blocked_probes_N23"]["probes"][0]
+        assert p0["given_in_sha"] == tj.array_sha(hs.start_set(p0["nx"], 3))
+
+    def other(edit):
+        m = json.loads(json.dumps(committed))
+        m["hash_platform"] = {**m["hash_platform"], "sys_platform": "linux", "machine": "x86_64", "processor": "x86_64"}
+        for x in [r["inputs"] for r in m["mandatory_rows"] if r["s"] == 1] + m["blocked_probes_N23"]["probes"]:
+            x["given_in_sha"] = hashlib.sha256(x["given_in_sha"].encode()).hexdigest()  # a different sin -> different hashes
+        edit(m)
+        return m
+
+    linux = other(lambda m: None)
+    assert _strip_platform(linux, False) == _strip_platform(committed, False)  # cross-platform: accepted
+    assert _strip_platform(linux, True) != _strip_platform(committed, True)  # same platform: strict, the difference is seen
+    breaks = {
+        "companion_in_sha of s = 1": lambda m: m["mandatory_rows"][0]["inputs"].update(companion_in_sha="0" * 64),
+        "dynamic link of s = 2": lambda m: m["mandatory_rows"][1]["inputs"].update(given_in_sha="= next_given_sha of X"),
+        "config_sha256": lambda m: m["mandatory_rows"][5].update(config_sha256="0" * 64),
+        "row key": lambda m: m["mandatory_rows"][7].update(key="D1-A|x"),
+        "keys sha": lambda m: m.update(mandatory_keys_sha256="0" * 64),
+        "probe companion": lambda m: m["blocked_probes_N23"]["probes"][0].update(companion_in_sha="0" * 64),
+        "probe BLOCKED state": lambda m: m["blocked_probes_N23"]["probes"][0].update(state="EXECUTED"),
+        "probe plan status": lambda m: m["blocked_probes_N23"].update(status="EXECUTED"),
+        "blob of a used file": lambda m: m["sha_inventory"]["components"][0].update(blob="0" * 40),
+        "expected sha": lambda m: m.update(controls_expected_sha256="0" * 64),
+    }
+    for name, edit in breaks.items():
+        assert _strip_platform(other(edit), False) != _strip_platform(committed, False), name
+    bad = other(lambda m: m["mandatory_rows"][0]["inputs"].update(given_in_sha="not a hash"))
+    with pytest.raises(AssertionError):
+        _strip_platform(bad, False)
+    text = (OUT / "mandatory_rows.csv").read_text(encoding="utf-8")
+    rows = list(csv.DictReader(text.splitlines()))
+
+    def as_csv(rs):
+        buf = io.StringIO()
+        w = csv.DictWriter(buf, fieldnames=list(rows[0]), lineterminator="\n")
+        w.writeheader()
+        w.writerows(rs)
+        return buf.getvalue()
+
+    assert _strip_platform_csv(as_csv(rows)) == _strip_platform_csv(text)
+    alt = [dict(r) for r in rows]
+    for r in alt:
+        if r["s"] == "1":
+            r["given_in_sha"] = hashlib.sha256(r["given_in_sha"].encode()).hexdigest()
+    assert _strip_platform_csv(as_csv(alt)) == _strip_platform_csv(text)
+    alt[0]["companion_in_sha"] = "f" * 64
+    assert _strip_platform_csv(as_csv(alt)) != _strip_platform_csv(text)
 
 
 def test_sha_inventory_against_git(manifest):
@@ -277,6 +380,71 @@ def test_row_tree_boundaries():
         c({"executed": True, "premises": {**ok, "P-a": {"state": "OK"}}, "dP": "1", "Q": "1", "tau": "0"})
     with pytest.raises(TypeError):
         c({"executed": True, "premises": ok, "dP": True, "Q": "1", "tau": "0"})
+
+
+def test_missing_or_not_finite_values_are_attributed_by_source():
+    """Protocol 4.1: P^, Q^ not finite -> П-в (P-c); B_E inapplicable / not finite -> П-е (P-f); otherwise no premise is invented."""
+    ok = {p: {"state": "ESTABLISHED"} for p in pf.PREMISES}
+    good = {"executed": True, "premises": ok, "dP": "1", "Q": "1", "tau": "1/2", "P_p": "3", "P_s": "2", "Gamma_up": "1/4",
+            "B_E": "1/4"}
+
+    def c(**kw):
+        row = {**good, **kw}
+        for k in [k for k, v in kw.items() if v is ...]:
+            row.pop(k)
+        r = pf.classify_row(row)
+        assert r["status"] == "UNRESOLVED_CERTIFICATE"  # never PASS or FAIL_COMPUTATION on a faulty value (4.2 item 1)
+        return r
+
+    def src(r, value):
+        return sorted(f["source"] for f in r["value_faults"] if f["value"] == value)
+
+    assert pf.classify_row(good)["status"] == "PASS" and pf.classify_row(good)["value_faults"] == []
+    undetermined = {  # the cause is not recorded: UNRESOLVED_CERTIFICATE, no premise, explicit UNDETERMINED
+        "dP absent": dict(dP=...), "dP null": dict(dP=None), "dP nan, P^ absent": dict(dP="nan", P_p=..., P_s=...),
+        "dP inf, P^ finite": dict(dP="inf"), "Q absent": dict(Q=...), "Q null": dict(Q=None),
+        "tau absent": dict(tau=...), "tau inf, Gamma_up and B_E finite": dict(tau="inf"),
+        "tau null, Gamma_up and B_E absent": dict(tau=None, Gamma_up=..., B_E=...),
+    }
+    for name, kw in undetermined.items():
+        r = c(**kw)
+        assert r["reason_premises"] == [] and r["source_undetermined"] is True, name
+        assert r["e1"] is None and r["e2"] is None and r["e_diag"] is False, name
+        assert all(f["premise"] is None and f["source"] == "UNDETERMINED" for f in r["value_faults"]), name
+        assert any("no premise attributed" in x and "UNDETERMINED" in x for x in r["reasons"]), name
+    # dP: a not finite P^ is the recorded cause -> P-c
+    for kw in (dict(dP="nan", P_p="inf"), dict(dP=None, P_s=float("nan")), dict(dP=..., P_p="-inf")):
+        r = c(**kw)
+        assert r["reason_premises"] == ["P-c"] and src(r, "dP") == ["P_hat"] and not r["source_undetermined"], kw
+    # Q^ not finite -> P-c (row case A-18 of control A)
+    for q in ("inf", "-inf", "nan", float("inf"), float("nan")):
+        r = c(Q=q)
+        assert r["reason_premises"] == ["P-c"] and src(r, "Q^") == ["Q_hat"] and not r["source_undetermined"], q
+    # tau': a known fault of B_E -> P-f
+    r = c(tau="inf", B_E="inf")
+    assert r["reason_premises"] == ["P-f"] and src(r, "tau'") == ["B_E"] and src(r, "B_E") == ["B_E"] and not r["source_undetermined"]
+    r = c(tau=..., B_E=..., premises={**ok, "P-f": {"state": "NOT_CHECKABLE", "reason": "negative radicand"}})
+    assert r["reason_premises"] == ["P-f"] and src(r, "tau'") == ["B_E"] and not r["source_undetermined"]
+    r = c(tau=None, B_E="inf", Gamma_up=...)  # B_E known, Gamma_up not recorded: its part stays explicitly undetermined
+    assert r["reason_premises"] == ["P-f"] and src(r, "tau'") == ["B_E", "UNDETERMINED"] and r["source_undetermined"]
+    # tau': a fault of Gamma_up is a known source, but protocol 4.1 lists no premise for it: no premise is attributed
+    r = c(tau="inf", Gamma_up="nan")
+    assert r["reason_premises"] == [] and src(r, "tau'") == ["Gamma_up"] and not r["source_undetermined"]
+    assert any("Gamma_up" in x and "no premise attributed" in x for x in r["reasons"])
+    r = c(tau="inf", Gamma_up="inf", B_E="inf")
+    assert r["reason_premises"] == ["P-f"] and src(r, "tau'") == ["B_E", "Gamma_up"]
+    # a not finite component with finite dP, Q^, tau': premise not established; E1/E2 recorded, not as verified
+    r = c(B_E="inf")
+    assert r["reason_premises"] == ["P-f"] and r["e1"] is True and r["e2"] is True and r["resolvable_unverified"] is True
+    r = c(P_s="nan")
+    assert r["reason_premises"] == ["P-c"]
+    r = c(Gamma_up="inf")
+    assert r["reason_premises"] == [] and r["e1"] is True and not r["source_undetermined"]
+    # several faults; a premise already not established keeps its reason and gets the value fault added
+    r = c(Q="inf", dP=..., premises={**ok, "P-c": {"state": "NOT_ESTABLISHED", "reason": "FTZ"}})
+    assert r["reason_premises"] == ["P-c"] and r["source_undetermined"] and "FTZ" in r["reasons"][0] and "Q^" in r["reasons"][0]
+    r = c(Q=None, tau=None, B_E="nan", premises={**ok, "P-a": {"state": "NOT_ESTABLISHED", "reason": "hash"}})
+    assert r["reason_premises"] == ["P-a", "P-f"] and src(r, "Q^") == ["UNDETERMINED"] and r["source_undetermined"]
 
 
 def test_verdict_needs_the_102_rows(manifest):
