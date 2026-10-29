@@ -194,10 +194,15 @@ def test_platform_dependent_hashes_are_the_only_ones_masked(committed):
 
     from kkvim_reference import r5_cccc_halfstep as hs
 
+    def other_platform(name: str) -> str:  # a real sys.platform value that differs from ``name`` on any runner
+        return "linux" if name != "linux" else "win32"
+
     tj = pf._load(pf.OP8_TOOL, "_op8_test_platform")
-    assert pf._same_hash_platform(pf.platform_fingerprint())
-    assert not pf._same_hash_platform({**pf.platform_fingerprint(), "sys_platform": "linux"})
-    assert not pf._same_hash_platform({**pf.platform_fingerprint(), "numpy": "0.0"})
+    now = pf.platform_fingerprint()
+    assert pf._same_hash_platform(now)
+    alien = {**now, "sys_platform": other_platform(now["sys_platform"])}
+    assert alien["sys_platform"] != now["sys_platform"] and not pf._same_hash_platform(alien)
+    assert not pf._same_hash_platform({**now, "numpy": "0.0"})
     for r in committed["mandatory_rows"]:  # the zero companion set is platform independent: compared everywhere
         if r["s"] == 1:
             assert r["inputs"]["companion_in_sha"] == tj.array_sha(np.zeros((r["ny"] - 1, 1)))
@@ -209,15 +214,18 @@ def test_platform_dependent_hashes_are_the_only_ones_masked(committed):
 
     def other(edit):
         m = json.loads(json.dumps(committed))
-        m["hash_platform"] = {**m["hash_platform"], "sys_platform": "linux", "machine": "x86_64", "processor": "x86_64"}
+        m["hash_platform"] = {**m["hash_platform"], "sys_platform": other_platform(committed["hash_platform"]["sys_platform"]),
+                              "machine": "other-machine", "processor": "other-processor"}
+        assert m["hash_platform"]["sys_platform"] != committed["hash_platform"]["sys_platform"]
         for x in [r["inputs"] for r in m["mandatory_rows"] if r["s"] == 1] + m["blocked_probes_N23"]["probes"]:
             x["given_in_sha"] = hashlib.sha256(x["given_in_sha"].encode()).hexdigest()  # a different sin -> different hashes
         edit(m)
         return m
 
-    linux = other(lambda m: None)
-    assert _strip_platform(linux, False) == _strip_platform(committed, False)  # cross-platform: accepted
-    assert _strip_platform(linux, True) != _strip_platform(committed, True)  # same platform: strict, the difference is seen
+    elsewhere = other(lambda m: None)
+    assert not pf._same_hash_platform(elsewhere["hash_platform"])  # the model is another platform on any runner
+    assert _strip_platform(elsewhere, False) == _strip_platform(committed, False)  # cross-platform: accepted
+    assert _strip_platform(elsewhere, True) != _strip_platform(committed, True)  # same platform: strict, the difference is seen
     breaks = {
         "companion_in_sha of s = 1": lambda m: m["mandatory_rows"][0]["inputs"].update(companion_in_sha="0" * 64),
         "dynamic link of s = 2": lambda m: m["mandatory_rows"][1]["inputs"].update(given_in_sha="= next_given_sha of X"),
