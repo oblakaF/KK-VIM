@@ -1,0 +1,7416 @@
+{
+ "document": "R5-V Q4 D1 PRELAUNCH: results of controls A and B (synthetic harness)",
+ "data_status": "PRELAUNCH preparation, not D1 data (D1_START = BLOCKED; protocol 12)",
+ "expected_file": "docs/results/r5_cccc_q4_d1_prelaunch/control_ab_expected.json",
+ "expected_sha256": "19225c8e131701824f0ea5529b8edc06ca6b07a872eedc6cd8744263739cb454",
+ "classifier": {
+  "path": "scripts/r5_cccc_q4_d1_preflight.py",
+  "blob": "42d76c63d4d99c3c44bc902579c6a31010bcf560"
+ },
+ "environment": {
+  "sys_platform": "win32",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "python": "3.14.8",
+  "numpy": "2.5.4"
+ },
+ "summary": {
+  "row_cases": 213,
+  "row_cases_matching": 213,
+  "aggregation_cases": 18,
+  "aggregation_matching": 18,
+  "detector_cases": 12,
+  "detector_matching": 12,
+  "detector_not_executed": [],
+  "control_A_all_match": true,
+  "control_B_synthetic_all_match": true,
+  "control_B_detector_functions_all_match": true
+ },
+ "row_cases": [
+  {
+   "id": "A-01",
+   "control": "A",
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-02",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-03",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-04",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-05",
+   "control": "A",
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-06",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-07",
+   "control": "A",
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-08",
+   "control": "A",
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": false,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "FAIL_COMPUTATION",
+    "e1": false,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-09",
+   "control": "A",
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-10",
+   "control": "A",
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-11",
+   "control": "A",
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-12",
+   "control": "A",
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-13",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-14",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-15",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-f (П-е applicability of B_E): NOT_CHECKABLE: synthetic"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-16",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_CHECKABLE: not provided"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-17",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": false,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": false,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-18",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED; dP, Q^ or tau' missing or not finite"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-19",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_RESOURCES",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "UNRESOLVED_RESOURCES",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [
+    "PL 6.3: PL 6.3 limit exceeded (synthetic)"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-20",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "UNRESOLVED",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [
+    "synthetic: tool exception"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-21",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "UNRESOLVED",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [
+    "synthetic: no probe (resource rule claimed without measured probe values: not the rule of PL 6.3)"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M00-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-M00-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "A-M00-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "actual": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": []
+   },
+   "reasons": [],
+   "match": true
+  },
+  {
+   "id": "B-M01-PASS_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M01-FAIL_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M01-RES_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M02-PASS_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M02-FAIL_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M02-RES_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M03-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M03-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M03-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M04-PASS_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M04-FAIL_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M04-RES_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M05-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M05-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M05-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M06-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M06-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M06-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M07-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M07-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M07-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M08-PASS_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M08-FAIL_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M08-RES_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M09-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M09-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M09-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M10-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M10-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M10-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M11-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M11-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M11-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M12-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M12-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M12-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M13-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M13-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M13-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M14-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M14-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M14-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M15-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M15-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M15-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M16-PASS_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M16-FAIL_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M16-RES_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M17-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M17-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M17-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M18-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M18-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M18-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M19-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M19-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M19-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M20-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M20-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M20-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M21-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M21-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M21-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M22-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M22-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M22-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M23-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M23-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M23-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M24-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M24-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M24-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M25-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M25-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M25-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M26-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M26-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M26-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M27-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M27-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M27-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M28-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M28-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M28-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M29-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M29-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M29-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M30-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M30-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M30-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M31-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M31-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M31-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M32-PASS_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M32-FAIL_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "B-M32-RES_LIKE",
+   "control": "B",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M33-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M33-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M33-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M34-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M34-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M34-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M35-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M35-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M35-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M36-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M36-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M36-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M37-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M37-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M37-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M38-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M38-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M38-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M39-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M39-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M39-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M40-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M40-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M40-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M41-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M41-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M41-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M42-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M42-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M42-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M43-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M43-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M43-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M44-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M44-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M44-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M45-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M45-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M45-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M46-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M46-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M46-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M47-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M47-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M47-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M48-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M48-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M48-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M49-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M49-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M49-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M50-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M50-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M50-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M51-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M51-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M51-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M52-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M52-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M52-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M53-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M53-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M53-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M54-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M54-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M54-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M55-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M55-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M55-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M56-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M56-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M56-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M57-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M57-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M57-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M58-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M58-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M58-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M59-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M59-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M59-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M60-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M60-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M60-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M61-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M61-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M61-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M62-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M62-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M62-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M63-PASS_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M63-FAIL_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  },
+  {
+   "id": "A-M63-RES_LIKE",
+   "control": "A",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "actual": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [
+     "P-a",
+     "P-b",
+     "P-c",
+     "P-d",
+     "P-e",
+     "P-f"
+    ]
+   },
+   "reasons": [
+    "P-a (П-а data binding): NOT_ESTABLISHED: synthetic injection",
+    "P-b (П-б U-1): NOT_ESTABLISHED: synthetic injection",
+    "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: synthetic injection",
+    "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: synthetic injection",
+    "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: synthetic injection",
+    "P-f (П-е applicability of B_E): NOT_ESTABLISHED: synthetic injection"
+   ],
+   "match": true
+  }
+ ],
+ "aggregation_cases": [
+  {
+   "id": "V-01",
+   "expected": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "unresolved_keys": [],
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-02",
+   "expected": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "unresolved_keys": [
+     "D1-A|r=1|50x50|N1|s1"
+    ],
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": [
+     "D1-A|r=1|50x50|N1|s1"
+    ]
+   },
+   "match": true
+  },
+  {
+   "id": "V-03",
+   "expected": {
+    "campaign_verdict": "FAIL_CANDIDATE",
+    "candidate_verdict": "FAIL_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "unresolved_keys": [
+     "D1-A|1x1|150x48|N1|s3"
+    ],
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "FAIL_CANDIDATE",
+    "candidate_verdict": "FAIL_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": [
+     "D1-A|1x1|150x48|N1|s3"
+    ]
+   },
+   "match": true
+  },
+  {
+   "id": "V-04",
+   "expected": {
+    "campaign_verdict": "FAIL_CANDIDATE",
+    "candidate_verdict": "FAIL_CANDIDATE",
+    "denominator": 102,
+    "pass": 100,
+    "unresolved_keys": [
+     "D1-A|1x1|150x48|N1|s3",
+     "D1-A|r=1|50x50|N1|s1"
+    ],
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "FAIL_CANDIDATE",
+    "candidate_verdict": "FAIL_CANDIDATE",
+    "denominator": 102,
+    "pass": 100,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": [
+     "D1-A|1x1|150x48|N1|s3",
+     "D1-A|r=1|50x50|N1|s1"
+    ]
+   },
+   "match": true
+  },
+  {
+   "id": "V-05",
+   "expected": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "unresolved_keys": [
+     "D1-A|r=1|50x50|N1|s1"
+    ],
+    "e_diag_keys": [
+     "D1-A|r=1|50x50|N1|s1"
+    ],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "e_diag_keys": [
+     "D1-A|r=1|50x50|N1|s1"
+    ],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": [
+     "D1-A|r=1|50x50|N1|s1"
+    ]
+   },
+   "match": true
+  },
+  {
+   "id": "V-06",
+   "expected": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "unresolved_keys": [
+     "D1-A|r=4|320x1280|N1|s2"
+    ],
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": [
+     "D1-A|r=4|320x1280|N1|s2"
+    ]
+   },
+   "match": true
+  },
+  {
+   "id": "V-07",
+   "expected": {
+    "campaign_verdict": "BLOCKED_CAMPAIGN",
+    "candidate_verdict": null,
+    "block_reasons_contain": [
+     "D1-B|r=1|50x50|N2|s1"
+    ]
+   },
+   "actual": {
+    "campaign_verdict": "BLOCKED_CAMPAIGN",
+    "candidate_verdict": null,
+    "denominator": null,
+    "pass": null,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": [
+     "FAIL_COMPUTATION on a non-mutated row: D1-B|r=1|50x50|N2|s1"
+    ],
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-08",
+   "expected": {
+    "campaign_verdict": "BLOCKED_CAMPAIGN",
+    "candidate_verdict": null,
+    "block_reasons_contain": [
+     "D1-A|r=1|50x50|N1|s1"
+    ]
+   },
+   "actual": {
+    "campaign_verdict": "BLOCKED_CAMPAIGN",
+    "candidate_verdict": null,
+    "denominator": null,
+    "pass": null,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": [
+     "FAIL_COMPUTATION on a non-mutated row: D1-A|r=1|50x50|N1|s1"
+    ],
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-09",
+   "expected": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "unresolved_keys": [],
+    "e_diag_keys": [],
+    "injected_keys": [
+     "CTRL-G|gamma-sign|r=1|50x50|N1|s2"
+    ]
+   },
+   "actual": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "e_diag_keys": [],
+    "injected_keys": [
+     "CTRL-G|gamma-sign|r=1|50x50|N1|s2"
+    ],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-10",
+   "expected": {
+    "campaign_verdict": "BLOCKED_CAMPAIGN",
+    "candidate_verdict": null,
+    "block_reasons_contain": [
+     "D1-A|r=1|50x50|N1|s1"
+    ]
+   },
+   "actual": {
+    "campaign_verdict": "BLOCKED_CAMPAIGN",
+    "candidate_verdict": null,
+    "denominator": null,
+    "pass": null,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": [
+     "input hash mismatch before the run: D1-A|r=1|50x50|N1|s1"
+    ],
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-11",
+   "expected": {
+    "campaign_verdict": "BLOCKED_CAMPAIGN",
+    "candidate_verdict": null,
+    "block_reasons_contain": [
+     "control V"
+    ]
+   },
+   "actual": {
+    "campaign_verdict": "BLOCKED_CAMPAIGN",
+    "candidate_verdict": null,
+    "denominator": null,
+    "pass": null,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": [
+     "FAIL of the positive control V (protocol 6)"
+    ],
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-12",
+   "expected": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "unresolved_keys": [],
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-13",
+   "expected": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "unresolved_keys": [],
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-14",
+   "expected": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "unresolved_keys": [],
+    "e_diag_keys": [
+     "D1-B|r=1|50x50|N3|s2"
+    ],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "PASS_CANDIDATE",
+    "candidate_verdict": "PASS_CANDIDATE",
+    "denominator": 102,
+    "pass": 102,
+    "e_diag_keys": [
+     "D1-B|r=1|50x50|N3|s2"
+    ],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-15",
+   "expected": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 0,
+    "unresolved_count": 102,
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 0,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": [
+     "D1-A|1x1|150x48|N1|s1",
+     "D1-A|1x1|150x48|N1|s2",
+     "D1-A|1x1|150x48|N1|s3",
+     "D1-A|1x1|37x61|N1|s1",
+     "D1-A|1x1|37x61|N1|s2",
+     "..."
+    ]
+   },
+   "match": true
+  },
+  {
+   "id": "V-16",
+   "expected": {
+    "error": "duplicate row key"
+   },
+   "actual": {
+    "campaign_verdict": null,
+    "candidate_verdict": null,
+    "denominator": null,
+    "pass": null,
+    "e_diag_keys": null,
+    "injected_keys": null,
+    "block_reasons": null,
+    "error": "duplicate row key D1-A|r=1|50x50|N1|s1",
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-17",
+   "expected": {
+    "error": "mandatory key with block/N/s different from the manifest"
+   },
+   "actual": {
+    "campaign_verdict": null,
+    "candidate_verdict": null,
+    "denominator": null,
+    "pass": null,
+    "e_diag_keys": null,
+    "injected_keys": null,
+    "block_reasons": null,
+    "error": "mandatory key with block/N/s different from the manifest: D1-A|r=1|50x50|N1|s1",
+    "unresolved_keys": []
+   },
+   "match": true
+  },
+  {
+   "id": "V-18",
+   "expected": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "unresolved_keys": [
+     "D1-A|r=4|320x1280|N1|s2"
+    ],
+    "e_diag_keys": [],
+    "injected_keys": []
+   },
+   "actual": {
+    "campaign_verdict": "UNRESOLVED_CANDIDATE",
+    "candidate_verdict": "UNRESOLVED_CANDIDATE",
+    "denominator": 102,
+    "pass": 101,
+    "e_diag_keys": [],
+    "injected_keys": [],
+    "block_reasons": null,
+    "error": null,
+    "unresolved_keys": [
+     "D1-A|r=4|320x1280|N1|s2"
+    ]
+   },
+   "match": true
+  }
+ ],
+ "detector_cases": [
+  {
+   "id": "B-D-a1",
+   "premise": "P-a",
+   "injection": "binding of a row value: historical P_hat_s (repr) vs the value shifted by 1 ulp (QA-EB _bind)",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-a"
+    ],
+    "reasons": [
+     "P-a (П-а data binding): NOT_ESTABLISHED: QA-EB _bind -> False"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-a2",
+   "premise": "P-a",
+   "injection": "input array with one entry shifted by 1 ulp: sha256 (OP-8 array_sha) differs from the fixed hash",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-a"
+    ],
+    "reasons": [
+     "P-a (П-а data binding): NOT_ESTABLISHED: array_sha b9bae4a968e8 vs fixed ab57122bc956"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-b",
+   "premise": "P-b",
+   "injection": "U-1: computed field entry moved by 2^-40 relative (QA-EB formation_check)",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-b"
+    ],
+    "reasons": [
+     "P-b (П-б U-1): NOT_ESTABLISHED: formation_check holds=False, violations=1"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-c1",
+   "premise": "P-c",
+   "injection": "subnormal operand 2^-1060 x 1 in a checked multiplication (QA-EB OpLog.mul)",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-c"
+    ],
+    "reasons": [
+     "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: injection: nonzero operands, |result| <= 2^-1022 (1)"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-c2",
+   "premise": "P-c",
+   "injection": "FTZ imitation: zero sum of 1.5 2^-1022 and -2^-1022 (QA-EB OpLog.add)",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-c"
+    ],
+    "reasons": [
+     "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: injection: zero result with a != -b (flush to zero) (1)"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-c3",
+   "premise": "P-c",
+   "injection": "rounding mode upward in a separate process (_controlfp), QA-EB probe_mode in the same thread",
+   "evidence": {
+    "injected": {
+     "mode": "round_up",
+     "ok": false,
+     "fails": 20,
+     "controlfp": "0x8021f"
+    },
+    "clean": {
+     "mode": "none",
+     "ok": true,
+     "fails": 0,
+     "controlfp": "0x8001f"
+    }
+   },
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-c"
+    ],
+    "reasons": [
+     "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: probe_mode ok=False, fails=20, controlfp=0x8021f"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-c4",
+   "premise": "P-c",
+   "injection": "FTZ+DAZ in a separate process (_controlfp _DN_FLUSH), QA-EB probe_mode in the same thread",
+   "evidence": {
+    "injected": {
+     "mode": "ftz_daz",
+     "ok": false,
+     "fails": 31,
+     "controlfp": "0x108001f"
+    },
+    "clean": {
+     "mode": "none",
+     "ok": true,
+     "fails": 0,
+     "controlfp": "0x8001f"
+    }
+   },
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-c"
+    ],
+    "reasons": [
+     "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: probe_mode ok=False, fails=31, controlfp=0x108001f"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-c5",
+   "premise": "P-c",
+   "injection": "non-finite P_hat (pi_double of a field 1e200 overflows), QA-EB is_finite",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-c"
+    ],
+    "reasons": [
+     "P-c (П-в U-2, mode, finiteness): NOT_ESTABLISHED: pi_double finite=False"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-d",
+   "premise": "P-d",
+   "injection": "U-3: D = 2^-1074 (D/2 not normal), QA-EB grid_constants / grid_ok",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-d"
+    ],
+    "reasons": [
+     "P-d (П-г U-3 grid constants): NOT_ESTABLISHED: grid_ok=False, normal_ok=False"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-e",
+   "premise": "P-e",
+   "injection": "N-7: previous field 2^-600 x 2^-600 computed as 0 with eps_a^C(s-1) = 0 recorded; QA-EB formation_check and the N-7 predicate of QA-EB analyse_row (U-1 is violated by the same injection)",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-b",
+     "P-e"
+    ],
+    "reasons": [
+     "P-b (П-б U-1): NOT_ESTABLISHED: formation_check holds=False",
+     "P-e (П-д N-7 exact zero): NOT_ESTABLISHED: N-7: exact product zero=False, computed zero=True, EN eps_prev == 0: False"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-f1",
+   "premise": "P-f",
+   "injection": "B_E not finite in binary64 (field 2^1000 on a 4 x 4 grid), QA-EB b_e + directed",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-f"
+    ],
+    "reasons": [
+     "P-f (П-е applicability of B_E): NOT_ESTABLISHED: B_E up finite=False"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  },
+  {
+   "id": "B-D-f2",
+   "premise": "P-f",
+   "injection": "root domain: negative radicand in QA-EB sqrt_bounds (exception)",
+   "evidence": null,
+   "injected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "reason_premises": [
+     "P-f"
+    ],
+    "reasons": [
+     "P-f (П-е applicability of B_E): NOT_CHECKABLE: sqrt_bounds: ValueError: negative radicand"
+    ],
+    "match": true
+   },
+   "clean": {
+    "status": "PASS",
+    "reason_premises": [],
+    "reasons": [],
+    "match": true
+   },
+   "match": true
+  }
+ ]
+}

@@ -1,0 +1,275 @@
+{
+ "document": "R5-V Q4 D1 PRELAUNCH resource probes (protocol 8, 12.5; PL 6.3)",
+ "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+ "data_status": "PRELAUNCH preparation, not D1 data (D1_START = BLOCKED; protocol 12)",
+ "total_ram_bytes": 34033348608,
+ "limit_bytes_50pct": 17016674304,
+ "environment": {
+  "sys_platform": "win32",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "python": "3.14.8",
+  "numpy": "2.5.4"
+ },
+ "probe_tool_blob": "42d76c63d4d99c3c44bc902579c6a31010bcf560",
+ "probe_code_sha256": "601dacf9c45c604ff0c5b04e8463c02546e292433d7e93dd54b231a15b0445a6",
+ "definitions": "OD-7 (proposal)",
+ "material_load": "D = q = 1 (OD-5 proposal)",
+ "child_environment_set_by_the_launcher": {
+  "OPENBLAS_NUM_THREADS": "1",
+  "OMP_NUM_THREADS": "1",
+  "MKL_NUM_THREADS": "1"
+ },
+ "results": [
+  {
+   "probe": "A:400x600",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "N": 1,
+   "s": 1,
+   "direction": "Y",
+   "nx": 400,
+   "ny": 600,
+   "lx": "1.0",
+   "ly": "1.5",
+   "cells": 240000,
+   "import_s": 0.36,
+   "blas_threads_read_from_library": 1,
+   "stage_op8": {
+    "seconds": 0.04,
+    "completed": true,
+    "tool_status_class": "OK"
+   },
+   "stage_qaeb": {
+    "seconds": 37.86,
+    "completed": true,
+    "B_E_evaluated": true,
+    "control_path_rows": false
+   },
+   "op8_V_equals_EQ_path_V_bitwise": true,
+   "stage_br": {
+    "seconds": 0.32,
+    "lambda_low_certified": true,
+    "factorization_attempts": 1,
+    "factorization_failed_at": 0,
+    "precision_used": 40,
+    "refine_steps": 6,
+    "refine_converged": true
+   },
+   "peak_working_set_bytes": 293163008,
+   "total_seconds": 38.62,
+   "pl63_under_OD7": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "refinement_converges": true,
+    "B_E_and_premises_included": true,
+    "all_within": true
+   },
+   "result": "WITHIN_PL63_UNDER_PROPOSED_DEFINITIONS"
+  },
+  {
+   "probe": "A:400x1000",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "N": 1,
+   "s": 1,
+   "direction": "Y",
+   "nx": 400,
+   "ny": 1000,
+   "lx": "1.0",
+   "ly": "2.5",
+   "cells": 400000,
+   "import_s": 0.36,
+   "blas_threads_read_from_library": 1,
+   "stage_op8": {
+    "seconds": 0.06,
+    "completed": true,
+    "tool_status_class": "OK"
+   },
+   "stage_qaeb": {
+    "seconds": 64.98,
+    "completed": true,
+    "B_E_evaluated": true,
+    "control_path_rows": false
+   },
+   "op8_V_equals_EQ_path_V_bitwise": true,
+   "stage_br": {
+    "seconds": 0.54,
+    "lambda_low_certified": true,
+    "factorization_attempts": 1,
+    "factorization_failed_at": 0,
+    "precision_used": 40,
+    "refine_steps": 6,
+    "refine_converged": true
+   },
+   "peak_working_set_bytes": 436858880,
+   "total_seconds": 65.99,
+   "pl63_under_OD7": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "refinement_converges": true,
+    "B_E_and_premises_included": true,
+    "all_within": true
+   },
+   "result": "WITHIN_PL63_UNDER_PROPOSED_DEFINITIONS"
+  },
+  {
+   "probe": "A:320x1280",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "N": 1,
+   "s": 1,
+   "direction": "Y",
+   "nx": 320,
+   "ny": 1280,
+   "lx": "1.0",
+   "ly": "4.0",
+   "cells": 409600,
+   "import_s": 0.33,
+   "blas_threads_read_from_library": 1,
+   "stage_op8": {
+    "seconds": 0.07,
+    "completed": true,
+    "tool_status_class": "OK"
+   },
+   "stage_qaeb": {
+    "seconds": 66.17,
+    "completed": true,
+    "B_E_evaluated": true,
+    "control_path_rows": false
+   },
+   "op8_V_equals_EQ_path_V_bitwise": true,
+   "stage_br": {
+    "seconds": 0.73,
+    "lambda_low_certified": true,
+    "factorization_attempts": 1,
+    "factorization_failed_at": 0,
+    "precision_used": 40,
+    "refine_steps": 6,
+    "refine_converged": true
+   },
+   "peak_working_set_bytes": 451723264,
+   "total_seconds": 67.35,
+   "pl63_under_OD7": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "refinement_converges": true,
+    "B_E_and_premises_included": true,
+    "all_within": true
+   },
+   "result": "WITHIN_PL63_UNDER_PROPOSED_DEFINITIONS"
+  },
+  {
+   "probe": "S:400x1600",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "N": 1,
+   "s": 1,
+   "direction": "Y",
+   "nx": 400,
+   "ny": 1600,
+   "lx": "1.0",
+   "ly": "4.0",
+   "cells": 640000,
+   "import_s": 0.33,
+   "blas_threads_read_from_library": 1,
+   "stage_op8": {
+    "seconds": 0.09,
+    "completed": true,
+    "tool_status_class": "OK"
+   },
+   "stage_qaeb": {
+    "seconds": 104.42,
+    "completed": true,
+    "B_E_evaluated": true,
+    "control_path_rows": false
+   },
+   "op8_V_equals_EQ_path_V_bitwise": true,
+   "stage_br": {
+    "seconds": 0.97,
+    "lambda_low_certified": true,
+    "factorization_attempts": 1,
+    "factorization_failed_at": 0,
+    "precision_used": 40,
+    "refine_steps": 6,
+    "refine_converged": true
+   },
+   "peak_working_set_bytes": 639238144,
+   "total_seconds": 105.86,
+   "pl63_under_OD7": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "refinement_converges": true,
+    "B_E_and_premises_included": true,
+    "all_within": true
+   },
+   "result": "WITHIN_PL63_UNDER_PROPOSED_DEFINITIONS"
+  },
+  {
+   "probe": "S:1600x400",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "N": 1,
+   "s": 1,
+   "direction": "Y",
+   "nx": 1600,
+   "ny": 400,
+   "lx": "1.0",
+   "ly": "0.25",
+   "cells": 640000,
+   "import_s": 0.33,
+   "blas_threads_read_from_library": 1,
+   "stage_op8": {
+    "seconds": 0.09,
+    "completed": true,
+    "tool_status_class": "OK"
+   },
+   "stage_qaeb": {
+    "seconds": 103.34,
+    "completed": true,
+    "B_E_evaluated": true,
+    "control_path_rows": false
+   },
+   "op8_V_equals_EQ_path_V_bitwise": true,
+   "stage_br": {
+    "seconds": 0.43,
+    "lambda_low_certified": true,
+    "factorization_attempts": 1,
+    "factorization_failed_at": 0,
+    "precision_used": 40,
+    "refine_steps": 6,
+    "refine_converged": true
+   },
+   "peak_working_set_bytes": 643768320,
+   "total_seconds": 104.27,
+   "pl63_under_OD7": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "refinement_converges": true,
+    "B_E_and_premises_included": true,
+    "all_within": true
+   },
+   "result": "WITHIN_PL63_UNDER_PROPOSED_DEFINITIONS"
+  },
+  {
+   "probe": "D:11x15",
+   "result": "NOT_EXECUTED",
+   "reason": "block D: geometry (l_x, l_y) not fixed (OD-1); largest small N = 1 configuration by cells"
+  },
+  {
+   "probe": "B:160x640:N3",
+   "result": "NOT_EXECUTED",
+   "reason": "N = 3: PRE_D1_RANK (D-049.5 stop before QR vs QR continued by OP-8 as RESEARCH_ONLY)"
+  },
+  {
+   "probe": "B:200x500:N3",
+   "result": "NOT_EXECUTED",
+   "reason": "N = 3: PRE_D1_RANK"
+  },
+  {
+   "probe": "C:80x320:N3",
+   "result": "NOT_EXECUTED",
+   "reason": "N = 3: PRE_D1_RANK"
+  },
+  {
+   "probe": "C:100x250:N3",
+   "result": "NOT_EXECUTED",
+   "reason": "N = 3: PRE_D1_RANK"
+  }
+ ]
+}
