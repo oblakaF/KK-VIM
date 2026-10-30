@@ -9,7 +9,12 @@ writes what they return. It computes no quantity of the method itself:
 - the status of the solver (CONVERGED, STAGNATED, MAX_HALF_STEPS, ERROR_*) is written unchanged;
 - ``field.csv`` is written only for CONVERGED. Any other run with a completed half-step gets
   ``field_diagnostic.csv`` (marked: the field of the last half-step, not a computed solution);
-- existing result files are never overwritten without ``--overwrite``.
+- existing result files are never overwritten without ``--overwrite``; files are written through new temporary
+  files, so that a failed write leaves no half-written result and touches no other file;
+- an error of creating the folder or writing the files is exit code 4, an unexpected internal error is exit code 5;
+  neither is reported as a status of the solver;
+- ``result.json`` lists the necessary conditions of a qualification grid (R3_NUMERICAL_SPEC.md 6.1, D-039) as
+  plain facts about n_x and n_y; the command makes no qualification verdict about a run.
 
 Values are written with ``repr`` and read back bit for bit; non-finite values are empty (CSV) or null (JSON).
 Units are SI: lengths in m, E and q in Pa, D in N·m, w in m.
@@ -22,6 +27,8 @@ import json
 import math
 import os
 import sys
+import tempfile
+import traceback
 from dataclasses import asdict
 from pathlib import Path
 
@@ -38,6 +45,8 @@ EXIT_CONVERGED = 0
 EXIT_NOT_CONVERGED = 1  # STAGNATED or MAX_HALF_STEPS: the run ended without the stopping criterion
 EXIT_USAGE = 2  # command line errors (argparse) and refused overwriting; nothing is computed
 EXIT_SOLVER_ERROR = 3  # ERROR_* of the solver, ERROR_INPUT included
+EXIT_OUTPUT_ERROR = 4  # the results could not be saved (folder or file I/O); not a status of the solver
+EXIT_INTERNAL_ERROR = 5  # unexpected internal error of the program; not a status of the solver
 
 STATUS_NOTES = {
     CONVERGED: "Критерий остановки NUMERICAL_SPEC.md 11.3, п. 2 выполнен. Это не научная приёмка отдельного расчёта "
@@ -52,13 +61,22 @@ APPLICABILITY = (
     "Решатель R3 ACCEPTED (D-043): линейная прямоугольная пластина Кирхгофа–Лява, однородный изотропный материал, "
     "SSSS, равномерная нагрузка q = const, N = 1.",
     "Решатель проверяет 0,2 ≤ b/a ≤ 5 (D-038); вне диапазона — ERROR_INPUT.",
-    "Численная квалификация — только отношения сторон 1/5, 1/3, 1/2, 2/3, 1, 7/5, 3/2, 2, 3, 5, семейства сеток I "
-    "(n_x = n_y) и II (h_x = h_y) с max(n_x, n_y) ≤ 640 (D-043, ограничение 5). Вне этой области расчёт выполняется, "
-    "но не квалифицирован.",
+    "Численная квалификация относится только к десяти утверждённым отношениям сторон 1/5, 1/3, 1/2, 2/3, 1, 7/5, 3/2, "
+    "2, 3, 5 и к установленным семействам сеток I (n_x = n_y) и II (h_x = h_y) квалификационного набора "
+    "R3_NUMERICAL_SPEC.md 6.2 (D-039; D-043, ограничение 5). Вне этой области расчёт выполняется как диагностический "
+    "и не квалифицирован.",
     "Не доказаны сходимость при s → ∞, единственность предела и независимость от старта (D-043, ограничение 4; Q-025).",
     "Моменты и напряжения R3 не квалифицированы (D-034, Q-027) и не вычисляются.",
     "CCCC, N ≥ 2 и нелинейные постановки вне R3. Успешный запуск, сходимость итераций и научная приёмка — разные "
     "статусы (AGENTS.md, разд. 4).",
+)
+GRID_CONDITIONS_NOTE = (
+    "Необходимые условия квалификационной сетки R3_NUMERICAL_SPEC.md 6.1 (D-039): min(n_x, n_y) ≥ 20, "
+    "max(n_x, n_y) ≤ 640, n_x и n_y кратны 4. Здесь записано только, выполнено ли каждое из них для n_x, n_y этого "
+    "расчёта. Их выполнение не означает, что сетка входит в квалификационный набор 6.2 (десять утверждённых "
+    "отношений сторон, семейства I и II): отношение сторон и семейство командой не проверяются. Принадлежность "
+    "сетки к квалификационному набору сама по себе не означает научной приёмки конкретного расчёта. Заключения "
+    "QUALIFIED или PASS команда не делает. Сетки, не удовлетворяющие условиям, — только диагностика."
 )
 INPUT_UNITS = (("a", "m"), ("b", "m"), ("t", "m"), ("E", "Pa"), ("nu", "1"), ("q", "Pa"))
 W_BAR = "w_bar = w*D/(q*a^4), a — сторона вдоль x (R3_NUMERICAL_SPEC.md 1.2; RectangleResult.dimensionless_field)"
@@ -148,6 +166,16 @@ def exit_code(status: str) -> int:
     return EXIT_SOLVER_ERROR
 
 
+def grid_conditions(n_x: int, n_y: int) -> dict:
+    """Each necessary condition of a qualification grid (R3_NUMERICAL_SPEC.md 6.1) as a fact; no verdict."""
+    return {
+        "min_n_at_least_20": min(n_x, n_y) >= 20,
+        "max_n_at_most_640": max(n_x, n_y) <= 640,
+        "n_x_and_n_y_multiples_of_4": n_x % 4 == 0 and n_y % 4 == 0,
+        "note": GRID_CONDITIONS_NOTE,
+    }
+
+
 def _number(value):
     """JSON value: finite floats as they are (json writes repr), non-finite as null."""
     if isinstance(value, float) and not math.isfinite(value):
@@ -183,12 +211,16 @@ def history_rows(report):
         }
 
 
-def _write_text(path: Path, text: str) -> None:
-    """Write through a temporary file, so that an interrupted write never leaves a half-written result."""
-    tmp = path.with_name(path.name + ".tmp")
-    with open(tmp, "w", encoding="utf-8", newline="") as f:
-        f.write(text)
-    os.replace(tmp, path)
+def _write_temporary(folder: Path, text: str) -> Path:
+    """A new file with a unique name in ``folder`` (never an existing one) holding ``text``."""
+    handle, name = tempfile.mkstemp(dir=folder, prefix=".kkvim-", suffix=".tmp")
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+    except BaseException:
+        Path(name).unlink(missing_ok=True)
+        raise
+    return Path(name)
 
 
 def _csv_text(header, rows, comments=()) -> str:
@@ -269,30 +301,46 @@ def result_document(args, argv, result, report, field_name) -> dict:
         },
         "applicability": {
             "limits": list(APPLICABILITY),
-            "max_n_within_qualified_640": max(args.nx, args.ny) <= 640,
+            "necessary_grid_conditions_6_1": grid_conditions(args.nx, args.ny),
         },
     }
 
 
-def write_results(out: Path, args, argv, result, report, overwrite: bool) -> dict:
-    """Write the files of one run; with --overwrite, result files of an earlier run that this run does not
-    produce are removed (a converged field.csv must not stay next to a later failed run)."""
-    out.mkdir(parents=True, exist_ok=True)
+def result_texts(args, argv, result, report) -> dict:
+    """{file name: text} of one run (no file is touched)."""
     s = 0 if result.run is None else result.run.s
     field_name = field_file(result.status, s)
-    written = {}
+    texts = {}
     if field_name is not None:
-        written[field_name] = field_csv(result, diagnostic=field_name == FIELD_DIAGNOSTIC)
-    written[HISTORY] = history_csv(report)
+        texts[field_name] = field_csv(result, diagnostic=field_name == FIELD_DIAGNOSTIC)
+    texts[HISTORY] = history_csv(report)
     document = result_document(args, argv, result, report, field_name)
-    written[RESULT] = json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
-    if overwrite:
-        for name in OUTPUTS:
-            if name not in written and (out / name).exists():
-                (out / name).unlink()
-    for name, text in written.items():
-        _write_text(out / name, text)
-    return {name: out / name for name in written}
+    texts[RESULT] = json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+    return texts
+
+
+def write_results(out: Path, texts: dict, overwrite: bool) -> dict:
+    """Write the files of one run into the existing folder ``out``.
+
+    Every file is first written completely to a new temporary file; only then are the result files replaced.
+    If writing fails, the temporary files are removed and the folder keeps its earlier content. With
+    --overwrite, result files of an earlier run that this run does not produce are removed (a converged
+    field.csv must not stay next to a later failed run). Other files are never touched.
+    """
+    temporary = {}
+    try:
+        for name, text in texts.items():
+            temporary[name] = _write_temporary(out, text)
+        for name, path in temporary.items():
+            os.replace(path, out / name)
+        if overwrite:  # only after every new file is in place
+            for name in OUTPUTS:
+                if name not in texts and (out / name).exists():
+                    (out / name).unlink()
+    finally:
+        for path in temporary.values():
+            path.unlink(missing_ok=True)  # only files not moved into place: after a failure
+    return {name: out / name for name in texts}
 
 
 def _utf8_streams() -> None:
@@ -315,6 +363,13 @@ def _say(stream, text: str) -> None:
     stream.flush()
 
 
+def _internal_error(stage: str) -> int:
+    _say(sys.stderr, f"Внутренняя ошибка программы ({stage}). Это не статус решателя; результаты не сохранены "
+                     "или сохранены не полностью.")
+    _say(sys.stderr, traceback.format_exc().rstrip())
+    return EXIT_INTERNAL_ERROR
+
+
 def main(argv=None) -> int:
     _utf8_streams()
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -324,8 +379,24 @@ def main(argv=None) -> int:
     except OutputExistsError as exc:
         _say(sys.stderr, f"Расчёт не выполнен: {exc}")
         return EXIT_USAGE
-    result, report = solve(args)
-    paths = write_results(args.out, args, argv, result, report, args.overwrite)
+    try:
+        args.out.mkdir(parents=True, exist_ok=True)  # before the computation: an unusable path costs no run
+    except OSError as exc:
+        _say(sys.stderr, f"Расчёт не выполнен: не удалось создать папку результатов {args.out}: {exc}")
+        return EXIT_OUTPUT_ERROR
+    try:
+        result, report = solve(args)
+        texts = result_texts(args, argv, result, report)
+    except Exception:  # noqa: BLE001 - reported as an internal error, never as a status of the solver
+        return _internal_error("расчёт или подготовка результатов")
+    try:
+        paths = write_results(args.out, texts, args.overwrite)
+    except OSError as exc:
+        _say(sys.stderr, f"Результаты не сохранены: ошибка записи в {args.out}: {exc}")
+        _say(sys.stderr, f"Расчёт завершился со статусом решателя {result.status}, но файлы результатов не записаны.")
+        return EXIT_OUTPUT_ERROR
+    except Exception:  # noqa: BLE001
+        return _internal_error("запись результатов")
     s = 0 if result.run is None else result.run.s
     _say(sys.stdout, f"Статус решателя R3: {result.status} (полушагов s = {s}, циклов k = {s // 2})")
     _say(sys.stdout, STATUS_NOTES.get(result.status, ERROR_NOTE))
@@ -337,4 +408,8 @@ def main(argv=None) -> int:
     for name, path in paths.items():
         role = " (ДИАГНОСТИКА, не решение)" if name == FIELD_DIAGNOSTIC else ""
         _say(sys.stdout, f"  {name}{role}")
+    conditions = grid_conditions(args.nx, args.ny)
+    if not all(value for key, value in conditions.items() if key != "note"):
+        _say(sys.stdout, f"Сетка {args.nx}×{args.ny} не удовлетворяет необходимым условиям квалификационной сетки "
+                         "R3_NUMERICAL_SPEC.md 6.1 (min ≥ 20, max ≤ 640, кратность 4): расчёт диагностический.")
     return exit_code(result.status)

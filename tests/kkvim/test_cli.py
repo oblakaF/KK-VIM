@@ -81,7 +81,11 @@ def test_example_writes_the_result_of_the_direct_api_call_bitwise(tmp_path, caps
     assert doc["field"]["file"] == "field.csv" and doc["field"]["role"] == "converged"
     assert doc["field"]["w_bar_centre"] == direct.dimensionless_field()[12, 12]
     assert any("D-043" in text for text in doc["applicability"]["limits"])
-    assert doc["applicability"]["max_n_within_qualified_640"] is True
+    conditions = doc["applicability"]["necessary_grid_conditions_6_1"]
+    assert (conditions["min_n_at_least_20"], conditions["max_n_at_most_640"],
+            conditions["n_x_and_n_y_multiples_of_4"]) == (True, True, True)
+    assert "max_n_within_qualified_640" not in doc["applicability"]
+    assert_no_qualification_verdict(doc)
 
     comments, field = read_field(out / "field.csv", (25, 25))
     assert comments == []
@@ -229,3 +233,114 @@ def test_an_output_path_that_is_a_file_is_refused(tmp_path):
     target.write_text("keep", encoding="utf-8")
     assert cli.main(command(target, "--overwrite")) == cli.EXIT_USAGE
     assert target.read_text(encoding="utf-8") == "keep"
+
+
+# --- B-1: errors of saving and internal errors are not statuses of the solver ------------------------------
+
+def test_exit_codes_are_distinct():
+    codes = (cli.EXIT_CONVERGED, cli.EXIT_NOT_CONVERGED, cli.EXIT_USAGE, cli.EXIT_SOLVER_ERROR,
+             cli.EXIT_OUTPUT_ERROR, cli.EXIT_INTERNAL_ERROR)
+    assert codes == (0, 1, 2, 3, 4, 5)
+
+
+def test_a_folder_under_a_regular_file_is_an_output_error(tmp_path, monkeypatch, capsys):
+    blocker = tmp_path / "file.txt"
+    blocker.write_text("keep", encoding="utf-8")
+    monkeypatch.setattr(cli, "run_rectangle_physical", lambda *a, **k: pytest.fail("the solver was called"))
+    assert cli.main(command(blocker / "sub")) == cli.EXIT_OUTPUT_ERROR
+    captured = capsys.readouterr()
+    assert "не удалось создать папку результатов" in captured.err and "Traceback" not in captured.err
+    assert "Результаты:" not in captured.out
+    assert blocker.read_text(encoding="utf-8") == "keep" and sorted(p.name for p in tmp_path.iterdir()) == ["file.txt"]
+
+
+def test_python_m_kkvim_reports_an_output_error_without_a_traceback(tmp_path):
+    (tmp_path / "file.txt").write_text("keep", encoding="utf-8")
+    done = subprocess.run([sys.executable, "-m", "kkvim", *command("file.txt/sub")], cwd=tmp_path,
+                          capture_output=True, timeout=300)
+    err = done.stderr.decode("utf-8")
+    assert done.returncode == cli.EXIT_OUTPUT_ERROR and "Traceback" not in err and "file.txt" in err
+    assert (tmp_path / "file.txt").read_text(encoding="utf-8") == "keep"
+
+
+def test_a_write_error_after_the_run_leaves_the_folder_as_it_was(tmp_path, monkeypatch, capsys):
+    out = tmp_path / "demo"
+    assert cli.main(command(out)) == 0
+    (out / "result.json.tmp").write_text("user file", encoding="utf-8")       # a name a naive writer would use
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    capsys.readouterr()
+
+    def failing_replace(source, target):
+        raise PermissionError(13, "access denied", str(target))
+
+    monkeypatch.setattr(cli.os, "replace", failing_replace)
+    code = cli.main(command(out, "--overwrite", base=with_option("--nu", "1")))   # ERROR_INPUT would drop field.csv
+    assert code == cli.EXIT_OUTPUT_ERROR
+    captured = capsys.readouterr()
+    assert "Результаты не сохранены" in captured.err and ERROR_INPUT in captured.err
+    assert "Результаты:" not in captured.out and "Traceback" not in captured.err
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before          # nothing removed, replaced or left
+
+
+def test_an_unexpected_error_of_the_computation_is_exit_5(tmp_path, monkeypatch, capsys):
+    def broken(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli, "run_rectangle_physical", broken)
+    out = tmp_path / "demo"
+    assert cli.main(command(out)) == cli.EXIT_INTERNAL_ERROR
+    captured = capsys.readouterr()
+    assert "Внутренняя ошибка программы" in captured.err and "не статус решателя" in captured.err
+    assert "RuntimeError: boom" in captured.err and "Результаты:" not in captured.out
+    assert list(out.iterdir()) == []
+
+
+def test_an_unexpected_error_while_preparing_the_files_is_exit_5(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "result_document", lambda *a, **k: 1 / 0)
+    out = tmp_path / "demo"
+    assert cli.main(command(out)) == cli.EXIT_INTERNAL_ERROR
+    assert "ZeroDivisionError" in capsys.readouterr().err and list(out.iterdir()) == []
+
+
+# --- B-2: necessary grid conditions are facts, never a qualification verdict ---------------------------------
+
+def assert_no_qualification_verdict(doc):
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                assert not ("qualif" in key.lower() and value is True), key
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+        else:
+            assert node not in ("QUALIFIED", "PASS", "ACCEPTED"), node
+
+    walk({k: v for k, v in doc.items() if k != "model"})   # "model" names the accepted solver R3 (D-043)
+
+
+@pytest.mark.parametrize(("sides", "grid", "expected", "diagnostic"), [
+    (("1", "1"), (8, 8), (False, True, True), True),            # min(n) < 20
+    (("1", "1"), (22, 22), (True, True, False), True),          # not multiples of 4
+    (("1", "1.7"), (40, 68), (True, True, True), False),        # r = 1.7 is not one of the ten approved ratios
+])
+def test_grids_outside_the_qualification_set_are_not_presented_as_qualified(tmp_path, capsys, sides, grid,
+                                                                           expected, diagnostic):
+    base = with_option("--b", sides[1])
+    base[base.index("--nx") + 1], base[base.index("--ny") + 1] = str(grid[0]), str(grid[1])
+    out = tmp_path / "grid"
+    code = cli.main(command(out, base=base))
+    direct = rr.run_rectangle_physical(**{**PLATE, "b": float(sides[1])}, n_x=grid[0], n_y=grid[1])
+    assert code == cli.exit_code(direct.status)               # the run itself is allowed (diagnostic)
+    doc = json.loads((out / "result.json").read_text(encoding="utf-8"))
+    assert doc["status"] == direct.status and doc["half_steps"] == direct.run.s
+    conditions = doc["applicability"]["necessary_grid_conditions_6_1"]
+    assert (conditions["min_n_at_least_20"], conditions["max_n_at_most_640"],
+            conditions["n_x_and_n_y_multiples_of_4"]) == expected
+    note = conditions["note"]
+    for text in ("min(n_x, n_y) ≥ 20", "max(n_x, n_y) ≤ 640", "кратны 4", "десять утверждённых",
+                 "не означает научной приёмки", "отношение сторон и семейство командой не проверяются"):
+        assert text in note, text
+    assert set(conditions) == {"min_n_at_least_20", "max_n_at_most_640", "n_x_and_n_y_multiples_of_4", "note"}
+    assert_no_qualification_verdict(doc)
+    assert ("расчёт диагностический" in capsys.readouterr().out) == diagnostic
