@@ -1,0 +1,48 @@
+{
+ "schema": "kkvim-gui-backend-case/1",
+ "model": "R3",
+ "N": 1,
+ "purpose": "n_x = 3 < N_MIN: ERROR_INPUT",
+ "input": {
+  "a": 1.0,
+  "b": 1.0,
+  "t": 0.01,
+  "E": 210000000000.0,
+  "nu": 0.3,
+  "q": 1000.0,
+  "n_x": 3,
+  "n_y": 24
+ },
+ "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+ "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+ "source": {
+  "python": "3.13.15",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "kkvim": "0.0.0",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "git_commit": "79b6d82bc524ca818a31a1bfb492059be1668ab7",
+  "git_dirty": false
+ },
+ "status": "ERROR_INPUT",
+ "status_class": "ERROR",
+ "is_error": true,
+ "completed": false,
+ "scientific_status": "R3 run not completed (ERROR_INPUT); no result is claimed",
+ "mark": null,
+ "reason": "n_x must be an integer >= 4, got 3",
+ "D": null,
+ "D_formula": "kkvim.physical.bending_stiffness: E t^3 / (12 (1 - nu^2))",
+ "parameters": null,
+ "half_steps_done": 0,
+ "history": [],
+ "limitations": [
+  "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+  "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+ ],
+ "field_available": false,
+ "field": null,
+ "files": {
+  "json": "r3_error_grid.json"
+ }
+}
