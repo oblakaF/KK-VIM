@@ -12,6 +12,7 @@ import contextlib
 import copy
 import csv
 import ctypes
+import hashlib
 import importlib.util
 import json
 import math
@@ -214,10 +215,12 @@ def test_binary_representation_is_kept():
 # --- D0 regression (published EQ and QA-EB rows) ----------------------------------------------------------------------------------
 # Protocol 7, area D0: a repeat gives the published values bitwise, otherwise UNRESOLVED. D-025 / AGENTS.md 4: bitwise equality is
 # required only with a fixed order of the arithmetic operations. The regression is split in two checks:
-#  - portable (every platform): composition and identifiers of the sample, the input of s = 1, premises P-a...P-f and the status of
-#    the certificate of the recomputed rows (whole pipeline: OP-8 journal, binding, OP-8 re-run, reproduction in a separate process),
-#    exact dP and tau', the directed bounds (gamma contract, B_E_up >= B_E), E1/E2 and the strict sign; the published rows on their
-#    own values. Values of two machines are never compared with each other, and no tolerance is used;
+#  - portable (every platform): the source files (git blob ids; the sha256 the publications record of them), the published rows
+#    (columns, one row per identifier, matched by identifier), composition, selection and identifiers of the sample, the input of
+#    s = 1, premises P-a...P-f with their reasons and the status of the certificate of the recomputed rows (whole pipeline: OP-8
+#    journal, binding, OP-8 re-run, reproduction in a separate process), finiteness, exact dP and tau', the directed bounds (gamma
+#    contract; B_E_up >= B_E and B_E_up the upward binary64 of B_E), |E_s| <= B_E, E1/E2 and the strict sign; the published rows on
+#    their own values. Values of two machines are never compared with each other, and no tolerance is used;
 #  - bitwise (recomputed against published values): a row equal bitwise is reproduced on any path; a difference is a FAIL only on a
 #    computational path shown identical to the recorded path of the published runs (_d0_path_identity); otherwise that comparison is
 #    NOT_VERIFIED (protocol 7: UNRESOLVED, not FAIL) and the check is skipped with the reason. sys.platform alone fixes no path.
@@ -233,14 +236,30 @@ D0_META = {"Q3": D0_RESULTS / "r5_cccc_q3_prequalification" / "meta.json",
 D0_BITWISE = (("P_hat_p", "QA-EB", "P_hat_prev"), ("P_hat_s", "QA-EB", "P_hat_s"), ("Q_hat", "QA-EB", "Q_hat"),
               ("B_E_up", "QA-EB", "B_E_up"), ("Gamma_up", "EQ", "Gamma_up"), ("gamma_down", "EQ", "gamma_down"),
               ("gamma_up", "EQ", "gamma_up"))
-D0_PUBLISHED_FLAGS = {"QA-EB": {"status": "VERIFIED", "q3_state_reproduced_bitwise": "True", "B_E_finite": "True", "E_s_le_B_E": "True"},
+D0_PUBLISHED_FLAGS = {"QA-EB": {"status": "VERIFIED", "q3_state_reproduced_bitwise": "True", "B_E_finite": "True", "E_s_le_B_E": "True",
+                                "mode_before_ok": "True", "mode_after_ok": "True"},
                       "EQ": {"status": "COMPLETE", "q3_state_reproduced_bitwise": "True", "gamma_inclusion_exact": "True",
                              "Gamma_up_holds": "True"}}
+D0_REQUIRED = {"QA-EB": ("id", *D0_PUBLISHED_FLAGS["QA-EB"], "P_hat_prev", "P_hat_s", "Q_hat", "B_E_up", "E_s_abs_up", "controlfp_before",
+                         "controlfp_after"),
+               "EQ": ("id", *D0_PUBLISHED_FLAGS["EQ"], "P_hat_prev", "P_hat_s", "Q_hat", "gamma_down", "gamma_up", "Gamma_up")}
+# the source files of D0: git blob ids of main 323d4ed (content with LF line ends, as stored by git; a Windows checkout with
+# core.autocrlf has CRLF). The publications record the sha256 of their (CRLF) checkout of some of them: (file, meta file, keys, kind)
+D0_FILES = {"Q3": ("r5_cccc_q3_prequalification/sequences_e1_e7_e9.csv", "920d342777f6eac563f2f04d91ee5d7e7a1b23e6"),
+            "QA-EB": ("r5_cccc_q4_energy_error_bound/rows.csv", "47ed2df4f21fed02de5ffc7040ee56c50027dfc6"),
+            "EQ": ("r5_cccc_q4_energy_bc/rows.csv", "b0554f26b9eb87d305f54e686a840885320590c1"),
+            "Q3 meta": ("r5_cccc_q3_prequalification/meta.json", "e53eb2a7b2797cff03b7249b1bc6e712c05a43ed"),
+            "QA-EB meta": ("r5_cccc_q4_energy_error_bound/meta.json", "91557df2331cd77eaa848a6ec7f3025e41d6821d"),
+            "EQ meta": ("r5_cccc_q4_energy_bc/meta.json", "ca5d4ba7a82a33a07427d3e90c5df6aecf0759ca")}
+D0_FILE_RECORDS = (("Q3", "QA-EB meta", ("data", "q3_csv", "blob"), "blob"), ("Q3", "QA-EB meta", ("data", "q3_csv", "sha256"), "crlf"),
+                   ("Q3", "EQ meta", ("data", "q3_csv", "sha256"), "crlf"), ("EQ", "QA-EB meta", ("data", "eq_rows_sha256"), "crlf"),
+                   ("EQ meta", "QA-EB meta", ("data", "eq_meta_sha256"), "crlf"))
 # parameters that fix the arithmetic path of a D0 row: OS build (C runtime), processor model (CPU dispatch of NumPy and the OpenBLAS
-# core selection), NumPy and SciPy builds, NumPy's OpenBLAS build and file, the cores actually used by NumPy's and SciPy's OpenBLAS
-# (read from the loaded libraries) and their thread counts, the NumPy variables that restrict its CPU dispatch
-D0_PATH_KEYS = ("platform", "machine", "processor", "numpy", "scipy", "numpy_blas", "numpy_blas_library", "numpy_blas_core",
-                "scipy_blas_core", "blas_threads", "numpy_cpu_env")
+# core selection), Python, NumPy and SciPy builds, NumPy's OpenBLAS build and file, the cores actually used by NumPy's and SciPy's
+# OpenBLAS (read from the loaded libraries) and their thread counts, the NumPy variables that restrict its CPU dispatch, the
+# floating-point control word (rounding, FTZ/DAZ) of the computing thread
+D0_PATH_KEYS = ("platform", "machine", "processor", "python", "numpy", "scipy", "numpy_blas", "numpy_blas_library", "numpy_blas_core",
+                "scipy_blas_core", "blas_threads", "numpy_cpu_env", "fp_control")
 NPY_CPU_ENV = ("NPY_DISABLE_CPU_FEATURES", "NPY_ENABLE_CPU_FEATURES")
 OPENBLAS = ((np, "64_"), (scipy, ""))  # NumPy's ILP64 and SciPy's LP64 scipy-openblas (symbol suffixes), as in QA-EB blas_info
 
@@ -304,12 +323,15 @@ def _d0_current_path() -> dict:
         dispatch = {"baseline": list(__cpu_baseline__), "dispatch": list(__cpu_dispatch__)}
     except ImportError:
         dispatch = None
+    # the control word of this thread by the probe of the pipeline (QA-EB probe_mode; the word only where _controlfp exists)
+    pb = pl.qa().probe_mode()
+    fp = pb["controlfp"].get("word") if pb["ok"] else f"mode probe failed: {pb['fails']}"
     return {"platform": platform.platform(), "machine": platform.machine(), "processor": platform.processor() or None,
-            "numpy": np.__version__, "scipy": scipy.__version__, "numpy_blas": numpy_blas, "numpy_blas_library": nb["library"],
-            "numpy_blas_core": nb["core"], "scipy_blas_core": sb["core"],
+            "python": platform.python_version(), "numpy": np.__version__, "scipy": scipy.__version__, "numpy_blas": numpy_blas,
+            "numpy_blas_library": nb["library"], "numpy_blas_core": nb["core"], "scipy_blas_core": sb["core"],
             "blas_threads": None if None in (nb["threads"], sb["threads"]) else (nb["threads"], sb["threads"]),
-            "numpy_cpu_env": {k: os.environ.get(k) for k in NPY_CPU_ENV},
-            "info": {"python": platform.python_version(), "sys_platform": sys.platform, "scipy_blas_library": sb["library"],
+            "numpy_cpu_env": {k: os.environ.get(k) for k in NPY_CPU_ENV}, "fp_control": fp,
+            "info": {"sys_platform": sys.platform, "scipy_blas_library": sb["library"],
                      "OPENBLAS_CORETYPE": os.environ.get("OPENBLAS_CORETYPE"), "numpy_cpu": dispatch}}
 
 
@@ -318,7 +340,7 @@ def _d0_recorded_path(meta: dict | None = None) -> tuple[dict, list[str]]:
     parameter the runs record differently, or do not record, is None and listed: no identity can be shown for it."""
     m = {run: json.loads(Path(p).read_text(encoding="utf-8")) for run, p in (meta or D0_META).items()}
     rec, problems = {}, []
-    for key in ("platform", "machine", "processor", "numpy", "scipy"):
+    for key in ("platform", "machine", "processor", "python", "numpy", "scipy"):
         vals = {run: mm.get(key) for run, mm in m.items()}
         rec[key] = vals["Q3"] if None not in vals.values() and len(set(vals.values())) == 1 else None
         if rec[key] is None:
@@ -342,6 +364,13 @@ def _d0_recorded_path(meta: dict | None = None) -> tuple[dict, list[str]]:
     # NumPy's CPU dispatch is not recorded: fixed by the processor model and the NumPy build unless an NPY_*_CPU_FEATURES variable
     # restricts it; these are taken as unset in the published runs (an inference, QA report 12.8)
     rec["numpy_cpu_env"] = dict.fromkeys(NPY_CPU_ENV)
+    # the control word: probed by QA-EB at its start and end (Q3 and EQ record none; the EQ gamma is taken under the same word - an
+    # inference from the same machine and builds, QA report 12.7). The words of the rows are compared in _d0_identity.
+    words = {when: (m["QA-EB"].get(f"mode_probe_main_{when}") or {}).get("controlfp") or {} for when in ("start", "end")}
+    ok = all(w.get("ok") is True and w.get("word") for w in words.values()) and len({w.get("word") for w in words.values()}) == 1
+    rec["fp_control"] = words["start"]["word"] if ok else None
+    if not ok:
+        problems.append(f"control word recorded as {words}")
     return rec, problems
 
 
@@ -360,10 +389,16 @@ def _d0_path_identity(now: dict, rec: dict, problems=()) -> tuple[bool, list[str
 
 
 def _d0_identity(d0: dict) -> tuple[bool, list[str]]:
-    """The path of the D0 computation, read before and after it, against the record."""
+    """The path of the D0 computation, read before and after it, against the record; and the control word of every recomputed and
+    published row (probed before and after the row) against the recorded one."""
     diff = []
     for when in ("path", "path_after"):
         diff += [x for x in _d0_path_identity(d0[when], d0["recorded"], d0["record_problems"])[1] if x not in diff]
+    word = d0["recorded"].get("fp_control")
+    for c in d0["cases"]:
+        for src, row in (("recomputed", c["result"]["row"]), ("published", c.get("QA-EB") or {})):
+            diff += [f"fp_control: {src} {k} of {c['id']} is {row.get(k)!r}, {word!r} recorded"
+                     for k in ("controlfp_before", "controlfp_after") if row.get(k) != word]
     return not diff, diff
 
 
@@ -393,12 +428,74 @@ def _exact_tests(P_p, P_s, Q, G, B_E):
     return dP, tau, dP >= -tau, abs(dP - Fraction(Q)) <= tau, Fraction(Q) > tau
 
 
+def _round_up(x: Fraction) -> float:
+    """The upward binary64 of an exact rational, computed here: float() of a Fraction is correctly rounded to nearest, then one step
+    up when below x (finite range)."""
+    f = float(x)
+    return math.nextafter(f, math.inf) if Fraction(f) < x else f
+
+
+def _blob_id(content: bytes) -> str:
+    return hashlib.sha1(b"blob %d\0" % len(content) + content).hexdigest()
+
+
+def _d0_data_defects(results: Path = D0_RESULTS) -> list[str]:
+    """The D0 source files against the frozen git blob ids (content with LF line ends: CRLF line ends of a Windows checkout are
+    turned back, any other CR is a defect) and against the sha256 the publications record of their CRLF checkout."""
+    bad, content = [], {}
+    for k, (rel, blob) in D0_FILES.items():
+        p = Path(results) / rel
+        if not p.is_file():
+            bad.append(f"{k}: missing {rel}")
+            continue
+        c = p.read_bytes().replace(b"\r\n", b"\n")
+        if b"\r" in c:
+            bad.append(f"{k}: CR outside a CRLF line end")
+        if _blob_id(c) != blob:
+            bad.append(f"{k}: blob {_blob_id(c)}, frozen {blob}")
+        content[k] = c
+    for k, meta, keys, kind in D0_FILE_RECORDS:
+        if k not in content or meta not in content:
+            continue
+        rec = json.loads(content[meta].decode("utf-8"))
+        for key in keys:
+            rec = rec.get(key) if isinstance(rec, dict) else None
+        got = _blob_id(content[k]) if kind == "blob" else hashlib.sha256(content[k].replace(b"\n", b"\r\n")).hexdigest()
+        if rec != got:
+            bad.append(f"{k}: {kind} {got}, {meta} records {'/'.join(keys)} = {rec}")
+    return bad
+
+
+def _d0_published(results: Path = D0_RESULTS) -> tuple[dict, list[str]]:
+    """The published QA-EB and EQ rows of the D0 identifiers, matched by identifier (never by position), and the defects of the
+    files: a required column missing (no row of that file is used), an identifier repeated (not used) or a D0 identifier absent."""
+    pub, bad = {}, []
+    for run, name in (("QA-EB", "r5_cccc_q4_energy_error_bound"), ("EQ", "r5_cccc_q4_energy_bc")):
+        with open(Path(results) / name / "rows.csv", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        missing = [f"{run}: column {c} missing" for c in D0_REQUIRED[run] if c not in (reader.fieldnames or [])]
+        count = {}
+        for r in rows:
+            count[r.get("id")] = count.get(r.get("id"), 0) + 1
+        bad += missing + [f"{run}: identifier {i} in {n} rows" for i, n in count.items() if n > 1]
+        bad += [f"{run}: no row {i}" for i in D0_IDS if i not in count]
+        pub[run] = {} if missing else {r["id"]: r for r in rows if r.get("id") in D0_IDS and count[r["id"]] == 1}
+    return pub, bad
+
+
+def _d0_select(q3_rows: list[dict]) -> list[dict]:
+    """The D0 selection of the Q3 rows (QA-EB control rule n_x n_y <= 4096; N = 1, s = 1, first = Y)."""
+    return [r for r in q3_rows if r["N"] == "1" and r["j_s"] == "1" and r["first"] == "Y" and int(r["nx"]) * int(r["ny"]) <= 4096]
+
+
 def _d0_composition_defects(cases: list[dict]) -> list[str]:
     bad = []
     ids = [c["id"] for c in cases]
     if ids != list(D0_IDS):
         bad.append(f"the D0 sample is {ids}, not the published one {list(D0_IDS)}")
     bad += [f"{c['id']}: no published {run} row" for c in cases for run in ("QA-EB", "EQ") if c.get(run) is None]
+    bad += [f"{c['id']}: the Q3 row is outside the D0 selection" for c in cases if _d0_select([c["Q3"]]) != [c["Q3"]]]
     return bad
 
 
@@ -424,6 +521,7 @@ def _d0_portable_defects(case: dict) -> list[str]:
     states = {k: v["state"] for k, v in res["premises"].items()}
     if states != dict.fromkeys(("P-a", "P-b", "P-c", "P-d", "P-e", "P-f"), "ESTABLISHED"):
         bad.append(f"premises {states}")
+    bad += [f"premise {k} without a reason" for k, v in res["premises"].items() if not (isinstance(v.get("reason"), str) and v["reason"])]
     if not (res.get("op8_rerun") or {}).get("reproduced") or res["reproduction"].get("bitwise_equal") is not True:
         bad.append("OP-8 re-run or the reproduction in a separate process differs")
     if res["contradictions"] or res["faults"] or res["row"]["contradictions"] or res["row"]["faults"]:
@@ -433,13 +531,21 @@ def _d0_portable_defects(case: dict) -> list[str]:
         bad.append(f"status {res['status']} / {res['classification']['status']}, published rows PASS")
     row, c = res["row"], res["classification"]
     x = {k: float.fromhex(row[k]) for k in ("P_hat_p", "P_hat_s", "Q_hat", "Gamma_up", "B_E_up", "gamma_down", "gamma_up")}
+    if not all(math.isfinite(v) for v in x.values()):
+        return bad + [f"recomputed component not finite: {x}"]
     dP, tau, e1, e2, resolvable = _exact_tests(x["P_hat_p"], x["P_hat_s"], x["Q_hat"], x["Gamma_up"], x["B_E_up"])
     if Fraction(c["dP_exact"]) != dP or Fraction(c["tau_exact"]) != tau:
         bad.append("dP or tau' is not the exact rational of the recorded components")
-    bad += [f"gamma contract: {v}" for v in pl.gamma_contract(Fraction(row["gamma_exact"]), x["gamma_down"], x["gamma_up"],
-                                                              x["Gamma_up"])]
-    if not Fraction(x["B_E_up"]) >= Fraction(row["B_E_exact"]):
+    gamma, B_E = Fraction(row["gamma_exact"]), Fraction(row["B_E_exact"])
+    bad += [f"gamma contract: {v}" for v in pl.gamma_contract(gamma, x["gamma_down"], x["gamma_up"], x["Gamma_up"])]
+    if not Fraction(x["B_E_up"]) >= B_E:  # protocol 6: B_E,s a strict upper bound
         bad.append("B_E_up is below the exact B_E")
+    if x["B_E_up"].hex() != _round_up(B_E).hex():  # the recorded form: the upward binary64 of the exact B_E (QA-EB 8.1)
+        bad.append(f"B_E_up = {x['B_E_up'].hex()} is not the upward binary64 {_round_up(B_E).hex()} of the exact B_E")
+    # own derivation: D-054.1 item 3 writes dP - Q^ = -gamma_s + E_s, so E_s = dP - Q^ + gamma_s exactly, and theorem E-2 bounds
+    # |E_s| <= B_E,s with the premises established (QA-EB records the same E_s: E_s_abs_up, E_s_over_B_E)
+    if not abs(dP - Fraction(x["Q_hat"]) + gamma) <= B_E:
+        bad.append("|E_s| = |dP - Q^ + gamma_s| exceeds the exact B_E")
     if row["diagnostics"]["second_path_gamma"].get("consistent") is not True:
         bad.append("the exact gamma of the second path is not consistent")
     if not (e1 and e2 and c["e1"] is True and c["e2"] is True):
@@ -449,11 +555,16 @@ def _d0_portable_defects(case: dict) -> list[str]:
     # the published rows on their own values: flags, agreement of QA-EB and EQ, Gamma_up = max, E1/E2 and the strict sign
     for run, flags in D0_PUBLISHED_FLAGS.items():
         bad += [f"published {run} {k} = {case[run].get(k)!r}" for k, v in flags.items() if case[run].get(k) != v]
-    p = {k: ga.read_double(h[col]) for k, col in (("P_p", "P_hat_prev"), ("P_s", "P_hat_s"), ("Q", "Q_hat"), ("B_E", "B_E_up"))}
+    p = {k: ga.read_double(h[col]) for k, col in (("P_p", "P_hat_prev"), ("P_s", "P_hat_s"), ("Q", "Q_hat"), ("B_E", "B_E_up"),
+                                                   ("E_s", "E_s_abs_up"))}
+    gd, gu, G = (ga.read_double(e[k]) for k in ("gamma_down", "gamma_up", "Gamma_up"))
+    if not all(math.isfinite(v) for v in (*p.values(), gd, gu, G)):
+        return bad + ["published component not finite"]
     for k, col in (("P_p", "P_hat_prev"), ("P_s", "P_hat_s"), ("Q", "Q_hat")):
         if ga.read_double(e[col]).hex() != p[k].hex():
             bad.append(f"published {col}: QA-EB and EQ differ")
-    gd, gu, G = (ga.read_double(e[k]) for k in ("gamma_down", "gamma_up", "Gamma_up"))
+    if not p["E_s"] <= p["B_E"]:  # both upward binary64: |E_s| <= B_E gives RU(|E_s|) <= RU(B_E)
+        bad.append("published E_s_abs_up exceeds B_E_up")
     if not (gd <= gu and G.hex() == max(abs(gd), abs(gu)).hex()):
         bad.append("published Gamma_up is not max(|gamma_down|, |gamma_up|) of an ordered interval")
     _, _, pe1, pe2, pres = _exact_tests(p["P_p"], p["P_s"], p["Q"], G, p["B_E"])
@@ -466,12 +577,10 @@ def _d0_portable_defects(case: dict) -> list[str]:
 def d0(tmp_path_factory):
     """The nine published D0 rows recomputed through the pipeline (journal of s = 1, analyse) with one BLAS thread."""
     ga = pl.ga()
+    data_before = _d0_data_defects()
     q3 = ga.read_q3_rows(D0_RESULTS / "r5_cccc_q3_prequalification" / "sequences_e1_e7_e9.csv")
-    pub = {}
-    for run, name in (("QA-EB", "r5_cccc_q4_energy_error_bound"), ("EQ", "r5_cccc_q4_energy_bc")):
-        with open(D0_RESULTS / name / "rows.csv", encoding="utf-8") as f:
-            pub[run] = {r["id"]: r for r in csv.DictReader(f)}
-    sel = [r for r in q3 if r["N"] == "1" and r["j_s"] == "1" and r["first"] == "Y" and int(r["nx"]) * int(r["ny"]) <= 4096]
+    pub, pub_defects = _d0_published()
+    sel = _d0_select(q3)
     out, cases = tmp_path_factory.mktemp("d0"), []
     threads_before = [_openblas_state(pkg, suffix)["threads"] for pkg, suffix in OPENBLAS]
     with _one_blas_thread():
@@ -485,22 +594,30 @@ def d0(tmp_path_factory):
         path_after = _d0_current_path()
     rec, problems = _d0_recorded_path()
     return {"cases": cases, "path": path, "path_after": path_after, "recorded": rec, "record_problems": problems,
-            "threads_before": threads_before}
+            "threads_before": threads_before, "published_defects": pub_defects, "data_defects": (data_before, _d0_data_defects())}
 
 
 def _d0_case(d0, rid):
     return copy.deepcopy(next(c for c in d0["cases"] if c["id"] == rid))
 
 
+def _d0_portable_report(d0: dict) -> dict:
+    """Every portable check of the D0 regression, by part; independent of the computational path."""
+    before, after = d0["data_defects"]
+    return {"data": before + [f"after the D0 computation: {x}" for x in after], "published": d0["published_defects"],
+            "composition": _d0_composition_defects(d0["cases"]), **{c["id"]: _d0_portable_defects(c) for c in d0["cases"]}}
+
+
 def test_d0_regression_portable(d0):
-    assert _d0_composition_defects(d0["cases"]) == []
-    for case in d0["cases"]:
-        assert _d0_portable_defects(case) == [], case["id"]
+    assert _d0_portable_report(d0) == {"data": [], "published": [], "composition": [], **dict.fromkeys(D0_IDS, [])}
 
 
-def test_d0_regression_bitwise(d0):
+def test_d0_regression_bitwise(d0, record_property):
     identical, why = _d0_identity(d0)
     res = {c["id"]: (_d0_bitwise_verdict(identical, m), m) for c in d0["cases"] for m in [_d0_bitwise_mismatches(c)]}
+    # for the parent of a child run (test_d0_real_openblas_cores_in_a_child_process): the core actually loaded, not the variable
+    record_property("d0_path", json.dumps({"numpy_blas_core": d0["path"]["numpy_blas_core"], "identical": identical,
+                                           "rows_differing": sum(1 for _, m in res.values() if m)}))
     assert not {k: m for k, (v, m) in res.items() if v == "FAIL"}, "D0 not reproduced bitwise on the recorded computational path"
     open_ = {k: m for k, (v, m) in res.items() if v == "NOT_VERIFIED"}
     if open_:
@@ -517,6 +634,7 @@ def test_d0_recorded_path_is_usable(d0):
     rec, problems = d0["recorded"], d0["record_problems"]
     assert problems == [] and all(rec[k] is not None for k in D0_PATH_KEYS)
     assert rec["numpy_blas_core"] == "Haswell" and rec["blas_threads"] == (1, 1) and rec["numpy_blas"].startswith("scipy-openblas")
+    assert rec["python"] == "3.13.15" and rec["fp_control"] == "0x8001f"
 
 
 def test_d0_inconsistent_or_missing_record_gives_no_identity(d0, tmp_path):
@@ -535,7 +653,9 @@ def test_d0_inconsistent_or_missing_record_gives_no_identity(d0, tmp_path):
     assert not ok and "processor: not recorded" in diff and "numpy_blas_core: not recorded" in diff
 
 
-@pytest.mark.parametrize("key", D0_PATH_KEYS)
+# listed here, not taken from D0_PATH_KEYS: a parameter dropped from the identity is then detected
+@pytest.mark.parametrize("key", ["platform", "machine", "processor", "python", "numpy", "scipy", "numpy_blas", "numpy_blas_library",
+                                 "numpy_blas_core", "scipy_blas_core", "blas_threads", "numpy_cpu_env", "fp_control"])
 def test_d0_every_path_parameter_is_needed(d0, key):
     rec = d0["recorded"]
     other = {"blas_threads": (24, 1), "numpy_cpu_env": {"NPY_DISABLE_CPU_FEATURES": "X86_V3", "NPY_ENABLE_CPU_FEATURES": None}}
@@ -627,7 +747,18 @@ def _input_not_t1(case):
 D0_VIOLATIONS = {
     "Gamma_up below max(|gamma|)": (_set_hex("Gamma_up", lambda v, r: math.nextafter(v, 0.0)), "gamma contract"),
     "interval above the exact gamma": (_set_hex("gamma_down", lambda v, r: float.fromhex(r["gamma_up"])), "gamma contract"),
+    "Gamma_up 1 ulp above max(|gamma|)": (_set_hex("Gamma_up", lambda v, r: math.nextafter(v, math.inf)), "gamma contract"),
+    "gamma_up below the exact gamma": (_set_hex("gamma_up", lambda v, r: math.nextafter(float.fromhex(r["gamma_down"]), -math.inf)),
+                                       "gamma contract"),
     "B_E_up below the exact B_E": (_set_hex("B_E_up", lambda v, r: float(Fraction(r["B_E_exact"])) / 2), "B_E_up is below"),
+    "B_E_up 1 ulp below": (_set_hex("B_E_up", lambda v, r: math.nextafter(v, -math.inf)), "B_E_up is below"),
+    "B_E_up 1 ulp above": (_set_hex("B_E_up", lambda v, r: math.nextafter(v, math.inf)), "not the upward binary64"),
+    "|E_s| above B_E": (_set(["result", "row", "B_E_exact"], "0"), "|E_s|"),
+    "component not finite": (_set_hex("P_hat_s", lambda v, r: math.inf), "not finite"),
+    "premise without a reason": (_set(["result", "premises", "P-b", "reason"], ""), "without a reason"),
+    "published component not finite": (_set(["QA-EB", "B_E_up"], "inf"), "published component not finite"),
+    "published E_s above B_E_up": (_set(["QA-EB", "E_s_abs_up"], "1.0"), "published E_s_abs_up"),
+    "published mode probe": (_set(["QA-EB", "mode_before_ok"], "False"), "published QA-EB mode_before_ok"),
     "E2 violated": (_set_hex("P_hat_s", lambda v, r: 2 * v), "E1 / E2"),
     "dP not exact": (_set(["result", "classification", "dP_exact"], "1/3"), "not the exact rational"),
     "tau not exact": (_set(["result", "classification", "tau_exact"], "0"), "not the exact rational"),
@@ -662,16 +793,208 @@ def test_d0_composition_is_checked(d0):
     assert _d0_composition_defects(cases) == []
     assert _d0_composition_defects(cases[:-1]) and _d0_composition_defects(cases[1:] + cases[:1])
     assert _d0_composition_defects([*cases[:-1], {**cases[-1], "EQ": None}]) != []
+    assert _d0_composition_defects([*cases, cases[0]]) and _d0_composition_defects([*cases[:-1], cases[0]])  # duplicates
+    # a Q3 row outside the selection under a D0 identifier
+    for field, value in (("N", "2"), ("j_s", "2"), ("first", "N"), ("nx", "4097")):
+        other = [*cases[:-1], {**cases[-1], "Q3": {**cases[-1]["Q3"], field: value}}]
+        assert any("outside the D0 selection" in x for x in _d0_composition_defects(other)), field
+    q3 = pl.ga().read_q3_rows(D0_RESULTS / "r5_cccc_q3_prequalification" / "sequences_e1_e7_e9.csv")
+    assert [pl.ga().row_id(r) for r in _d0_select(q3)] == list(D0_IDS)
+    # a repeated Q3 row is selected twice (no silent de-duplication) and the composition then differs
+    assert [pl.ga().row_id(r) for r in _d0_select([*q3, _d0_select(q3)[0]])] == [*D0_IDS, D0_IDS[0]]
+
+
+def _d0_copy_sources(dst: Path) -> Path:
+    for rel, _ in D0_FILES.values():
+        (dst / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(D0_RESULTS / rel, dst / rel)
+    return dst
+
+
+def _d0_rewrite_rows(path: Path, edit):
+    with open(path, encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        fields, rows = list(reader.fieldnames), list(reader)
+    fields, rows = edit(fields, rows)
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+
+
+def _ulp_in_row(rid, col):
+    def edit(fields, rows):
+        for r in rows:
+            if r["id"] == rid:
+                r[col] = repr(math.nextafter(float(r[col]), math.inf))
+        return fields, rows
+    return edit
+
+
+def _crlf(path: Path):
+    path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+
+
+def _lf(path: Path):
+    path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
+
+
+# (edit of the copied sources, every defect expected as "file key: kind"): the frozen blob id of each file and each record of a
+# publication (blob id or sha256 of the CRLF checkout) that the edit breaks
+D0_SOURCE_EDITS = {
+    "QA-EB value 1 ulp": (lambda d: _d0_rewrite_rows(d / D0_FILES["QA-EB"][0], _ulp_in_row(D0_IDS[1], "P_hat_s")), ["QA-EB: blob"]),
+    "QA-EB and EQ value 1 ulp alike": (
+        lambda d: [_d0_rewrite_rows(d / D0_FILES[k][0], _ulp_in_row(D0_IDS[1], "P_hat_s")) for k in ("QA-EB", "EQ")],
+        ["QA-EB: blob", "EQ: blob", "EQ: crlf"]),
+    "Q3 row deleted": (lambda d: _d0_rewrite_rows(d / D0_FILES["Q3"][0], lambda f, r: (f, r[:-1])),
+                       ["Q3: blob", "Q3: blob", "Q3: crlf", "Q3: crlf"]),
+    "Q3 meta changed": (lambda d: (d / D0_FILES["Q3 meta"][0]).write_text(
+        (d / D0_FILES["Q3 meta"][0]).read_text(encoding="utf-8").replace("Haswell", "Sandybridge").replace("3.13.15", "3.13.14"),
+        encoding="utf-8"), ["Q3 meta: blob"]),
+    "QA-EB meta: record of the EQ rows changed": (lambda d: (d / D0_FILES["QA-EB meta"][0]).write_text(
+        (d / D0_FILES["QA-EB meta"][0]).read_text(encoding="utf-8").replace("225605c8", "225605c9"), encoding="utf-8"),
+        ["QA-EB meta: blob", "EQ: crlf"]),
+    "EQ meta changed": (lambda d: (d / D0_FILES["EQ meta"][0]).write_text(
+        (d / D0_FILES["EQ meta"][0]).read_text(encoding="utf-8").replace("\"workers\": 12", "\"workers\": 13"), encoding="utf-8"),
+        ["EQ meta: blob", "EQ meta: crlf"]),
+    "EQ rows file missing": (lambda d: (d / D0_FILES["EQ"][0]).unlink(), ["EQ: missing"]),
+    "a lone CR": (lambda d: (d / D0_FILES["QA-EB"][0]).write_bytes((d / D0_FILES["QA-EB"][0]).read_bytes() + b"\r"),
+                  ["QA-EB: CR", "QA-EB: blob"]),
+}
+
+
+def test_d0_sources_unchanged_and_as_published(d0):
+    assert d0["data_defects"] == ([], []) and _d0_data_defects() == []
+
+
+@pytest.mark.parametrize("name", list(D0_SOURCE_EDITS))
+def test_d0_altered_source_file_is_detected(tmp_path, name):
+    edit, expected = D0_SOURCE_EDITS[name]
+    d = _d0_copy_sources(tmp_path)
+    assert _d0_data_defects(d) == []
+    edit(d)
+    bad = _d0_data_defects(d)
+    assert sorted(f"{x.split(': ')[0]}: {x.split(': ')[1].split()[0]}" for x in bad) == sorted(expected), bad
+
+
+def test_d0_line_ends_of_the_checkout_change_nothing(tmp_path):
+    """LF (git, Linux) and CRLF (Windows with core.autocrlf) checkouts of the same content: no defect, the same published rows."""
+    for convert in (_lf, _crlf):
+        d = _d0_copy_sources(tmp_path / convert.__name__)
+        for rel, _ in D0_FILES.values():
+            convert(d / rel)
+        assert _d0_data_defects(d) == [], convert.__name__
+        assert _d0_published(d) == _d0_published(), convert.__name__
+
+
+D0_PUBLISHED_EDITS = {
+    "D0 row deleted": ("EQ", lambda f, r: (f, [x for x in r if x["id"] != D0_IDS[4]]), f"EQ: no row {D0_IDS[4]}"),
+    "identifier changed": ("QA-EB", lambda f, r: (f, [{**x, "id": x["id"].replace("|s1", "|s9")} if x["id"] == D0_IDS[2] else x
+                                                      for x in r]), f"QA-EB: no row {D0_IDS[2]}"),
+    "row duplicated": ("QA-EB", lambda f, r: (f, [*r, next(x for x in r if x["id"] == D0_IDS[3])]), f"QA-EB: identifier {D0_IDS[3]} in 2"),
+    "column missing": ("EQ", lambda f, r: ([c for c in f if c != "Gamma_up"], [{k: v for k, v in x.items() if k != "Gamma_up"}
+                                                                                 for x in r]), "EQ: column Gamma_up missing"),
+}
+
+
+@pytest.mark.parametrize("name", list(D0_PUBLISHED_EDITS))
+def test_d0_incomplete_published_data_is_detected(d0, tmp_path, name):
+    run, edit, expected = D0_PUBLISHED_EDITS[name]
+    d = _d0_copy_sources(tmp_path)
+    _d0_rewrite_rows(d / D0_FILES[run][0], edit)
+    pub, bad = _d0_published(d)
+    assert expected in " ".join(bad) and bad, bad
+    # the D0 regression on these rows has no PASS: a missing or repeated identifier leaves its case without a published row
+    cases = [{**c, run: pub[run].get(c["id"])} for c in d0["cases"]]
+    report = _d0_portable_report({**d0, "cases": cases, "published_defects": bad})
+    assert report["published"] and report["composition"]
+
+
+def test_d0_rows_matched_by_identifier_not_by_position(d0, tmp_path):
+    d = _d0_copy_sources(tmp_path)
+    for run in ("QA-EB", "EQ"):
+        _d0_rewrite_rows(d / D0_FILES[run][0], lambda f, r: (f, r[::-1]))
+    pub, bad = _d0_published(d)
+    assert bad == [] and pub == _d0_published()[0]  # the same row for every identifier
+    # matching by position (the k-th D0 row of each file to the k-th case) is detected as a defect of the identifiers
+    order = {}
+    for run in ("QA-EB", "EQ"):
+        with open(d / D0_FILES[run][0], encoding="utf-8", newline="") as f:
+            order[run] = [r for r in csv.DictReader(f) if r["id"] in D0_IDS]
+    cases = copy.deepcopy(d0["cases"])
+    positional = [{**c, "QA-EB": order["QA-EB"][k], "EQ": order["EQ"][k]} for k, c in enumerate(cases)]
+    moved = {k for k, c in enumerate(cases) if c["id"] != order["QA-EB"][k]["id"] or c["id"] != order["EQ"][k]["id"]}
+    flagged = {k for k, c in enumerate(positional) if any("identifiers differ" in x for x in _d0_portable_defects(c))}
+    assert moved and flagged == moved
+
+
+def test_d0_portable_checks_run_on_a_path_not_identical(d0):
+    rec = d0["recorded"]
+    runner = {**rec, "platform": "Windows-10-10.0.20348-SP0", "processor": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+              "numpy_blas_core": "Zen", "scipy_blas_core": "Zen"}
+    other = {**d0, "path": runner, "path_after": runner}
+    assert not _d0_identity(other)[0]
+    report = _d0_portable_report(other)
+    assert set(report) == {"data", "published", "composition", *D0_IDS} and all(v == [] for v in report.values())
+    broken = copy.deepcopy(other)
+    broken["cases"][5]["result"]["row"]["Gamma_up"] = math.nextafter(float.fromhex(broken["cases"][5]["result"]["row"]["Gamma_up"]),
+                                                                     0.0).hex()
+    assert [k for k, v in _d0_portable_report(broken).items() if v] == [D0_IDS[5]]
+    # the portable test itself has no skip and no path condition
+    src = ast.get_source_segment(Path(__file__).read_text(encoding="utf-8"), next(
+        n for n in ast.parse(Path(__file__).read_text(encoding="utf-8")).body if getattr(n, "name", "") == "test_d0_regression_portable"))
+    assert "skip" not in src and "_identity" not in src and "_d0_portable_report(d0)" in src
+
+
+def test_d0_unknown_blas_or_mode_is_never_identical(d0, monkeypatch):
+    rec, mism = d0["recorded"], ["P_hat_s: computed x, published y"]
+    with monkeypatch.context() as m:
+        m.setattr(sys.modules[__name__], "_openblas", lambda pkg, suffix: (None, "no OpenBLAS library found"))
+        now = _d0_current_path()
+        with _one_blas_thread() as before:
+            assert before == []
+    assert now["numpy_blas_core"] is None and now["scipy_blas_core"] is None and now["blas_threads"] is None
+    ok, diff = _d0_path_identity(now, rec)
+    assert not ok and {"numpy_blas_core: not readable here", "scipy_blas_core: not readable here"} <= set(diff)
+    assert _d0_bitwise_verdict(ok, mism) == "NOT_VERIFIED"
+    with monkeypatch.context() as m:
+        m.setattr(pl.qa(), "probe_mode", lambda: {"ok": True, "fails": [], "controlfp": {"available": False}})
+        now = _d0_current_path()
+    assert now["fp_control"] is None and "fp_control: not readable here" in _d0_path_identity(now, rec)[1]
+    with monkeypatch.context() as m:
+        m.setattr(pl.qa(), "probe_mode", lambda: {"ok": False, "fails": ["numpy[8] ftz"], "controlfp": {"word": "0x8001f"}})
+        now = _d0_current_path()
+    assert not _d0_path_identity(now, rec)[0] and now["fp_control"].startswith("mode probe failed")
+    # a recomputed row probed under another control word
+    case = copy.deepcopy(d0["cases"][0])
+    case["result"]["row"]["controlfp_after"] = "0x9001f"
+    moved = {**d0, "path": dict(rec), "path_after": dict(rec), "record_problems": [], "cases": [case, *d0["cases"][1:]]}
+    ok, diff = _d0_identity(moved)
+    assert not ok and diff == [f"fp_control: recomputed controlfp_after of {D0_IDS[0]} is '0x9001f', '0x8001f' recorded"]
+
+
+def test_d0_code_under_test_is_this_checkout(d0):
+    """The D0 rows were computed by the code of this checkout: every loaded module of the two packages (the pipeline loads
+    kkvim_reference) and the pipeline script."""
+    assert any(n.split(".")[0] == "kkvim_reference" for n in sys.modules)
+    for pkg in ("kkvim", "kkvim_reference"):
+        importlib.import_module(pkg)
+    mods = {n: m for n, m in sys.modules.items() if n.split(".")[0] in ("kkvim", "kkvim_reference") and getattr(m, "__file__", None)}
+    assert {n.split(".")[0] for n in mods} == {"kkvim", "kkvim_reference"}
+    assert all(Path(m.__file__).resolve().is_relative_to(ROOT / "src") for m in mods.values()), \
+        {n: m.__file__ for n, m in mods.items() if not Path(m.__file__).resolve().is_relative_to(ROOT / "src")}
+    assert Path(sys.modules["_pl_pipeline"].__file__).resolve() == TOOL
 
 
 @pytest.mark.skipif(platform.machine().lower() not in ("amd64", "x86_64"), reason="OpenBLAS cores of x86-64 only")
-@pytest.mark.parametrize("core", ["Haswell", "Sandybridge", "Prescott"])
+@pytest.mark.parametrize("core", ["Haswell", "Zen", "Sandybridge", "Prescott"])
 def test_d0_real_openblas_cores_in_a_child_process(d0, core, tmp_path):
-    """The two D0 tests with OPENBLAS_CORETYPE forced in a child process: another core never makes the bitwise check FAIL and leaves
-    the portable checks intact; on the recorded path the recorded core keeps the bitwise check strict and passing."""
+    """The two D0 tests with OPENBLAS_CORETYPE set before a child process starts: another core never makes the bitwise check FAIL
+    and leaves the portable checks intact. The core the child actually loaded (read from its library, recorded by its bitwise test)
+    decides, not the variable: OpenBLAS may map the requested core to another one (Zen -> Haswell on an Intel processor)."""
     xml = tmp_path / "d0.xml"
     p = subprocess.run([sys.executable, "-m", "pytest", str(Path(__file__)), "-q", "-p", "no:cacheprovider", f"--junitxml={xml}",
-                        "-k", "test_d0_regression_portable or test_d0_regression_bitwise"], cwd=ROOT,
+                        "-o", "junit_family=xunit1", "-k", "test_d0_regression_portable or test_d0_regression_bitwise"], cwd=ROOT,
                        env={**os.environ, "OPENBLAS_CORETYPE": core}, capture_output=True, text=True, timeout=1800)
     if not xml.exists():
         pytest.skip(f"the core {core} does not run on this processor (exit {p.returncode}): {p.stderr[-300:]}")
@@ -679,13 +1002,22 @@ def test_d0_real_openblas_cores_in_a_child_process(d0, core, tmp_path):
     outcome = {n: ("failed" if t.find("failure") is not None or t.find("error") is not None else
                    "skipped" if t.find("skipped") is not None else "passed") for n, t in cases.items()}
     assert outcome["test_d0_regression_portable"] == "passed" and p.returncode == 0, p.stdout[-2000:]
-    assert outcome["test_d0_regression_bitwise"] in ("passed", "skipped")
-    if _d0_identity(d0)[0]:  # this machine is the recorded path: the forced core decides
-        if core == d0["recorded"]["numpy_blas_core"]:
-            assert outcome["test_d0_regression_bitwise"] == "passed"
-        else:
-            msg = cases["test_d0_regression_bitwise"].find("skipped").get("message")
-            assert outcome["test_d0_regression_bitwise"] == "skipped" and "NOT_VERIFIED" in msg and "numpy_blas_core" in msg, msg
+    bit = outcome["test_d0_regression_bitwise"]
+    assert bit in ("passed", "skipped")
+    child = json.loads(next(x.get("value") for x in cases["test_d0_regression_bitwise"].iter("property") if x.get("name") == "d0_path"))
+    loaded = child["numpy_blas_core"]
+    assert loaded is not None
+    if loaded != d0["recorded"]["numpy_blas_core"]:  # another core: never an identical path
+        assert child["identical"] is False
+    if child["identical"]:  # the recorded path: strict, every row reproduced bitwise
+        assert bit == "passed" and child["rows_differing"] == 0
+    elif child["rows_differing"]:  # a difference off the recorded path: NOT_VERIFIED with the reason, never FAIL
+        msg = cases["test_d0_regression_bitwise"].find("skipped").get("message")
+        assert bit == "skipped" and "NOT_VERIFIED" in msg and (loaded == d0["recorded"]["numpy_blas_core"] or "numpy_blas_core" in msg)
+    else:
+        assert bit == "passed"
+    if _d0_identity(d0)[0] and loaded == d0["recorded"]["numpy_blas_core"]:  # this machine and process are the recorded path
+        assert child["identical"] is True
 
 
 def test_d0_blas_threads_restored_after_the_d0_computation(d0):
@@ -702,7 +1034,8 @@ def test_d0_path_condition_is_local_to_the_d0_checks():
     assert users == {"d0", "test_d0_regression_bitwise", "test_d0_every_path_parameter_is_needed",
                      "test_d0_win32_alone_is_not_an_identical_path", "test_d0_platform_mismatch_is_not_a_false_fail",
                      "test_d0_bitwise_is_strict_on_an_identical_path", "test_d0_inconsistent_or_missing_record_gives_no_identity",
-                     "test_d0_real_openblas_cores_in_a_child_process", "test_d0_path_read_after_the_computation_counts"}
+                     "test_d0_real_openblas_cores_in_a_child_process", "test_d0_path_read_after_the_computation_counts",
+                     "test_d0_portable_checks_run_on_a_path_not_identical", "test_d0_unknown_blas_or_mode_is_never_identical"}
     src = TOOL.read_text(encoding="utf-8")
     assert "OPENBLAS_CORETYPE" not in src and "_d0_" not in src
 
