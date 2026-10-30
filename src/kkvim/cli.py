@@ -9,8 +9,10 @@ writes what they return. It computes no quantity of the method itself:
 - the status of the solver (CONVERGED, STAGNATED, MAX_HALF_STEPS, ERROR_*) is written unchanged;
 - ``field.csv`` is written only for CONVERGED. Any other run with a completed half-step gets
   ``field_diagnostic.csv`` (marked: the field of the last half-step, not a computed solution);
-- existing result files are never overwritten without ``--overwrite``; files are written through new temporary
-  files, so that a failed write leaves no half-written result and touches no other file;
+- existing result files are never overwritten without ``--overwrite``; every file is written through a new
+  temporary file, so no result file is ever half-written and no file of another name is touched. The set of files
+  is not replaced atomically: a failure in the middle may leave files of two runs, and the command then says
+  exactly which files were changed (``write_results``);
 - an error of creating the folder or writing the files is exit code 4, an unexpected internal error is exit code 5;
   neither is reported as a status of the solver;
 - ``result.json`` lists the necessary conditions of a qualification grid (R3_NUMERICAL_SPEC.md 6.1, D-039) as
@@ -101,6 +103,24 @@ HISTORY_COLUMNS = (
 
 class OutputExistsError(Exception):
     """Result files are present in the output folder and --overwrite was not given."""
+
+
+class OutputWriteError(OSError):
+    """Saving failed; records what had already been changed in the folder when it failed."""
+
+    def __init__(self, action: str, name: str, cause: OSError, created, replaced, removed, pending, leftovers):
+        super().__init__(f"{action} {name}: {cause}")
+        self.action, self.name, self.cause = action, name, cause
+        self.created = tuple(created)  # result files written where none existed
+        self.replaced = tuple(replaced)  # result files of the earlier run replaced by new ones
+        self.removed = tuple(removed)  # stale result files of the earlier run removed
+        self.pending = tuple(pending)  # operations not done: (action, name)
+        self.leftovers = tuple(leftovers)  # own temporary files that could not be removed
+
+    @property
+    def changed(self) -> bool:
+        """True if any result file in the folder was changed before the failure."""
+        return bool(self.created or self.replaced or self.removed)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -320,27 +340,83 @@ def result_texts(args, argv, result, report) -> dict:
 
 
 def write_results(out: Path, texts: dict, overwrite: bool) -> dict:
-    """Write the files of one run into the existing folder ``out``.
+    """Write the files of one run into the existing folder ``out``; on failure raise ``OutputWriteError``.
 
-    Every file is first written completely to a new temporary file; only then are the result files replaced.
-    If writing fails, the temporary files are removed and the folder keeps its earlier content. With
-    --overwrite, result files of an earlier run that this run does not produce are removed (a converged
-    field.csv must not stay next to a later failed run). Other files are never touched.
+    1. Every file is written completely to a new temporary file with a unique name. A failure here changes no
+       result file: the folder keeps its earlier results.
+    2. The result files are moved into place one by one (``os.replace``).
+    3. With --overwrite, result files of an earlier run that this run does not produce are removed (a converged
+       field.csv must not stay next to a later failed run).
+
+    The set is not replaced atomically. A failure in step 2 or 3 (for example a file locked by another program)
+    leaves a partial update: some files are of the new run, others of the earlier one. ``OutputWriteError`` then
+    lists the files created, replaced and removed, the file that failed and the operations not done; the folder
+    must not be used as a completed run, and the run has to be repeated after the cause is removed. Only own
+    temporary files are deleted; files of other names are never touched.
     """
-    temporary = {}
+    temporary, created, replaced, removed = {}, [], [], []
+    stale = [name for name in OUTPUTS if overwrite and name not in texts]
+    step = ("запись", "")
     try:
         for name, text in texts.items():
+            step = ("запись временного файла для", name)
             temporary[name] = _write_temporary(out, text)
-        for name, path in temporary.items():
+        for name, path in list(temporary.items()):
+            step = ("замена", name)
+            existed = (out / name).exists()
             os.replace(path, out / name)
-        if overwrite:  # only after every new file is in place
-            for name in OUTPUTS:
-                if name not in texts and (out / name).exists():
-                    (out / name).unlink()
+            del temporary[name]
+            (replaced if existed else created).append(name)
+        for name in stale:  # only after every new file is in place
+            step = ("удаление устаревшего файла", name)
+            if (out / name).exists():
+                os.remove(out / name)
+                removed.append(name)
+    except OSError as exc:
+        action, name = step
+        done = set(created) | set(replaced)
+        pending = [("замена", n) for n in texts if n not in done and n != name]
+        pending += [("удаление устаревшего файла", n) for n in stale
+                    if n not in removed and n != name and (out / n).exists()]
+        raise OutputWriteError(action, name, exc, created, replaced, removed, pending,
+                               _remove_temporary(temporary.values())) from exc
     finally:
-        for path in temporary.values():
-            path.unlink(missing_ok=True)  # only files not moved into place: after a failure
+        _remove_temporary(temporary.values())
     return {name: out / name for name in texts}
+
+
+def _remove_temporary(paths) -> list:
+    """Remove own temporary files (never a result or another file); names of those that remain."""
+    left = []
+    for path in list(paths):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            left.append(path.name)
+    return left
+
+
+def output_error_lines(out: Path, exc: OutputWriteError, status: str) -> list:
+    """Messages of a failed save: what failed, what had changed, and whether the folder may be used."""
+    lines = [f"Сохранение результатов завершилось ошибкой: {exc.action} {exc.name} в {out}: {exc.cause}"]
+    if exc.changed:
+        if exc.replaced:
+            lines.append("Уже заменены новыми: " + ", ".join(exc.replaced))
+        if exc.created:
+            lines.append("Уже записаны (новые): " + ", ".join(exc.created))
+        if exc.removed:
+            lines.append("Уже удалены устаревшие: " + ", ".join(exc.removed))
+        not_done = [f"{name} ({action})" for action, name in exc.pending]
+        lines.append(f"Не выполнено: {exc.name} ({exc.action})" + "".join(f", {item}" for item in not_done))
+        lines.append("ВНИМАНИЕ: каталог может содержать результаты разных расчётов. Использовать его как завершённый "
+                     "расчёт нельзя. Устраните причину ошибки (например, файл открыт другой программой) и повторите "
+                     "расчёт с --overwrite.")
+    else:
+        lines.append(f"Прежние файлы результатов в {out} не изменены.")
+    if exc.leftovers:
+        lines.append("Не удалось удалить собственные временные файлы: " + ", ".join(exc.leftovers))
+    lines.append(f"Расчёт завершился со статусом решателя {status}; полный набор результатов этого расчёта не сохранён.")
+    return lines
 
 
 def _utf8_streams() -> None:
@@ -391,9 +467,9 @@ def main(argv=None) -> int:
         return _internal_error("расчёт или подготовка результатов")
     try:
         paths = write_results(args.out, texts, args.overwrite)
-    except OSError as exc:
-        _say(sys.stderr, f"Результаты не сохранены: ошибка записи в {args.out}: {exc}")
-        _say(sys.stderr, f"Расчёт завершился со статусом решателя {result.status}, но файлы результатов не записаны.")
+    except OutputWriteError as exc:
+        for line in output_error_lines(args.out, exc, result.status):
+            _say(sys.stderr, line)
         return EXIT_OUTPUT_ERROR
     except Exception:  # noqa: BLE001
         return _internal_error("запись результатов")

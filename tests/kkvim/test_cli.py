@@ -277,9 +277,102 @@ def test_a_write_error_after_the_run_leaves_the_folder_as_it_was(tmp_path, monke
     code = cli.main(command(out, "--overwrite", base=with_option("--nu", "1")))   # ERROR_INPUT would drop field.csv
     assert code == cli.EXIT_OUTPUT_ERROR
     captured = capsys.readouterr()
-    assert "Результаты не сохранены" in captured.err and ERROR_INPUT in captured.err
+    assert "Сохранение результатов завершилось ошибкой: замена " in captured.err and ERROR_INPUT in captured.err
+    assert "Прежние файлы результатов" in captured.err and "не изменены" in captured.err
+    assert "ВНИМАНИЕ" not in captured.err and "Уже " not in captured.err      # nothing changed: no false alarm
     assert "Результаты:" not in captured.out and "Traceback" not in captured.err
     assert {p.name: p.read_bytes() for p in out.iterdir()} == before          # nothing removed, replaced or left
+
+
+# --- B-1a: a partial update is reported exactly ---------------------------------------------------------------
+
+def partial_setup(tmp_path, *earlier):
+    """An earlier run in ``out`` with files of other names; returns (out, bytes of every file before)."""
+    out = tmp_path / "demo"
+    assert cli.main(command(out, *earlier)) in (0, 1)
+    (out / "notes.txt").write_text("user file", encoding="utf-8")
+    (out / "result.json.tmp").write_text("user tmp", encoding="utf-8")
+    return out, {p.name: p.read_bytes() for p in out.iterdir()}
+
+
+def fail_on_call(monkeypatch, name, number):
+    """``cli.os.<name>`` fails on its ``number``-th call (a file locked by another program)."""
+    original, calls = getattr(cli.os, name), []
+
+    def operation(*args):
+        calls.append(args)
+        if len(calls) == number:
+            raise PermissionError(13, "file is locked by another process", str(args[-1]))
+        return original(*args)
+
+    monkeypatch.setattr(cli.os, name, operation)
+    return calls
+
+
+def check_partial(out, before, captured, *, replaced, failed, kept_old, extra=()):
+    files = {p.name: p.read_bytes() for p in out.iterdir()}
+    assert not any(name.startswith(".kkvim-") for name in files)                      # no own temporary file left
+    assert files["notes.txt"] == before["notes.txt"] and files["result.json.tmp"] == before["result.json.tmp"]
+    for name in replaced:
+        assert files[name] != before[name], name                                       # really the new run
+    for name in kept_old:
+        assert files[name] == before[name], name                                       # really the earlier run
+    err = captured.err
+    assert "Сохранение результатов завершилось ошибкой" in err and failed in err
+    assert ("Уже заменены новыми: " + ", ".join(replaced)) in err if replaced else "Уже заменены" not in err
+    for line in extra:
+        assert line in err, line
+    assert "ВНИМАНИЕ: каталог может содержать результаты разных расчётов" in err
+    assert "Использовать его как завершённый расчёт нельзя" in err and "не изменены" not in err
+    assert "Результаты:" not in captured.out and "Traceback" not in err
+
+
+@pytest.mark.parametrize(("number", "replaced", "failed", "kept_old"), [
+    (2, ["field.csv"], "Не выполнено: history.csv (замена), result.json (замена)", ["history.csv", "result.json"]),
+    (3, ["field.csv", "history.csv"], "Не выполнено: result.json (замена)", ["result.json"]),
+])
+def test_a_failed_second_or_third_replacement_is_reported_as_partial(tmp_path, monkeypatch, capsys, number,
+                                                                    replaced, failed, kept_old):
+    out, before = partial_setup(tmp_path)
+    capsys.readouterr()
+    calls = fail_on_call(monkeypatch, "replace", number)
+    assert cli.main(command(out, "--overwrite", base=with_option("--q", "2000"))) == cli.EXIT_OUTPUT_ERROR
+    assert len(calls) == number                                                        # stopped at the failure
+    check_partial(out, before, capsys.readouterr(), replaced=replaced, failed=failed, kept_old=kept_old)
+
+
+def test_a_stale_diagnostic_field_that_cannot_be_removed_is_reported(tmp_path, monkeypatch, capsys):
+    out, before = partial_setup(tmp_path, "--s-max", "4")                             # MAX_HALF_STEPS
+    assert "field_diagnostic.csv" in before and "field.csv" not in before
+    capsys.readouterr()
+    fail_on_call(monkeypatch, "remove", 1)
+    assert cli.main(command(out, "--overwrite")) == cli.EXIT_OUTPUT_ERROR             # CONVERGED: field.csv
+    captured = capsys.readouterr()
+    check_partial(out, before, captured, replaced=["history.csv", "result.json"],
+                  failed="Не выполнено: field_diagnostic.csv (удаление устаревшего файла)",
+                  kept_old=["field_diagnostic.csv"], extra=("Уже записаны (новые): field.csv",))
+    assert json.loads((out / "result.json").read_text(encoding="utf-8"))["status"] == CONVERGED
+    assert (out / "field.csv").exists() and (out / "field_diagnostic.csv").exists()   # two runs side by side
+
+
+def test_a_failed_temporary_write_changes_no_result(tmp_path, monkeypatch, capsys):
+    out, before = partial_setup(tmp_path)
+    capsys.readouterr()
+    written = []
+    original = cli._write_temporary
+
+    def failing(folder, text):
+        if written:
+            raise OSError(28, "No space left on device")
+        written.append(original(folder, text))
+        return written[-1]
+
+    monkeypatch.setattr(cli, "_write_temporary", failing)
+    assert cli.main(command(out, "--overwrite", base=with_option("--q", "2000"))) == cli.EXIT_OUTPUT_ERROR
+    captured = capsys.readouterr()
+    assert "запись временного файла для history.csv" in captured.err and "не изменены" in captured.err
+    assert "ВНИМАНИЕ" not in captured.err and "Результаты:" not in captured.out
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before and not written[0].exists()
 
 
 def test_an_unexpected_error_of_the_computation_is_exit_5(tmp_path, monkeypatch, capsys):
