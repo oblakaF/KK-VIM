@@ -439,7 +439,11 @@ class References:
     def control(self, N, r_label, n_x, n_y):
         ref = self.grid(r_label, n_x, n_y)
         if N not in ref["control"]:
-            ref["control"][N] = run_control(ref["g"], N, self.cfg["s_run"])
+            try:
+                ref["control"][N] = run_control(ref["g"], N, self.cfg["s_run"])
+            except (np.linalg.LinAlgError, ValueError) as exc:  # reported as a missing control, never repaired
+                print(f"control N={N} r={r_label} {n_x}x{n_y} failed: {exc}", flush=True)
+                ref["control"][N] = None
         return ref["control"][N]
 
 
