@@ -1885,8 +1885,8 @@ def main(argv=None):
     out.mkdir(parents=True, exist_ok=True)
     if args.mode == "one":
         for c in select_cells(args.cells):
-            meta, rows = campaign_cell(c, args.transform, args.S, verbose=True)
-            print(json.dumps(aggregate(meta, rows), default=str, indent=1))
+            info, rows = campaign_cell(c, args.transform, args.S, verbose=True)
+            print(json.dumps(aggregate(info, rows), default=str, indent=1))
     elif args.mode == "campaign":
         run_campaign(select_cells(args.cells), args.transform, args.S, args.work or str(out / "_work"), args.workers,
                      args.tag or f"{args.transform}_{args.mode_run}", out, mode=args.mode_run)
