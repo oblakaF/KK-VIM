@@ -1,0 +1,42 @@
+{
+ "plan_commit": "df376524ffa638bca9de2cd9f31cff5e5c1cb81d",
+ "head": "see the report (commit containing this file)",
+ "base": "a2307cd8030db812ff1769bc775c0e5485b8f9e2",
+ "untracked_or_modified": [
+  "?? docs/results/r4_roundoff_rank_qualification/",
+  "?? tests/cross/test_r4_roundoff_rank_qualification.py"
+ ],
+ "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+ "numpy": "2.5.4",
+ "scipy": "1.18.1",
+ "python_flint": "0.9.0",
+ "mpmath": "1.4.1",
+ "platform": "Windows-10-10.0.19045-SP0",
+ "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+ "openblas": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=24",
+ "blas_threads_bitwise": {
+  "cells": [
+   "3:1:320:320",
+   "2:5:1600:320"
+  ],
+  "hash_threads_1": [
+   "68502233b8036369009da4be07bc037ba0784e5ab2f84b54f419785cc5398c53",
+   "f15fdba3aae7395178b11342927495f5cf7d089231f6b51ec731a228d7d2b45f"
+  ],
+  "hash_threads_24": [
+   "68502233b8036369009da4be07bc037ba0784e5ab2f84b54f419785cc5398c53",
+   "f15fdba3aae7395178b11342927495f5cf7d089231f6b51ec731a228d7d2b45f"
+  ],
+  "equal": true
+ },
+ "precision": {
+  "PREC": 256,
+  "SEQ_PREC0": 256,
+  "SEQ_PREC_MAX": 16384,
+  "SEQ_TARGET": 7.52316384526264e-37
+ },
+ "u": 1.1102230246251565e-16,
+ "data_tool_commit": "a2649450805620caad284789d79f8ab56a22ab59",
+ "data_tool_sha256": "668f38bf6c98d128a449ec6420ee3aa67bcc1a2896d2cb27378988512f6767c1",
+ "data_notes": "cells/steps fft_M2, validate_*, boundary_g1, ranktests_g3, gl_g2: run from a264945 (Python 3.13.15, 12 workers, OPENBLAS_NUM_THREADS=1); cells/steps dense_M1, dense_M2: same file content (sha256 above); meta.json and summary.json: bc6ae13 (only the 'one' branch of main changed). Reproduction of 12 cells on Python 3.14.8: steps CSV bitwise equal to 3.13."
+}
