@@ -322,6 +322,76 @@ def continuous_case(a, b, q, D, N, M=M_CONT, M_check=M_CHECK, s_max=S_MAX):
     return rows
 
 
+def n23_transfer_case(a, b, q, D, N, M=M_CONT, s_max=S_MAX):
+    """QA diagnostic of docs/R4_N23_QUALIFICATION.plan.md, run ONLY with --n23-transfer; changes no other output.
+
+    On the arrays of continuous_case (the same call of continuous_sequence) evaluates in double the transfer bound of the
+    truncation E'_s (Corollary N23-6: theta'_s = min(1, E'_{s-1} / (D^1/2 lambda11 sigma_N^L2(w'_{s-1}))), no stop), the
+    monotone upper bound U_s of the untruncated energy error (Corollary N23-7) and adds E'_s to the measurement budget of
+    group B (strict + model) in the same relative norm of every measure (plan, sec. 4). The rounding of the inputs of E'_s
+    is bounded separately (scripts/r4_n23_qualification.py); the statuses status_cont_* are not changed (D-048.10)."""
+    steps = continuous_sequence(a, b, N, s_max, M, q=q, D=D)
+    modes = odd_modes(M)
+    K = len(modes)
+    w0 = omega0_coefficients(a, b, q, D, M)
+    out_ht = omega0_ht_outside(a, b, q, D, M)
+    T = math.sqrt(out_ht)  # strict bound of |omega_0 - omega_M|_{H_T} (Q22, sec. 2)
+    lam11 = math.pi**2 * (1.0 / a**2 + 1.0 / b**2)
+    pi0, pi0_budget = omega0_energy(a, b, q, D, M=M_ENERGY)
+    beta_pi = pi0_budget / abs(pi0)
+    c0 = levy_centre_140(a=a, b=b, q=q, D=D)
+    cb = levy_centre_bounds(a=a, b=b, q=q, D=D)
+    xs, ys = np.linspace(0.0, a, SAMPLE + 1), np.linspace(0.0, b, SAMPLE + 1)
+    W0 = levy_series_w_grid(xs, ys, a=a, b=b, q=q, D=D)
+    lb = levy_field_bounds(a=a, b=b, q=q, D=D)
+    # Riesz constant of the centre (Q22-6, item 1); for odd-mode fields also of the sup norm (Q22, З-3)
+    gamma2 = psum(1.0 / (D * a * b / 4.0 * math.pi**4 * lam_weights(a, b, M)))
+    gamma2 += (a * b) ** 2 / (4.0 * math.pi**4) * 2.0 * (1.0 / (2.0 * M)) * (math.pi**2 / 8.0) / (D * a * b / 4.0)
+    gc = math.sqrt(gamma2)
+    rows, prev, E, upper, sig_prev = [], None, None, math.inf, None
+    for st in steps:
+        s = st.s
+        C = st.x @ st.y.T
+        err2_block = ht_norm2(C - w0, a, b, D, M)
+        Rs = math.sqrt(T * T + err2_block)
+        sig = math.sqrt(a * b) / 2.0 * float(np.linalg.svd(np.linalg.qr(st.x)[1] @ np.linalg.qr(st.y)[1].T,
+                                                            compute_uv=False)[N - 1])
+        if prev is None:
+            d, theta, E = math.nan, math.nan, T
+        else:
+            d = math.sqrt(ht_norm2(C - prev, a, b, D, M))
+            theta = min(1.0, E / (math.sqrt(D) * lam11 * sig_prev))
+            E = math.sqrt((T + theta * Rs) ** 2 + (E + theta * d) ** 2)
+        upper = min(upper, math.sqrt(err2_block + T * T) + E)
+        err2 = err2_block + 0.5 * out_ht  # the measured value of continuous_case (err2_direct)
+        err = math.sqrt(err2)
+        beta_D = (0.5 * out_ht + direct_rounding(st.x, st.y, w0, err2_block, a, b, D, M)) / err2
+        beta_err = 1.0 - math.sqrt(1.0 - beta_D)
+        qs = E / (err * (1.0 - beta_err))
+        wc = centre_value(st.x, st.y)
+        dcabs = abs(wc - c0)
+        beta_c = (cb.truncation + cb.rounding_model + centre_rounding(st.x, st.y)) / dcabs
+        Wc = field_at_nodes(st, SAMPLE, SAMPLE)
+        einf = float(np.max(np.abs(Wc - W0)))
+        beta_inf = (lb.truncation + lb.rounding_model + K * U * float(np.max(np.abs(Wc)))) / einf
+        row = {"N": N, "s": s, "r": b / a, "M": M, "T": T, "lambda11": lam11, "Gamma_c": gc,
+               "sigma_N_L2": sig, "d_norm": d, "err_M": math.sqrt(err2_block), "R_s": Rs, "theta": theta,
+               "E_transfer": E, "U_upper": upper, "err2_direct": err2, "err_abs": err, "e_rel": err2 / (-2.0 * pi0),
+               "w_cont_centre": wc, "delta_c": (wc - c0) / c0, "E_inf_abs": einf,
+               "beta_D": beta_D, "beta_err": beta_err, "beta_Pi0": beta_pi, "beta_c": beta_c, "beta_inf": beta_inf,
+               "R_err_abs": beta_err + qs, "R_e_rel": beta_D + beta_pi + 2.0 * qs + qs * qs,
+               "R_delta_c": beta_c + gc * E / (dcabs * (1.0 - beta_c)),
+               "R_E_inf": beta_inf + gc * E / (einf * (1.0 - beta_inf)),
+               "RU_err_abs": (upper - err) / err + beta_err, "RU_e_rel": (upper * upper - err2) / err2 + beta_D + beta_pi}
+        for key in ("err_abs", "e_rel", "delta_c", "E_inf"):
+            row[f"rule_{key}"] = bool(row[f"R_{key}"] <= RULE)
+        for key in ("err_abs", "e_rel"):
+            row[f"rule_upper_{key}"] = bool(row[f"RU_{key}"] <= RULE)
+        rows.append(row)
+        prev, sig_prev = C, sig
+    return rows
+
+
 def scale_invariance(N, r, cases=((2.9, 3.7, 0.013), (0.37, -1.0, 5.0))):
     """Relative quantities for (a, b = r a, q, D) scaled against a = q = D = 1 (task B-2)."""
     base = {row["s"]: row for row in continuous_case(1.0, r, 1.0, 1.0, N, M_check=2001)}
@@ -601,7 +671,7 @@ def hp_checks():
 # ------------------------------------------------------------------------------------------------------------------
 
 
-def write_csv(path, rows):
+def write_csv(path, rows, spec=".6e"):
     keys = []
     for row in rows:
         for k in row:
@@ -611,7 +681,7 @@ def write_csv(path, rows):
         w = csv.DictWriter(f, fieldnames=keys, lineterminator="\n")
         w.writeheader()
         for row in rows:
-            w.writerow({k: (f"{v:.6e}" if isinstance(v, float) else v) for k, v in row.items() if not k.startswith("_")})
+            w.writerow({k: (format(v, spec) if isinstance(v, float) else v) for k, v in row.items() if not k.startswith("_")})
 
 
 def read_csv(path):
@@ -863,7 +933,20 @@ def main(argv=None):
     p.add_argument("--no-grid", action="store_true")
     p.add_argument("--max-n", type=int, default=1280)
     p.add_argument("--tables-only", action="store_true", help="regenerate master.csv and tables.md from the CSV files")
+    p.add_argument("--n23-transfer", metavar="CSV", help="QA diagnostic only (docs/R4_N23_QUALIFICATION.plan.md): write the "
+                   "N23-6/N23-7 transfer bounds on the continuous arrays to CSV (17 digits); no other output is written")
     args = p.parse_args(argv)
+    if args.n23_transfer:
+        rset = R_ALL if not args.quick else {"1": 1.0, "5": 5.0}
+        rows = []
+        for N in NS:
+            for lab, r in rset.items():
+                for row in n23_transfer_case(1.0, r, 1.0, 1.0, N):
+                    rows.append({"r_label": lab, **row})
+                print("n23-transfer", N, lab, flush=True)
+        Path(args.n23_transfer).parent.mkdir(parents=True, exist_ok=True)
+        write_csv(Path(args.n23_transfer), rows, spec=".17g")
+        return
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     if args.tables_only:
