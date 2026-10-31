@@ -168,6 +168,27 @@ def test_rank_certificate_at_the_boundary_m23():
     assert res["certified"] and Decimal(res["mu_up"]) < Decimal("0.1")
 
 
+def _text(data):
+    """Bytes of a text result with CRLF line ends normalised to LF: a checkout of Git for Windows (core.autocrlf=true) has CRLF,
+    the script writes LF (csv) or the platform line end (json). Nothing else is changed; a lone CR is content."""
+    text = data.replace(b"\r\n", b"\n")
+    assert b"\r" not in text
+    return text
+
+
+def test_text_comparison_ignores_only_line_ends():
+    lf = b"r_label,N,s,R\n1/5,2,1,1.25e-03\n1/5,2,2,3.5e-03\n"
+    assert _text(lf.replace(b"\n", b"\r\n")) == _text(lf)
+    for other in (b"r_label,N,s,R\n1/5,2,1,1.26e-03\n1/5,2,2,3.5e-03\n",     # one digit
+                  b"r_label,N,s,R\n1/5,2,2,3.5e-03\n1/5,2,1,1.25e-03\n",     # order of the rows
+                  b"r_label,N,s,R\n1/5,2,1,1.250e-03\n1/5,2,2,3.5e-03\n",    # printed precision
+                  b"r_label,N,s,R\n1/5,2,1,1.25e-03\n",                      # a missing row
+                  b"r_label,N,s,R\n1/5,2,1,1.25e-03\n1/5,2,2,3.5e-03"):      # a missing final line end
+        assert _text(other) != _text(lf) and _text(other.replace(b"\n", b"\r\n")) != _text(lf)
+    with pytest.raises(AssertionError):
+        _text(b"1/5,2,1\r1.25e-03\n")
+
+
 @pytest.mark.skipif(os.environ.get("KKVIM_N23_HEAVY") != "1", reason="full combine only with KKVIM_N23_HEAVY=1")
 def test_combine_reproduces_the_committed_tables(tmp_path):
     import shutil
@@ -177,4 +198,4 @@ def test_combine_reproduces_the_committed_tables(tmp_path):
     q = _load(SCRIPT, "r4_n23_qualification_combine")
     q.main(["combine", "--out", str(tmp_path)])
     for name in ("matrix.csv", "smax.csv", "summary.json"):
-        assert (tmp_path / name).read_bytes() == (RESULTS / name).read_bytes(), name
+        assert _text((tmp_path / name).read_bytes()) == _text((RESULTS / name).read_bytes()), name
