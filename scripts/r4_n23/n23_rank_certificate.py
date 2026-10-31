@@ -223,19 +223,33 @@ def discrete_case(nx, ny, r, N):
     return dict(c0=hx * hy, dN1=dN1, dN=dN, E2=E2, E1=None, W0=W0, cert=(cert1, cert2))
 
 
+def outward(x, fmt, upward):
+    """Printed bound: x rounded OUTWARD to the digits of fmt ("%.4f": 4 decimals, "%.4g": 4 significant digits), up for an
+    upper bound and down for a lower bound (review N-1, QA-1). Printing only; the certificate and mu < 1 are not changed.
+
+    x comes from interval endpoints through round-to-nearest mp operations (relative error ~2^-250); the factor 1 +- 2^-200
+    covers it before the directed rounding."""
+    x = x * (1 + mp.mpf(2) ** -200) if upward else x * (1 - mp.mpf(2) ** -200)
+    places = 4 if fmt == "%.4f" else 3 - int(mp.floor(mp.log10(x)))
+    k = (mp.ceil if upward else mp.floor)(x * mp.mpf(10) ** places)
+    text = fmt % float(k / mp.mpf(10) ** places)
+    assert mp.nint(mp.mpf(text) * mp.mpf(10) ** places) == k, (x, text)  # the printed digits are exactly the rounded value
+    return text
+
+
 def report(label, res):
     c0 = res['c0']
     mu = mp.sqrt(hi(res['E2']) / lo(res['dN1']))
     norm = mp.sqrt(lo(c0 * res['W0']))
     e2 = mp.sqrt(hi(c0 * res['E2'])) / norm
-    e1 = ("%.4g" % float(mp.sqrt(hi(c0 * res['E1'])) / norm)) if res['E1'] is not None else "-"
+    e1 = outward(mp.sqrt(hi(c0 * res['E1'])) / norm, "%.4g", True) if res['E1'] is not None else "-"
     dn1 = mp.sqrt(lo(c0 * res['dN1'])) / norm
     dn = mp.sqrt(lo(c0 * res['dN'])) / norm
     enc = mp.sqrt(lo(res['dN']) / hi(res['E2']))
     ok = mu < 1
-    print("%s | err1/|w0|<=%s err2/|w0|<=%.4g d(N-1)/|w0|>=%.4g d(N)/|w0|>=%.4g | mu<=%.4f %s | d(N)_low/err2_up>=%.4f | j_cert %s"
-          % (label, e1, float(e2), float(dn1), float(dn), float(mu), "CERTIFIED" if ok else "NOT_CERTIFIED", float(enc),
-             res['cert']), flush=True)
+    print("%s | err1/|w0|<=%s err2/|w0|<=%s d(N-1)/|w0|>=%.4g d(N)/|w0|>=%.4g | mu<=%s %s | d(N)_low/err2_up>=%s | j_cert %s"
+          % (label, e1, outward(e2, "%.4g", True), float(dn1), float(dn), outward(mu, "%.4f", True),
+             "CERTIFIED" if ok else "NOT_CERTIFIED", outward(enc, "%.4f", False), res['cert']), flush=True)
     return ok
 
 
