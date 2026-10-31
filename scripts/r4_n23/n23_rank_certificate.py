@@ -167,10 +167,16 @@ def continuous_case(r, N):
     tail_rows = 32 * a ** 4 / pi ** 6 / (10 * iv.mpf(M_ROWS) ** 5)        # rows m > M_ROWS (row-energy bound, sec. 3.2)
     E2 += tail_rows
     E1 += tail_rows
-    W0 = iv.mpf(0)                                                       # ||omega_0||^2 / c0 from below (display only)
-    for m in range(1, M_COLS + 1, 2):
+    # ||omega_0||^2 / c0 (display only), enclosed: from below the block m <= M_ROWS, n <= M_COLS; from above the block plus the
+    # strict tails of sec. 3.1 with t = 0 (the bounds of E1): columns n > M_COLS of every row m <= M_ROWS, rows m > M_ROWS
+    W0 = iv.mpf(0)
+    W0_tail = tail_rows
+    for m in range(1, M_ROWS + 1, 2):
         for n in ncols:
             W0 += (lam(m, n) * coef(m, n)) ** 2
+        rho = 1 + iv.mpf(m) ** 2 * b ** 2 / (a ** 2 * iv.mpf(M_COLS) ** 2)
+        W0_tail += 256 * rho ** 2 * b ** 4 / pi ** 8 * (1 / iv.mpf(m)) ** 2 / (10 * iv.mpf(M_COLS) ** 5)
+    W0 = iv.mpf([W0.a, (W0 + W0_tail).b])
     return dict(c0=a * b / 4, dN1=dN1, dN=dN, E2=E2, E1=E1, W0=W0, cert=(cert1, cert2))
 
 
@@ -218,38 +224,64 @@ def discrete_case(nx, ny, r, N):
     if nrows_full < len(mux):                                  # rows beyond: rho_m^2 <= c_m^2 / mu_m^2 * sum_n c_n^2
         scn = sum((c ** 2 for c in cy), iv.mpf(0))
         E2 += scn * sum((cx[i] ** 2 / mux[i] ** 2 for i in range(nrows_full, len(mux))), iv.mpf(0))
+    # ||omega_0||^2 / c0 (display only), enclosed: from below the block of the first 40 x 40 odd modes; from above the full rows
+    # of the first nrows_full odd modes plus the row bound of sec. 3.1 for the rest (the bound of E2)
     W0 = sum((cx[i] ** 2 * cy[j] ** 2 / (mux[i] + muy[j]) ** 2 for i in range(min(len(mux), 40))
               for j in range(min(len(muy), 40))), iv.mpf(0))
+    W0_up = sum((cx[i] ** 2 * cy[j] ** 2 / (mux[i] + muy[j]) ** 2 for i in range(nrows_full) for j in range(len(muy))),
+                iv.mpf(0))
+    if nrows_full < len(mux):
+        W0_up += sum((c ** 2 for c in cy), iv.mpf(0)) * sum((cx[i] ** 2 / mux[i] ** 2 for i in range(nrows_full, len(mux))),
+                                                            iv.mpf(0))
+    W0 = iv.mpf([W0.a, W0_up.b])
     return dict(c0=hx * hy, dN1=dN1, dN=dN, E2=E2, E1=None, W0=W0, cert=(cert1, cert2))
 
 
-def outward(x, fmt, upward):
-    """Printed bound: x rounded OUTWARD to the digits of fmt ("%.4f": 4 decimals, "%.4g": 4 significant digits), up for an
-    upper bound and down for a lower bound (review N-1, QA-1). Printing only; the certificate and mu < 1 are not changed.
+def exact(x):
+    """Exact rational value of a finite interval endpoint x (an mpmath.iv endpoint or a degenerate interval)."""
+    sign, man, exp, _ = x._mpi_[0]
+    assert man or x._mpi_[0] == (0, 0, 0, 0), x                   # no inf / nan
+    v = Fraction(man) * Fraction(2) ** exp
+    return -v if sign else v
 
-    x comes from interval endpoints through round-to-nearest mp operations (relative error ~2^-250); the factor 1 +- 2^-200
-    covers it before the directed rounding."""
-    x = x * (1 + mp.mpf(2) ** -200) if upward else x * (1 - mp.mpf(2) ** -200)
-    places = 4 if fmt == "%.4f" else 3 - int(mp.floor(mp.log10(x)))
-    k = (mp.ceil if upward else mp.floor)(x * mp.mpf(10) ** places)
-    text = fmt % float(k / mp.mpf(10) ** places)
-    assert mp.nint(mp.mpf(text) * mp.mpf(10) ** places) == k, (x, text)  # the printed digits are exactly the rounded value
+
+def outward(x, fmt, upward):
+    """Printed bound of the interval x: its upper end rounded UP for an upper bound, its lower end rounded DOWN for a lower
+    bound, to the digits of fmt ("%.4f": 4 decimals, "%.4g": 4 significant digits) (review N-1, QA-1). The endpoint and the
+    decimal rounding are exact rationals; the check below is the automatic control of the direction of every printed bound."""
+    e = exact(x.b if upward else x.a)
+    assert e > 0, x
+    if fmt == "%.4f":
+        places = 4
+    else:                                                          # 4 significant digits: 10^(3 - places) <= e < 10^(4 - places)
+        places = 3 - int(mp.floor(mp.log10(mp.mpf(e.numerator) / e.denominator)))
+        while e * Fraction(10) ** places >= 10 ** 4:
+            places -= 1
+        while e * Fraction(10) ** places < 10 ** 3:
+            places += 1
+    scaled = e * Fraction(10) ** places
+    k = -(-scaled.numerator // scaled.denominator) if upward else scaled.numerator // scaled.denominator
+    value = Fraction(k) / Fraction(10) ** places
+    text = fmt % float(value)
+    assert Fraction(text) == value, (x, text)                      # the printed digits are exactly the rounded value
+    assert (value >= e) if upward else (value <= e), (x, text)     # direction of the printed bound
     return text
 
 
 def report(label, res):
     c0 = res['c0']
-    mu = mp.sqrt(hi(res['E2']) / lo(res['dN1']))
-    norm = mp.sqrt(lo(c0 * res['W0']))
-    e2 = mp.sqrt(hi(c0 * res['E2'])) / norm
-    e1 = outward(mp.sqrt(hi(c0 * res['E1'])) / norm, "%.4g", True) if res['E1'] is not None else "-"
-    dn1 = mp.sqrt(lo(c0 * res['dN1'])) / norm
-    dn = mp.sqrt(lo(c0 * res['dN'])) / norm
-    enc = mp.sqrt(lo(res['dN']) / hi(res['E2']))
-    ok = mu < 1
-    print("%s | err1/|w0|<=%s err2/|w0|<=%s d(N-1)/|w0|>=%.4g d(N)/|w0|>=%.4g | mu<=%s %s | d(N)_low/err2_up>=%s | j_cert %s"
-          % (label, e1, outward(e2, "%.4g", True), float(dn1), float(dn), outward(mu, "%.4f", True),
-             "CERTIFIED" if ok else "NOT_CERTIFIED", outward(enc, "%.4f", False), res['cert']), flush=True)
+    mu = iv.sqrt(res['E2'] / res['dN1'])                     # upper end: (E2_up / D_low(N-1))^(1/2), directed rounding
+    enc = iv.sqrt(res['dN'] / res['E2'])                     # lower end: (D_low(N) / E2_up)^(1/2)
+    norm = iv.sqrt(c0 * res['W0'])                           # encloses ||omega_0||: lower end for the upper bounds err/|w0|,
+    e2 = iv.sqrt(c0 * res['E2']) / norm                      # upper end for the lower bounds d/|w0| (review N-1, I-1)
+    e1 = outward(iv.sqrt(c0 * res['E1']) / norm, "%.4g", True) if res['E1'] is not None else "-"
+    dn1 = iv.sqrt(c0 * res['dN1']) / norm
+    dn = iv.sqrt(c0 * res['dN']) / norm
+    ok = exact(mu.b) < 1
+    print("%s | err1/|w0|<=%s err2/|w0|<=%s d(N-1)/|w0|>=%s d(N)/|w0|>=%s | mu<=%s %s | d(N)_low/err2_up>=%s | j_cert %s"
+          % (label, e1, outward(e2, "%.4g", True), outward(dn1, "%.4g", False), outward(dn, "%.4g", False),
+             outward(mu, "%.4f", True), "CERTIFIED" if ok else "NOT_CERTIFIED", outward(enc, "%.4f", False), res['cert']),
+          flush=True)
     return ok
 
 

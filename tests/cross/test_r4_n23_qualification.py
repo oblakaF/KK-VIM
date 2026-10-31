@@ -1,8 +1,9 @@
 """QA checks of the R4 N23 qualification (docs/R4_N23_QUALIFICATION.plan.md, docs/R4_N23_QUALIFICATION.qa-report.md).
 
 Fast checks run in CI: independence of the QA script, consistency of the committed result tables with the rule of the plan,
-unchanged group B statuses. The checks that need python-flint or mpmath (temporary tools, not project dependencies) are
-skipped when they are absent. The full campaign (minutes) is re-run only with KKVIM_N23_HEAVY=1.
+unchanged group B statuses, completeness of the certificates in scripts/r4_n23/expected/. The checks that need python-flint or
+mpmath (temporary tools, not project dependencies) are skipped when they are absent; among them the direction of every printed
+bound of the certificates. The full campaign (minutes) is re-run only with KKVIM_N23_HEAVY=1.
 """
 
 import ast
@@ -12,7 +13,9 @@ import importlib.util
 import json
 import math
 import os
+import re
 from decimal import Decimal
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -20,6 +23,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "r4_n23_qualification.py"
 RESULTS = ROOT / "docs" / "results" / "r4_n23_qualification"
+AUTHOR = ROOT / "scripts" / "r4_n23" / "n23_rank_certificate.py"
+EXPECTED = ROOT / "scripts" / "r4_n23" / "expected"
+CERT_LINE = re.compile(r"^(.*?) \| err1/\|w0\|<=(\S+) err2/\|w0\|<=(\S+) d\(N-1\)/\|w0\|>=(\S+) d\(N\)/\|w0\|>=(\S+) \| "
+                       r"mu<=(\S+) (\S+) \| d\(N\)_low/err2_up>=(\S+) \| j_cert ")
 RULE = 0.01
 decimal.getcontext().prec = 120  # the 45-digit control values must not be rounded to the default 28 digits
 MEASURES = ("err_abs", "e_rel", "delta_c", "E_inf")
@@ -166,6 +173,71 @@ def test_rank_certificate_at_the_boundary_m23():
     q = _load(SCRIPT, "r4_n23_qualification_rank")
     res = q.rank_continuous("1", 2, 23)
     assert res["certified"] and Decimal(res["mu_up"]) < Decimal("0.1")
+
+
+def _certificates(name):
+    lines = (EXPECTED / name).read_text(encoding="utf-8").splitlines()
+    return lines, {m.group(1).strip(): m.groups()[1:] for m in map(CERT_LINE.match, lines) if m}
+
+
+def test_committed_certificates_are_complete_and_consistent():
+    for name, count in (("certificate_continuous.txt", 20), ("certificate_discrete.txt", 132),
+                        ("certificate_dense.txt", 402)):
+        lines, cert = _certificates(name)
+        assert len(cert) == count and lines[-1] == "ALL CERTIFIED", name
+        for e1, e2, dn1, dn, mu, status, enc in cert.values():
+            assert status == "CERTIFIED" and Decimal(mu) < 1
+            # d_N <= err(N, 2) (MATH_SPEC VB-19: W_2 has rank <= N): a printed lower bound of d_N above a printed upper bound of
+            # err(N, 2), or d_N^low / err(N, 2)^up above 1, would be a bound of the wrong direction
+            assert Decimal(dn) <= Decimal(e2) and Decimal(enc) <= 1
+
+
+@pytest.mark.parametrize("kind, args", [("continuous", (1, 1, 2)), ("continuous", (1, 5, 3)),
+                                        ("discrete", (40, 40, 1, 1, 2)), ("discrete", (320, 320, 1, 3, 3))])
+def test_printed_certificate_bounds_have_the_right_direction(kind, args, capsys):
+    """Every printed bound of n23_rank_certificate.py against the certified interval endpoints, in exact rationals (I-1, I-5).
+
+    With err^2 = c0 E2, d_k^2 = c0 D(k) and ||omega_0||^2 = c0 W0 the factor c0 cancels: an upper bound p of err/||omega_0|| needs
+    p^2 lo(W0) >= hi(E2), a lower bound p of d/||omega_0|| needs p^2 hi(W0) <= lo(D). The enclosure W0 of ||omega_0||^2 / c0 is
+    checked against a direct sum: the full finite sum (discrete) or a larger block of the series (continuous, from below)."""
+    pytest.importorskip("mpmath")
+    from mpmath import iv
+
+    mod = _load(AUTHOR, "n23_rank_certificate_direction")
+    if kind == "continuous":
+        r = Fraction(*args[:2])
+        res, label, committed = mod.continuous_case(r, args[2]), "r=%-4s N=%d" % (r, args[2]), "certificate_continuous.txt"
+        b, pi = iv.mpf(r.numerator) / r.denominator, iv.pi
+        modes = [iv.mpf(m) for m in range(1, 2 * mod.M_COLS + 1, 2)]
+        direct = sum((256 / (pi ** 4 * m ** 2 * n ** 2 * (pi ** 2 * (m ** 2 + n ** 2 / b ** 2)) ** 2)
+                      for m in modes for n in modes), iv.mpf(0))
+        assert mod.exact(direct.a) <= mod.exact(res["W0"].b)              # a partial sum of the series is below its upper bound
+    else:
+        nx, ny, r, N = args[0], args[1], Fraction(*args[2:4]), args[4]
+        res, label = mod.discrete_case(nx, ny, r, N), "nx=%-4d ny=%-4d r=%-4s N=%d" % (nx, ny, r, N)
+        committed = "certificate_discrete.txt"
+        b, pi = iv.mpf(r.numerator) / r.denominator, iv.pi
+
+        def axis(n, h):
+            return [(4 / h ** 2 * iv.sin(m * pi / (2 * n)) ** 2, iv.sqrt(iv.mpf(2) / n) * iv.cot(m * pi / (2 * n)))
+                    for m in range(1, n, 2)]
+
+        direct = sum((cm ** 2 * cn ** 2 / (mm + mn) ** 2 for mm, cm in axis(nx, iv.mpf(1) / nx) for mn, cn in axis(ny, b / ny)),
+                     iv.mpf(0))
+        # the finite sum and the enclosure overlap (both contain ||omega_0||^2 / c0)
+        assert mod.exact(res["W0"].a) <= mod.exact(direct.b) and mod.exact(direct.a) <= mod.exact(res["W0"].b)
+    assert mod.report(label, res)
+    line = capsys.readouterr().out.strip()
+    e1, e2, dn1, dn, mu, status, enc = CERT_LINE.match(line).groups()[1:]
+    lo, hi = (lambda x: mod.exact(x.a)), (lambda x: mod.exact(x.b))
+    W0, E2, D1, D = res["W0"], res["E2"], res["dN1"], res["dN"]
+    assert Fraction(e2) ** 2 * lo(W0) >= hi(E2)
+    if res["E1"] is not None:
+        assert Fraction(e1) ** 2 * lo(W0) >= hi(res["E1"])
+    assert Fraction(dn1) ** 2 * hi(W0) <= lo(D1) and Fraction(dn) ** 2 * hi(W0) <= lo(D)
+    assert Fraction(mu) ** 2 * lo(D1) >= hi(E2) and Fraction(mu) < 1 and status == "CERTIFIED"
+    assert Fraction(enc) ** 2 * hi(E2) <= lo(D)
+    assert line in _certificates(committed)[0]             # the committed output is the output of this code
 
 
 def _text(data):
