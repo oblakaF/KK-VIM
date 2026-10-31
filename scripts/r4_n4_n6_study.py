@@ -944,7 +944,8 @@ def make_tables(out):
             continue
         rows.append([N, len(sub), sum(int(c["energy_increases"]) for c in sub),
                      sum(int(c["energy_increases_beyond_tau"]) for c in sub),
-                     fnum(max(float(c["max_identity_defect_over_rounding"]) for c in sub if c["max_identity_defect_over_rounding"]), ".2e"),
+                     fnum(max((v for v in (float(c["max_identity_defect_over_rounding"] or "nan") for c in sub) if not math.isnan(v)),
+                              default=math.nan), ".2e"),
                      sum(int(c["e1_e2_hold_steps"]) for c in sub), sum(int(c["unresolved_steps"]) for c in sub),
                      fnum(max(abs(float(c["pythagoras_defect_over_budget"])) for c in comp if int(c["N"]) == N), ".2e")])
     parts.append("## T8 (V8). Энергетическое тождество и поведение по s\n\n"

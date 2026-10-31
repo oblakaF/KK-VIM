@@ -105,3 +105,72 @@ def test_quick_run_writes_consistent_outputs(tmp_path):
     before = text
     study.make_tables(tmp_path)
     assert (tmp_path / "tables.md").read_text(encoding="utf-8") == before  # tables are a function of the CSV files
+
+
+# ---- committed results (docs/results/r4_n4_n6) ------------------------------------------------------------------
+
+RESULTS = ROOT / "docs" / "results" / "r4_n4_n6"
+FULL = {"N": study.N_STUDY, "r": tuple(study.R_TEN), "family_I": study.FAMILY_I, "family_II": study.FAMILY_II,
+        "control_r": study.CONTROL_R, "control_n": study.CONTROL_N}
+
+
+def test_committed_results_cover_the_plan():
+    meta = json.loads((RESULTS / "meta.json").read_text(encoding="utf-8"))
+    assert meta["quick"] is False and meta["N_SOLVE_before"] == [2, 3] and meta["N_SOLVE_after"] == [2, 3]
+    assert meta["control_cells_equal_run_coupled"] is True
+    assert meta["plan"]["S_RUN"] == study.S_RUN and meta["plan"]["S_LIST"] == list(study.S_LIST)
+    assert meta["plan"]["FAMILY_I"] == list(study.FAMILY_I) and meta["plan"]["r"] == list(study.R_TEN)
+    cells = study.read_csv(RESULTS / "cells.csv")
+    got = [(int(c["N"]), c["r_label"], c["family"], int(c["nx"]), int(c["ny"])) for c in cells]
+    assert got == study.plan(FULL)
+    steps = study.read_csv(RESULTS / "steps.csv")
+    for c in cells:
+        n = sum(1 for t in steps if (t["N"], t["r_label"], t["family"], t["nx"], t["ny"]) ==
+                (c["N"], c["r_label"], c["family"], c["nx"], c["ny"]))
+        assert n == int(c["s_reached"]) <= study.S_RUN
+        assert (c["status"] == cr.RESEARCH_LIMIT_REACHED) == (int(c["s_reached"]) == study.S_RUN)
+
+
+def test_committed_statuses_follow_the_rule():
+    for row in study.read_csv(RESULTS / "compare.csv"):
+        s = int(row["s"])
+        if row["status_E_total"] == "RESOLVED":
+            assert float(row["levy_budget_rel"]) <= 0.01 * float(row["E_total_inf"])
+        if row["status_meas_E_disc"] == "RESOLVED":
+            assert float(row["cont_round_rel"]) + float(row["cont_tail_s1_rel"]) <= 0.01 * float(row["E_disc_inf"])
+        if s >= 2:
+            for key in ("status_cont_E_disc", "status_cont_d_disc_c", "status_cont_E_method"):
+                assert row[key] in ("PROVISIONAL", "UNRESOLVED")
+        if row["status_cont_E_disc"] == "PROVISIONAL":
+            assert float(row["cont_diag_rel"]) <= 0.01 * float(row["E_disc_inf"])
+        if row["status_e_rel_h"] == "RESOLVED":
+            assert float(row["e_rel_h_budget_rel"]) <= 0.01
+
+
+def test_committed_tables_are_a_function_of_the_csv_files(tmp_path):
+    for p in RESULTS.iterdir():
+        (tmp_path / p.name).write_bytes(p.read_bytes())
+    study.make_tables(tmp_path)
+    regenerated = (tmp_path / "tables.md").read_bytes().replace(b"\r\n", b"\n")
+    committed = (RESULTS / "tables.md").read_bytes().replace(b"\r\n", b"\n")  # checkout with core.autocrlf (И-6)
+    assert b"\r" not in regenerated and b"\r" not in committed
+    assert regenerated == committed
+
+
+@pytest.mark.parametrize("N", [4, 5, 6])
+def test_small_cells_reproduce_the_committed_values(N):
+    """Family I n = 40, three r: statuses, stop reasons and s exactly; w(centre) and Pi_h to 1e-10 relative. Bitwise
+    equality across platforms is not required (AGENTS.md, section 4): FFT, QR and SVD orders of operations differ."""
+    steps = study.read_csv(RESULTS / "steps.csv")
+    cells = {(c["N"], c["r_label"], c["family"], c["nx"]): c for c in study.read_csv(RESULTS / "cells.csv")}
+    for lab in ("1/5", "1", "5"):
+        cell = study.run_cell(N, lab, "I", 40, 40, keep=())
+        ref = cells[(str(N), lab, "I", "40")]
+        assert cell.status == ref["status"] and cell.s_reached == int(ref["s_reached"])
+        assert cell.first_stabilization_s == (int(ref["first_stabilization_s"]) if ref["first_stabilization_s"] else None)
+        rows = [t for t in steps if (t["N"], t["r_label"], t["family"], t["nx"]) == (str(N), lab, "I", "40")]
+        _, mine = study.cell_rows(cell)
+        for a, b in zip(mine, rows):
+            assert (a["stop_reason"] or "") == b["stop_reason"]
+            assert abs(a["w_centre"] - float(b["w_centre"])) <= 1e-10 * abs(float(b["w_centre"]))
+            assert abs(a["Pi_h"] - float(b["Pi_h"])) <= 1e-10 * abs(float(b["Pi_h"]))
