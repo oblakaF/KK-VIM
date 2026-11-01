@@ -1,0 +1,42 @@
+{
+ "reference": "py314_tdefault",
+ "criteria": {
+  "classification": [
+   "status",
+   "s_reached",
+   "first_stabilization_s",
+   "energy_status",
+   "guard_rank_ok",
+   "guard_set_ok",
+   "guard_applicable",
+   "stabilization_ok",
+   "stop_reason"
+  ],
+  "rel_centre_Pi": 1e-10,
+  "abs_rho": 1e-12
+ },
+ "pairs": {
+  "py314_tdefault vs py314_t1": {
+   "classification_differences": 0,
+   "max_rel_centre_Pi": 0.0,
+   "max_abs_rho": 0.0,
+   "bitwise_equal_sets": "8/8",
+   "PASS": true
+  },
+  "py314_tdefault vs py313_tdefault": {
+   "classification_differences": 0,
+   "max_rel_centre_Pi": 0.0,
+   "max_abs_rho": 0.0,
+   "bitwise_equal_sets": "8/8",
+   "PASS": true
+  },
+  "py314_tdefault vs py313_t1": {
+   "classification_differences": 0,
+   "max_rel_centre_Pi": 0.0,
+   "max_abs_rho": 0.0,
+   "bitwise_equal_sets": "8/8",
+   "PASS": true
+  }
+ },
+ "ALL_PASS": true
+}

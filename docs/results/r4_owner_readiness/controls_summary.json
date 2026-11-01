@@ -1,0 +1,23 @@
+{
+ "nodal_rows": 27,
+ "max_field_err_rel": 2.989313951263659e-15,
+ "max_energy_norm_err_rel": 6.277735385687653e-14,
+ "max_galerkin_residual_rel": 6.129167241582837e-11,
+ "max_Pi_rel_diff": 1.0361865121413182e-15,
+ "max_rho_rel_diff": 6.114604438270115e-06,
+ "guard_decisions_equal": true,
+ "max_ball_rel_radius": 9.353810144803923e-181,
+ "rho1_rows": 10,
+ "rho1_two_routes_max_rel_diff": 0.0,
+ "rho1_inside_qa": true,
+ "rho1_guard_equal": true,
+ "rho1_max_solver_rel_diff": 5.26863992283278e-07,
+ "reruns": 8,
+ "reruns_text_equal": true,
+ "reruns_status_equal": true,
+ "delta_f1_cells": 12,
+ "delta_f1_max_rel_diff": 7.212926115115355e-09,
+ "delta_f1_qa_upper": true,
+ "seconds": 53.6,
+ "prec_bits": 640
+}

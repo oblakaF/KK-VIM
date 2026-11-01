@@ -1,0 +1,26 @@
+{
+ "tool": "scripts/r4_owner_readiness_audit.py",
+ "object_head": "a5d89c35ff08b85270d08685d0624b8930298bd9",
+ "base": "a2307cd8030db812ff1769bc775c0e5485b8f9e2",
+ "git_head_at_collect": "a5d89c35ff08b85270d08685d0624b8930298bd9",
+ "tool_sha256_lf": "a333e23e50d3c081bbb9eb5314152dd8afbf82b3af57a36ac19d08e357075d28",
+ "python": "3.14.8",
+ "numpy": "2.5.4",
+ "platform": "Windows-10-10.0.19045-SP0",
+ "outputs": {
+  "config_compare.json": "bd91afcc93218fef3ae82e1f7a5b3425efa851f7f96f5aa9c3fe00413ab2f82f",
+  "config_py313_t1.json": "d6959f8352f09cb8cae801fabe6aa445501db434f227df40d703814a8d2a609c",
+  "config_py313_tdefault.json": "37f8636a64e843143f2614ead408f916ee9283378abaceae44b0b06270967cf6",
+  "config_py314_t1.json": "3609966e600f7580fab54066f1e05e99958c2aa7e85821d08862340aaa9dd237",
+  "config_py314_tdefault.json": "e3df181591090a428bb94de9b3bfc92d35f8a254dc7ee2d0ee49f6ff55a7f0c9",
+  "controls_delta_f1.csv": "75ca55cfaef261cfdf3ea418c5d839abbf27fc3f04b62dc7aeba5f5df6ae0bb0",
+  "controls_nodal.csv": "15a37c17cf48f2692726fb8c1c03c0d5b36a9bcf0f1e8c7ee776e744fb0d2178",
+  "controls_rerun.csv": "7af9d1cc53382a1b24c6c0f995ca197b864f119075a0cfa68fc7427ede74f73d",
+  "controls_rho1.csv": "835f64230f8341543026011924577b20762def14963c036e56c9ec513509c4a6",
+  "controls_summary.json": "9c279762c015566ec5d3c5bf73dfbfd2672422272096651c77a0568ee66ea5f7",
+  "integrity.json": "020cb249560872c57d903d229df437f20dfd7024be9da8510e65ab1171a2cb25",
+  "n46_recount.json": "1329e0e88f350e00f162602b605b9054fe0f6bd97dfeec0ae25f06eeeb865619",
+  "roundoff_recount.json": "08f27b3097a1ee619ed6e6db94b5662789c20ccd83e4a1537f2b0ed072417712",
+  "table31_rounding.csv": "42c93f08ba5bbade5c3c373646cd0dc1d3e4fa7a3cb3d1333f980a5bddba2b4f"
+ }
+}

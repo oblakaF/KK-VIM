@@ -1,0 +1,81 @@
+group,column,direction,cells,csv_value,printed_3_1,printed_15,outward_15_ok,nearest_3_1,3_1_is_outward,3_1_safe_side
+"I, N = 2, n = 40",max_delta_f,up,10,2.50467556E-15,"2,50·10⁻¹⁵","2,51·10⁻¹⁵",True,True,False,False
+"I, N = 2, n = 40",max_delta_f_s41_100,up,10,2.12106280E-15,"2,12·10⁻¹⁵","2,13·10⁻¹⁵",True,True,False,False
+"I, N = 2, n = 40",max_transfer,up,10,4.25625368E-16,"4,3·10⁻¹⁶","4,3·10⁻¹⁶",True,True,True,True
+"I, N = 2, n = 40",max_eps_cert,up,10,2.63159763E-15,"2,63·10⁻¹⁵","2,64·10⁻¹⁵",True,True,False,False
+"I, N = 2, n = 40",max_c_d_obs,up,10,3.77734627,"3,78","3,78",True,True,True,True
+"I, N = 2, n = 40",min_rho_hat,down,10,0.000493320401,"4,93·10⁻⁴","4,93·10⁻⁴",True,True,True,True
+"I, N = 2, n = 40",min_rho_hat_over_eps_ratio,down,10,3.08576807E+11,"3,1·10¹¹","3,0·10¹¹",True,True,False,False
+"I, N = 2, n = 40",min_energy_margin_s_ge2,down,10,0.916288952,"0,916","0,916",True,True,True,True
+"I, N = 2, n = 160",max_delta_f,up,10,6.90893382E-15,"6,91·10⁻¹⁵","6,91·10⁻¹⁵",True,True,True,True
+"I, N = 2, n = 160",max_delta_f_s41_100,up,10,6.10846574E-15,"6,11·10⁻¹⁵","6,11·10⁻¹⁵",True,True,True,True
+"I, N = 2, n = 160",max_transfer,up,10,7.20287526E-16,"7,2·10⁻¹⁶","7,3·10⁻¹⁶",True,True,False,False
+"I, N = 2, n = 160",max_eps_cert,up,10,6.99210119E-15,"6,99·10⁻¹⁵","7,00·10⁻¹⁵",True,True,False,False
+"I, N = 2, n = 160",max_c_d_obs,up,10,4.29773581,"4,30","4,30",True,True,True,True
+"I, N = 2, n = 160",min_rho_hat,down,10,0.000494904879,"4,95·10⁻⁴","4,94·10⁻⁴",True,True,False,False
+"I, N = 2, n = 160",min_rho_hat_over_eps_ratio,down,10,1.27046945E+11,"1,3·10¹¹","1,2·10¹¹",True,True,False,False
+"I, N = 2, n = 160",min_energy_margin_s_ge2,down,10,0.913820509,"0,914","0,913",True,True,False,False
+"I, N = 2, n = 640",max_delta_f,up,10,5.18978399E-14,"5,19·10⁻¹⁴","5,19·10⁻¹⁴",True,True,True,True
+"I, N = 2, n = 640",max_delta_f_s41_100,up,10,2.50508141E-14,"2,51·10⁻¹⁴","2,51·10⁻¹⁴",True,True,True,True
+"I, N = 2, n = 640",max_transfer,up,10,3.25907112E-15,"3,3·10⁻¹⁵","3,3·10⁻¹⁵",True,True,True,True
+"I, N = 2, n = 640",max_eps_cert,up,10,5.11856851E-14,"5,12·10⁻¹⁴","5,12·10⁻¹⁴",True,True,True,True
+"I, N = 2, n = 640",max_c_d_obs,up,10,4.14409100,"4,14","4,15",True,True,False,False
+"I, N = 2, n = 640",min_rho_hat,down,10,0.000495003179,"4,95·10⁻⁴","4,95·10⁻⁴",True,True,True,True
+"I, N = 2, n = 640",min_rho_hat_over_eps_ratio,down,10,1.60523475E+10,"1,6·10¹⁰","1,6·10¹⁰",True,True,True,True
+"I, N = 2, n = 640",min_energy_margin_s_ge2,down,10,0.913677658,"0,914","0,913",True,True,False,False
+"I, N = 2, n = 1280",max_delta_f,up,10,1.37955570E-13,"1,38·10⁻¹³","1,38·10⁻¹³",True,True,True,True
+"I, N = 2, n = 1280",max_delta_f_s41_100,up,10,5.46715781E-14,"5,47·10⁻¹⁴","5,47·10⁻¹⁴",True,True,True,True
+"I, N = 2, n = 1280",max_transfer,up,10,9.20107381E-15,"9,2·10⁻¹⁵","9,3·10⁻¹⁵",True,True,False,False
+"I, N = 2, n = 1280",max_eps_cert,up,10,1.37235923E-13,"1,37·10⁻¹³","1,38·10⁻¹³",True,True,False,False
+"I, N = 2, n = 1280",max_c_d_obs,up,10,7.07327107,"7,07","7,08",True,True,False,False
+"I, N = 2, n = 1280",min_rho_hat,down,10,0.000495008092,"4,95·10⁻⁴","4,95·10⁻⁴",True,True,True,True
+"I, N = 2, n = 1280",min_rho_hat_over_eps_ratio,down,10,5.98732991E+9,"6,0·10⁹","5,9·10⁹",True,True,False,False
+"I, N = 2, n = 1280",min_energy_margin_s_ge2,down,10,0.913670562,"0,914","0,913",True,True,False,False
+"I, N = 3, n = 40",max_delta_f,up,10,2.50524716E-15,"2,51·10⁻¹⁵","2,51·10⁻¹⁵",True,True,True,True
+"I, N = 3, n = 40",max_delta_f_s41_100,up,10,1.24932675E-15,"1,25·10⁻¹⁵","1,25·10⁻¹⁵",True,True,True,True
+"I, N = 3, n = 40",max_transfer,up,10,5.94995251E-16,"6,0·10⁻¹⁶","6,0·10⁻¹⁶",True,False,True,True
+"I, N = 3, n = 40",max_eps_cert,up,10,2.55604443E-15,"2,56·10⁻¹⁵","2,56·10⁻¹⁵",True,True,True,True
+"I, N = 3, n = 40",max_c_d_obs,up,10,4.38827408,"4,39","4,39",True,True,True,True
+"I, N = 3, n = 40",min_rho_hat,down,10,0.00000218715531,"2,19·10⁻⁶","2,18·10⁻⁶",True,True,False,False
+"I, N = 3, n = 40",min_rho_hat_over_eps_ratio,down,10,4.14428561E+9,"4,1·10⁹","4,1·10⁹",True,True,True,True
+"I, N = 3, n = 40",min_energy_margin_s_ge2,down,10,0.822805944,"0,823","0,822",True,True,False,False
+"I, N = 3, n = 160",max_delta_f,up,10,7.03140315E-15,"7,03·10⁻¹⁵","7,04·10⁻¹⁵",True,True,False,False
+"I, N = 3, n = 160",max_delta_f_s41_100,up,10,7.03140315E-15,"7,03·10⁻¹⁵","7,04·10⁻¹⁵",True,True,False,False
+"I, N = 3, n = 160",max_transfer,up,10,1.31878990E-15,"1,3·10⁻¹⁵","1,4·10⁻¹⁵",True,True,False,False
+"I, N = 3, n = 160",max_eps_cert,up,10,6.67493078E-15,"6,67·10⁻¹⁵","6,68·10⁻¹⁵",True,True,False,False
+"I, N = 3, n = 160",max_c_d_obs,up,10,4.14271660,"4,14","4,15",True,True,False,False
+"I, N = 3, n = 160",min_rho_hat,down,10,0.00000222389497,"2,22·10⁻⁶","2,22·10⁻⁶",True,True,True,True
+"I, N = 3, n = 160",min_rho_hat_over_eps_ratio,down,10,2.18773636E+9,"2,2·10⁹","2,1·10⁹",True,True,False,False
+"I, N = 3, n = 160",min_energy_margin_s_ge2,down,10,0.750579105,"0,751","0,750",True,True,False,False
+"I, N = 3, n = 640",max_delta_f,up,10,5.20951277E-14,"5,21·10⁻¹⁴","5,21·10⁻¹⁴",True,True,True,True
+"I, N = 3, n = 640",max_delta_f_s41_100,up,10,2.20257040E-14,"2,20·10⁻¹⁴","2,21·10⁻¹⁴",True,True,False,False
+"I, N = 3, n = 640",max_transfer,up,10,3.64243258E-15,"3,6·10⁻¹⁵","3,7·10⁻¹⁵",True,True,False,False
+"I, N = 3, n = 640",max_eps_cert,up,10,5.16880017E-14,"5,17·10⁻¹⁴","5,17·10⁻¹⁴",True,True,True,True
+"I, N = 3, n = 640",max_c_d_obs,up,10,6.27434269,"6,27","6,28",True,True,False,False
+"I, N = 3, n = 640",min_rho_hat,down,10,0.00000222617329,"2,23·10⁻⁶","2,22·10⁻⁶",True,True,False,False
+"I, N = 3, n = 640",min_rho_hat_over_eps_ratio,down,10,277560542,"2,8·10⁸","2,7·10⁸",True,True,False,False
+"I, N = 3, n = 640",min_energy_margin_s_ge2,down,10,0.741844766,"0,742","0,741",True,True,False,False
+"I, N = 3, n = 1280",max_delta_f,up,10,1.38565780E-13,"1,39·10⁻¹³","1,39·10⁻¹³",True,True,True,True
+"I, N = 3, n = 1280",max_delta_f_s41_100,up,10,7.78440006E-14,"7,78·10⁻¹⁴","7,79·10⁻¹⁴",True,True,False,False
+"I, N = 3, n = 1280",max_transfer,up,10,7.57373505E-15,"7,6·10⁻¹⁵","7,6·10⁻¹⁵",True,True,True,True
+"I, N = 3, n = 1280",max_eps_cert,up,10,1.37713729E-13,"1,38·10⁻¹³","1,38·10⁻¹³",True,True,True,True
+"I, N = 3, n = 1280",max_c_d_obs,up,10,7.14923372,"7,15","7,15",True,True,True,True
+"I, N = 3, n = 1280",min_rho_hat,down,10,0.00000222628715,"2,23·10⁻⁶","2,22·10⁻⁶",True,True,False,False
+"I, N = 3, n = 1280",min_rho_hat_over_eps_ratio,down,10,104202945,"1,04·10⁸","1,04·10⁸",True,True,True,True
+"I, N = 3, n = 1280",min_energy_margin_s_ge2,down,10,0.741464236,"0,741","0,741",True,True,True,True
+"II, N = 2 (6 сеток)",max_delta_f,up,6,1.53684291E-14,"1,54·10⁻¹⁴","1,54·10⁻¹⁴",True,True,True,True
+"II, N = 2 (6 сеток)",max_delta_f_s41_100,up,6,1.21181852E-14,"1,21·10⁻¹⁴","1,22·10⁻¹⁴",True,True,False,False
+"II, N = 2 (6 сеток)",max_transfer,up,6,9.24783823E-16,"9,2·10⁻¹⁶","9,3·10⁻¹⁶",True,True,False,False
+"II, N = 2 (6 сеток)",max_eps_cert,up,6,1.51071554E-14,"1,51·10⁻¹⁴","1,52·10⁻¹⁴",True,True,False,False
+"II, N = 2 (6 сеток)",max_c_d_obs,up,6,6.23763440,"6,24","6,24",True,True,True,True
+"II, N = 2 (6 сеток)",min_rho_hat,down,6,0.000495036481,"4,95·10⁻⁴","4,95·10⁻⁴",True,True,True,True
+"II, N = 2 (6 сеток)",min_rho_hat_over_eps_ratio,down,6,5.44565258E+10,"5,4·10¹⁰","5,4·10¹⁰",True,True,True,True
+"II, N = 2 (6 сеток)",min_energy_margin_s_ge2,down,6,0.917357483,"0,917","0,917",True,True,True,True
+"II, N = 3 (6 сеток)",max_delta_f,up,6,1.76926608E-14,"1,77·10⁻¹⁴","1,77·10⁻¹⁴",True,True,True,True
+"II, N = 3 (6 сеток)",max_delta_f_s41_100,up,6,1.57279678E-14,"1,57·10⁻¹⁴","1,58·10⁻¹⁴",True,True,False,False
+"II, N = 3 (6 сеток)",max_transfer,up,6,1.25268597E-15,"1,3·10⁻¹⁵","1,3·10⁻¹⁵",True,True,True,True
+"II, N = 3 (6 сеток)",max_eps_cert,up,6,1.76342295E-14,"1,76·10⁻¹⁴","1,77·10⁻¹⁴",True,True,False,False
+"II, N = 3 (6 сеток)",max_c_d_obs,up,6,5.53227219,"5,53","5,54",True,True,False,False
+"II, N = 3 (6 сеток)",min_rho_hat,down,6,0.00000222669246,"2,23·10⁻⁶","2,22·10⁻⁶",True,True,False,False
+"II, N = 3 (6 сеток)",min_rho_hat_over_eps_ratio,down,6,983531664,"9,8·10⁸","9,8·10⁸",True,True,True,True
+"II, N = 3 (6 сеток)",min_energy_margin_s_ge2,down,6,0.741488809,"0,741","0,741",True,True,True,True
