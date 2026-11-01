@@ -1,0 +1,1002 @@
+{
+ "document": "R5-V Q4 PRELAUNCH N = 1 pipeline: expected results of the controls, fixed BEFORE the pipeline, the harness and any comparison (protocol docs/R5_CCCC_Q4_D1_PROTOCOL.md 4.1-4.4, 6; task: Z-3 guard)",
+ "data_status": "PRELAUNCH control expectations; not D1 data (D1_START = BLOCKED)",
+ "fixed_before_execution": "written by a separate generator from the protocol text, without importing project code; committed before the pipeline and the controls harness",
+ "premise_ids": {
+  "P-a": "П-а",
+  "P-b": "П-б",
+  "P-c": "П-в",
+  "P-d": "П-г",
+  "P-e": "П-д",
+  "P-f": "П-е"
+ },
+ "rules": {
+  "A_P": "pipeline boundary: dP = P^_p - P^_s and tau' = Gamma_up + B_E exactly; a recorded dP or tau' that differs from the definition rejects the row before classification (never PASS); a missing or not finite component is never replaced",
+  "B": "each injection gives UNRESOLVED_CERTIFICATE with the injected premise among the reasons (other reasons allowed and recorded), never PASS or FAIL_COMPUTATION; the clean twin satisfies clean_expected",
+  "V": "consistent perturbation of the factors; all dependent quantities recomputed; change confirmed (values and hashes); with established premises E1/E2 hold",
+  "G": "each mutation has its declared channel; a mutation detected by no channel is a gap (UNRESOLVED of the control), never PASS; channels proposed in OD-4 stay UNRESOLVED until the owner's decision"
+ },
+ "pipeline_boundary_cases": [
+  {
+   "id": "AP-01",
+   "description": "dP = Q^ = 1, tau' = 1/2: Q^ > tau'",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-02",
+   "description": "Q^ = tau' = 1/2 exactly (strict sign of resolvability)",
+   "components": {
+    "P_p": "0x1.4000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p-1",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-03",
+   "description": "Q^ = 1/2 + 2^-53 > tau' = 1/2 by one ulp",
+   "components": {
+    "P_p": "0x1.0000000000001p-1",
+    "P_s": "0x0.0p+0",
+    "Q": "0x1.0000000000001p-1",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-04",
+   "description": "E1 boundary dP = -tau' and E2 boundary |dP - Q^| = tau' (non-strict), Q^ = 0",
+   "components": {
+    "P_p": "0x0.0p+0",
+    "P_s": "0x1.0000000000000p-1",
+    "Q": "0x0.0p+0",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-05",
+   "description": "E2 violated: |1 - 1/4| = 3/4 > 1/2",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p-2",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-06",
+   "description": "E1 and E2 violated: dP = -1 < -1/2",
+   "components": {
+    "P_p": "0x1.0000000000000p+0",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x0.0p+0",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": false,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-07",
+   "description": "tau' = 0 and dP = Q^ = 1 exactly",
+   "components": {
+    "P_p": "0x1.0000000000000p+0",
+    "P_s": "0x0.0p+0",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "0x0.0p+0",
+    "B_E": "0x0.0p+0"
+   },
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-08",
+   "description": "tau' = 0 and |dP - Q^| = 2^-52",
+   "components": {
+    "P_p": "0x1.0000000000000p+0",
+    "P_s": "0x0.0p+0",
+    "Q": "0x1.0000000000001p+0",
+    "Gamma_up": "0x0.0p+0",
+    "B_E": "0x0.0p+0"
+   },
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-09",
+   "description": "tau' exact sum of 0.1 and 0.2 (< fl(0.1 + 0.2) = Q^ = dP): a float tau' would give UNRESOLVED_RESOLVABILITY",
+   "components": {
+    "P_p": "0x1.3333333333334p-2",
+    "P_s": "0x0.0p+0",
+    "Q": "0x1.3333333333334p-2",
+    "Gamma_up": "0x1.999999999999ap-4",
+    "B_E": "0x1.999999999999ap-3"
+   },
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-10",
+   "description": "exact dP = 2^53 + 3/2, Q^ = 2^53 + 2 = fl(P^_p - P^_s): exact |dP - Q^| = 1/2 > tau' = 1/4 (a float dP gives PASS)",
+   "components": {
+    "P_p": "0x1.0000000000001p+53",
+    "P_s": "0x1.0000000000000p-1",
+    "Q": "0x1.0000000000001p+53",
+    "Gamma_up": "0x1.0000000000000p-3",
+    "B_E": "0x1.0000000000000p-3"
+   },
+   "expected": {
+    "status": "FAIL_COMPUTATION",
+    "e1": true,
+    "e2": false,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-11",
+   "description": "recorded dP and tau' equal to the definitions: accepted",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "recorded": {
+    "dP": "1/1",
+    "tau": "1/2"
+   },
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-12",
+   "description": "Z-3: recorded dP = 3/4 != P^_p - P^_s = 1: rejected before classification",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "recorded": {
+    "dP": "3/4"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": true,
+    "source_undetermined": true
+   }
+  },
+  {
+   "id": "AP-13",
+   "description": "Z-3: recorded tau' = 1 != Gamma_up + B_E = 1/2 (it would hide the E2 violation): rejected",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p-2",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "recorded": {
+    "tau": "1/1"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": true,
+    "source_undetermined": true
+   }
+  },
+  {
+   "id": "AP-14",
+   "description": "Z-3: recorded tau' = fl(0.1 + 0.2) != exact 0.1 + 0.2: rejected",
+   "components": {
+    "P_p": "0x1.3333333333334p-2",
+    "P_s": "0x0.0p+0",
+    "Q": "0x1.3333333333334p-2",
+    "Gamma_up": "0x1.999999999999ap-4",
+    "B_E": "0x1.999999999999ap-3"
+   },
+   "recorded": {
+    "tau": "hex:0x1.3333333333334p-2"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": true,
+    "source_undetermined": true
+   }
+  },
+  {
+   "id": "AP-15",
+   "description": "Z-3: recorded dP = fl(P^_p - P^_s) = 2^53 + 2 != exact 2^53 + 3/2: rejected",
+   "components": {
+    "P_p": "0x1.0000000000001p+53",
+    "P_s": "0x1.0000000000000p-1",
+    "Q": "0x1.0000000000001p+53",
+    "Gamma_up": "0x1.0000000000000p-3",
+    "B_E": "0x1.0000000000000p-3"
+   },
+   "recorded": {
+    "dP": "hex:0x1.0000000000001p+53"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": true,
+    "source_undetermined": true
+   }
+  },
+  {
+   "id": "AP-16",
+   "description": "B_E absent: tau' is not built from a part (no assumed value)",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false,
+    "source_undetermined": true
+   }
+  },
+  {
+   "id": "AP-17",
+   "description": "Gamma_up absent: tau' is not built",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p+0",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false,
+    "source_undetermined": true
+   }
+  },
+  {
+   "id": "AP-18",
+   "description": "B_E = inf: P-f (П-е), tau' not built",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "inf"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [
+     "P-f"
+    ],
+    "rejected": false,
+    "source_undetermined": false
+   }
+  },
+  {
+   "id": "AP-19",
+   "description": "Gamma_up = inf: recorded fault, no premise attributed (none in 4.1)",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "inf",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false,
+    "source_undetermined": false
+   }
+  },
+  {
+   "id": "AP-20",
+   "description": "P^_s = nan: P-c (П-в), dP not built",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "nan",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ],
+    "rejected": false,
+    "source_undetermined": false
+   }
+  },
+  {
+   "id": "AP-21",
+   "description": "Q^ = inf: P-c (П-в)",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "inf",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": null,
+    "e2": null,
+    "e_diag": false,
+    "reason_premises": [
+     "P-c"
+    ],
+    "rejected": false,
+    "source_undetermined": false
+   }
+  },
+  {
+   "id": "AP-22",
+   "description": "P-d not established with E2 violated: UNRESOLVED_CERTIFICATE + E_DIAG",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p-2",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "premises": {
+    "P-d": "NOT_ESTABLISHED"
+   },
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "e1": true,
+    "e2": false,
+    "e_diag": true,
+    "reason_premises": [
+     "P-d"
+    ],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-23",
+   "description": "all zero: Q^ = 0 = tau'",
+   "components": {
+    "P_p": "0x0.0p+0",
+    "P_s": "0x0.0p+0",
+    "Q": "0x0.0p+0",
+    "Gamma_up": "0x0.0p+0",
+    "B_E": "0x0.0p+0"
+   },
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-24",
+   "description": "P^_p = -0.0, P^_s = +0.0: dP = 0 exactly",
+   "components": {
+    "P_p": "-0x0.0p+0",
+    "P_s": "0x0.0p+0",
+    "Q": "0x0.0p+0",
+    "Gamma_up": "0x0.0p+0",
+    "B_E": "0x0.0p+0"
+   },
+   "expected": {
+    "status": "UNRESOLVED_RESOLVABILITY",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  },
+  {
+   "id": "AP-25",
+   "description": "recorded dP given as a binary64 equal to the exact difference: accepted",
+   "components": {
+    "P_p": "0x1.8000000000000p+1",
+    "P_s": "0x1.0000000000000p+1",
+    "Q": "0x1.0000000000000p+0",
+    "Gamma_up": "0x1.0000000000000p-2",
+    "B_E": "0x1.0000000000000p-2"
+   },
+   "recorded": {
+    "dP": "hex:0x1.0000000000000p+0"
+   },
+   "expected": {
+    "status": "PASS",
+    "e1": true,
+    "e2": true,
+    "e_diag": false,
+    "reason_premises": [],
+    "rejected": false
+   }
+  }
+ ],
+ "rows": {
+  "T1": {
+   "lx": 1.0,
+   "nx": 8,
+   "ly": 1.25,
+   "ny": 10,
+   "N": 1,
+   "D": 1.0,
+   "q": 1.0,
+   "s_max": 3
+  },
+  "T2": {
+   "lx": 1.0,
+   "nx": 12,
+   "ly": 0.75,
+   "ny": 9,
+   "N": 1,
+   "D": 1.0,
+   "q": 1.0,
+   "s_max": 2
+  }
+ },
+ "clean_rows": [
+  [
+   "T1",
+   1
+  ],
+  [
+   "T1",
+   2
+  ],
+  [
+   "T1",
+   3
+  ],
+  [
+   "T2",
+   1
+  ],
+  [
+   "T2",
+   2
+  ]
+ ],
+ "clean_expected": {
+  "premises_all_established": true,
+  "e1": true,
+  "e2": true,
+  "status_in": [
+   "PASS",
+   "UNRESOLVED_RESOLVABILITY"
+  ],
+  "contradictions": [],
+  "second_path_gamma_consistent": true
+ },
+ "control_B": [
+  {
+   "id": "B-a1",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "journal_array_1ulp:s2_given_in",
+   "premise": "P-a",
+   "description": "an element of the journal array given_in of s = 2 moved by 1 ulp (hash binding of the input)",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-a",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-a2",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "recorded_value_1ulp:P_hat_s",
+   "premise": "P-a",
+   "description": "the recorded value P^_s the row is bound to moved by 1 ulp",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-a",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-a3",
+   "row": [
+    "T1",
+    1
+   ],
+   "injection": "journal_array_negzero:s1_companion_in",
+   "premise": "P-a",
+   "description": "+0.0 -> -0.0 in the journal companion of s = 1: the computed values may coincide, the hash binding differs",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-a",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-b",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "perturb_field_s_rel_2^-40",
+   "premise": "P-b",
+   "description": "one node of the computed current field multiplied by 1 + 2^-40 (U-1)",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-b",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-c1",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "mode_round_up",
+   "premise": "P-c",
+   "description": "rounding mode toward +inf in the separate process of the row (U-2)",
+   "platform": "win32",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-c",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-c2",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "mode_ftz_daz",
+   "premise": "P-c",
+   "description": "FTZ + DAZ in the separate process of the row (U-2)",
+   "platform": "win32",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-c",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-c3",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "scale_field_s_2^1000",
+   "premise": "P-c",
+   "description": "computed current field times 2^1000: P^_s not finite",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-c",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-c4",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "subnormal_field_s_node",
+   "premise": "P-c",
+   "description": "one node of the computed current field = 2^-1060: subnormal result of a checked product with nonzero operands",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-c",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-d",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "grid_D_2^-1074",
+   "premise": "P-d",
+   "description": "D = 2^-1074 given to the U-3 grid check (D/2 not normal)",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-d",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-e",
+   "row": [
+    "T1",
+    1
+   ],
+   "injection": "prev_factors_2^-600",
+   "premise": "P-e",
+   "description": "previous-field factors 2^-600: computed previous field 0, exact product 2^-1200 != 0 (N-7)",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-e",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-f1",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "mu_low_zero",
+   "premise": "P-f",
+   "description": "mu_low = 0 given to B_E: denominator D^(1/2) mu_low not positive",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-f",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  },
+  {
+   "id": "B-f2",
+   "row": [
+    "T1",
+    2
+   ],
+   "injection": "B_E_sqrt_negative_D",
+   "premise": "P-f",
+   "description": "D = -1 given to B_E: negative radicand (root domain)",
+   "platform": "any",
+   "expected": {
+    "status": "UNRESOLVED_CERTIFICATE",
+    "premise_in_reason_premises": "P-f",
+    "not_status": [
+     "PASS",
+     "FAIL_COMPUTATION"
+    ]
+   },
+   "expected_clean_twin": "clean_expected (the same row without the injection)"
+  }
+ ],
+ "control_V": [
+  {
+   "id": "V-1",
+   "row": [
+    "T1",
+    2
+   ],
+   "perturbation": "V' = V (1 + 2^-20) + (-1)^j 2^-30 max|V|; companion' = companion (1 + 2^-25)",
+   "expected": {
+    "changed": [
+     "field_s_sha",
+     "field_prev_sha",
+     "P_hat_p",
+     "P_hat_s",
+     "Q_hat",
+     "Gamma_up",
+     "B_E",
+     "tau"
+    ],
+    "premises_all_established": true,
+    "e1": true,
+    "e2": true,
+    "status_in": [
+     "PASS",
+     "UNRESOLVED_RESOLVABILITY"
+    ],
+    "contradictions": [],
+    "if_change_not_confirmed": "UNRESOLVED (empty control)",
+    "if_FAIL_with_established_premises": "BLOCKED_CAMPAIGN-equivalent finding (protocol 4.4)"
+   }
+  },
+  {
+   "id": "V-2",
+   "row": [
+    "T1",
+    1
+   ],
+   "perturbation": "V' = V (1 + 2^-20) + (-1)^j 2^-30 max|V|; companion stays exactly 0",
+   "expected": {
+    "changed": [
+     "field_s_sha",
+     "P_hat_s",
+     "Q_hat",
+     "Gamma_up",
+     "B_E",
+     "tau"
+    ],
+    "unchanged": [
+     "field_prev_sha",
+     "P_hat_p"
+    ],
+    "premises_all_established": true,
+    "e1": true,
+    "e2": true,
+    "status_in": [
+     "PASS",
+     "UNRESOLVED_RESOLVABILITY"
+    ],
+    "contradictions": [],
+    "if_change_not_confirmed": "UNRESOLVED (empty control)",
+    "if_FAIL_with_established_premises": "BLOCKED_CAMPAIGN-equivalent finding (protocol 4.4)"
+   }
+  }
+ ],
+ "control_G": [
+  {
+   "id": "G-1",
+   "row": [
+    "T1",
+    2
+   ],
+   "mutation": "gamma_sign_flip",
+   "description": "gamma_s of path B1 negated",
+   "channel": "second_path_gamma",
+   "channel_status": "PROPOSED (OD-4 of the PRELAUNCH manifest; not approved by the owner)",
+   "expected": {
+    "detected_by": "second_path_gamma"
+   },
+   "note": "E1/E2 do not see the sign: Gamma_up = max(|gamma_down|, |gamma_up|)"
+  },
+  {
+   "id": "G-2",
+   "row": [
+    "T1",
+    2
+   ],
+   "mutation": "gamma_from_step:1",
+   "description": "gamma of half-step 1 used for half-step 2",
+   "channel": "second_path_gamma",
+   "channel_status": "PROPOSED (OD-4 of the PRELAUNCH manifest; not approved by the owner)",
+   "expected": {
+    "detected_by": "second_path_gamma"
+   }
+  },
+  {
+   "id": "G-3",
+   "row": [
+    "T1",
+    2
+   ],
+   "mutation": "Q_from_field_s",
+   "description": "Q^ = q_double(w^_s) instead of q_double(w^_p - w^_s)",
+   "channel": "E1/E2",
+   "channel_status": "PROPOSED (OD-4 of the PRELAUNCH manifest; not approved by the owner)",
+   "expected": {
+    "detected_by": "E1/E2",
+    "status": "FAIL_COMPUTATION"
+   }
+  },
+  {
+   "id": "G-4",
+   "row": [
+    "T1",
+    2
+   ],
+   "mutation": "P_prev_from_field_s",
+   "description": "P^_p = pi_double(w^_s) (energy of the wrong field)",
+   "channel": "E1/E2",
+   "channel_status": "PROPOSED (OD-4 of the PRELAUNCH manifest; not approved by the owner)",
+   "expected": {
+    "detected_by": "E1/E2",
+    "status": "FAIL_COMPUTATION"
+   }
+  },
+  {
+   "id": "G-5",
+   "row": [
+    "T1",
+    2
+   ],
+   "mutation": "B_E_drop_B1",
+   "description": "term B1 (formation) dropped from B_E",
+   "channel": "separate recount of B_E (MISSING)",
+   "channel_status": "NO CHANNEL IMPLEMENTED (B_E_independent_recount MISSING; OD-4, OD-11)",
+   "expected": {
+    "control_status": "UNRESOLVED (gap of control G)"
+   }
+  },
+  {
+   "id": "G-6a",
+   "row": [
+    "T1",
+    2
+   ],
+   "mutation": "recorded_tau_double",
+   "description": "recorded tau' = 2 (Gamma_up + B_E)",
+   "channel": "boundary_definition",
+   "channel_status": "protocol 4.1 definition (tau' = exact sum of the recorded bounds)",
+   "expected": {
+    "detected_by": "boundary_definition",
+    "status": "UNRESOLVED_CERTIFICATE",
+    "rejected": true
+   }
+  },
+  {
+   "id": "G-6b",
+   "row": [
+    "T1",
+    2
+   ],
+   "mutation": "recorded_dP_offset",
+   "description": "recorded dP = exact (P^_p - P^_s) + 2^-1080",
+   "channel": "boundary_definition",
+   "channel_status": "protocol 4.1 definition (dP = exact difference of the recorded P^)",
+   "expected": {
+    "detected_by": "boundary_definition",
+    "status": "UNRESOLVED_CERTIFICATE",
+    "rejected": true
+   }
+  }
+ ]
+}
