@@ -1,0 +1,8 @@
+{
+ "statements_only_in_production": 1,
+ "statements_only_in_research": 1,
+ "difference_is_the_N_guard": true,
+ "attribute_assignments_to_kkvim": [],
+ "patch_calls": [],
+ "statements_compared": 12
+}

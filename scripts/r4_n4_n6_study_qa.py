@@ -7,6 +7,7 @@ not project dependencies. Reproduction (repository root, PYTHONPATH=src):
     python scripts/r4_n4_n6_study_qa.py integrity        # K-1, K-2: committed data, tables, report numbers, controller
     python scripts/r4_n4_n6_study_qa.py rho1             # K-3: exact rank of the first half-step field (all 210 cells)
     python scripts/r4_n4_n6_study_qa.py nodal            # K-4: exact discrete sequence by 2D Galerkin, small grids
+    python scripts/r4_n4_n6_study_qa.py resid            # K-4: s = 1 residual and solve error of the solver, same grids
     python scripts/r4_n4_n6_study_qa.py cont             # K-5: continuous sequence in arb, closed form s = 1
     python scripts/r4_n4_n6_study_qa.py repro            # K-6, K-7: rerun of committed rows, run_coupled, orders
 Outputs: docs/results/r4_n4_n6_qa/ (CSV, JSON).
@@ -227,19 +228,30 @@ def eig_brackets(G):
     f = _flint()
     prec = f.ctx.prec
     n = G.nrows()
-    mp.mp.prec = prec + 64
-    digits = int(prec * 0.302) + 10
-    A = mp.matrix(n, n)
-    for i in range(n):
-        for k in range(n):
-            A[i, k] = mp.mpf(G[i, k].mid().str(digits, radius=False))
-    A = (A + A.T) / 2
-    ev = sorted(mp.eigsy(A, eigvals_only=True), reverse=True)
+    # the guess needs only moderate precision (the certificate is the inertia count at the full working precision);
+    # mpmath's tridiagonal QL can fail to converge at thousands of bits, hence the capped and fallback precisions
+    ev = None
+    for bits in (min(prec, 384) + 64, 192, 128):
+        mp.mp.prec = bits
+        digits = int(bits * 0.302) + 5
+        A = mp.matrix(n, n)
+        for i in range(n):
+            for k in range(n):
+                A[i, k] = mp.mpf(G[i, k].mid().str(digits, radius=False))
+        A = (A + A.T) / 2
+        try:
+            ev = sorted(mp.eigsy(A, eigvals_only=True), reverse=True)
+            break
+        except RuntimeError:
+            continue
+    if ev is None:
+        return None
     out = []
     for j, lam in enumerate(ev, start=1):
-        for e in range(prec // 3, 8, -8):
+        for e in range(min(prec // 3, int(bits * 0.8)), 8, -8):
             eps = mp.mpf(2) ** (-e)
-            t_lo = f.arb(mp.nstr(lam * (1 - eps) if lam > 0 else lam - eps * abs(ev[0]), digits))
+            t_lo = f.arb(mp.nstr(lam * (1 - eps) - eps * abs(ev[0]) * mp.mpf(2) ** (-prec // 3) if lam > 0
+                                 else lam - eps * abs(ev[0]), digits))  # absolute term: an exact zero is bracketed too
             t_hi = f.arb(mp.nstr(lam * (1 + eps) + eps * abs(ev[0]) * mp.mpf(2) ** (-prec // 3), digits))
             n_lo, n_hi = _n_positive(G, t_lo), _n_positive(G, t_hi)
             if n_lo is not None and n_hi is not None and n_lo >= j and n_hi <= j - 1:
@@ -448,7 +460,9 @@ class NodalProblem:
         zero = f.arb(0)
         B = f.arb_mat([[c.get((idx // self.nyi, idx % self.nyi), zero) for c in cols] for idx in range(size)])
         G = (B.transpose() * B) * self.c0
-        x = G.solve(f.arb_mat([[v] for v in rhs]))
+        # preconditioned ball solve (approximate inverse, then elimination): the plain interval LU inflates the radius
+        # by many orders of magnitude per solve on these sizes (measured ~1e97 at N = 5, 40 x 40)
+        x = G.solve(f.arb_mat([[v] for v in rhs]), algorithm="precond")
         return f.arb_mat([[x[j * n_unk + k, 0] for j in range(N)] for k in range(n_unk)])
 
     def field(self, X, Y):
@@ -539,18 +553,21 @@ def nodal_cell(args):
     except (np.linalg.LinAlgError, ValueError):
         ctrl = None
     prec = NODAL_PREC[N]
+    last_exc = None
     for _ in range(3):
         try:
             seq, P = nodal_sequence(N, lab, nx, ny, NODAL_S, prec)
             rad = seq[-1]["rel_rad_W"]
-        except (ZeroDivisionError, ValueError, ArithmeticError):
-            seq, rad = None, math.inf
+        except (ZeroDivisionError, ValueError, ArithmeticError) as exc:
+            seq, rad, last_exc = None, math.inf, exc
         if seq is not None and rad < 2.0**-100:
             break
         if math.isfinite(rad) and rad > 0:
             prec += 256 * math.ceil((math.log2(rad) + 140) / 256)
         else:
             prec *= 2
+    if seq is None:
+        raise RuntimeError(f"exact sequence not obtained up to {prec} bits: {last_exc!r}")
     f = _flint()
     rows = []
     for e in seq:
@@ -591,9 +608,60 @@ def nodal_cell(args):
     return rows
 
 
+def resid_cell(args):
+    """s = 1 residual of the solver's received set in the 2D Galerkin system assembled from the solver's OWN given set
+    (exact arb conversion of its doubles): |G y - l|_inf / |l|_inf, and the true relative error of y against the exact
+    solution of the same system; with the solver's eta_N of s = 1."""
+    N, lab, nx, ny = args
+    f = _flint()
+    f.ctx.prec = 512
+    study = builder_study()
+    cell = study.run_cell(N, lab, "I" if nx == ny else "II", nx, ny, half_steps=1, keep=())
+    P = NodalProblem(Fraction(lab), nx, ny)
+    X0 = f.arb_mat([[f.arb(float(v)) for v in row] for row in np.asarray(cell.x)])
+    Y1 = np.asarray(cell.y)
+    Ystar = P.halfstep(X0, "Y")
+    def residual(Y):
+        """max_b |a_h(X0 Y^T, b) - l_h(b)| / max_b |l_h(b)| over the basis fields b = X0_j (x) e_k (exact for double Y)."""
+        W = X0 * f.arb_mat([[f.arb(float(v)) for v in row] for row in Y]).transpose()
+        lap_w = P.lap({(p, q): W[p, q] for p in range(P.nxi) for q in range(P.nyi)})
+        res, lsc = [], []
+        for j in range(N):
+            gsum = sum((X0[p, j] for p in range(P.nxi)), f.arb(0))
+            for k in range(P.nyi):
+                lb = P.lap({(p, k): X0[p, j] for p in range(P.nxi)})
+                a = P.c0 * sum((v * lap_w.get(key, 0) for key, v in lb.items()), f.arb(0))
+                res.append(abs(a - P.c0 * gsum))
+                lsc.append(abs(P.c0 * gsum))
+        return math.nextafter(_max_up(res) / _max_lo(lsc), math.inf)
+
+    Yround = np.array([[float(Ystar[k, j].mid()) for j in range(N)] for k in range(P.nyi)])  # exact solution in double
+    ymax = _max_lo(abs(Ystar[k, j]) for k in range(P.nyi) for j in range(N))
+    err = _max_up(abs(f.arb(float(Y1[k, j])) - Ystar[k, j]) for k in range(P.nyi) for j in range(N))
+    return {"N": N, "r_label": lab, "nx": nx, "ny": ny, "galerkin_residual_rel_up": residual(Y1),
+            "galerkin_residual_of_rounded_exact_rel_up": residual(Yround),
+            "solve_error_rel_up": math.nextafter(err / ymax, math.inf), "eta_N_solver": float(cell.steps[0].eta_N)}
+
+
+def resid(out, workers):
+    with Pool(min(workers, len(NODAL_CELLS))) as pool:
+        rows = pool.map(resid_cell, NODAL_CELLS, chunksize=1)
+    write_csv(out / "residual_s1.csv", rows)
+    return rows
+
+
+def _nodal_cell_safe(args):
+    try:
+        return nodal_cell(args)
+    except Exception as exc:  # recorded per cell (NOT_RUN), the campaign goes on
+        N, lab, nx, ny = args
+        print(f"nodal N={N} r={lab} {nx}x{ny}: NOT_RUN {exc!r}", flush=True)
+        return [{"N": N, "r_label": lab, "nx": nx, "ny": ny, "error": repr(exc)}]
+
+
 def nodal(out, workers):
     with Pool(min(workers, len(NODAL_CELLS))) as pool:
-        parts = pool.map(nodal_cell, NODAL_CELLS, chunksize=1)
+        parts = pool.map(_nodal_cell_safe, NODAL_CELLS, chunksize=1)
     rows = [r for p in parts for r in p]
     write_csv(out / "nodal.csv", rows)
     return rows
@@ -1279,7 +1347,7 @@ def isolation(out):
 # ======================================================================================== main
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("mode", choices=["integrity", "isolation", "rho1", "nodal", "cont", "repro", "meta"])
+    p.add_argument("mode", choices=["integrity", "isolation", "rho1", "nodal", "resid", "cont", "repro", "meta"])
     p.add_argument("--out", type=Path, default=OUT_DEFAULT)
     p.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     args = p.parse_args(argv)
@@ -1293,6 +1361,8 @@ def main(argv=None):
         rho1(args.out, args.workers)
     elif args.mode == "nodal":
         nodal(args.out, args.workers)
+    elif args.mode == "resid":
+        resid(args.out, args.workers)
     elif args.mode == "cont":
         cont(args.out, args.workers)
     elif args.mode == "repro":
