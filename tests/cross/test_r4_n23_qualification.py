@@ -102,13 +102,21 @@ def test_high_precision_requirements_of_the_plan():
     assert s["sigma_mp_in_ball"] is True
 
 
-def test_group_b_statuses_unchanged():
+def test_group_b_statuses_d056_4():
+    """D-056.4: status_cont_e_rel (176) and status_cont_delta_c (64) RESOLVED at the measurement level in the cells
+    s = 2...s_max of smax.csv; E_inf (QA-3 not accepted) and e_rel_E unchanged; everything else as before."""
     with open(ROOT / "docs" / "results" / "r4_group_b" / "continuous.csv", newline="", encoding="utf-8") as f:
         cont = list(csv.DictReader(f))
     assert len(cont) == 800
+    area = {"e_rel": set(), "delta_c": set()}
+    for t in _rows("smax.csv"):
+        for k in area:
+            area[k] |= {(t["N"], t["r_label"], str(s)) for s in range(2, int(t[f"smax_{k}"]) + 1)}
+    assert {k: len(v) for k, v in area.items()} == {"e_rel": 176, "delta_c": 64}
     for r in cont:
         for k in ("e_rel", "e_rel_E", "delta_c", "E_inf"):
-            assert r[f"status_cont_{k}"] == ("RESOLVED" if r["s"] == "1" else "PROVISIONAL")
+            inside = (r["N"], r["r_label"], r["s"]) in area.get(k, ())
+            assert r[f"status_cont_{k}"] == ("RESOLVED" if r["s"] == "1" or inside else "PROVISIONAL")
 
 
 def test_rank_checks_and_printed_bounds_tables():

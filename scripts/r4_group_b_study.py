@@ -32,14 +32,16 @@ Two statuses are kept apart (review b0c208d, И-1): status_meas_* - the measurem
 (budget = strict tails + rounding models with stated premises; the rounding of the recursion arrays themselves is not
 in the budget - checked by high precision: QA at M <= 81, Reviewer at M = 4001); status_cont_* - the statement on the
 UNTRUNCATED continuous KK-VIM: s = 1 RESOLVED/UNRESOLVED with the strict Navier-m tail, s >= 2 at best PROVISIONAL
-(Q-022). Budgets are written in three separate parts: *_strict_rel, *_model_rel, *_diag_rel (diagnostics: doubling
+(Q-022), except e_rel and delta_c in the area of the owner decision D-056.4 - RESOLVED at the measurement level
+(apply_d056_4). Budgets are written in three separate parts: *_strict_rel, *_model_rel, *_diag_rel (diagnostics: doubling
 of M, least squares). Routes D and E share the coefficient arrays of the recursion.
 
 Reproduction (repository root):
     uv run python scripts/r4_group_b_study.py                       # all tables except high precision
     uv run --with mpmath python scripts/r4_group_b_study.py --hp    # + temporary high-precision checks (QA only)
 Outputs: CSV files and tables.md in docs/results/r4_group_b/ (--out). Options: --quick (small set for tests),
---max-n (largest grid of the square chains), --no-grid (continuous part only).
+--max-n (largest grid of the square chains), --no-grid (continuous part only), --apply-d056-4 (statuses of D-056.4
+on the committed continuous.csv, then master.csv and tables.md; no recomputation).
 """
 
 import argparse
@@ -101,6 +103,37 @@ def continuous_status(s, meas_status, budget_s1, diagnostic, measured):
     if meas_status == "RESOLVED" and status(diagnostic, measured) == "RESOLVED":
         return "PROVISIONAL"
     return "UNRESOLVED"
+
+
+# Owner decision D-056.4 (docs/DECISIONS.md; clarifies D-048.10): the N23 qualification fulfils the conditions (2)-(4) of
+# Q-022 (docs/R4_Q022_ERROR_TRANSFER.md, sec. 9) for e_rel and delta_c in the cells s = 2 ... s_max of its committed
+# table smax.csv (rule 1/100 for every s' <= s_max). There status_cont_* PROVISIONAL -> RESOLVED at the measurement level,
+# as at s = 1; not a normative qualification (D-046, РВ4-8). E_inf (QA-3 not accepted) and e_rel_E are not covered.
+D056_4_SMAX = Path(__file__).resolve().parents[1] / "docs" / "results" / "r4_n23_qualification" / "smax.csv"
+D056_4_COUNTS = {"e_rel": 176, "delta_c": 64}
+
+
+def d056_4_area():
+    """{key: {(N, r_label, s)}} of D-056.4, from smax.csv of the N23 qualification (QA cfa9888)."""
+    area = {k: set() for k in D056_4_COUNTS}
+    with open(D056_4_SMAX, newline="", encoding="utf-8") as f:
+        for t in csv.DictReader(f):
+            for k in area:
+                area[k] |= {(int(t["N"]), t["r_label"], s) for s in range(2, int(t[f"smax_{k}"]) + 1)}
+    assert {k: len(v) for k, v in area.items()} == D056_4_COUNTS
+    return area
+
+
+def apply_d056_4(rows):
+    """D-056.4 on rows of continuous_case with r_label: PROVISIONAL -> RESOLVED inside the area; nothing else changes."""
+    area = d056_4_area()
+    for row in rows:
+        for k, cells in area.items():
+            if (row["N"], row["r_label"], row["s"]) in cells:
+                if row[f"status_cont_{k}"] not in ("PROVISIONAL", "RESOLVED"):
+                    raise ValueError(f"D-056.4 covers only PROVISIONAL cells: {k} {row['N']} {row['r_label']} {row['s']}")
+                row[f"status_cont_{k}"] = "RESOLVED"
+    return rows
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -765,7 +798,7 @@ def make_tables(out):
                          ts[1]["status_cont_e_rel"], ts[2]["status_cont_e_rel"]))
     parts.append("### T2a: energy error, all r (b = r, a = 1): e_rel and sqrt(e_rel)\n\n" + md_table(
         ["N", "r", "e_rel s=1", "√e_rel s=1", "e_rel s=2", "√ s=2", "e_rel s=3", "√ s=3", "e_rel s=10", "√ s=10",
-         "e_rel s=40", "√ s=40", "непр. метод s=1", "непр. метод s≥2"], rows))
+         "e_rel s=40", "√ s=40", "непр. метод s=1", "непр. метод s=2"], rows))
     rows = []
     for N in NS:
         for lab in R_ALL:
@@ -898,7 +931,9 @@ def make_tables(out):
                                    "Statuses: status_meas_* - measurement of the finite spectral problem (strict tails + "
                                    "rounding models; the rounding of the recursion arrays is not in the budget); "
                                    "status_cont_* - untruncated continuous KK-VIM: s = 1 with the strict Navier-m tail, "
-                                   "s >= 2 at best PROVISIONAL (Q-022). Not a normative qualification (D-046, РВ4-8).\n\n"
+                                   "s >= 2 at best PROVISIONAL (Q-022), except e_rel and delta_c in the area of D-056.4 "
+                                   "(s = 2...s_max of docs/results/r4_n23_qualification/smax.csv) - RESOLVED at the "
+                                   "measurement level. Not a normative qualification (D-046, РВ4-8).\n\n"
                                    "* n for 1/100: estimate n_f (|E_disc(n_f)| / (0.01 |E_method|))^(1/2) from the "
                                    "observed h^2 law on the finest grid - a research estimate, not a requirement.\n"
                                    "** agreement of the two squared energy errors e_rel,h (discrete, against omega_h) and "
@@ -933,6 +968,7 @@ def main(argv=None):
     p.add_argument("--no-grid", action="store_true")
     p.add_argument("--max-n", type=int, default=1280)
     p.add_argument("--tables-only", action="store_true", help="regenerate master.csv and tables.md from the CSV files")
+    p.add_argument("--apply-d056-4", action="store_true", help="statuses of D-056.4 on continuous.csv, then the tables")
     p.add_argument("--n23-transfer", metavar="CSV", help="QA diagnostic only (docs/R4_N23_QUALIFICATION.plan.md): write the "
                    "N23-6/N23-7 transfer bounds on the continuous arrays to CSV (17 digits); no other output is written")
     args = p.parse_args(argv)
@@ -952,6 +988,10 @@ def main(argv=None):
     if args.tables_only:
         make_tables(out)
         return
+    if args.apply_d056_4:
+        write_csv(out / "continuous.csv", apply_d056_4(read_csv(out / "continuous.csv")))
+        make_tables(out)
+        return
     t0 = time.time()
     rset = R_ALL if not args.quick else {"1": 1.0, "5": 5.0}
     cont, cont_steps = [], {}
@@ -962,6 +1002,7 @@ def main(argv=None):
                 row["r_label"] = lab
             cont += rows
             cont_steps[(N, lab)] = continuous_sequence(1.0, r, N, S_MAX, M_CONT)
+    apply_d056_4(cont)
     write_csv(out / "continuous.csv", cont)
     print("continuous", round(time.time() - t0), flush=True)
     s1 = [s1_against_navier(N, r) for N in NS for r in rset.values()]
