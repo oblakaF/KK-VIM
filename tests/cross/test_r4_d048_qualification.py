@@ -403,18 +403,19 @@ def test_k7_a4_12_in_the_area_of_d048_7():
 
 # --- K-8: statuses ------------------------------------------------------------------------------------------------
 
-GROUP_B_SHA256 = {  # docs/results/r4_group_b at main 8c4dbe1 (LF line endings)
+GROUP_B_SHA256 = {  # docs/results/r4_group_b at main 8c4dbe1 (LF line endings); continuous.csv, master.csv,
+    # tables.md - statuses of D-056.4 only (scripts/r4_group_b_study.py --apply-d056-4)
     "centre_decomposition.csv": "bad0716ec98787d91eecb2f8c1129eb9fc7ceeeac71c7c1ebfaeda4b381d5dce",
-    "continuous.csv": "a416824c28ef618c33e3505bfa2c294b73ffbb1816b853e1394806cc4f33d5f6",
+    "continuous.csv": "4492ccc853fe9b689312da25660ca230003dccec74dedba0ea58e747d04c94e1",
     "full_grid_r1.csv": "bf54f6495f17f32a261c3cbdd0c5552e910e35021354abe7e55fe5cde882e0d8",
     "grid.csv": "d3f55c9e7f58e7f81fd85bf05cbec1001bd4c05e3d3f8a9d9d2403e4f89c235e",
     "high_precision.csv": "84918a7a84673939ec3b4de2be9b277a0cb86aa08a033dd4434e446b1b5dd586",
-    "master.csv": "3f6ad3587eb60b8a4fa94a56ea84ca758058ac50b02a86804d1c8ac5cbbad35a",
+    "master.csv": "2246585a36df42d6e7e005d12c369e3f31bf719092eb662f3f9e749e5d8c2c6c",
     "meta.json": "535e6c7ce5cc9716b6febd09e4aa23a519f472280f6b8abb8e267fc4ff1237ff",
     "richardson.csv": "9e883e3a3a1c138a06bda02a66f205b0217f8bb048661334479f35cb2f86f106",
     "s1_navier.csv": "9e74075a42d3873a0b5322391b2bf1396a5abae2a2e6bdd69eecad98fcbbbda0",
     "scale_invariance.csv": "289234d52e10c6cc08243f1f92a252bbcc55e9747accc70af4b03e3d17bc9e07",
-    "tables.md": "ef43d02ae88b414bbd005814c003ac74ad23f0b154c49592bce137ddd2161870",
+    "tables.md": "0ac1139b1d9c0388a04d310cc483be7cec1b8905ccee54b2a671a3f583dfbdd3",
 }
 
 

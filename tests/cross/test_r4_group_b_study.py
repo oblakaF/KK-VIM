@@ -124,6 +124,9 @@ def test_committed_tables_keep_the_scientific_numbers():
     committed = {(int(t["N"]), t["r_label"], int(t["s"])): t for t in _read("continuous.csv")}
     rows = study.continuous_case(1.0, 1.0, 1.0, 1.0, 3, M=4001, M_check=4001, s_max=10)
     for row in rows:
+        row["r_label"] = "1"
+    study.apply_d056_4(rows)  # D-056.4: N = 3, r = 1, s = 2 - e_rel RESOLVED at the measurement level
+    for row in rows:
         if row["s"] not in (1, 2, 3, 10):
             continue
         t = committed[(3, "1", row["s"])]
@@ -138,6 +141,7 @@ def test_master_and_tables_are_consistent_with_the_sources():
     grid = {(t["N"], t["r_label"], t["s"], t["nx"], t["ny"], t["family"]): t for t in _read("grid.csv")}
     master = _read("master.csv")
     assert len(master) == len(grid)
+    area = study.d056_4_area()
     for m in master:
         c = cont[(m["N"], m["r"], m["s"])]
         g = grid[(m["N"], m["r"], m["s"], m["n_x"], m["n_y"], m["family"])]
@@ -147,8 +151,9 @@ def test_master_and_tables_are_consistent_with_the_sources():
         assert m["delta_c_method"] == c["delta_c"] and m["delta_c_disc"] == g.get("d_disc_c", "")
         assert m["E_inf_disc"] == g["E_inf_disc"] and m["e_rel_h"] == g["e_rel_h"]
         assert math.isclose(float(m["sqrt_e_rel"]) ** 2, float(m["e_rel"]), rel_tol=2e-6)
-        if int(m["s"]) >= 2:
-            assert m["status_cont_e_rel"] != "RESOLVED" and m["status_cont_delta_c"] != "RESOLVED"
+        if int(m["s"]) >= 2:  # RESOLVED (measurement level) only inside the area of D-056.4
+            for k in ("e_rel", "delta_c"):
+                assert (m[f"status_cont_{k}"] == "RESOLVED") == ((int(m["N"]), m["r"], int(m["s"])) in area[k])
     tables = (RESULTS / "tables.md").read_text(encoding="utf-8")
     assert "√e_rel" in tables and "согласие e_rel,h с e_rel (1 %)" in tables
     assert "1/100 (энергия)" not in tables  # И-4: the agreement measure is not an energy distinguishability
