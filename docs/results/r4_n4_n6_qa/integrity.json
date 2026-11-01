@@ -1,0 +1,89 @@
+{
+ "checks": {
+  "plan_equals_cells": true,
+  "cells_210_198_12": true,
+  "steps_7854": true,
+  "compare_1386": true,
+  "stops_14_N6_r15_r13_s1": true,
+  "stop_rows_before_qr": true,
+  "meta_N_SOLVE_unchanged": true,
+  "meta_run_commit_69e26bb": true,
+  "guards_follow_D048_5": true,
+  "no_forbidden_statuses": true,
+  "s2_mandatory_only_N23": true,
+  "mark_everywhere": true,
+  "energy_resolved_iff_m_ge_1": true,
+  "energy_increases_below_tau": true,
+  "energy_increases_all_after_stabilization_as_stated": false,
+  "tables_are_function_of_csv": true,
+  "T8_N6_after_fix": true,
+  "min_rho_margin_at_s1": true,
+  "s2_unresolved_N6_1280_five_r": true,
+  "min_m2_location_N4": true,
+  "min_m2_location_N5": true,
+  "min_m2_location_N6": true,
+  "control_equal_run_coupled_12": true,
+  "config_margin_1_42_at_n1280_as_stated": false,
+  "e_rel_strictly_decreasing_in_N": true,
+  "zeta_N4_1280_AQ_all_r": true,
+  "zeta_N5_1280": true,
+  "zeta_N6_1280": true,
+  "zeta_N6_familyII_G": true,
+  "report_numbers": false
+ },
+ "claims_failed": [
+  {
+   "claim": "grid of the minimal configuration margin",
+   "recomputed": "II 1600x320",
+   "printed": "N = 6, n = 1280",
+   "half_unit": "",
+   "ok": false
+  },
+  {
+   "claim": "family II E_disc max (5.4: 7.6e-6)",
+   "recomputed": 7.655154e-06,
+   "printed": 7.6e-06,
+   "half_unit": 5e-08,
+   "ok": false
+  },
+  {
+   "claim": "5.3 e_rel(cont) r = 1/5, s = 40, N = 6",
+   "recomputed": 1.154686e-12,
+   "printed": 1.16e-12,
+   "half_unit": 5e-15,
+   "ok": false
+  }
+ ],
+ "n_claims": 100,
+ "guard_rows_judged": 7854,
+ "energy_increases_printed_all_N": 2304,
+ "energy_increases_printed_by_position_all_N": {
+  "before": 180,
+  "at": 80,
+  "after": 2044
+ },
+ "energy_increases_printed_by_position_N4_6": {
+  "before": 171,
+  "at": 75,
+  "after": 1899
+ },
+ "energy_increase_earliest_offset_N4_6": -4.0,
+ "T8_max_identity_defect": {
+  "2": 1.402238e-05,
+  "3": 1.684719e-05,
+  "4": 0.0001805478,
+  "5": 0.0002024189,
+  "6": 0.0001156159
+ },
+ "env": {
+  "python": "3.14.8",
+  "numpy": "2.5.4",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "git_head": "58c35d747af64a9b62225a871c5b535440c8867a",
+  "script_sha256": "04f74eae7195c595b7ced2223dd3c5624c870d7ca05e6b78ca00e61c15063d12",
+  "scipy": "1.18.1",
+  "python_flint": "0.9.0",
+  "mpmath": "1.4.1",
+  "kkvim_path": "D:\\git\\Test_Versions\\KK-VIM\\KK-VIM-R4-N4N6-QA\\src\\kkvim"
+ }
+}

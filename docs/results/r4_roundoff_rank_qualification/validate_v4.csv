@@ -1,0 +1,13 @@
+n,N,r,s_end,records_ok,log_equal,final_equal
+40,2,1/5,100,True,True,True
+40,2,1,100,True,True,True
+40,2,5,100,True,True,True
+40,3,1/5,100,True,True,True
+40,3,1,100,True,True,True
+40,3,5,100,True,True,True
+160,2,1/5,100,True,True,True
+160,2,1,100,True,True,True
+160,2,5,100,True,True,True
+160,3,1/5,100,True,True,True
+160,3,1,100,True,True,True
+160,3,5,100,True,True,True

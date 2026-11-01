@@ -1,0 +1,7 @@
+control,baseline,measured,expected,detected,exact_rank,rho_hat,eps_cert,certified_by_rho,certified_by_energy,energy_err_up,dlow_sqrt_lo
+a_injection_1e-12,4.88640153E-16,9.87089695E-13,9.87525967E-13,True,,,,,,,
+d_wrong_h_1e-10,4.88640153E-16,2.00022845E-10,1.00000000E-10,True,,,,,,,
+e_exact_rank2_K1,,,,True,2,1.29266985E-16,1.29266986E-16,False,False,,
+e_exact_rank2_K1000,,,,True,2,1.29266985E-13,1.29266986E-13,False,False,,
+e_exact_rank2_K1e+06,,,,True,2,1.29266985E-10,1.29266986E-10,False,False,,
+e_rank2_truncation_of_W5,,,,True,,,,,False,4.15461620E-5,3.85598243E-5

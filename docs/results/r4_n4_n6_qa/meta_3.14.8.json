@@ -1,0 +1,12 @@
+{
+ "python": "3.14.8",
+ "numpy": "2.5.4",
+ "platform": "Windows-10-10.0.19045-SP0",
+ "git_head": "58c35d747af64a9b62225a871c5b535440c8867a",
+ "script_sha256": "04f74eae7195c595b7ced2223dd3c5624c870d7ca05e6b78ca00e61c15063d12",
+ "scipy": "1.18.1",
+ "python_flint": "0.9.0",
+ "mpmath": "1.4.1",
+ "kkvim_path": "D:\\git\\Test_Versions\\KK-VIM\\KK-VIM-R4-N4N6-QA\\src\\kkvim",
+ "object": "research/r4-n4-n6 @ 6c7a80de00140fbb714e6cb0577bed232f3bc644"
+}

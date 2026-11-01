@@ -1,0 +1,149 @@
+{
+ "base": "a2307cd8030db812ff1769bc775c0e5485b8f9e2",
+ "head": "a5d89c35ff08b85270d08685d0624b8930298bd9",
+ "commits": 12,
+ "linear_single_parents": true,
+ "order_as_reported": true,
+ "base_is_origin_main": true,
+ "A_qa_head_is_ancestor": true,
+ "B_source_chain_linear_from_base": true,
+ "B_cherry_picks": [
+  {
+   "new": "2e53a48",
+   "source": "df37652",
+   "patch_id_equal": true,
+   "x_trailer": true,
+   "author_kept": true
+  },
+  {
+   "new": "6468545",
+   "source": "a264945",
+   "patch_id_equal": true,
+   "x_trailer": true,
+   "author_kept": true
+  },
+  {
+   "new": "28046d6",
+   "source": "bc6ae13",
+   "patch_id_equal": true,
+   "x_trailer": true,
+   "author_kept": true
+  },
+  {
+   "new": "d4563dd",
+   "source": "a4add73",
+   "patch_id_equal": true,
+   "x_trailer": true,
+   "author_kept": true
+  },
+  {
+   "new": "d0a95c7",
+   "source": "0cfe5f9",
+   "patch_id_equal": true,
+   "x_trailer": true,
+   "author_kept": true
+  },
+  {
+   "new": "92e9fb9",
+   "source": "4b7094a",
+   "patch_id_equal": true,
+   "x_trailer": true,
+   "author_kept": true
+  }
+ ],
+ "files": 49,
+ "all_added": true,
+ "file_set_is_A_plus_B_plus_report": true,
+ "A_files": 27,
+ "B_files": 21,
+ "files_differing_from_source": [
+  "docs/R4_N4_N6_STUDY.report.md",
+  "docs/R4_ROUNDOFF_RANK_QUALIFICATION.qa-report.md"
+ ],
+ "only_the_two_reports_edited": true,
+ "edited_numstat": {
+  "docs/R4_N4_N6_STUDY.report.md": [
+   "24",
+   "8"
+  ],
+  "docs/R4_ROUNDOFF_RANK_QUALIFICATION.qa-report.md": [
+   "61",
+   "6"
+  ]
+ },
+ "final_commit_files": [
+  "docs/R4_N4_N6_STUDY.report.md",
+  "docs/R4_QA_N46_ROUNDOFF_INTEGRATION.report.md",
+  "docs/R4_ROUNDOFF_RANK_QUALIFICATION.qa-report.md"
+ ],
+ "protected_paths_unchanged": {
+  "src/kkvim": true,
+  "src/kkvim_reference": true,
+  "docs/MATH_SPEC.md": true,
+  "docs/R4_NUMERICAL_SPEC.md": true,
+  "docs/DECISIONS.md": true,
+  "docs/STATUS.md": true,
+  "docs/OPEN_QUESTIONS.md": true,
+  "docs/ROADMAP.md": true,
+  "docs/PROJECT_GOALS.md": true,
+  "docs/SOURCE_MAP.md": true,
+  "docs/R4_SOURCE_NOTES.md": true,
+  "docs/R4_Q022_ERROR_TRANSFER.md": true,
+  "AGENTS.md": true,
+  "CLAUDE.md": true,
+  "pyproject.toml": true,
+  "uv.lock": true,
+  ".github": true,
+  ".githooks": true,
+  ".gitignore": true,
+  ".gitattributes": true,
+  "references": true
+ },
+ "no_forbidden_extensions": true,
+ "no_scratch": true,
+ "secret_pattern_hits": [],
+ "binary_files": [],
+ "A_meta": {
+  "git_head_at_run": "69e26bb79f25c91e894b8f4b72da579d38cd9c9d",
+  "run_commit_is_69e26bb": true,
+  "script_changed_lines_after_run": [
+   947,
+   948
+  ],
+  "removed_lines": 1,
+  "changes_only_in_make_tables": true,
+  "N_SOLVE_unchanged": true,
+  "plan_equals_script": true,
+  "controller_constants_equal_main": true
+ },
+ "AQ_meta": {
+  "meta_3.13.15.json": {
+   "git_head": "58c35d7",
+   "script_sha256_equals_committed_tool": true,
+   "object": "research/r4-n4-n6 @ 6c7a80de00140fbb714e6cb0577bed232f3bc644"
+  },
+  "meta_3.14.8.json": {
+   "git_head": "58c35d7",
+   "script_sha256_equals_committed_tool": true,
+   "object": "research/r4-n4-n6 @ 6c7a80de00140fbb714e6cb0577bed232f3bc644"
+  }
+ },
+ "B_meta": {
+  "data_tool_commit_is_a264945": true,
+  "data_tool_sha256_equals_blob": true,
+  "script_changed_lines_after_data": [
+   1888,
+   1889
+  ],
+  "removed_lines": 2,
+  "changed_lines_text": [
+   "info, rows = campaign_cell(c, args.transform, args.S, verbose=True)",
+   "print(json.dumps(aggregate(info, rows), default=str, indent=1))"
+  ],
+  "plan_commit_is_df37652": true,
+  "blas_threads_bitwise": true,
+  "only_mode_one_changed": true
+ },
+ "INTEGRITY": "INTEGRITY_PASS",
+ "checks_passed": "24/24"
+}

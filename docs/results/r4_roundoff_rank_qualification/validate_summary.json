@@ -1,0 +1,15 @@
+{
+ "V1": true,
+ "V2": true,
+ "V3": true,
+ "V4": true,
+ "V5": true,
+ "V1_cases": 720,
+ "V3_cases": 240,
+ "V4_cells": 12,
+ "V5_controls": 6,
+ "V1_max_rel_width": 1.994308807437811e-42,
+ "V2_max_residual_over_scale": 1.508164431258566e-103,
+ "V3_max_rel_diff": 2.8084865722085268e-15,
+ "seconds": 43.9
+}
