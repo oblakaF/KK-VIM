@@ -601,6 +601,47 @@ def _d0_case(d0, rid):
     return copy.deepcopy(next(c for c in d0["cases"] if c["id"] == rid))
 
 
+# The logic tests of the bitwise comparison and of the path identity inject one difference into D0 cases. Their baseline is the
+# recorded path - the published value of every compared component, the recorded control word - and not the values of the machine
+# running them: off the recorded path (a Linux runner has no _controlfp; another OpenBLAS core or numpy.sin gives other last bits)
+# those differ, and only test_d0_regression_bitwise judges them (NOT_VERIFIED there). Each logic test runs on the D0 rows of this
+# machine and on d0_elsewhere, a model of another path; before this baseline they failed there (Linux CI of PR #50, run 41033985897).
+
+def _d0_published_baseline(case: dict, compared) -> dict:
+    """The case with each compared component (comp, run, col) of its recomputed row set to the published value."""
+    ga = pl.ga()
+    for comp, run, col in compared:
+        case["result"]["row"][comp] = ga.read_double(case[run][col]).hex()
+    return case
+
+
+def _d0_recorded_words(d0: dict) -> list[dict]:
+    """Copies of the D0 cases with the control words of the recomputed rows set to the recorded word."""
+    word, cases = d0["recorded"]["fp_control"], copy.deepcopy(d0["cases"])
+    for c in cases:
+        c["result"]["row"]["controlfp_before"] = c["result"]["row"]["controlfp_after"] = word
+    return cases
+
+
+@pytest.fixture(scope="module")
+def d0_elsewhere(d0):
+    """The D0 computation as a path other than the recorded one gives it: no control word (as on a Linux runner) and every compared
+    component of the recomputed rows 1 ulp above the published value (as with another OpenBLAS core or numpy.sin). A model built
+    from the published rows, the same on every machine; not a recomputation."""
+    other, ga = copy.deepcopy(d0), pl.ga()
+    for c in other["cases"]:
+        row = c["result"]["row"]
+        row["controlfp_before"] = row["controlfp_after"] = None
+        for comp, run, col in D0_BITWISE:
+            row[comp] = math.nextafter(ga.read_double(c[run][col]), math.inf).hex()
+    for when in ("path", "path_after"):
+        other[when] = {**d0[when], "fp_control": None}
+    return other
+
+
+D0_PATHS = ("d0", "d0_elsewhere")
+
+
 def _d0_portable_report(d0: dict) -> dict:
     """Every portable check of the D0 regression, by part; independent of the computational path."""
     before, after = d0["data_defects"]
@@ -665,9 +706,12 @@ def test_d0_every_path_parameter_is_needed(d0, key):
     assert _d0_path_identity({**rec, key: None}, rec) == (False, [f"{key}: not readable here"])
 
 
-def test_d0_path_read_after_the_computation_counts(d0):
+@pytest.mark.parametrize("which", D0_PATHS)
+def test_d0_path_read_after_the_computation_counts(request, which):
+    d0 = request.getfixturevalue(which)
     rec = d0["recorded"]
-    moved = {**d0, "path": dict(rec), "path_after": {**rec, "numpy_blas_core": "Sandybridge"}, "record_problems": []}
+    moved = {**d0, "path": dict(rec), "path_after": {**rec, "numpy_blas_core": "Sandybridge"}, "record_problems": [],
+             "cases": _d0_recorded_words(d0)}
     ok, diff = _d0_identity(moved)
     assert not ok and diff == ["numpy_blas_core: 'Sandybridge' here, 'Haswell' recorded"]
     assert _d0_identity({**moved, "path_after": dict(rec)}) == (True, [])
@@ -686,10 +730,11 @@ def test_d0_win32_alone_is_not_an_identical_path(d0):
     assert not _d0_path_identity(runner, rec)[0]
 
 
-def test_d0_platform_mismatch_is_not_a_false_fail(d0):
-    case = _d0_case(d0, "chain|1x3:32x96|N1|Y|s1")
+@pytest.mark.parametrize("which", D0_PATHS)
+def test_d0_platform_mismatch_is_not_a_false_fail(d0, request, which):
+    case = _d0_published_baseline(_d0_case(request.getfixturevalue(which), "chain|1x3:32x96|N1|Y|s1"), D0_BITWISE)
     # the value of GitHub Actions run 40946309468 (Windows, Python 3.13 and 3.14): 1 ULP from the published P_hat_s
-    assert case["QA-EB"]["P_hat_s"] == repr(float.fromhex("-0x1.7e08f45e0914ap-10"))
+    assert case["QA-EB"]["P_hat_s"] == repr(float.fromhex("-0x1.7e08f45e0914ap-10")) and _d0_bitwise_mismatches(case) == []
     case["result"]["row"]["P_hat_s"] = "-0x1.7e08f45e09149p-10"
     mism = _d0_bitwise_mismatches(case)
     assert mism == ["P_hat_s: computed -0x1.7e08f45e09149p-10, published -0x1.7e08f45e0914ap-10"]
@@ -701,12 +746,17 @@ def test_d0_platform_mismatch_is_not_a_false_fail(d0):
     assert _d0_portable_defects(_d0_case(d0, case["id"])) == []
 
 
-@pytest.mark.parametrize("comp, run, col", [("P_hat_p", "QA-EB", "P_hat_prev"), ("P_hat_s", "QA-EB", "P_hat_s"),
-                                             ("Q_hat", "QA-EB", "Q_hat"), ("B_E_up", "QA-EB", "B_E_up"), ("Gamma_up", "EQ", "Gamma_up"),
-                                             ("gamma_down", "EQ", "gamma_down"), ("gamma_up", "EQ", "gamma_up")])
-def test_d0_bitwise_is_strict_on_an_identical_path(d0, comp, run, col):
-    # the compared components listed here, not taken from D0_BITWISE: a component dropped from the comparison is then detected
-    case = _d0_case(d0, "chain|1x1:64x64|N1|Y|s1")
+# the compared components listed here, not taken from D0_BITWISE: a component dropped from the comparison is then detected
+D0_COMPARED_LISTED = (("P_hat_p", "QA-EB", "P_hat_prev"), ("P_hat_s", "QA-EB", "P_hat_s"), ("Q_hat", "QA-EB", "Q_hat"),
+                      ("B_E_up", "QA-EB", "B_E_up"), ("Gamma_up", "EQ", "Gamma_up"), ("gamma_down", "EQ", "gamma_down"),
+                      ("gamma_up", "EQ", "gamma_up"))
+
+
+@pytest.mark.parametrize("which", D0_PATHS)
+@pytest.mark.parametrize("comp, run, col", D0_COMPARED_LISTED)
+def test_d0_bitwise_is_strict_on_an_identical_path(request, which, comp, run, col):
+    case = _d0_published_baseline(_d0_case(request.getfixturevalue(which), "chain|1x1:64x64|N1|Y|s1"), D0_COMPARED_LISTED)
+    assert _d0_bitwise_mismatches(case) == []
     pub = pl.ga().read_double(case[run][col])
     for v in (math.nextafter(pub, math.inf), math.nextafter(pub, -math.inf)) + ((-pub,) if pub == 0.0 else ()):
         case["result"]["row"][comp] = v.hex()
@@ -946,7 +996,9 @@ def test_d0_portable_checks_run_on_a_path_not_identical(d0):
     assert "skip" not in src and "_identity" not in src and "_d0_portable_report(d0)" in src
 
 
-def test_d0_unknown_blas_or_mode_is_never_identical(d0, monkeypatch):
+@pytest.mark.parametrize("which", D0_PATHS)
+def test_d0_unknown_blas_or_mode_is_never_identical(request, which, monkeypatch):
+    d0 = request.getfixturevalue(which)
     rec, mism = d0["recorded"], ["P_hat_s: computed x, published y"]
     with monkeypatch.context() as m:
         m.setattr(sys.modules[__name__], "_openblas", lambda pkg, suffix: (None, "no OpenBLAS library found"))
@@ -966,11 +1018,23 @@ def test_d0_unknown_blas_or_mode_is_never_identical(d0, monkeypatch):
         now = _d0_current_path()
     assert not _d0_path_identity(now, rec)[0] and now["fp_control"].startswith("mode probe failed")
     # a recomputed row probed under another control word
-    case = copy.deepcopy(d0["cases"][0])
-    case["result"]["row"]["controlfp_after"] = "0x9001f"
-    moved = {**d0, "path": dict(rec), "path_after": dict(rec), "record_problems": [], "cases": [case, *d0["cases"][1:]]}
+    cases = _d0_recorded_words(d0)
+    cases[0]["result"]["row"]["controlfp_after"] = "0x9001f"
+    moved = {**d0, "path": dict(rec), "path_after": dict(rec), "record_problems": [], "cases": cases}
     ok, diff = _d0_identity(moved)
     assert not ok and diff == [f"fp_control: recomputed controlfp_after of {D0_IDS[0]} is '0x9001f', '0x8001f' recorded"]
+
+
+def test_d0_off_the_recorded_path_is_not_verified_never_fail(d0_elsewhere):
+    """The condition of the Linux CI of PR #50: no control word and other last bits. The path is not identical, the missing word of
+    every recomputed row is a listed difference, and every row is NOT_VERIFIED - the bitwise test skips with the reason, never FAIL."""
+    identical, why = _d0_identity(d0_elsewhere)
+    assert not identical and "fp_control: not readable here" in why
+    assert all(f"fp_control: recomputed {k} of {i} is None, '0x8001f' recorded" in why
+               for i in D0_IDS for k in ("controlfp_before", "controlfp_after"))
+    mism = [_d0_bitwise_mismatches(c) for c in d0_elsewhere["cases"]]
+    assert all(len(m) == len(D0_BITWISE) for m in mism)
+    assert [_d0_bitwise_verdict(identical, m) for m in mism] == ["NOT_VERIFIED"] * len(D0_IDS)
 
 
 def test_d0_code_under_test_is_this_checkout(d0):
@@ -1035,7 +1099,8 @@ def test_d0_path_condition_is_local_to_the_d0_checks():
                      "test_d0_win32_alone_is_not_an_identical_path", "test_d0_platform_mismatch_is_not_a_false_fail",
                      "test_d0_bitwise_is_strict_on_an_identical_path", "test_d0_inconsistent_or_missing_record_gives_no_identity",
                      "test_d0_real_openblas_cores_in_a_child_process", "test_d0_path_read_after_the_computation_counts",
-                     "test_d0_portable_checks_run_on_a_path_not_identical", "test_d0_unknown_blas_or_mode_is_never_identical"}
+                     "test_d0_portable_checks_run_on_a_path_not_identical", "test_d0_unknown_blas_or_mode_is_never_identical",
+                     "test_d0_off_the_recorded_path_is_not_verified_never_fail"}
     src = TOOL.read_text(encoding="utf-8")
     assert "OPENBLAS_CORETYPE" not in src and "_d0_" not in src
 
