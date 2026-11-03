@@ -16,12 +16,12 @@ import json
 
 import numpy as np
 import pytest
-from PySide6.QtCore import QPoint, Qt
 
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 pytest.importorskip("pyqtgraph")
 
+from PySide6.QtCore import QPoint, Qt  # noqa: E402
 import kkvim.coupled_run as cr  # noqa: E402
 import kkvim.rectangle_run as rr  # noqa: E402
 from kkvim.linear_solver import ERROR_LINEAR_SOLVE, LinearSolveError  # noqa: E402
