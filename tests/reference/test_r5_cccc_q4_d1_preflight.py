@@ -212,6 +212,30 @@ def test_manifest_tool_blob_is_the_historical_one(committed):
     assert _self_entry(committed)["blob"] == b.stdout.strip()
 
 
+def test_committed_manifest_written_on_the_approved_platform(committed):
+    """OD-6 (D-057.2 item 3): the process that wrote the committed manifest read one BLAS thread from the library on Windows, Python
+    3.13.15 (the record masked in test_committed_manifest_is_reproduced). Platform independent: the committed record is checked."""
+    d = committed["d057"]
+    assert d["platform"]["sys_platform"] == "win32" and d["platform"]["python"] == "3.13.15"
+    assert d["platform"]["blas_threads_read_from_library"] == 1
+    assert d["freeze"] == {"allowed": True, "state": "APPROVED_PLATFORM",
+                           "approved": {"sys_platform": "win32", "python": "3.13.15", "blas_threads": 1}}
+
+
+PR48_MANIFEST = ("30463a4", "a7a69bfe5a1dcd78e9bd10cbf0a4b9cc24596f3a")  # the PR #48 manifest: commit, git blob
+
+
+def test_pr48_manifest_is_recoverable(committed):
+    """The PR #48 manifest replaced by QA-D1-READY stays recoverable from git, with the same 102 mandatory keys."""
+    _require_history(PR48_MANIFEST[0])
+    rel = "docs/results/r5_cccc_q4_d1_prelaunch/manifest.json"
+    assert _git("rev-parse", f"{PR48_MANIFEST[0]}:{rel}").stdout.strip() == PR48_MANIFEST[1]
+    old = json.loads(_git("show", f"{PR48_MANIFEST[0]}:{rel}").stdout)
+    assert old["manifest_state"].startswith("INCOMPLETE - NOT FROZEN")
+    assert [r["key"] for r in old["mandatory_rows"]] == [r["key"] for r in committed["mandatory_rows"]]
+    assert old["mandatory_keys_sha256"] == committed["mandatory_keys_sha256"]
+
+
 def test_platform_dependent_hashes_are_the_only_ones_masked(committed):
     """Models a manifest built on another platform: only the T_N hashes differ (as observed on the Linux CI)."""
     import numpy as np

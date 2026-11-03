@@ -5655,7 +5655,7 @@
      "pc file directory": "D:/a/numpy-release/numpy-release/.openblas"
     }
    },
-   "blas_threads_read_from_library": 24,
+   "blas_threads_read_from_library": 1,
    "thread_env_vars": {
     "OPENBLAS_NUM_THREADS": "1",
     "OMP_NUM_THREADS": "1",
@@ -5664,8 +5664,8 @@
    "thread_env_set_before_numpy_import": "by this tool at import (OD-6: by the launching process); effective count read"
   },
   "freeze": {
-   "allowed": false,
-   "state": "UNRESOLVED (platform not the approved one; not frozen)",
+   "allowed": true,
+   "state": "APPROVED_PLATFORM",
    "approved": {
     "sys_platform": "win32",
     "python": "3.13.15",
