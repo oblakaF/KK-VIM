@@ -192,6 +192,26 @@ def round_down(x: Fraction) -> float:
     return _certify(x, _round(x, False), False)
 
 
+def log2_ceil(x: Fraction) -> int | None:
+    """The exact ceil(log2 x) of a positive rational (None for 0): an integer, so it never overflows binary64 or JSON."""
+    if x < 0:
+        raise SecondPathError("log2", "negative argument")
+    if x == 0:
+        return None
+    p, q = x.numerator, x.denominator
+    k = p.bit_length() - q.bit_length() - 1  # 2^(k-1) < x < 2^(k+2)
+    while (p << max(-k, 0)) > (q << max(k, 0)):  # x > 2^k
+        k += 1
+    return k
+
+
+def ratio_up(x: Fraction) -> float | None:
+    """A nonnegative diagnostic ratio as its certified upward binary64 (None if it exceeds DBL_MAX: JSON stays finite; the exact
+    magnitude is kept by log2_ceil). Never an OverflowError (review of PR #51, N-1)."""
+    v = round_up(x)
+    return v if math.isfinite(v) else None
+
+
 def ftext(x: Fraction | None) -> str | None:
     return None if x is None else f"{x.numerator}/{x.denominator}"
 
@@ -344,8 +364,8 @@ def formation(m: Mesh, X, Y, W_hat) -> dict:
                 worst = max(worst, err / (gN * s))
             prod.append(p)
             S.append(s)
-    return {"N": N, "exact": prod, "S": S, "computed": We, "holds": viol == 0, "violations": viol, "max_ratio": float(worst),
-            "exact_zero": not any(prod), "S_zero": not any(S),
+    return {"N": N, "exact": prod, "S": S, "computed": We, "holds": viol == 0, "violations": viol, "max_ratio": ratio_up(worst),
+            "max_ratio_log2_up": log2_ceil(worst), "exact_zero": not any(prod), "S_zero": not any(S),
             "factor_zero": all(v == 0 for row in Xe for v in row) or all(v == 0 for row in Ye for v in row)}
 
 
@@ -677,6 +697,29 @@ def _prem(state: str, reason: str) -> dict:
     return {"state": state, "reason": reason}
 
 
+def _probe_text(p: dict) -> str:
+    return "OK" if p["ok"] else "FAILED: " + "; ".join(p["fails"])
+
+
+def _probe_premises(premises: dict, before: dict, after: dict | None) -> None:
+    """P-1 and P-3'(a) from the probes of this thread before and (when performed) after the computation (ST 1.2; review of PR #51,
+    N-2): both must be OK and in the same thread; the reason names the failing probe. Before the second probe the states are
+    provisional; a failed or missing second probe never leaves a certifiable state."""
+    text = "before the computation " + _probe_text(before)
+    ok = before["ok"]
+    if after is None:
+        text += "; after the computation NOT PERFORMED"
+        ok = False
+    else:
+        text += "; after the computation " + _probe_text(after)
+        same = before["thread"] == after["thread"]
+        ok = ok and after["ok"] and same
+        if not same:
+            text += f"; probes in different threads ({before['thread']} != {after['thread']})"
+    premises["P-1"] = _prem(ASSUMED if ok else NOT_ESTABLISHED, "platform premise (IEEE binary64, round to nearest); probes " + text)
+    premises["P-3'(a)"] = _prem(ESTABLISHED if ok else NOT_ESTABLISHED, "FTZ/DAZ probes in this thread " + text)
+
+
 def second_path(mesh: dict, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, P_hat: dict | None = None, parts: bool = False,
                 timing: bool = False) -> dict:
     """B_E,s of one half-step by the second path. ``mesh`` = {lx, nx, ly, ny, D, q}; factors as oriented in the path
@@ -693,6 +736,7 @@ def second_path(mesh: dict, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, P_hat: dict | None =
     reasons = out["reasons"]
     premises = {}
     out["premises"] = premises
+    pb = pa = None  # probes of this thread before and after the computation (both kept for diagnostics)
     try:
         m = Mesh(mesh["lx"], mesh["nx"], mesh["ly"], mesh["ny"], mesh.get("D", 1.0), mesh.get("q", 1.0))
         if m.D <= 0:
@@ -704,10 +748,7 @@ def second_path(mesh: dict, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, P_hat: dict | None =
         tick("mesh")
         # --- premises in this thread
         pb = probes()
-        premises["P-1"] = _prem(ASSUMED if pb["ok"] else NOT_ESTABLISHED, "platform premise (IEEE binary64, round to nearest); "
-                                "probes " + ("OK" if pb["ok"] else "FAILED: " + "; ".join(pb["fails"])))
-        premises["P-3'(a)"] = _prem(ESTABLISHED if pb["ok"] else NOT_ESTABLISHED,
-                                    "FTZ/DAZ probes in this thread " + ("OK" if pb["ok"] else "FAILED"))
+        _probe_premises(premises, pb, None)
         fp, fs = formation(m, Xp, Yp, wh_p), formation(m, Xs, Ys, wh_s)
         N = fs["N"]
         if fp["N"] != N:
@@ -762,12 +803,14 @@ def second_path(mesh: dict, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, P_hat: dict | None =
                                 + (" (exact zero product, zero factor)" if fp["S_zero"] else ""))
         out.update({"N": N, "kc": kc, "radicands": rad, "assembly": asm, "assembly_qaeb80": asm_q, "assembly_lower": asm_lo,
                     "BE": asm["BE"], "BE_up": BE_up, "BE_lower_exact_roots": asm_lo["BE"], "formation": {
-                        "p": {k: fp[k] for k in ("holds", "violations", "max_ratio", "exact_zero", "S_zero", "factor_zero")},
-                        "s": {k: fs[k] for k in ("holds", "violations", "max_ratio", "exact_zero", "S_zero", "factor_zero")}},
+                        "p": {k: fp[k] for k in ("holds", "violations", "max_ratio", "max_ratio_log2_up", "exact_zero", "S_zero",
+                                                 "factor_zero")},
+                        "s": {k: fs[k] for k in ("holds", "violations", "max_ratio", "max_ratio_log2_up", "exact_zero", "S_zero",
+                                                 "factor_zero")}},
                     "subtraction": sc, "op_checks": {"violations": ops.violations, "counts": ops.counts,
                                                      "subnormal_add_results": ops.subnormal_results},
                     "double_path": {"replication": {k: reps[k]["value"] for k in reps}, "module": bind["module"]},
-                    "probes": pb, "components": _component_values(kc, rad, asm)})
+                    "components": _component_values(kc, rad, asm)})
         # --- exact E_s (and parts) from the exact product fields
         if P_hat is not None:
             Pp, Ps, Qd = (exact(P_hat[k]) for k in ("P_p", "P_s", "Q"))
@@ -784,12 +827,18 @@ def second_path(mesh: dict, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, P_hat: dict | None =
             if parts:
                 out["parts"] = e1_parts(m, fp, fs, exact_list(dh), Pp, Ps, Qd, rad, E_s, asm)
                 tick("parts E^(1)...E^(4)")
+        # --- the same premises in this thread after the computation (N-2): the final state of P-1 and P-3'(a)
+        pa = probes()
+        _probe_premises(premises, pb, pa)
+        tick("probes after the computation")
     except SecondPathError as exc:
         reasons.append({"component": exc.component, "premise": None, "reason": exc.reason})
         out["status"] = UNRESOLVED
+        out["probes"] = {"before": pb, "after": pa}
         out["seconds"] = round(time.perf_counter() - t0, 4)
         out["timing"] = clock
         return out
+    out["probes"] = {"before": pb, "after": pa, "same_thread": pb["thread"] == pa["thread"]}
     for p, st in premises.items():
         if st["state"] not in (ESTABLISHED, ASSUMED):
             reasons.append({"component": "premise", "premise": p, "reason": st["reason"]})

@@ -5,10 +5,12 @@ agreement of the two implementations is NOT taken as a proof of their common for
 
 import ast
 import importlib.util
+import json
 import math
 import os
 import subprocess
 import sys
+import threading
 from fractions import Fraction
 from pathlib import Path
 
@@ -321,6 +323,218 @@ def test_guards_of_the_own_routines(monkeypatch):
 def test_probes_in_this_thread():
     p = be.probes()
     assert p["ok"], p["fails"]
+
+
+# --- hardening after the review of PR #51 (N-1, N-2) -----------------------------------------------------------------------------
+
+def test_n1_violated_u1_beyond_binary64_is_refused_not_raised():
+    """Counterexample of the review (N-1): N = 1, X = Y = 2^-600 on the mesh 6 x 5, recorded field w^ = 1. The exact ratio
+    |w^ - X Y^T| / (gamma_1 |X||Y|^T) = (1 - 2^-1200)(2^53 - 1) 2^1200 lies in (2^1252, 2^1253): above DBL_MAX."""
+    nx, ny = 6, 5
+    X, Y, W = np.full((nx - 1, 1), 2.0**-600), np.full((ny - 1, 1), 2.0**-600), np.ones((nx - 1, ny - 1))
+    f = be.formation(be.Mesh(1.0, nx, 1.0, ny), X, Y, W)
+    assert not f["holds"] and f["violations"] == (nx - 1) * (ny - 1)
+    assert f["max_ratio"] is None and f["max_ratio_log2_up"] == 1253
+    mesh = {"lx": 1.0, "nx": nx, "ly": 1.0, "ny": ny, "D": 1.0, "q": 1.0}
+    res = be.second_path(mesh, X, Y, X, Y, W, W, W - W, parts=True)
+    assert res["status"] == be.UNRESOLVED and any(r["premise"] == "U-1" for r in res["reasons"]), res["reasons"]
+    assert res["formation"]["s"]["max_ratio"] is None and res["formation"]["s"]["max_ratio_log2_up"] == 1253
+    json.dumps(res, default=be._json, allow_nan=False)  # the diagnostics stay strict JSON (no Infinity)
+
+
+def test_formation_ratio_is_a_certified_upper_bound_with_its_exact_magnitude():
+    row = be.synthetic_row(1.0, 8, 1.0, 10, N=1, seed=10)
+    w = row["wh_s"].copy()
+    w[3, 4] = w[3, 4] * (1 + 2.0**-42)  # one entry moved by 2^10 ulps: the worst ratio (the others are <= 1 for N = 1)
+    f = be.formation(be.Mesh(1.0, 8, 1.0, 10), row["Xs"], row["Ys"], w)
+    x, y = F(row["Xs"][3, 0]), F(row["Ys"][4, 0])
+    ratio = abs(F(w[3, 4]) - x * y) / (be.gam(1) * abs(x * y))
+    k = f["max_ratio_log2_up"]
+    assert not f["holds"] and f["violations"] == 1 and F(2) ** (k - 1) < ratio <= F(2) ** k
+    assert F(f["max_ratio"]) >= ratio and F(math.nextafter(f["max_ratio"], -math.inf)) < ratio  # tightest upward binary64
+    ok = be.formation(be.Mesh(1.0, 8, 1.0, 10), row["Xs"], row["Ys"], row["wh_s"])
+    assert ok["holds"] and 0 < ok["max_ratio"] <= 1.0 and ok["max_ratio_log2_up"] <= 0
+    for x, want in ((F(0), None), (F(1), 0), (F(3), 2), (F(4), 2), (F(1, 2), -1), (F(1, 3), -1), (F(2**1300), 1300),
+                    (F(2**1300 + 1), 1301), (F(1, 2**1100), -1100)):
+        assert be.log2_ceil(x) == want, x
+    assert be.ratio_up(F(2**1300)) is None and be.ratio_up(F(2**1024 - 2**970)) is None  # above DBL_MAX = 2^1024 - 2^971
+    assert be.ratio_up(F(2**1024 - 2**971)) == 1.7976931348623157e308  # DBL_MAX itself
+    assert be.ratio_up(F(2**1024 - 2**972) + F(1, 3)) == 1.7976931348623157e308  # between the two largest doubles: rounded up
+    assert be.ratio_up(F(3, 2)) == 1.5 and be.ratio_up(F(0)) == 0.0
+
+
+def test_n2_probes_before_and_after_the_computation(monkeypatch):
+    """The FPU probes are repeated in the same thread after the computation (N-2): a failure of either probe, or probes in
+    different threads, gives UNRESOLVED naming P-1 and P-3'(a); both probe results are kept."""
+    row = be.synthetic_row(1.0, 8, 1.0, 10, N=1, seed=10)
+    res = be.run_row(row, parts=True)
+    assert res["status"] == be.CERTIFIED and res["probes"]["before"]["ok"] and res["probes"]["after"]["ok"]
+    assert res["probes"]["same_thread"] and res["timing"]["probes after the computation"] >= 0
+    real = be.probes
+
+    def fake(fails_by_call: dict, thread_after=None):
+        calls = []
+
+        def probe():
+            p = real()
+            calls.append(p)
+            fails = fails_by_call.get(len(calls), [])
+            p = {**p, "ok": not fails, "fails": fails}
+            if len(calls) == 2 and thread_after is not None:
+                p["thread"] = thread_after
+            return p
+        return probe, calls
+
+    # the second probe fails (simulated FTZ switched on during the computation)
+    probe, calls = fake({2: ["python simulated FTZ after the computation"]})
+    monkeypatch.setattr(be, "probes", probe)
+    res = be.run_row(row, parts=True)
+    assert len(calls) == 2 and res["status"] == be.UNRESOLVED and res["contradictions"] == []
+    assert res["probes"]["before"]["ok"] and not res["probes"]["after"]["ok"] and res["probes"]["same_thread"]
+    assert {r["premise"] for r in res["reasons"]} == {"P-1", "P-3'(a)"}
+    assert all("before the computation OK; after the computation FAILED: python simulated FTZ" in r["reason"] for r in res["reasons"])
+    assert res["premises"]["P-1"]["state"] == res["premises"]["P-3'(a)"]["state"] == be.NOT_ESTABLISHED
+    assert res["E_s_le_B_E"] and res["parts"]["ok"]  # the computation is kept for diagnostics, not certified
+    # the two probes are not in the same thread
+    probe, calls = fake({}, thread_after=-1)
+    monkeypatch.setattr(be, "probes", probe)
+    res = be.run_row(row)
+    assert res["status"] == be.UNRESOLVED and not res["probes"]["same_thread"]
+    assert {r["premise"] for r in res["reasons"]} == {"P-1", "P-3'(a)"}
+    assert all("different threads" in r["reason"] for r in res["reasons"])
+    # the first probe fails: refused as before, and the second probe is still performed and recorded
+    probe, calls = fake({1: ["numpy[7] simulated DAZ"]})
+    monkeypatch.setattr(be, "probes", probe)
+    res = be.run_row(row)
+    assert len(calls) == 2 and res["status"] == be.UNRESOLVED and not res["probes"]["before"]["ok"] and res["probes"]["after"]["ok"]
+    assert all("before the computation FAILED: numpy[7] simulated DAZ; after the computation OK" in r["reason"] for r in res["reasons"])
+    # a refusal before the computation keeps the first probe only; the second is NOT PERFORMED
+    monkeypatch.undo()
+    res = be.second_path({**row["mesh"], "D": 0.0}, row["Xp"], row["Yp"], row["Xs"], row["Ys"], row["wh_p"], row["wh_s"], row["dh"])
+    assert res["status"] == be.UNRESOLVED and res["probes"] == {"before": None, "after": None}
+    bad = row["wh_s"].copy()
+    bad[2, 3] = math.nan
+    res = be.second_path(row["mesh"], row["Xp"], row["Yp"], row["Xs"], row["Ys"], row["wh_p"], bad, row["dh"])
+    assert res["status"] == be.UNRESOLVED and res["probes"] == {"before": None, "after": None}
+
+
+# --- guards of the probe order (A-1) and of a failure between the probes (A-2), with their defective mutants ---------------------
+# The mutants are executed as separate module objects from the source text of the tool (as in the mutation research tool); the file
+# itself is never changed. M10: the second probe moved before the computation. M08: a missing second probe counted as successful.
+
+_PROBE_FIRST = "        _probe_premises(premises, pb, None)\n"
+_PROBE_SECOND = "        pa = probes()\n        _probe_premises(premises, pb, pa)\n        tick(\"probes after the computation\")\n"
+_MISSING = "        text += \"; after the computation NOT PERFORMED\"\n        ok = False\n"
+PROBE_MUTANTS = {
+    "M10": ((_PROBE_FIRST, "        pa = probes()\n        _probe_premises(premises, pb, pa)\n"),
+            (_PROBE_SECOND, "        tick(\"probes after the computation\")\n")),
+    "M08": ((_MISSING, "        text += \"; after the computation NOT PERFORMED\"\n"),),
+}
+# computations of second_path after the first probe (module-level names, looked up at call time)
+_COMPUTATIONS = ("formation", "subtraction_check", "replicate_g4", "bind_double_path", "grid_constants", "field_quantities",
+                 "residual_h2", "assemble", "bilinear", "e1_parts")
+
+
+def _mutant(mid: str):
+    src = TOOL.read_text(encoding="utf-8")
+    for old, new in PROBE_MUTANTS[mid]:
+        assert src.count(old) == 1, (mid, old)  # the mutated text occurs exactly once in the checked code
+        src = src.replace(old, new)
+    spec = importlib.util.spec_from_file_location(f"_be2_probe_mut_{mid}", TOOL)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    exec(compile(src, str(TOOL), "exec"), mod.__dict__)
+    return mod
+
+
+def _probe_trace(mod, monkeypatch, row) -> tuple[dict, list]:
+    """Run one row with every probe and every computation recorded in call order with its native thread id."""
+    events = []
+    real_probes = mod.probes
+
+    def probe():
+        events.append(("probe", threading.get_native_id()))
+        return real_probes()
+    monkeypatch.setattr(mod, "probes", probe)
+    for name in _COMPUTATIONS:
+        def wrap(*a, _f=getattr(mod, name), _n=name, **k):
+            events.append((_n, threading.get_native_id()))
+            out = _f(*a, **k)
+            events.append((_n + " end", threading.get_native_id()))
+            return out
+        monkeypatch.setattr(mod, name, wrap)
+    res = mod.run_row(row, parts=True)
+    monkeypatch.undo()
+    return res, events
+
+
+def _probe_order_violations(res: dict, events: list) -> list:
+    names = [e[0] for e in events]
+    bad = []
+    if names.count("probe") != 2:
+        bad.append(f"{names.count('probe')} probes instead of 2")
+    if not names or names[0] != "probe":
+        bad.append("the first probe is not before the first computation")
+    if not names or names[-1] != "probe":
+        bad.append("the second probe is not after the last computation")
+    if "e1_parts end" not in names or not set(_COMPUTATIONS) - {"bilinear"} <= set(names):
+        bad.append("the computation (with the parts of E-1) was not performed in full")
+    if len({e[1] for e in events}) != 1:
+        bad.append("probes and computations not in one thread")
+    pr = res.get("probes") or {}
+    if not (pr.get("before") and pr.get("after") and pr["before"]["thread"] == pr["after"]["thread"] == events[0][1]):
+        bad.append("the recorded probes are not those of this thread")
+    return bad
+
+
+def test_a1_probe_order_first_before_second_after_the_last_computation(monkeypatch):
+    """A-1: the first probe precedes every computation, the second follows the last one (the parts of E-1), both in the thread
+    of the computation; the guard must catch M10 (second probe moved before the computation)."""
+    row = be.synthetic_row(1.0, 8, 1.0, 10, N=1, seed=10)
+    res, events = _probe_trace(be, monkeypatch, row)
+    assert res["status"] == be.CERTIFIED and _probe_order_violations(res, events) == [], _probe_order_violations(res, events)
+    assert events[0] == ("probe", threading.get_native_id()) and events[-2][0] == "e1_parts end"
+    mres, mevents = _probe_trace(_mutant("M10"), monkeypatch, row)
+    bad = _probe_order_violations(mres, mevents)
+    assert "the second probe is not after the last computation" in bad, bad  # M10 detected
+    assert mres["status"] == be.CERTIFIED  # the status alone does not reveal M10: only the order guard does
+
+
+@pytest.mark.parametrize("where", ["formation", "grid_constants", "assemble", "e1_parts"])
+def test_a2_failure_between_the_probes_never_counts_the_missing_probe(monkeypatch, where):
+    """A-2: a controlled failure after the first probe and before the second (in the computation ``where``): the second probe is
+    not performed, it is not counted as successful, P-1 and P-3'(a) are NOT_ESTABLISHED and the row is not CERTIFIED; the guard
+    must catch M08 (a missing second probe counted as successful)."""
+    row = be.synthetic_row(1.0, 8, 1.0, 10, N=1, seed=10)
+
+    def run(mod):
+        calls = []
+        real = mod.probes
+
+        def probe():
+            calls.append(threading.get_native_id())
+            return real()
+
+        def fail(*a, **k):
+            raise mod.SecondPathError("injected", f"controlled failure in {where} between the probes")
+        monkeypatch.setattr(mod, "probes", probe)
+        monkeypatch.setattr(mod, where, fail)
+        res = mod.run_row(row, parts=True)
+        monkeypatch.undo()
+        return res, calls
+
+    res, calls = run(be)
+    assert len(calls) == 1 and res["probes"]["before"]["ok"] and res["probes"]["after"] is None
+    assert res["status"] == be.UNRESOLVED and res["status"] != be.CERTIFIED
+    assert res["reasons"][0] == {"component": "injected", "premise": None,
+                                 "reason": f"controlled failure in {where} between the probes"}
+    for p in ("P-1", "P-3'(a)"):
+        assert res["premises"][p]["state"] == be.NOT_ESTABLISHED, res["premises"][p]
+        assert "before the computation OK; after the computation NOT PERFORMED" in res["premises"][p]["reason"]
+    mres, mcalls = run(_mutant("M08"))
+    assert len(mcalls) == 1 and mres["status"] == be.UNRESOLVED  # refused by the failure itself, not by the probes
+    assert mres["premises"]["P-1"]["state"] != be.NOT_ESTABLISHED  # M08: the missing probe is counted as successful
+    assert mres["premises"]["P-1"]["state"] != res["premises"]["P-1"]["state"]  # detected by the guard above
 
 
 # --- published Q3 rows (inputs only if the arrays are available and their sha256 match) ------------------------------------------
