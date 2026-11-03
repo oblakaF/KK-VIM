@@ -238,4 +238,3 @@ def test_header_shortens_on_narrow_windows(qtbot, gui):
     header.resize(1400, header.height())
     header._adapt()
     assert header.badge.text().startswith("TEST DATA ·")
-
