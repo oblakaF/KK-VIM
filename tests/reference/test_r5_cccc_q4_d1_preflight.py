@@ -136,7 +136,7 @@ def test_input_hashes_reproducible(manifest, committed):
 
 
 PLATFORM_DEPENDENT = "<platform-dependent: start set T_N via numpy.sin (OD-12)>"
-MANIFEST_COMMIT = "30463a411f1a16544412c0da967f230be84d79fd"  # the tool version that wrote manifest.json (its blob is recorded there)
+MANIFEST_COMMIT = "711a1c1c44b15c562142d3d6497c0578b47bfa4e"  # the tool version that wrote manifest.json (QA-D1-READY; PR #48: 30463a4)
 _SHA = re.compile(r"[0-9a-f]{64}")
 
 
