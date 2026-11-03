@@ -2,3 +2,5 @@
 # with core.autocrlf=true (Git for Windows default) a CRLF checkout breaks sh.
 .githooks/* text eol=lf
 *.sh text eol=lf
+# Windows batch files must keep CRLF line endings: cmd.exe misreads LF-only batch files.
+*.cmd text eol=crlf
