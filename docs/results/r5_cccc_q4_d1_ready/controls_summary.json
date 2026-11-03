@@ -1,0 +1,408 @@
+{
+ "document": "R5-V Q4 QA-D1-READY integrated controls - summary (protocol 6, 12 item 4; D-057)",
+ "data_status": "PRELAUNCH research observation (QA-D1-READY); NOT D1 data, never D1_RESULT (D1_START = BLOCKED)",
+ "expected_sha256": "b12f3157ad0f13d85dd46ef22d166fbacf981fef2de707215dbbda37d6eae89e",
+ "all_match": true,
+ "summary": {
+  "rank_guard": {
+   "cases": 4,
+   "match": 4,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "rt3": {
+   "cases": 5,
+   "match": 5,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "rt15": {
+   "cases": 4,
+   "match": 4,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "forbidden": {
+   "cases": 7,
+   "match": 7,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "clean_rows": {
+   "cases": 10,
+   "match": 10,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "control_B": {
+   "cases": 12,
+   "match": 12,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "control_V": {
+   "cases": 3,
+   "match": 3,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "control_G": {
+   "cases": 11,
+   "match": 11,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "z4_procedure": {
+   "cases": 7,
+   "match": 7,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "sp_op": {
+   "cases": 4,
+   "match": 4,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "block_C_crosscheck": {
+   "cases": 2,
+   "match": 2,
+   "not_executed": 0,
+   "mismatch": []
+  },
+  "control_A": {
+   "pr48_harness_all_match": true,
+   "z4_aggregation_match": 8,
+   "z4_aggregation_cases": 8,
+   "mismatch": []
+  },
+  "row_plan": {
+   "match": true
+  },
+  "rt17": {
+   "match": true
+  },
+  "platform": {
+   "match": true
+  }
+ },
+ "control_G": [
+  {
+   "id": "RG-1a",
+   "mutation": "gamma_sign_flip",
+   "channel": "binding_F2",
+   "detected": true,
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE",
+   "channels": [
+    "binding_F2",
+    "sp_gamma_inclusion"
+   ]
+  },
+  {
+   "id": "RG-1b",
+   "mutation": "gamma_function_sign_flip",
+   "channel": "sp_gamma_inclusion",
+   "detected": true,
+   "match": true,
+   "status": "PASS",
+   "channels": [
+    "sp_gamma_inclusion"
+   ]
+  },
+  {
+   "id": "RG-2",
+   "mutation": "gamma_from_step_arrays:1",
+   "channel": "binding_F2",
+   "detected": true,
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE",
+   "channels": [
+    "binding_F2"
+   ]
+  },
+  {
+   "id": "RG-3",
+   "mutation": "Q_from_field_s",
+   "channel": "binding_F2",
+   "detected": true,
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE",
+   "channels": [
+    "binding_F2",
+    "E1/E2"
+   ]
+  },
+  {
+   "id": "RG-4",
+   "mutation": "P_prev_from_field_s",
+   "channel": "binding_F2",
+   "detected": true,
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE",
+   "channels": [
+    "binding_F2",
+    "E1/E2"
+   ]
+  },
+  {
+   "id": "RG-5",
+   "mutation": "B_E_function_drop_B1",
+   "channel": "second_path_BE",
+   "detected": true,
+   "match": true,
+   "status": "PASS",
+   "channels": [
+    "second_path_BE"
+   ]
+  },
+  {
+   "id": "RG-6",
+   "mutation": "gamma_interval_widened",
+   "channel": "sp_gamma_narrowness",
+   "detected": true,
+   "match": true,
+   "status": "PASS",
+   "channels": [
+    "sp_gamma_narrowness"
+   ]
+  },
+  {
+   "id": "RG-7",
+   "mutation": "recorded_tau_double",
+   "channel": "boundary_definition",
+   "detected": true,
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE",
+   "channels": [
+    "boundary_definition"
+   ]
+  },
+  {
+   "id": "RG-8",
+   "mutation": "Q_from_field_s",
+   "channel": "binding_F2",
+   "detected": true,
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE",
+   "channels": [
+    "binding_F2"
+   ]
+  },
+  {
+   "id": "RG-9",
+   "mutation": "gamma_function_sign_flip",
+   "channel": "sp_gamma_inclusion",
+   "detected": true,
+   "match": true,
+   "status": "PASS",
+   "channels": [
+    "sp_gamma_inclusion"
+   ]
+  },
+  {
+   "id": "RG-10",
+   "mutation": "B_E_function_drop_B1",
+   "channel": "second_path_BE",
+   "detected": true,
+   "match": true,
+   "status": "PASS",
+   "channels": [
+    "second_path_BE"
+   ]
+  }
+ ],
+ "z4_procedure": [
+  {
+   "id": "Z4-1",
+   "outcome": "CONFIRMED",
+   "status": "PASS",
+   "match": true
+  },
+  {
+   "id": "Z4-2",
+   "outcome": "DEFECT_GAMMA_INCLUSION",
+   "status": "PASS",
+   "match": true
+  },
+  {
+   "id": "Z4-3",
+   "outcome": "DEFECT_GAMMA_NARROWNESS",
+   "status": "PASS",
+   "match": true
+  },
+  {
+   "id": "Z4-4",
+   "outcome": "DEFECT_BE_SECOND_PATH",
+   "status": "PASS",
+   "match": true
+  },
+  {
+   "id": "Z4-5",
+   "outcome": "BINDING_MISMATCH",
+   "status": "UNRESOLVED_CERTIFICATE",
+   "match": true
+  },
+  {
+   "id": "Z4-6",
+   "outcome": "CONFIRMED",
+   "status": "PASS",
+   "match": true
+  },
+  {
+   "id": "Z4-7",
+   "outcome": "CONFIRMED",
+   "status": "PASS",
+   "match": true
+  }
+ ],
+ "control_B": [
+  {
+   "id": "RB-a1",
+   "premise": "P-a",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-a2",
+   "premise": "P-a",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-a3",
+   "premise": "P-a",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-b",
+   "premise": "P-b",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-c1",
+   "premise": "P-c",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-c2",
+   "premise": "P-c",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-c3",
+   "premise": "P-c",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-c4",
+   "premise": "P-c",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-d",
+   "premise": "P-d",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-e",
+   "premise": "P-e",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-f1",
+   "premise": "P-f",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  },
+  {
+   "id": "RB-f2",
+   "premise": "P-f",
+   "match": true,
+   "status": "UNRESOLVED_CERTIFICATE"
+  }
+ ],
+ "row_plan": {
+  "actual": {
+   "A": {
+    "rows": 272,
+    "executable": 272,
+    "not_executed_rank_guard": 0
+   },
+   "B": {
+    "rows": 336,
+    "executable": 42,
+    "not_executed_rank_guard": 294
+   },
+   "D": {
+    "rows": 32,
+    "executable": 25,
+    "not_executed_rank_guard": 7
+   },
+   "S": {
+    "rows": 16,
+    "executable": 16,
+    "not_executed_rank_guard": 0
+   },
+   "C_paired": {
+    "rows": 168,
+    "executable": 70,
+    "not_executed_rank_guard": 98
+   },
+   "C_RAC_reference_chain": {
+    "half_steps": 168,
+    "executable": 70,
+    "stopped_rank_guard": 98
+   },
+   "classified": 824,
+   "mandatory": 102,
+   "mandatory_executable": 102
+  },
+  "match": true
+ },
+ "platform": {
+  "sys_platform": "win32",
+  "python": "3.13.15",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "blas_threads_read_from_library": 1
+ },
+ "freeze": {
+  "allowed": true,
+  "state": "APPROVED_PLATFORM",
+  "approved": {
+   "sys_platform": "win32",
+   "python": "3.13.15",
+   "blas_threads": 1
+  }
+ },
+ "hash_platform": {
+  "sys_platform": "win32",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "python": "3.13.15",
+  "numpy": "2.5.4"
+ },
+ "tool_blobs": {
+  "scripts/r5_cccc_q4_d1_ready.py": "3dcdce54e582de36fc3cf60c97609bb9026d1c7b",
+  "scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py": "ee9a36d293882453d7d2909cfc101ba7f468e418",
+  "scripts/r5_cccc_q4_d1_preflight.py": "b2b06add6c3ce987df5573595fcd5bb88fb93df7",
+  "scripts/r5_cccc_q4_d1_block_c_driver.py": "8e5ca4be69361480b873f3838de7fa7c3389a513",
+  "scripts/r5_cccc_q4_d1_c3plus_trajectories.py": "7015c6dec2a3cf2e175d24771896915f35935b89",
+  "scripts/r5_cccc_q4_be_second_path_research.py": "6f0b06047fd5dbac18c1b11b5c79fbf54d2c08f2",
+  "scripts/r5_cccc_q4_energy_bound_premises_audit.py": "d360be47ce3dec578cc1ca3730d9897876b7d88f",
+  "scripts/r5_cccc_q4_energy_bc_audit.py": "57ba0bed736d8f50d3b86dce987b6bad0e127ffb",
+  "scripts/r5_cccc_q4_gamma_interval_audit.py": "34541b7603dd26e5d9b81c1f02ec52d36c1c49e4",
+  "scripts/r5_cccc_q4_gamma_audit.py": "8ef2f154b94aaf37d19d2a6726c5f1c80d016f43",
+  "scripts/r5_cccc_q4_c_assembly_e4_audit.py": "89b009b463324775e139d4781f60ab3665e60aa3",
+  "scripts/r5_cccc_q4_bc_reference_audit.py": "5df282246c99362ead5da6b524987e59528c7f58"
+ }
+}

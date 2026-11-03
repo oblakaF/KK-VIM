@@ -1,0 +1,199 @@
+{
+ "document": "R5-V Q4 QA-D1-READY: expectations of the integrated PRELAUNCH controls and checks (protocol docs/R5_CCCC_Q4_D1_PROTOCOL.md 4, 6, 12; D-057.1...D-057.6), fixed BEFORE the code of the integrated layer was written (own commit)",
+ "data_status": "PRELAUNCH research controls on small non-D1 configurations; NOT D1 data, never D1_RESULT (D1_START = BLOCKED)",
+ "fixed_before_execution": true,
+ "decisions": ["D-057.1", "D-057.2", "D-057.3", "D-057.4", "D-057.5", "D-057.6"],
+ "names": {
+  "trajectory_label": "STOPPED_RANK_GUARD_UNCERTIFIED",
+  "config_S1_prefix": "STOP_BEFORE_QR: S-1, configuration (RN-3)",
+  "start_S1_prefix": "STOP_BEFORE_QR: S-1, start set T_N dependent",
+  "row_not_executed_status": "UNRESOLVED",
+  "channels": ["binding_F2", "sp_gamma_inclusion", "sp_gamma_narrowness", "second_path_BE", "boundary_definition", "E1/E2"],
+  "z4_outcomes": ["CONFIRMED", "DEFECT_GAMMA_INCLUSION", "DEFECT_GAMMA_NARROWNESS", "DEFECT_BE_SECOND_PATH", "CONTRADICTION_E2", "BINDING_MISMATCH"],
+  "verdict_not_issued": "VERDICT_NOT_ISSUED"
+ },
+ "rows": {
+  "T1": {"lx": 1.0, "nx": 8, "ly": 1.25, "ny": 10, "N": 1, "D": 1.0, "q": 1.0, "s_max": 3},
+  "T2N2": {"lx": 1.0, "nx": 8, "ly": 1.25, "ny": 10, "N": 2, "D": 1.0, "q": 1.0, "s_max": 8},
+  "T2N3": {"lx": 1.0, "nx": 8, "ly": 1.25, "ny": 10, "N": 3, "D": 1.0, "q": 1.0, "s_max": 8},
+  "T5N3": {"lx": 1.0, "nx": 12, "ly": 1.0, "ny": 6, "N": 3, "D": 1.0, "q": 1.0, "s_max": 8}
+ },
+ "paired": {
+  "C1": {"lx": 1.0, "nx": 8, "ly": 1.25, "ny": 10, "N": 1, "D": 1.0, "q": 1.0, "s_max": 8},
+  "C3": {"lx": 1.0, "nx": 8, "ly": 1.25, "ny": 10, "N": 3, "D": 1.0, "q": 1.0, "s_max": 8}
+ },
+ "rank_guard": [
+  {"id": "RG-1", "row": "T2N2", "D-057.1": "items 2, 4",
+   "expected": {"records": 2, "s1_status": "OK", "s1_qr": true, "s2_status_prefix": "STOPPED_RANK_GUARD_UNCERTIFIED", "s2_qr_executed": false,
+                "s2_R_array": false, "s2_solved": false, "trajectory_status_prefix": "STOPPED_RANK_GUARD_UNCERTIFIED at s = 2", "N_kept": 2,
+                "not_S1": true, "not_S2": true}},
+  {"id": "RG-2", "row": "T2N3", "D-057.1": "items 2, 4",
+   "expected": {"records": 2, "s1_status": "OK", "s1_qr": true, "s2_status_prefix": "STOPPED_RANK_GUARD_UNCERTIFIED", "s2_qr_executed": false,
+                "s2_R_array": false, "s2_solved": false, "trajectory_status_prefix": "STOPPED_RANK_GUARD_UNCERTIFIED at s = 2", "N_kept": 3,
+                "not_S1": true, "not_S2": true}},
+  {"id": "RG-3", "row": "T5N3", "D-057.1": "item 5 (N = floor(n_y/2): equality, configurational S-1 NOT assigned)",
+   "expected": {"records": 2, "s1_status": "OK", "s1_qr": true, "s2_status_prefix": "STOPPED_RANK_GUARD_UNCERTIFIED", "s2_qr_executed": false,
+                "s2_R_array": false, "s2_solved": false, "trajectory_status_prefix": "STOPPED_RANK_GUARD_UNCERTIFIED at s = 2", "N_kept": 3,
+                "not_S1": true, "not_S2": true}},
+  {"id": "RG-4", "row": "T1", "D-057.1": "N = 1 behaviour preserved",
+   "expected": {"records": 3, "all_status": "OK", "trajectory_status_prefix": "COMPLETED s = 1..3", "qr_any": false}}
+ ],
+ "rt3": [
+  {"id": "RT-3a", "config": {"lx": 1.0, "nx": 12, "ly": 1.0, "ny": 4, "N": 3, "D": 1.0, "q": 1.0, "s_max": 8},
+   "note": "OP-8 without the configurational check continued QR here (PR #49 review); RN-3: N = 3 > floor(4/2) = 2",
+   "expected": {"records": 1, "s1_status_prefix": "STOP_BEFORE_QR: S-1, configuration (RN-3)", "qr_executed": false, "R_array": false,
+                "bc_solved": false, "conditions_all_hold": true, "n_s": 4, "floor_n_s_half": 2,
+                "trajectory_status_prefix": "STOPPED at s = 1: STOP_BEFORE_QR: S-1, configuration (RN-3)"}},
+  {"id": "RT-3b", "config": {"lx": 1.0, "nx": 10, "ly": 1.0, "ny": 4, "N": 3, "D": 1.0, "q": 1.0, "s_max": 8},
+   "expected": {"records": 1, "s1_status_prefix": "STOP_BEFORE_QR: S-1, configuration (RN-3)", "qr_executed": false, "R_array": false,
+                "bc_solved": false, "conditions_all_hold": true, "n_s": 4, "floor_n_s_half": 2,
+                "trajectory_status_prefix": "STOPPED at s = 1: STOP_BEFORE_QR: S-1, configuration (RN-3)"}},
+  {"id": "RT-3c", "config": {"lx": 1.0, "nx": 14, "ly": 1.0, "ny": 4, "N": 3, "D": 1.0, "q": 1.0, "s_max": 8},
+   "expected": {"records": 1, "s1_status_prefix": "STOP_BEFORE_QR: S-1, configuration (RN-3)", "qr_executed": false, "R_array": false,
+                "bc_solved": false, "conditions_all_hold": true, "n_s": 4, "floor_n_s_half": 2,
+                "trajectory_status_prefix": "STOPPED at s = 1: STOP_BEFORE_QR: S-1, configuration (RN-3)"}},
+  {"id": "RT-3d", "config": {"lx": 1.0, "nx": 10, "ly": 1.0, "ny": 5, "N": 3, "D": 1.0, "q": 0.0, "s_max": 8},
+   "note": "q = 0 is a constant load: RN-3 applies (floor(5/2) = 2 < 3)",
+   "expected": {"records": 1, "s1_status_prefix": "STOP_BEFORE_QR: S-1, configuration (RN-3)", "qr_executed": false, "R_array": false,
+                "bc_solved": false, "conditions_all_hold": true, "n_s": 5, "floor_n_s_half": 2,
+                "trajectory_status_prefix": "STOPPED at s = 1: STOP_BEFORE_QR: S-1, configuration (RN-3)"}},
+  {"id": "RT-3e", "config": {"lx": 1.0, "nx": 4, "ly": 1.0, "ny": 10, "N": 3, "D": 1.0, "q": 1.0, "s_max": 8},
+   "note": "start condition first (VBC-13 item 4: N > floor(n_x/2)); the RN-3 check needs an independent given set",
+   "expected": {"records": 1, "s1_status_prefix": "STOP_BEFORE_QR: S-1, start set T_N dependent", "qr_executed": false, "R_array": false,
+                "bc_solved": false}}
+ ],
+ "rt15_rows": [
+  {"id": "RT-15a", "row": "T2N2", "expected": {"s1_status_in": ["PASS", "UNRESOLVED_RESOLVABILITY"], "s1_premises_all_established": true,
+   "s2_to_s8_status": "UNRESOLVED", "s2_to_s8_reason_contains": "STOPPED_RANK_GUARD_UNCERTIFIED", "never": ["FAIL_COMPUTATION", "PASS"]}},
+  {"id": "RT-15b", "row": "T2N3", "expected": {"s1_status_in": ["PASS", "UNRESOLVED_RESOLVABILITY"], "s1_premises_all_established": true,
+   "s2_to_s8_status": "UNRESOLVED", "s2_to_s8_reason_contains": "STOPPED_RANK_GUARD_UNCERTIFIED", "never": ["FAIL_COMPUTATION", "PASS"]}},
+  {"id": "RT-15c", "config": "RT-3a", "expected": {"s1_to_s8_status": "UNRESOLVED", "s1_reason_contains": "S-1, configuration (RN-3)"}},
+  {"id": "RT-15d", "paired": "C3", "expected": {"s1_status_in": ["PASS", "UNRESOLVED_RESOLVABILITY"], "s1_premises_all_established": true,
+   "s2_to_s8_status": "UNRESOLVED", "s2_to_s8_reason_contains": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "rac_chain": {"s1_solved": true, "s1_qr_transform": false, "s2_to_s8": "STOPPED_RANK_GUARD_UNCERTIFIED"}}}
+ ],
+ "forbidden": [
+  {"id": "FB-1", "call": "row computation on arrays, N = 2, s = 2 (small grid)", "expected": "refused before any computation"},
+  {"id": "FB-2", "call": "row computation on arrays, N = 3, s = 3 (small grid)", "expected": "refused before any computation"},
+  {"id": "FB-3", "call": "row computation on a D1 grid (50, 50), N = 1, s = 1", "expected": "refused before any computation (D1_START = BLOCKED)"},
+  {"id": "FB-4", "call": "paired block-C row N = 2, s = 2", "expected": "refused before any computation"},
+  {"id": "FB-5", "call": "paired block-C chain on a D1 grid (100, 100)", "expected": "refused before any computation (D1_START = BLOCKED)"},
+  {"id": "FB-6", "call": "campaign entry (any block)", "expected": "refused: D1_START = BLOCKED"},
+  {"id": "FB-7", "call": "OP-8 run_step N = 2, s = 2 on independent inputs", "expected": "STOPPED_RANK_GUARD_UNCERTIFIED before QR: no R, no C-3+ assembly, no B-C solve"}
+ ],
+ "row_plan": {
+  "A": {"rows": 272, "executable": 272, "not_executed_rank_guard": 0},
+  "B": {"rows": 336, "executable": 42, "not_executed_rank_guard": 294},
+  "C_paired": {"rows": 168, "executable": 70, "not_executed_rank_guard": 98},
+  "C_RAC_reference_chain": {"half_steps": 168, "executable": 70, "stopped_rank_guard": 98},
+  "D": {"rows": 32, "executable": 25, "not_executed_rank_guard": 7},
+  "S": {"rows": 16, "executable": 16, "not_executed_rank_guard": 0},
+  "classified": 824,
+  "mandatory": 102,
+  "mandatory_executable": 102
+ },
+ "control_A": {
+  "pr48_harness": "unchanged classifier: the 213 row cases and 18 aggregation cases of docs/results/r5_cccc_q4_d1_prelaunch/control_ab_expected.json match",
+  "z4_aggregation": [
+   {"id": "AZ-1", "case": "102 mandatory rows PASS, no Z-4 defect, SP-GAMMA consistent", "expected": {"verdict": "PASS_CANDIDATE"}},
+   {"id": "AZ-2", "case": "102 mandatory rows PASS, one row with an SP-GAMMA narrowness defect", "expected": {"verdict": "VERDICT_NOT_ISSUED", "classifier_verdict": "PASS_CANDIDATE"}},
+   {"id": "AZ-3", "case": "one mandatory row UNRESOLVED_RESOLVABILITY with Z-4 CONFIRMED, the others PASS", "expected": {"verdict": "FAIL_CANDIDATE"}},
+   {"id": "AZ-4", "case": "one mandatory row UNRESOLVED_RESOLVABILITY, Z-4 not performed", "expected": {"verdict": "VERDICT_NOT_ISSUED", "classifier_verdict": "FAIL_CANDIDATE"}},
+   {"id": "AZ-5", "case": "FAIL_COMPUTATION on a block-B row with Z-4 CONFIRMED, block A all PASS", "expected": {"verdict": "BLOCKED_CAMPAIGN"}},
+   {"id": "AZ-6", "case": "one mandatory row UNRESOLVED_RESOLVABILITY with Z-4 BINDING_MISMATCH, the others PASS", "expected": {"verdict": "UNRESOLVED_CANDIDATE", "row_status_after_z4": "UNRESOLVED_CERTIFICATE"}},
+   {"id": "AZ-7", "case": "one mandatory row UNRESOLVED_RESOLVABILITY with Z-4 DEFECT_GAMMA_INCLUSION", "expected": {"verdict": "VERDICT_NOT_ISSUED"}},
+   {"id": "AZ-8", "case": "rows of blocks B, C, D, S not executed by the rank guard, 102 mandatory PASS", "expected": {"verdict": "PASS_CANDIDATE", "denominator": 102}}
+  ]
+ },
+ "control_B": [
+  {"id": "RB-a1", "row": ["T1", 2], "injection": "journal_array_1ulp:s2_given_in", "premise": "P-a"},
+  {"id": "RB-a2", "row": ["C1", 2], "injection": "paired_array_1ulp:companion_in", "premise": "P-a"},
+  {"id": "RB-a3", "row": ["T2N2", 1], "injection": "journal_array_1ulp:s1_V_bc", "premise": "P-a"},
+  {"id": "RB-b", "row": ["T2N2", 1], "injection": "perturb_field_s_rel_2^-40", "premise": "P-b"},
+  {"id": "RB-c1", "row": ["T2N2", 1], "injection": "mode_round_up", "premise": "P-c", "platform": "win32"},
+  {"id": "RB-c2", "row": ["C1", 2], "injection": "mode_ftz_daz", "premise": "P-c", "platform": "win32"},
+  {"id": "RB-c3", "row": ["T2N2", 1], "injection": "scale_field_s_2^1000", "premise": "P-c"},
+  {"id": "RB-c4", "row": ["C1", 2], "injection": "subnormal_field_s_node", "premise": "P-c"},
+  {"id": "RB-d", "row": ["T2N2", 1], "injection": "grid_D_2^-1074", "premise": "P-d"},
+  {"id": "RB-e", "row": ["T2N2", 1], "injection": "prev_factors_2^-600", "premise": "P-e"},
+  {"id": "RB-f1", "row": ["T2N3", 1], "injection": "mu_low_zero", "premise": "P-f"},
+  {"id": "RB-f2", "row": ["C1", 2], "injection": "B_E_sqrt_negative_D", "premise": "P-f"}
+ ],
+ "control_B_expected": {"status": "UNRESOLVED_CERTIFICATE", "premise_in_reason_premises": "the injected premise", "not_status": ["PASS", "FAIL_COMPUTATION"]},
+ "clean_rows": [["T1", 1], ["T1", 2], ["T1", 3], ["T2N2", 1], ["T2N3", 1], ["T5N3", 1], ["C1", 1], ["C1", 2], ["C1", 3], ["C3", 1]],
+ "clean_expected": {"premises_all_established": true, "e1": true, "e2": true, "status_in": ["PASS", "UNRESOLVED_RESOLVABILITY"],
+                    "binding_F2_defects": [], "sp_gamma": {"inclusion": true, "tight": true}, "second_path_BE": {"match": true},
+                    "contradictions": [], "faults": []},
+ "control_V": [
+  {"id": "RV-1", "row": ["T1", 2], "perturbation": "V' = V (1 + 2^-20) + (-1)^j 2^-30 max|V|; companion' = companion (1 + 2^-25)",
+   "changed": ["field_s_sha", "field_prev_sha", "P_hat_p", "P_hat_s", "Q_hat", "Gamma_up", "B_E_up", "tau"]},
+  {"id": "RV-2", "row": ["T2N2", 1], "perturbation": "V' = V (1 + 2^-20) + (-1)^j 2^-30 max|V|; companion stays exactly 0",
+   "changed": ["field_s_sha", "P_hat_s", "Q_hat", "Gamma_up", "B_E_up", "tau"], "unchanged": ["field_prev_sha", "P_hat_p"]},
+  {"id": "RV-3", "row": ["C1", 2], "perturbation": "V' = V (1 + 2^-20) + (-1)^j 2^-30 max|V|; companion' = companion (1 + 2^-25)",
+   "changed": ["field_s_sha", "field_prev_sha", "P_hat_p", "P_hat_s", "Q_hat", "Gamma_up", "B_E_up", "tau"]}
+ ],
+ "control_V_expected": {"premises_all_established": true, "e1": true, "e2": true, "status_in": ["PASS", "UNRESOLVED_RESOLVABILITY"],
+                        "binding_F2_defects": [], "sp_gamma": {"inclusion": true, "tight": true}, "second_path_BE": {"match": true},
+                        "contradictions": [], "if_change_not_confirmed": "UNRESOLVED (empty control)",
+                        "if_FAIL_with_established_premises": "BLOCKED_CAMPAIGN-equivalent finding (protocol 4.4)"},
+ "control_G": [
+  {"id": "RG-1a", "row": ["T1", 2], "mutation": "gamma_sign_flip", "description": "gamma_s used = minus the output of the bound gamma_b1 call",
+   "channel": "binding_F2", "expected": {"detected_by": "binding_F2", "status": "UNRESOLVED_CERTIFICATE", "premise": "P-a"}},
+  {"id": "RG-1b", "row": ["T1", 2], "mutation": "gamma_function_sign_flip", "description": "the gamma_b1 call itself returns -gamma_s (code defect, consistent binding)",
+   "channel": "sp_gamma_inclusion", "expected": {"detected_by": "sp_gamma_inclusion", "status": "same as the clean twin", "z4": "DEFECT_GAMMA_INCLUSION"}},
+  {"id": "RG-2", "row": ["T1", 2], "mutation": "gamma_from_step_arrays:1", "description": "gamma_b1 called with the arrays of half-step 1",
+   "channel": "binding_F2", "expected": {"detected_by": "binding_F2", "status": "UNRESOLVED_CERTIFICATE", "premise": "P-a"}},
+  {"id": "RG-3", "row": ["T1", 2], "mutation": "Q_from_field_s", "description": "q_double receives w^_s instead of d^",
+   "channel": "binding_F2", "expected": {"detected_by": "binding_F2", "status": "UNRESOLVED_CERTIFICATE", "premise": "P-a"}},
+  {"id": "RG-4", "row": ["T1", 2], "mutation": "P_prev_from_field_s", "description": "pi_double for P^_p receives w^_s",
+   "channel": "binding_F2", "expected": {"detected_by": "binding_F2", "status": "UNRESOLVED_CERTIFICATE", "premise": "P-a"}},
+  {"id": "RG-5", "row": ["T1", 2], "mutation": "B_E_function_drop_B1", "description": "the b_e call itself omits the term B1 (code defect, consistent binding)",
+   "channel": "second_path_BE", "expected": {"detected_by": "second_path_BE", "z4": "DEFECT_BE_SECOND_PATH"}},
+  {"id": "RG-6", "row": ["T1", 2], "mutation": "gamma_interval_widened", "description": "gamma_down moved one binary64 step down (wider enclosing interval, larger Gamma_up possible)",
+   "channel": "sp_gamma_narrowness", "expected": {"detected_by": "sp_gamma_narrowness", "z4": "DEFECT_GAMMA_NARROWNESS"}},
+  {"id": "RG-7", "row": ["T1", 2], "mutation": "recorded_tau_double", "description": "recorded tau' = 2 (Gamma_up + B_E)",
+   "channel": "boundary_definition", "expected": {"detected_by": "boundary_definition", "status": "UNRESOLVED_CERTIFICATE", "rejected": true}},
+  {"id": "RG-8", "row": ["T2N2", 1], "mutation": "Q_from_field_s", "description": "N = 2, s = 1: q_double receives w^_s instead of d^",
+   "channel": "binding_F2", "expected": {"detected_by": "binding_F2", "status": "UNRESOLVED_CERTIFICATE", "premise": "P-a"}},
+  {"id": "RG-9", "row": ["C1", 2], "mutation": "gamma_function_sign_flip", "description": "paired block-C row: the gamma_b1 call returns -gamma_s",
+   "channel": "sp_gamma_inclusion", "expected": {"detected_by": "sp_gamma_inclusion", "status": "same as the clean twin", "z4": "DEFECT_GAMMA_INCLUSION"}},
+  {"id": "RG-10", "row": ["T2N3", 1], "mutation": "B_E_function_drop_B1", "description": "N = 3, s = 1: the b_e call omits B1",
+   "channel": "second_path_BE", "expected": {"detected_by": "second_path_BE", "z4": "DEFECT_BE_SECOND_PATH"}}
+ ],
+ "control_G_rule": "a mutation detected by no channel is a gap of control G (UNRESOLVED of the control), never PASS; a channel counts only with its registered finding",
+ "z4_procedure": [
+  {"id": "Z4-1", "row": ["T1", 2], "case": "clean row, procedure forced", "expected": {"outcome": "CONFIRMED", "status": "same as the clean twin"}},
+  {"id": "Z4-2", "row": ["T1", 2], "case": "gamma_function_sign_flip", "expected": {"outcome": "DEFECT_GAMMA_INCLUSION"}},
+  {"id": "Z4-3", "row": ["T1", 2], "case": "gamma_interval_widened", "expected": {"outcome": "DEFECT_GAMMA_NARROWNESS"}},
+  {"id": "Z4-4", "row": ["T1", 2], "case": "B_E_function_drop_B1", "expected": {"outcome": "DEFECT_BE_SECOND_PATH"}},
+  {"id": "Z4-5", "row": ["T1", 2], "case": "binding repeated in a separate process on a journal changed by 1 ulp after the first binding", "expected": {"outcome": "BINDING_MISMATCH", "status": "UNRESOLVED_CERTIFICATE"}},
+  {"id": "Z4-6", "row": ["T2N2", 1], "case": "clean row, procedure forced", "expected": {"outcome": "CONFIRMED", "status": "same as the clean twin"}},
+  {"id": "Z4-7", "row": ["C1", 2], "case": "clean paired row, procedure forced", "expected": {"outcome": "CONFIRMED", "status": "same as the clean twin"}}
+ ],
+ "sp_op": [
+  {"id": "OP-1", "row": ["T1", 1], "expected": "HOLDS (exact node-wise D2 a_h equals h_s times the exact tensor K^C, every checked column)"},
+  {"id": "OP-2", "row": ["T1", 2], "expected": "HOLDS"},
+  {"id": "OP-3", "row": ["T2N3", 1], "expected": "HOLDS"},
+  {"id": "OP-4", "row": ["T1", 2], "injection": "tensor coefficients of the binary64 coefficient system instead of the exact ones", "expected": "VIOLATED"}
+ ],
+ "block_C_crosscheck": [
+  {"id": "CX-1", "paired": "C1", "expected": {"s": [1, 2, 3, 4, 5, 6, 7, 8], "EQ_equals_OP8_bitwise": true, "input_is_RAC_state": true, "blas_threads_read": 1}},
+  {"id": "CX-2", "paired": "C3", "expected": {"s": [1], "EQ_equals_OP8_bitwise": true, "input_is_RAC_state": true, "rac_s1_qr_transform": false}}
+ ],
+ "rt17": {
+  "geometry": "every row of the D1 plan: l_x = 1, l_y = fl(r) for the families, 1 x 1 for the anisotropic grids and block D (OD-1); exact h = l/n; n_s of the solved direction",
+  "set_inf_norm": {"V": [[1.0, -3.0], [2.0, 0.5]], "expected": 3.0, "N1_equals_vector_norm": true, "basis_recorded": true}
+ },
+ "platform": {
+  "approved": {"sys_platform": "win32", "python": "3.13.15", "blas_threads_read_from_library": 1},
+  "freeze_on_other_platform": "UNRESOLVED (not PASS)"
+ },
+ "probes": {
+  "limits": "PL 6.3 unchanged: peak working set <= 50 % of physical RAM; each stage containing a factorization <= 30 min; refinement convergence by the existing contract (BR); BR / R-AC certificates recorded apart (OD-7)",
+  "surrogate_definition": "s = 2 (half-step X): given = hs.start_set(n_y, N), companion = 2^-10 hs.start_set(n_x, N); s = 3 (half-step Y): given = hs.start_set(n_x, N), companion = 2^-10 hs.start_set(n_y, N); fixed before the run; not a D1 input (OD-9 (a))",
+  "list": ["A:320x1280:N1:s2", "A:320x1280:N1:s3", "A:400x1000:N1:s2", "A:400x1000:N1:s3", "A:400x600:N1:s2", "S:400x1600:N1:s2", "S:1600x400:N1:s2",
+           "B:160x640:N3:s1", "B:200x500:N3:s1", "C:80x320:N3:s1", "C:100x250:N3:s1", "C:100x250:N1:s2", "D:9x11:N1:s1", "D:11x15:N1:s1", "D:14x6:N1:s1", "D:14x6:N3:s1"],
+  "second_paths_in_probes": {"SP-GAMMA": "every probe", "SP-BE": ["A:320x1280:N1:s2", "A:400x1000:N1:s2"], "SP-OP": ["A:320x1280:N1:s2"]},
+  "record": "resources only (times, peak working set, flags); no value of a row"
+ }
+}

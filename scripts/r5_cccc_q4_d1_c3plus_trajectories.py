@@ -16,15 +16,32 @@ Trajectory (fixed here; the order is the approved one, nothing of it is new):
   the B-C solution of s - 1 (checked bitwise per step). No stored R-AC set of Q3 (or any other R-AC / R-H solution) enters the
   trajectory; R-H and the exact system appear only in the separate small-grid check ``independent_check``.
 
+Rank protection of D-057.1 (owner decision 2026-11-02, variant V of PRE_D1_RANK; QA-D1-READY change of the tool accepted by D-055.1,
+subject to the targeted Reviewer check of D-057.1, item 7). Applied by ``run_step`` itself (Python API and command line), BEFORE any
+QR, C-3+ assembly or B-C solve of the half-step, in this order:
+  (a) s = 1: the start conditions of D-049.3, item 3 (below, step 1); N > floor(n_x/2) -> S-1 (start set, VBC-13 item 4);
+  (b) exact rank of the given set (rational): exact rank < N -> S-1 (proven dependence, D-049.5 item 2);
+  (c) configurational S-1 by RN-3 (PR #49 rank study 4.3, a derivation of the project, PROVEN by its review; used only as the
+      condition of a proven dependence, D-049.5 item 2): uniform grid, clamped at both ends of the solved direction, q = const, an
+      independent given set (b) and N > floor(n_s/2), n_s the number of intervals of the SOLVED direction of the half-step -> S-1
+      "STOP_BEFORE_QR: S-1, configuration (RN-3)". Every condition is recorded (``config_S1_RN3``); without all of them no S-1;
+  (d) N >= 2 and s >= 2: protective stop BEFORE the QR of the solved set of s - 1, trajectory status
+      ``STOPPED_RANK_GUARD_UNCERTIFIED`` (D-057.1, items 2 and 4; D-049.5 item 1 with R4NS 5.2 item 9: the error budget of the exact
+      sequence is not established, O4 UNRESOLVED, so the rank is numerically indistinguishable). No QR, N is not reduced, no
+      direction is restored, no rank tolerance is used, the field diagnostic (which factorises the solved set) is not computed; it is
+      a status of the TRAJECTORY, not S-1, not S-2 and not a status of the row classifier. s = 1 of N = 2, 3 is allowed (QR of the
+      start set T_N only). There is no bypass of (a)-(d) in this tool. N = 1 is unchanged (no QR; (c) can never hold for N = 1 since
+      n_s >= 3).
+
 Order of one half-step (NS 5.1; D-049.2, item 3; the same functions as ``r5_cccc_bc.run_halfstep``, but the solve uses C-3+):
 1. rank diagnostic of the given set: exact rank (rational, no threshold); s = 1: the proven conditions of D-049.3, item 3 on the start
    grid (independence N <= floor(n_x/2), exact formulas 2N < n_x) - statements about the EXACT T_N, applied only when the given set
    is bitwise hs.start_set(n_x, N) and the companion is 0 (``run_step`` refuses any other input at s = 1; the stored doubles of T_N
-   are not claimed dependent by the theorem); s >= 2, N >= 2: the field diagnostic of w^(s-1) (rho_N, kappa_rep,
-   cond(A) before QR; r5_cccc_sequence._rank_diagnostic, OBSERVATION). A PROVEN dependence (exact rank < N, or N > floor(n_x/2) at
-   s = 1) stops the trajectory BEFORE QR (S-1 only for a proven dependence, D-049.5, item 2). Otherwise the numerical rank decision is
-   UNRESOLVED (no approved criterion; no S-2, no K, c_rank, c_d, tau_set, no rank reduction, no regularisation) and the run goes on as
-   RESEARCH_ONLY (N >= 2). QR is not a proof that the true rank is preserved (O4 UNRESOLVED, D-054.5);
+   are not claimed dependent by the theorem). A PROVEN dependence (exact rank < N, N > floor(n_x/2) at s = 1, or the configurational
+   S-1 of RN-3) stops the trajectory BEFORE QR (S-1 only for a proven dependence, D-049.5, item 2); N >= 2, s >= 2 stops BEFORE QR
+   with STOPPED_RANK_GUARD_UNCERTIFIED (rank protection above). At s = 1 the numerical rank decision of N >= 2 is UNRESOLVED (no
+   approved criterion; no S-2, no K, c_rank, c_d, tau_set, no rank reduction, no regularisation) and the half-step runs as
+   RESEARCH_ONLY: the QR there is the QR of the start set, not of a solved set (D-057.1 item 2; O4 UNRESOLVED, D-054.5);
 2. N >= 2: QR of the given set by the prototype (``bc.orthonormalise``: sqrt(h_f) G = Q R, U~ = Q/sqrt(h_f)); companion C' = fl(C R^T)
    (w = G C^T = U~ (C R^T)^T, R4 5.4); N = 1: no QR (NS 5.1);
 3. diagnostics of the prototype (values only): cond(A) before QR = cond(R)^2, cond(A) after QR, exact orthonormality defect, angle
@@ -54,11 +71,13 @@ Order of one half-step (NS 5.1; D-049.2, item 3; the same functions as ``r5_cccc
 8. transformation for s + 1:
    - N = 1: I-4 (D-049.1, item 4; NS 4.4): c = sigma ||f||_inf, sigma = sign <f, 1> (sign of the EXACT sum of the stored doubles,
      >= 0 -> +1), f <- f/c, g <- g c; f = 0 exactly -> STOP ZERO_FIELD. The factors before and after I-4 are both stored;
-   - N >= 2: next given = V (the B-C solved factor, untransformed), next companion = U~; the QR of V is step 2 of half-step s + 1.
+   - N >= 2: next given = V (the B-C solved factor, untransformed), next companion = U~; half-step s + 1 >= 2 stops before its QR
+     (rank protection (d)); the arrays are kept for the binding of s.
 
-Statuses of a half-step (no thresholds): OK; STOP_BEFORE_QR (proven dependence, S-1); STOP_ZERO_FIELD; PROTECTIVE_STOP (QR factor or
-solved set exactly singular, B-C factorization failed); UNRESOLVED_C3PLUS_PREMISE; FAIL_C3PLUS_BOUND_CHECK; FAIL_TOOL (only-C
-replacement not confirmed, broken input link, exception). N >= 2 is RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED (D-049.5, D-054.5).
+Statuses of a half-step (no thresholds): OK; STOP_BEFORE_QR (proven dependence, S-1: start set, exact rank, configuration RN-3);
+STOPPED_RANK_GUARD_UNCERTIFIED (D-057.1; N >= 2, s >= 2); STOP_ZERO_FIELD; PROTECTIVE_STOP (QR factor or solved set exactly singular,
+B-C factorization failed); UNRESOLVED_C3PLUS_PREMISE; FAIL_C3PLUS_BOUND_CHECK; FAIL_TOOL (only-C replacement not confirmed, broken input
+link, exception). N >= 2 is RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED (D-049.5, D-054.5).
 
 Journal (``write_journal``): journal.json (meta + one record per half-step) and arrays.npz (keys ``s{s}_{name}``) with the given set
 and companion as received, R, the solved set, the transformed companion, the C-3+ matrix, the B-C solved factor and the next input
@@ -133,6 +152,15 @@ OK = "OK"
 STOP_START = ("STOP_BEFORE_QR: S-1, start set T_N dependent (N > floor(n_x/2), D-049.3 item 3; proven for the exact T_N, not a "
               "statement about the stored doubles)")
 STOP_DEPENDENT = "STOP_BEFORE_QR: S-1, given set exactly dependent (exact rank < N; D-049.5 item 2)"
+STOP_CONFIG = ("STOP_BEFORE_QR: S-1, configuration (RN-3): N > floor(n_s/2) on a uniform grid clamped at both ends of the solved "
+               "direction, q = const, independent given set - the exact half-step solution has rank < N (D-049.5 item 2; D-057.1 "
+               "item 5); checked on the configuration before the half-step")
+RANK_GUARD = "STOPPED_RANK_GUARD_UNCERTIFIED"
+STOP_RANK_GUARD = (f"{RANK_GUARD}: protective stop before the QR of the solved set (N >= 2, s >= 2; D-057.1 items 2, 4; D-049.5 "
+                   "item 1, R4NS 5.2 item 9: rank not certified, O4 UNRESOLVED); no QR, N not reduced, no direction restored; not "
+                   "S-1, not S-2")
+RANK_GUARD_RULE = ("D-057.1 (variant V): N = 2, 3 - only s = 1 (QR of the start set); s >= 2 stops before QR "
+                   f"({RANK_GUARD}); configurational S-1 by RN-3 before the half-step; no bypass")
 STOP_ZERO = "STOP_ZERO_FIELD: computed factor exactly 0 (N = 1, I-4 undefined)"
 PROTECTIVE = "PROTECTIVE_STOP"
 UNRES_PREMISE = "UNRESOLVED_C3PLUS_PREMISE"
@@ -420,6 +448,20 @@ def _stop(rec: dict, arrays: dict, status: str) -> StepResult:
     return StepResult(rec, arrays)
 
 
+def config_s1_conditions(cfg: TrajectoryConfig, N: int, n_s: int, given_rank: int) -> dict:
+    """Conditions of the configurational S-1 by RN-3 (module docstring (c)), each recorded; ``all_hold`` iff every one holds.
+    Uniform grid and clamping at both ends of the solved direction hold by construction of this tool (h = l/n; the CCCC operator
+    with D4 rows (7, -4, 1) at both ends, D-049.1); q = const: the load is the scalar cfg.q; independence of the given set: its exact
+    rank is N (computed in step (b))."""
+    out = {"uniform_grid": True, "clamped_both_ends_of_solved_direction": True,
+           "q_const": isinstance(cfg.q, (int, float)) and not isinstance(cfg.q, bool) and math.isfinite(cfg.q),
+           "given_set_independent": given_rank == N, "n_s": n_s, "floor_n_s_half": n_s // 2, "N": N, "N_gt_floor_n_s_half": N > n_s // 2,
+           "source": "RN-3 (PR #49 rank study 4.3; project derivation, PROVEN by review); D-057.1 item 5; D-049.5 item 2"}
+    out["all_hold"] = bool(out["uniform_grid"] and out["clamped_both_ends_of_solved_direction"] and out["q_const"]
+                           and out["given_set_independent"] and out["N_gt_floor_n_s_half"])
+    return out
+
+
 def run_step(cfg: TrajectoryConfig, s: int, given: np.ndarray, companion: np.ndarray) -> StepResult:
     """Half-step s of the trajectory from (given, companion) (module docstring, steps 1-8)."""
     ca = _ca()
@@ -454,9 +496,20 @@ def run_step(cfg: TrajectoryConfig, s: int, given: np.ndarray, companion: np.nda
     rec["given_exact_rank"] = rank
     if rank < N:
         return _stop(rec, arrays, STOP_DEPENDENT)
-    if N >= 2 and s >= 2 and not prev_zero:
-        diag, _, _ = seq._rank_diagnostic(companion, h_s, given, h_f)
-        rec.update({f"prev_field_{k}": v for k, v in diag.items()})
+    # --- rank protection of D-057.1 (module docstring (c), (d)): before any QR, C-3+ assembly or solve
+    cond = config_s1_conditions(cfg, N, n_s, rank)
+    rec["config_S1_RN3"] = cond
+    rec["rank_guard_rule"] = RANK_GUARD_RULE
+    if cond["all_hold"]:
+        rec["qr_executed"] = False
+        return _stop(rec, arrays, STOP_CONFIG)
+    if N >= 2 and s >= 2:
+        rec["qr_executed"] = False
+        rec["rank_guard"] = (f"N = {N}, s = {s}: protective stop before the QR of the solved set of s - 1; the field diagnostic "
+                             "(it factorises the solved set) is not computed")
+        return _stop(rec, arrays, STOP_RANK_GUARD)
+    rec["rank_guard"] = ("N = 1: no QR (the guard does not apply)" if N == 1 else
+                         f"N = {N}, s = 1: allowed by D-057.1 item 2 (QR of the start set T_N only)")
     rec["rank_decision"] = "UNRESOLVED (no approved numerical rank criterion; D-049.5, D-049.6)" if N >= 2 else "N = 1"
     # --- 2./3. QR (N >= 2) and the prototype's diagnostics
     if N >= 2:
@@ -607,7 +660,8 @@ def run_trajectory(cfg: TrajectoryConfig, independent: bool = False) -> Trajecto
         tr.arrays.append(res.arrays)
         tr.timing.append(round(time.perf_counter() - t0, 3))
         if res.next_given is None:
-            tr.status = f"STOPPED at s = {s}: {res.record['status']}"
+            st = str(res.record["status"])
+            tr.status = f"{RANK_GUARD} at s = {s}: {st}" if st.startswith(RANK_GUARD) else f"STOPPED at s = {s}: {st}"
             return tr
         given, companion = res.next_given, res.next_companion
     tr.status = f"COMPLETED s = 1..{cfg.s_max} (no stop criterion applied)"
@@ -709,7 +763,7 @@ def provenance() -> dict:
             "platform": platform.platform(), "machine": platform.machine(), "processor": platform.processor(),
             "blas_thread_env_vars_as_found": {k: os.environ.get(k) for k in THREAD_VARS},
             "blas_threads_effective": "NOT_VERIFIED (the values above are environment variables, not the effective thread count)",
-            "solve_isolation": ISOLATION, "d1_guard": D1_GUARD,
+            "solve_isolation": ISOLATION, "d1_guard": D1_GUARD, "rank_guard": RANK_GUARD_RULE,
             "reproducibility": "bitwise only on the same platform, BLAS build and thread settings; not across BLAS platforms "
                                "(D-025; AGENTS.md 4)"}
 

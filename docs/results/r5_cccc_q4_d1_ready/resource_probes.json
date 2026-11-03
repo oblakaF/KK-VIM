@@ -1,0 +1,967 @@
+{
+ "document": "R5-V Q4 QA-D1-READY resource probes (protocol 8, 12.5; PL 6.3; D-057.4)",
+ "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+ "data_status": "PRELAUNCH research observation (QA-D1-READY); NOT D1 data, never D1_RESULT (D1_START = BLOCKED)",
+ "total_ram_bytes": 34033348608,
+ "limit_bytes_50pct": 17016674304,
+ "platform": {
+  "sys_platform": "win32",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "python": "3.13.15",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "blas_lapack": {
+   "blas": {
+    "name": "scipy-openblas",
+    "found": true,
+    "version": "0.3.34.106.0",
+    "detection method": "pkgconfig",
+    "include directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-_ivn3drs/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/include",
+    "lib directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-_ivn3drs/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/lib",
+    "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=24",
+    "pc file directory": "D:/a/numpy-release/numpy-release/.openblas"
+   },
+   "lapack": {
+    "name": "scipy-openblas",
+    "found": true,
+    "version": "0.3.34.106.0",
+    "detection method": "pkgconfig",
+    "include directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-_ivn3drs/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/include",
+    "lib directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-_ivn3drs/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/lib",
+    "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=24",
+    "pc file directory": "D:/a/numpy-release/numpy-release/.openblas"
+   }
+  },
+  "blas_threads_read_from_library": 1,
+  "thread_env_vars": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  },
+  "thread_env_set_before_numpy_import": "by this tool at import (OD-6: by the launching process); effective count read"
+ },
+ "freeze": {
+  "allowed": true,
+  "state": "APPROVED_PLATFORM",
+  "approved": {
+   "sys_platform": "win32",
+   "python": "3.13.15",
+   "blas_threads": 1
+  }
+ },
+ "probe_tool_blob": "3dcdce54e582de36fc3cf60c97609bb9026d1c7b",
+ "surrogate_definition": "s = 2 (half-step X): given = hs.start_set(n_y, N), companion = 2^-10 hs.start_set(n_x, N); s = 3 (half-step Y): given = hs.start_set(n_x, N), companion = 2^-10 hs.start_set(n_y, N); fixed before the run; not a D1 input (OD-9 (a))",
+ "material_load": "D = q = 1 (OD-5)",
+ "launcher_environment": {
+  "OPENBLAS_NUM_THREADS": "1",
+  "OMP_NUM_THREADS": "1",
+  "MKL_NUM_THREADS": "1"
+ },
+ "results": [
+  {
+   "probe": "A:320x1280:N1:s2",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "A",
+   "N": 1,
+   "s": 2,
+   "nx": 320,
+   "ny": 1280,
+   "lx": "1.0",
+   "ly": "4.0",
+   "cells": 409600,
+   "input": "surrogate (OD-9 (a))",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.15,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 149.63,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.96,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_BE_second_path": {
+     "seconds": 165.42,
+     "completed": true,
+     "factorization": false,
+     "status_class": "CERTIFIED"
+    },
+    "SP_OP": {
+     "seconds": 23.66,
+     "completed": true,
+     "factorization": false,
+     "status_class": "HOLDS"
+    },
+    "BR_reference": {
+     "seconds": 0.48,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 1489289216,
+   "total_seconds": 340.45,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "A:320x1280:N1:s3",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "A",
+   "N": 1,
+   "s": 3,
+   "nx": 320,
+   "ny": 1280,
+   "lx": "1.0",
+   "ly": "4.0",
+   "cells": 409600,
+   "input": "surrogate (OD-9 (a))",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.13,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 148.37,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.93,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 1.44,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 695705600,
+   "total_seconds": 151.01,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "A:400x1000:N1:s2",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "A",
+   "N": 1,
+   "s": 2,
+   "nx": 400,
+   "ny": 1000,
+   "lx": "1.0",
+   "ly": "2.5",
+   "cells": 400000,
+   "input": "surrogate (OD-9 (a))",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.13,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 143.97,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.95,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_BE_second_path": {
+     "seconds": 161.83,
+     "completed": true,
+     "factorization": false,
+     "status_class": "CERTIFIED"
+    },
+    "BR_reference": {
+     "seconds": 0.47,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 1458032640,
+   "total_seconds": 307.51,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "A:400x1000:N1:s3",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "A",
+   "N": 1,
+   "s": 3,
+   "nx": 400,
+   "ny": 1000,
+   "lx": "1.0",
+   "ly": "2.5",
+   "cells": 400000,
+   "input": "surrogate (OD-9 (a))",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.12,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 143.97,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.96,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 1.02,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 667209728,
+   "total_seconds": 146.22,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "A:400x600:N1:s2",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "A",
+   "N": 1,
+   "s": 2,
+   "nx": 400,
+   "ny": 600,
+   "lx": "1.0",
+   "ly": "1.5",
+   "cells": 240000,
+   "input": "surrogate (OD-9 (a))",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.11,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 87.31,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.62,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 0.44,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 426217472,
+   "total_seconds": 88.64,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "S:400x1600:N1:s2",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "S",
+   "N": 1,
+   "s": 2,
+   "nx": 400,
+   "ny": 1600,
+   "lx": "1.0",
+   "ly": "4.0",
+   "cells": 640000,
+   "input": "surrogate (OD-9 (a))",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.19,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 231.24,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 1.28,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 0.8,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 1024503808,
+   "total_seconds": 233.67,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "S:1600x400:N1:s2",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "S",
+   "N": 1,
+   "s": 2,
+   "nx": 1600,
+   "ny": 400,
+   "lx": "1.0",
+   "ly": "0.25",
+   "cells": 640000,
+   "input": "surrogate (OD-9 (a))",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.16,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 216.88,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 1.27,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 1.66,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 1028886528,
+   "total_seconds": 220.12,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "B:160x640:N3:s1",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "B",
+   "N": 3,
+   "s": 1,
+   "nx": 160,
+   "ny": 640,
+   "lx": "1.0",
+   "ly": "4.0",
+   "cells": 102400,
+   "input": "start set T_N, zero companion (s = 1)",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.24,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 30.6,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.17,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 4.62,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "start_rank_diagnostic": {
+    "exact_rank_of_start": 3,
+    "note": "s = 1: QR of the start set only (VBC-13 item 4: independent start)"
+   },
+   "peak_working_set_bytes": 205520896,
+   "total_seconds": 35.8,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "B:200x500:N3:s1",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "B",
+   "N": 3,
+   "s": 1,
+   "nx": 200,
+   "ny": 500,
+   "lx": "1.0",
+   "ly": "2.5",
+   "cells": 100000,
+   "input": "start set T_N, zero companion (s = 1)",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.24,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 30.55,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.16,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 3.52,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "start_rank_diagnostic": {
+    "exact_rank_of_start": 3,
+    "note": "s = 1: QR of the start set only (VBC-13 item 4: independent start)"
+   },
+   "peak_working_set_bytes": 198131712,
+   "total_seconds": 34.63,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "C:80x320:N3:s1",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "C",
+   "N": 3,
+   "s": 1,
+   "nx": 80,
+   "ny": 320,
+   "lx": "1.0",
+   "ly": "4.0",
+   "cells": 25600,
+   "input": "start set T_N, zero companion (s = 1)",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.12,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 7.7,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.05,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 2.26,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    },
+    "RAC_halfstep_s1_no_QR": {
+     "seconds": 1.05,
+     "completed": true,
+     "factorization": true
+    },
+    "EQ_paired_halfstep": {
+     "seconds": 0.13,
+     "completed": true,
+     "factorization": true
+    }
+   },
+   "op8_status_class": "OK",
+   "EQ_equals_OP8_bitwise": true,
+   "start_rank_diagnostic": {
+    "exact_rank_of_start": 3,
+    "note": "s = 1: QR of the start set only (VBC-13 item 4: independent start)"
+   },
+   "peak_working_set_bytes": 102998016,
+   "total_seconds": 11.47,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "C:100x250:N3:s1",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "C",
+   "N": 3,
+   "s": 1,
+   "nx": 100,
+   "ny": 250,
+   "lx": "1.0",
+   "ly": "2.5",
+   "cells": 25000,
+   "input": "start set T_N, zero companion (s = 1)",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.14,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 7.7,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.04,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 1.75,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    },
+    "RAC_halfstep_s1_no_QR": {
+     "seconds": 0.84,
+     "completed": true,
+     "factorization": true
+    },
+    "EQ_paired_halfstep": {
+     "seconds": 0.13,
+     "completed": true,
+     "factorization": true
+    }
+   },
+   "op8_status_class": "OK",
+   "EQ_equals_OP8_bitwise": true,
+   "start_rank_diagnostic": {
+    "exact_rank_of_start": 3,
+    "note": "s = 1: QR of the start set only (VBC-13 item 4: independent start)"
+   },
+   "peak_working_set_bytes": 97890304,
+   "total_seconds": 10.78,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "C:100x250:N1:s2",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "C",
+   "N": 1,
+   "s": 2,
+   "nx": 100,
+   "ny": 250,
+   "lx": "1.0",
+   "ly": "2.5",
+   "cells": 25000,
+   "input": "surrogate (OD-9 (a))",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.02,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 7.42,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.05,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 0.11,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    },
+    "RAC_halfstep": {
+     "seconds": 0.02,
+     "completed": true,
+     "factorization": true
+    },
+    "EQ_paired_halfstep": {
+     "seconds": 0.03,
+     "completed": true,
+     "factorization": true
+    }
+   },
+   "op8_status_class": "OK",
+   "EQ_equals_OP8_bitwise": true,
+   "peak_working_set_bytes": 102170624,
+   "total_seconds": 7.8,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "D:9x11:N1:s1",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "D",
+   "N": 1,
+   "s": 1,
+   "nx": 9,
+   "ny": 11,
+   "lx": "1.0",
+   "ly": "1.0",
+   "cells": 99,
+   "input": "start set T_N, zero companion (s = 1)",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.01,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 0.05,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.0,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 0.02,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 63602688,
+   "total_seconds": 0.23,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "D:11x15:N1:s1",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "D",
+   "N": 1,
+   "s": 1,
+   "nx": 11,
+   "ny": 15,
+   "lx": "1.0",
+   "ly": "1.0",
+   "cells": 165,
+   "input": "start set T_N, zero companion (s = 1)",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.01,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 0.06,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.0,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 0.02,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 63823872,
+   "total_seconds": 0.24,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "D:14x6:N1:s1",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "D",
+   "N": 1,
+   "s": 1,
+   "nx": 14,
+   "ny": 6,
+   "lx": "1.0",
+   "ly": "1.0",
+   "cells": 84,
+   "input": "start set T_N, zero companion (s = 1)",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.01,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 0.06,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.0,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 0.01,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "peak_working_set_bytes": 63500288,
+   "total_seconds": 0.24,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  },
+  {
+   "probe": "D:14x6:N3:s1",
+   "label": "PRELAUNCH_RESOURCE_PROBE (not D1_RESULT; no row value recorded)",
+   "block": "D",
+   "N": 3,
+   "s": 1,
+   "nx": 14,
+   "ny": 6,
+   "lx": "1.0",
+   "ly": "1.0",
+   "cells": 84,
+   "input": "start set T_N, zero companion (s = 1)",
+   "blas_threads_read_from_library": 1,
+   "stages": {
+    "op8_halfstep": {
+     "seconds": 0.02,
+     "completed": true,
+     "factorization": true
+    },
+    "row_G4_gamma_B1_premises_B_E": {
+     "seconds": 0.06,
+     "completed": true,
+     "factorization": false
+    },
+    "SP_GAMMA_energies_path_b": {
+     "seconds": 0.0,
+     "completed": true,
+     "factorization": false
+    },
+    "BR_reference": {
+     "seconds": 0.08,
+     "completed": true,
+     "factorization": true,
+     "certificate_lambda_low": true,
+     "refine_converged": true,
+     "precision_used": 40,
+     "kind": "reference certificate (observation; OD-7: apart from the resources of the row)"
+    }
+   },
+   "op8_status_class": "OK",
+   "start_rank_diagnostic": {
+    "exact_rank_of_start": 3,
+    "note": "s = 1: QR of the start set only (VBC-13 item 4: independent start)"
+   },
+   "peak_working_set_bytes": 63922176,
+   "total_seconds": 0.3,
+   "pl63": {
+    "peak_le_50pct_ram": true,
+    "factorization_stages_le_30min": true,
+    "all_stages_completed": true,
+    "B_E_and_premises_included": true,
+    "reference_certificate": "CERTIFIED",
+    "all_within": true
+   },
+   "result": "WITHIN_PL63"
+  }
+ ]
+}

@@ -86,7 +86,16 @@ MANDATORY_S = (1, 2, 3)  # D-054.2, item 2
 S_MAX = 8
 RH_NODES = 4096  # protocol 5 item 9: R-H where (n_x - 1)(n_y - 1) <= 4096
 PROTOCOL_RH_GRIDS = ((50, 50), (48, 72), (48, 32), (50, 20), (100, 40), (48, 12), (100, 25), (72, 40), (40, 72), (61, 37), (37, 61))
-PROPOSED_D, PROPOSED_Q = 1.0, 1.0  # OD-5: proposal (Q3 / D0, PL 1.5); the protocol does not state D, q - not an owner decision
+PROPOSED_D, PROPOSED_Q = 1.0, 1.0  # OD-5: DECIDED D = q = 1 by the owner (D-057.2 item 2); names kept for the PR #48 history
+READY_BASE_COMMIT = "f5c51c8afa1aa2be464be137a3421bf3820b4721"  # main at the start of QA-D1-READY (D-057)
+READY_TOOL = "scripts/r5_cccc_q4_d1_ready.py"
+READY_CONTROLS_EXPECTED = "tests/reference/r5_cccc_q4_d1_ready_controls_expected.json"
+READY_RESULTS = "docs/results/r5_cccc_q4_d1_ready"
+# files changed by QA-D1-READY against READY_BASE_COMMIT (D-057.1 change of OP-8; extension of the PR #50 pipeline; section 13 of
+# the protocol; this tool); every other used file is the one of READY_BASE_COMMIT
+READY_CHANGED = ("docs/R5_CCCC_Q4_D1_PROTOCOL.md", OP8_TOOL, "tests/reference/test_r5_cccc_q4_d1_c3plus_trajectories.py",
+                 "scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py", SELF)
+READY_NEW = (READY_TOOL, "scripts/r5_cccc_q4_d1_block_c_driver.py", "scripts/r5_cccc_q4_d1_ready_controls.py")
 
 # ---------------------------------------------------------------------------------------------------------------------------------
 # helpers
@@ -139,7 +148,8 @@ COMPONENTS = (  # (id, role in the campaign, path or None = MISSING)
     ("op8_tests", "tests of the OP-8 tool", "tests/reference/test_r5_cccc_q4_d1_c3plus_trajectories.py"),
     ("c3plus_and_control", "C-3+ assembly, its premises / exact check, variant CONTROL (second path for C; D-054.3)",
      "scripts/r5_cccc_q4_c_assembly_e4_audit.py"),
-    ("classifier_campaign", "energy classifier of the campaign wired to D1 rows (protocol 4)", None),
+    ("classifier_campaign", "energy classifier of the campaign wired to D1 rows (protocol 4): integrated layer QA-D1-READY (F-2, "
+     "F-3, Z-4, verdict over classify_row / campaign_verdict unchanged)", "scripts/r5_cccc_q4_d1_ready.py"),
     ("classifier_prelaunch_qa", "isolated QA classifier 4.2-4.4 + synthetic harness of controls A, B (this tool)", SELF),
     ("gamma_B1", "Gamma_up of path B1: gamma_b1, directed, gamma_up (GP 5.3; QA-gamma3)", "scripts/r5_cccc_q4_gamma_interval_audit.py"),
     ("gamma_audit", "gamma audit: helpers of B1; second path for gamma (VOK-2 identity, energies_path_b)",
@@ -149,11 +159,16 @@ COMPONENTS = (  # (id, role in the campaign, path or None = MISSING)
     ("BR_reference", "certified reference of the half-step (BR, PR #39): BC-1 / TS-1 observations, second path for B-C", BR_TOOL),
     ("q3_script", "Q3 helpers loaded by BR and the gamma audit", "scripts/r5_cccc_q3_prequalification.py"),
     ("second_path_RH_RAC_RHP", "R-H, R-AC, R-HP, lambda_low (Q1b) of the half-step", "src/kkvim_reference/r5_cccc_halfstep.py"),
-    ("row_pipeline", "pipeline of a D1 row: OP-8 trajectory -> G-4, B1, B_E, premises P-a...P-f -> classifier", None),
-    ("block_C_driver", "R-AC chains on the 7 level-2 grids and the paired B-C (C-3+) of block C", None),
-    ("B_E_independent_recount", "separate recount of B_E on a control sample (sect. 9, recommendation N-10)", None),
-    ("control_V_harness", "positive control V (consistent perturbation of the factors; protocol 6)", None),
-    ("control_G_harness", "control G: mutations of the computing path with declared detection channels (protocol 6)", None),
+    ("row_pipeline", "pipeline of a D1 row: OP-8 trajectory -> G-4, B1, B_E, premises P-a...P-f -> classifier (PR #50, extended by "
+     "QA-D1-READY)", "scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py"),
+    ("block_C_driver", "R-AC chains on the 7 level-2 grids and the paired B-C (C-3+) of block C (OD-3)",
+     "scripts/r5_cccc_q4_d1_block_c_driver.py"),
+    ("B_E_independent_recount", "separate recount of B_E (PR #51, N-1/N-2 hardened; SP-BE, channel of G-5)",
+     "scripts/r5_cccc_q4_be_second_path_research.py"),
+    ("control_V_harness", "positive control V (consistent perturbation of the factors; protocol 6) on the integrated pipeline",
+     "scripts/r5_cccc_q4_d1_ready_controls.py"),
+    ("control_G_harness", "control G: mutations of the computing path with declared detection channels (protocol 6; OD-4)",
+     "scripts/r5_cccc_q4_d1_ready_controls.py"),
 )
 TOOL_ROOTS = (OP8_TOOL, "scripts/r5_cccc_q4_c_assembly_e4_audit.py", "scripts/r5_cccc_q4_gamma_interval_audit.py",
               "scripts/r5_cccc_q4_gamma_audit.py", "scripts/r5_cccc_q4_energy_bc_audit.py", QAEB_TOOL, BR_TOOL)
@@ -204,6 +219,7 @@ def sha_inventory() -> dict:
     listed = {c["path"] for c in comps if c["path"]}
     modules = [{"path": p, "blob": git_blob_id(ROOT / p), "used_by_closure_of": "TOOL_ROOTS"} for p in deps if p not in listed]
     return {"base_commit": BASE_COMMIT, "blob_rule": "git blob id of the LF content (= git rev-parse <commit>:<path> for these files)",
+            "ready_base_commit": READY_BASE_COMMIT, "ready_changed": list(READY_CHANGED), "ready_new": list(READY_NEW),
             "components": comps, "dependency_closure": deps, "other_used_files": modules,
             "missing": [c["id"] for c in comps if c["state"] == "MISSING"]}
 
@@ -241,9 +257,9 @@ def geometry(g: dict) -> dict:
 
 
 def config_record(g: dict) -> dict:
-    """Configuration of the trajectory of one block-A grid (all rows s = 1..8 share it). D and q are PROPOSALS (OD-5)."""
+    """Configuration of the trajectory of one block-A grid (all rows s = 1..8 share it). D = q = 1 decided (OD-5, D-057.2)."""
     return {"tool": OP8_TOOL, "block": "A", "lx_hex": g["lx"].hex(), "ly_hex": g["ly"].hex(), "nx": g["nx"], "ny": g["ny"], "N": 1,
-            "D_hex": PROPOSED_D.hex(), "q_hex": PROPOSED_Q.hex(), "D_q_status": "PROPOSAL OD-5 (OWNER_DECISION_REQUIRED)",
+            "D_hex": PROPOSED_D.hex(), "q_hex": PROPOSED_Q.hex(), "D_q_status": "DECIDED: D = q = 1 (OD-5; D-057.2 item 2)",
             "s_max": S_MAX, "orientation": "first half-step Y with given functions of x (D-049.3 item 2)",
             "start": "T_1 = sin^2(pi x/a) on the interior x nodes (hs.start_set(n_x, 1); D-049.3 item 1)",
             "stop_rule": "none: s = 1..8 fixed (protocol 2.1)"}
@@ -429,9 +445,9 @@ def blocked_probe_plan(tj) -> dict:
                     "ny": ny, "N": 3, "s": 1, "start": "T_3 (hs.start_set(n_x, 3))",
                     "given_in_sha": tj.array_sha(hs.start_set(nx, 3)), "companion_in_sha": tj.array_sha(np.zeros((ny - 1, 3))),
                     "plan": "same stages as the N = 1 probe; block C adds the R-AC half-step of r5_cccc_sequence on the same input",
-                    "state": "BLOCKED: PRE_D1_RANK (D-049.5 requires a stop before QR at lost or indistinguishable rank; the OP-8 tool "
-                             "continues QR with rank_decision = UNRESOLVED as RESEARCH_ONLY) - needs a separate owner permission"})
-    return {"status": "NOT_EXECUTED", "probes": out}
+                    "state": "PERMITTED (D-057.4, OD-9 item 2: research probe N = 3 at s = 1, QR of the start set only); executed by "
+                             f"{READY_TOOL} (results {READY_RESULTS}/resource_probes.json); s >= 2 of N = 3 never (D-057.1)"})
+    return {"status": "PERMITTED_N3_S1 (D-057.4); probed by QA-D1-READY, not by this tool", "probes": out}
 
 
 def build_manifest() -> dict:
@@ -441,18 +457,66 @@ def build_manifest() -> dict:
     if len(keys) != 102 or len(set(keys)) != 102:
         raise RuntimeError("the mandatory list must have 102 unique keys")
     return {
-        "document": "R5-V Q4 D1 PRELAUNCH manifest (protocol 12, item 3)", "manifest_state": "INCOMPLETE - NOT FROZEN (OWNER_DECISION_"
-        "REQUIRED items open; components MISSING)", "d1_start": D1_START, "data_status": NOT_D1,
+        "document": "R5-V Q4 D1 PRELAUNCH manifest (protocol 12, item 3)", "manifest_state": "FREEZE_CANDIDATE - NOT FROZEN (D-057 "
+        "decisions recorded; QA-D1-READY components present; awaiting the Reviewer check of D-057.1 item 7 and the owner)",
+        "d1_start": D1_START, "data_status": NOT_D1,
         "sha_inventory": sha_inventory(),
         "hash_platform": platform_fingerprint(),
         "sample_arithmetic": planned_row_counts(),
         "mandatory_rows": rows, "mandatory_keys_sha256": sha256_bytes(canonical(keys)),
         "dynamic_hash_procedure": DYNAMIC_PROCEDURE,
         "second_path": second_path_sample(rows),
-        "owner_decisions": [{**d, "status": "OWNER_DECISION_REQUIRED"} for d in OWNER_DECISIONS],
+        "owner_decisions": [{**d, "status": "DECIDED", "decision": D057[d["id"]]} for d in OWNER_DECISIONS],
         "blocked_probes_N23": blocked_probe_plan(tj),
         "controls_expected_sha256": EXPECTED_SHA256,
+        "d057": d057_section(),
     }
+
+
+D057 = {  # the owner decisions of D-057.2...D-057.4 for OD-1...OD-12 (docs/DECISIONS.md; protocol 13)
+    "OD-1": "D-057.2 item 1: block D (9, 11), (11, 15), (14, 6): l_x = l_y = 1",
+    "OD-2": "D-057.3 item 1: N >= 2 BC-1 in the elementwise infinity norm of the set V, basis U~ recorded",
+    "OD-3": "D-057.3 item 2: block C N = 1 by SEQ run_sequence + EQ functions (blob), single-threaded, bitwise against isolated OP-8 "
+            "at s = 1..8 on small grids; N >= 2 by D-057.1",
+    "OD-4": "D-057.3 item 3: channel map of control G with the binding of the actual inputs (F-2); G-5 by the separate recount of B_E",
+    "OD-5": "D-057.2 item 2: D = 1, q = 1",
+    "OD-6": "D-057.2 item 3: PRELAUNCH machine, Windows, Python 3.13.15, single-threaded BLAS set by the launching process",
+    "OD-7": "D-057.4 item 1: PL 6.3 unchanged; resources of the row apart from the certificates of the references",
+    "OD-8": "D-057.3 item 4: C-3+ failure ends the trajectory (no OLD / CONTROL); P-4 ASSUMED; C3P observations; procedure Z-4",
+    "OD-9": "D-057.4 item 2: surrogate probes s = 2, 3; research probes N = 3 at s = 1; real s >= 2 only with the campaign permission",
+    "OD-10": "D-057.3 item 5: the PR #50 pipeline is the base; F-2, F-3, Z-4 to be implemented (QA-D1-READY)",
+    "OD-11": "D-057.3 item 6: SP-GAMMA all 102; SP-BE = PRE rule + (320, 1280), (400, 1000) at s = 2; SP-OP; other subsets by the PRE rule",
+    "OD-12": "D-057.2 item 4: platform-dependent hashes strict on the fixed platform; start sets archived; no cross-platform bitwise identity",
+}
+
+
+def d057_section() -> dict:
+    """QA-D1-READY (D-057.6, protocol 12 item 3 and 13): the decided inputs, the row plan under D-057.1, the subsets of OD-11, the
+    input hashes of every executable s = 1 row, the platform record and the freeze rule, the archive of the start sets, the tools."""
+    rd = _load(READY_TOOL, "_ready_for_manifest")
+    plan = rd.row_plan()
+    arch_path = ROOT / READY_RESULTS / "start_archive.json"
+    arch = {"path": f"{READY_RESULTS}/start_archive.json", "state": "PRESENT" if arch_path.exists() else "MISSING",
+            "sha256_lf": sha256_bytes(arch_path.read_bytes().replace(b"\r\n", b"\n")) if arch_path.exists() else None,
+            "content_sha256": sha256_bytes(canonical(rd.start_archive(plan)))}
+    tools = (READY_TOOL, "scripts/r5_cccc_q4_d1_block_c_driver.py", "scripts/r5_cccc_q4_d1_ready_controls.py",
+             "scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py", OP8_TOOL, "scripts/r5_cccc_q4_be_second_path_research.py", QAEB_TOOL,
+             "scripts/r5_cccc_q4_energy_bc_audit.py", "scripts/r5_cccc_q4_gamma_interval_audit.py", "scripts/r5_cccc_q4_gamma_audit.py",
+             "scripts/r5_cccc_q4_c_assembly_e4_audit.py", BR_TOOL, PROTOCOL, READY_CONTROLS_EXPECTED)
+    return {"decisions": "D-057.1...D-057.6 (owner, 2026-11-02); protocol 13", "ready_base_commit": READY_BASE_COMMIT,
+            "D": PROPOSED_D.hex(), "q": PROPOSED_Q.hex(), "block_D_geometry": {"lx": rd.BLOCK_D_GEOMETRY[0].hex(),
+                                                                             "ly": rd.BLOCK_D_GEOMETRY[1].hex()},
+            "rank_policy": "D-057.1 variant V: N = 2, 3 only s = 1; STOPPED_RANK_GUARD_UNCERTIFIED; configurational S-1 (RN-3)",
+            "set_inf_norm": "OD-2: elementwise max of the set, basis U~ recorded", "row_plan_counts": rd.plan_counts(plan),
+            "subsets": rd.subsets(plan), "input_hashes_s1": rd.input_hashes(plan),
+            "input_hashes_note": "platform dependent (numpy.sin, OD-12): strict on the recorded platform only",
+            "platform": rd.platform_record(), "freeze": rd.freeze_allowed(), "start_archive": arch,
+            "tool_blobs": {t_: git_blob_id(ROOT / t_) for t_ in tools},
+            "ready_controls_expected_sha256": hashlib.sha256((ROOT / READY_CONTROLS_EXPECTED).read_bytes().replace(b"\r\n", b"\n"))
+            .hexdigest(),
+            "results": {"controls": f"{READY_RESULTS}/controls_summary.json", "probes": f"{READY_RESULTS}/resource_probes.json"},
+            "frozen": False, "freeze_condition": "approved platform (OD-6) AND Reviewer check of the OP-8 change (D-057.1 item 7) AND "
+                                                 "owner acceptance; D1_START = BLOCKED"}
 
 
 def manifest_csv(rows: list[dict]) -> str:
