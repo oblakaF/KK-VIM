@@ -24,13 +24,31 @@ dependencies = [
     "scipy>=1.16.1",
 ]
 
+[project.optional-dependencies]
+# Optional GUI (docs/gui/GUI_DESIGN.md, GUI-D01); the scientific core does not depend on it.
+# PySide6-Essentials is the Qt part of PySide6 without WebEngine/Pdf. Lower bounds (checked on
+# PyPI, 2026-10-12): PySide6-Essentials 6.10.1 is the first release allowing CPython 3.14;
+# pyqtgraph 0.14.0 is the first release after NumPy 2 and PySide6 6.10.
+gui = [
+    "PySide6-Essentials>=6.10.1",
+    "pyqtgraph>=0.14.0",
+]
+
+[project.gui-scripts]
+kkvim-gui = "kkvim_gui.app:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.4.0",
 ]
+# Not a default group: pytest-qt needs a Qt binding, i.e. the "gui" extra.
+# uv sync --extra gui --group gui-test
+gui-test = [
+    "pytest-qt>=4.5.0",
+]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/kkvim", "src/kkvim_reference"]
+packages = ["src/kkvim", "src/kkvim_reference", "src/kkvim_gui"]
 
 [tool.pytest.ini_options]
 minversion = "8.4"
