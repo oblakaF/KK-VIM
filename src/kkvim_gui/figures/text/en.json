@@ -25,5 +25,6 @@
   "legend.tol_inf": "tol_∞",
   "legend.tol_E": "tol_E",
   "mark.provisional": "PROVISIONAL / NOT_QUALIFIED",
-  "mark.diagnostic": "DIAGNOSTIC · RUN NOT COMPLETED"
+  "mark.diagnostic": "DIAGNOSTIC · RUN NOT COMPLETED",
+  "surface.title": "Deformed plate shape (axonometric view)"
 }

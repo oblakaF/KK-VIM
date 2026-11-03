@@ -42,6 +42,10 @@ from kkvim_gui.model.setup_state import summary_rows, to_request
 from kkvim_gui.widgets.common import fit_to_screen, label
 from kkvim_gui.widgets.header import AppHeader, HeaderNav, app_icon
 
+PREVIEW_N = (1,)  # functional preview: only the accepted R3 solver (D-043)
+PREVIEW_BADGE = "ПРЕДВАРИТЕЛЬНАЯ ВЕРСИЯ · SSSS, N = 1"
+PREVIEW_TOOLTIP = ("Функциональная предварительная версия GUI, не официальный выпуск R7. Доступно: Кирхгоф–Ляв, SSSS, "
+                   "N = 1 (решатель R3, ACCEPTED, D-043). Отдельный расчёт — не научная приёмка")
 STATES = ("start", "setup", "running", "finished")
 STATE_NAMES = {
     "start": "Старт",
@@ -65,11 +69,13 @@ class MainWindow(QMainWindow):
     helpRequested = Signal()
 
     def __init__(self, session, dev=False, demo=False, protocol_dir=None, process_factory=SolverProcess,
-                 parent=None):
+                 preview=False, parent=None):
+        """preview=True: the functional preview — only Kirchhoff–Love, SSSS, N = 1 (R3) can be chosen and run."""
         super().__init__(parent)
         self.session = session
         self.dev = dev
         self.demo = demo
+        self.preview = preview
         self.setWindowIcon(app_icon())
         self.state = None
         self.runs = RunManager(process_factory=process_factory, protocol_dir=protocol_dir, parent=self)
@@ -85,14 +91,16 @@ class MainWindow(QMainWindow):
         lay.setSpacing(0)
         self.nav = HeaderNav(NAV_SECTIONS)
         self.nav.navigate.connect(self._navigate)
-        self.header = AppHeader(session, "КК-ВИМ", nav=self.nav, show_badge=demo)
+        self.header = AppHeader(session, "КК-ВИМ", nav=self.nav, show_badge=demo or preview)
+        if preview and not demo:
+            self.header.set_badge(PREVIEW_BADGE, "ПРЕДВАРИТЕЛЬНАЯ", PREVIEW_TOOLTIP)
         self.header.settingsClicked.connect(self.settingsRequested)
         self.header.helpClicked.connect(self.helpRequested)
         lay.addWidget(self.header)
 
         self.stack = QStackedWidget()
         self.start_view = StartView(demo=demo)
-        self.setup_view = SetupView(self.setup_model, session, demo=demo)
+        self.setup_view = SetupView(self.setup_model, session, demo=demo, n_selectable=PREVIEW_N if preview else None)
         self.run_view = RunView(session, self.runs)
         for w in (self.start_view, self.setup_view, self.run_view):
             self.stack.addWidget(w)
@@ -190,6 +198,8 @@ class MainWindow(QMainWindow):
             return run
         request = to_request(snapshot)
         problems = check_request(request)
+        if self.preview and request.N not in PREVIEW_N:
+            problems.append(f"N = {request.N}: недоступно в функциональной предварительной версии; доступно N = 1 (R3)")
         if problems:
             self.setup_view.show_solver_problems(problems)
             return None
@@ -216,10 +226,31 @@ class MainWindow(QMainWindow):
         run = self.runs.get(run_id)
         if run is None or run.outcome is None:
             return
-        folder = QFileDialog.getExistingDirectory(self, "Папка для результатов")
-        if folder:
-            paths = self.export_run(run_id, folder)
-            self.status_label.setText(f"●  Результаты сохранены: {paths['manifest'].parent}")
+        folder = QFileDialog.getExistingDirectory(self, "Папка для расчёта и отчёта")
+        if not folder:
+            return
+        try:
+            paths = self.save_package(run_id, folder)
+        except OSError as exc:
+            QMessageBox.warning(self, "Сохранение не выполнено", f"Расчёт не сохранён: {exc}")
+            return
+        self.status_label.setText(f"●  Расчёт и отчёт сохранены: {paths['report'].parent}")
+
+    def save_package(self, run_id, folder):
+        """Export files, PNG figures (if the run has a field) and report.html of a run in a new subfolder."""
+        from kkvim_gui.backend import report
+
+        run = self.runs.get(run_id)
+        target = Path(folder) / f"kkvim_{run.started:%Y%m%d-%H%M%S}_run{run.run_id:03d}"
+        render = view = None
+        if run.outcome.has_field:
+            from kkvim_gui.analysis import snapshots
+
+            render = snapshots.renderer(self.session, run.outcome)
+            view = snapshots.view_record(run.outcome)
+        paths = report.write_package(run.outcome, target, run.meta(self.runs.clock()), run.detailed, render, view)
+        run.log("ИНФО", f"Расчёт и отчёт сохранены: {target}")
+        return paths
 
     def export_run(self, run_id, folder):
         """Write manifest.json, history.csv and field.csv of a run into a new subfolder of ``folder``."""

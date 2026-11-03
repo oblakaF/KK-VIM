@@ -12,8 +12,10 @@ import math
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QRectF, Qt
+from PySide6.QtGui import QTransform
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QFrame,
     QGridLayout,
@@ -21,6 +23,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QScrollArea,
     QSplitter,
+    QStackedWidget,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -178,15 +181,21 @@ class Figure(QFrame):
 class FieldFigure(Figure):
     """Static colour field of w (mm) or w̄ on the nodes of the result grid with a colour bar."""
 
-    def __init__(self, session, outcome, compact=False, parent=None):
+    ISOLINES = 10  # contour levels evenly inside (min, max) of the shown quantity
+
+    def __init__(self, session, outcome, compact=False, isolines=False, parent=None):
         super().__init__(session, outcome, "field.w.title", interactive=False, parent=parent)
         self.quantity, self.cmap_name = "w", "viridis"
+        self.show_isolines = isolines
+        self.isocurves = []
         self.image = pg.ImageItem()
         self.plot.addItem(self.image)
         x, y = outcome.x, outcome.y
         hx, hy = x[1] - x[0], y[1] - y[0]
         # every image pixel is centred on its node (axis 0 = x, axis 1 = y: column-major, as the solver array)
         self.rect = QRectF(x[0] - hx / 2, y[0] - hy / 2, x[-1] - x[0] + hx, y[-1] - y[0] + hy)
+        # isolines are traced through the node values: node (i, j) is drawn at (x_i, y_j)
+        self.node_transform = QTransform.fromTranslate(float(x[0]), float(y[0])).scale(float(hx), float(hy))
         self.plot.setAspectLocked(True)
         self.bar = None if compact else pg.ColorBarItem(interactive=False, width=14)
         if self.bar is not None:
@@ -206,6 +215,32 @@ class FieldFigure(Figure):
         self.cmap_name = name
         self.update_image()
 
+    def set_isolines(self, on):
+        self.show_isolines = bool(on)
+        self.update_isolines()
+
+    def isoline_levels(self):
+        values = self.values()
+        low, high = float(values.min()), float(values.max())
+        if not high > low:
+            return []
+        return [low + (high - low) * k / (self.ISOLINES + 1) for k in range(1, self.ISOLINES + 1)]
+
+    def update_isolines(self):
+        for curve in self.isocurves:
+            self.plot.removeItem(curve)
+        self.isocurves = []
+        if not self.show_isolines:
+            return
+        values = np.asarray(self.values())
+        pen = pg.mkPen(self.session.tokens["plot.bg"], width=1)
+        for level in self.isoline_levels():
+            curve = pg.IsocurveItem(data=values, level=level, pen=pen)
+            curve.setTransform(self.node_transform)
+            curve.setZValue(10)
+            self.plot.addItem(curve)
+            self.isocurves.append(curve)
+
     def update_image(self):
         values = self.values()
         low, high = float(values.min()), float(values.max())
@@ -221,6 +256,7 @@ class FieldFigure(Figure):
             self.bar.setLevels((low, high))
             lang = self.session.figure_language
             self.bar.axis.setLabel(fig_text(lang, "colorbar.w" if self.quantity == "w" else "colorbar.wbar"))
+        self.update_isolines()
 
     def retranslate(self, *_):
         super().retranslate()
@@ -350,21 +386,43 @@ class OverviewTab(QWidget):
 
 
 class FieldsTab(QWidget):
+    """Colour field with isolines, or the axonometric view of the deformed surface with a labelled factor."""
+
     def __init__(self, session, outcome, model_rows, trailing=(), parent=None):
         super().__init__(parent)
-        self.figure = FieldFigure(session, outcome)
+        from kkvim_gui.analysis.surface import PRESETS, SurfaceFigure
+
+        self.figure = FieldFigure(session, outcome, isolines=True)
+        self.surface = SurfaceFigure(session, outcome)
+        self.view = SegmentedControl({"map": "Карта и изолинии", "surface": "3D-вид"}, "map")
         self.quantity = SegmentedControl({"w": "Прогиб w, mm", "w_bar": "Безразмерный w̄"}, "w")
         self.quantity.changed.connect(self.figure.set_quantity)
         self.cmap = QComboBox()
         self.cmap.addItems(["viridis", "cividis"])
         self.cmap.currentTextChanged.connect(self.figure.set_colormap)
-        bar = toolbar(self.quantity, labelled("Шкала", self.cmap), trailing=trailing)
+        self.isolines = QCheckBox("Изолинии")
+        self.isolines.setChecked(True)
+        self.isolines.toggled.connect(self.figure.set_isolines)
+        self.factor = QComboBox()
+        self.factor.addItem(f"Авто: ×{fmt(self.surface.auto, 3)}", self.surface.auto)
+        for value in PRESETS:
+            self.factor.addItem("×1 (истинный)" if value == 1.0 else f"×{fmt(value, 3)}", value)
+        self.factor.setToolTip("Масштаб прогиба только на изображении 3D-вида; числовые значения не изменяются")
+        self.factor.currentIndexChanged.connect(lambda i: self.surface.set_factor(self.factor.itemData(i)))
+        self.map_controls = (self.quantity, labelled("Шкала", self.cmap), self.isolines)
+        self.surface_controls = (labelled("Масштаб прогиба", self.factor),)
+        bar = toolbar(self.view, *self.map_controls, *self.surface_controls, trailing=trailing)
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self.figure)
+        self.stack.addWidget(self.surface)
+        self.view.changed.connect(self.set_view)
+        self.set_view("map")
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
         box = QVBoxLayout()
         box.setContentsMargins(16, 14, 16, 16)
-        box.addWidget(self.figure)
+        box.addWidget(self.stack)
         body.addLayout(box, 1)
         body.addWidget(self._inspector(outcome, model_rows))
         content = QWidget()
@@ -372,6 +430,16 @@ class FieldsTab(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(page(bar, content))
+
+    def set_view(self, view):
+        surface = view == "surface"
+        self.stack.setCurrentWidget(self.surface if surface else self.figure)
+        for w in self.map_controls:
+            w.setVisible(not surface)
+        for w in self.surface_controls:
+            w.setVisible(surface)
+        if self.view.current() != view:
+            self.view.set_current(view)
 
     @staticmethod
     def _inspector(outcome, model_rows):

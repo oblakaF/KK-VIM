@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QMainWindow,
     QMenu,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTabWidget,
@@ -264,9 +265,14 @@ class AnalysisWindow(QMainWindow):
         self.report_button = QPushButton("Собрать отчёт…")
         self.report_button.setEnabled(False)
         self.report_button.setToolTip(REPORT_TOOLTIP)
+        self.save_button = QPushButton("Сохранить расчёт и отчёт…")
+        self.save_button.setToolTip("Папка расчёта: manifest.json, history.csv, field.csv, рисунки PNG и "
+                                    "читаемый отчёт report.html")
+        self.save_button.clicked.connect(self._save_package_dialog)
         corner = QWidget()
         corner_lay = QHBoxLayout(corner)
         corner_lay.setContentsMargins(0, 4, 16, 4)
+        corner_lay.addWidget(self.save_button)
         corner_lay.addWidget(self.report_button)
         self.tabs.setCornerWidget(corner, Qt.Corner.TopRightCorner)
         self.tabs.setCurrentIndex(0)
@@ -301,6 +307,28 @@ class AnalysisWindow(QMainWindow):
     def export_all(self, folder):
         meta = self.run.meta(self.run._t0 + (self.run._elapsed_final or 0.0))
         return export.write_result(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed)
+
+    def save_package(self, folder):
+        """Calculation package of this run (export files, PNG figures, report.html) in a new subfolder."""
+        from kkvim_gui.analysis import snapshots
+        from kkvim_gui.backend import report
+
+        factor = self.fields.surface.factor
+        meta = self.run.meta(self.run._t0 + (self.run._elapsed_final or 0.0))
+        return report.write_package(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed,
+                                    render=snapshots.renderer(self.session, self.outcome, factor),
+                                    view=snapshots.view_record(self.outcome, factor))
+
+    def _save_package_dialog(self):
+        folder = QFileDialog.getExistingDirectory(self, "Папка для расчёта и отчёта")
+        if not folder:
+            return
+        try:
+            paths = self.save_package(folder)
+        except OSError as exc:
+            QMessageBox.warning(self, "Сохранение не выполнено", f"Расчёт не сохранён: {exc}")
+            return
+        self.statusBar().showMessage(f"Сохранено: {paths['report'].parent}", 10000)
 
     def _export_all_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Папка для результатов")

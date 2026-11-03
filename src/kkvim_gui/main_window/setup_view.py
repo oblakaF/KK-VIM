@@ -82,6 +82,12 @@ R4_NOTE = (
     "По умолчанию — нормативный режим D-047 (research_mode=False): после s = 1 — NOT_QUALIFIED. "
     "Исследовательское продолжение через QR включается только флажком (D-048.5) и сбрасывается при смене N."
 )
+PREVIEW_NOTE = (
+    "Функциональная предварительная версия: доступна только модель Кирхгофа–Лява, SSSS, равномерная нагрузка, "
+    "N = 1 — принятый решатель R3 (D-043). N = 2–6, CCCC, теории Тимошенко и Редди показаны как недоступные."
+)
+PREVIEW_N_TOOLTIP = ("N — число членов разделённого представления (D-003). В этой версии доступно только N = 1 "
+                     "(R3, ACCEPTED). N = 2–3 (R4) не квалифицированы, N = 4–6 не реализованы")
 RESEARCH_TEXT = "Исследовательское продолжение через QR (D-048.5)"
 RESEARCH_TOOLTIP = (
     "Выключено — нормативный режим D-047: research_mode=False, после s = 1 — NOT_QUALIFIED.\n"
@@ -118,11 +124,15 @@ def layout_mode(width):
 class SetupView(QWidget):
     runRequested = Signal()
 
-    def __init__(self, model=None, session=None, demo=False, parent=None):
+    def __init__(self, model=None, session=None, demo=False, n_selectable=None, parent=None):
+        """n_selectable: values of N the user may choose (the functional preview passes PREVIEW_N = (1,));
+        None keeps every N that the adapter implements."""
         super().__init__(parent)
         self.setObjectName("Page")
         set_help_context(self, "model.overview")
         self.demo = demo
+        self.n_selectable = tuple(N_AVAILABLE if n_selectable is None else n_selectable)
+        self.preview = n_selectable is not None
         self.model = model if model is not None else SetupModel(parent=self)
         self.session = session if session is not None else Session(settings=None, parent=self)
         st = self.model.state
@@ -191,10 +201,13 @@ class SetupView(QWidget):
         for n in N_VALUES:
             text = {1: "1 — R3, принятый", 2: "2 — R4, NOT_QUALIFIED", 3: "3 — R4, NOT_QUALIFIED"}.get(
                 n, f"{n} — не реализовано")
+            if self.preview and n in N_AVAILABLE and n not in self.n_selectable:
+                text = f"{n} — R4, не квалифицировано: недоступно в этой версии"
             self.N.addItem(text, n)
-        _disable_items(self.N, [n in N_AVAILABLE for n in N_VALUES])
+        _disable_items(self.N, [n in self.n_selectable for n in N_VALUES])
         self.N.setCurrentIndex(N_VALUES.index(st.N))
-        self.N.setToolTip("N — число членов разделённого представления (D-003). Реализовано: N = 1 (R3), "
+        self.N.setToolTip(PREVIEW_N_TOOLTIP if self.preview else
+                          "N — число членов разделённого представления (D-003). Реализовано: N = 1 (R3), "
                           "N = 2–3 (R4, D-047); N = 4–6 не реализовано")
         self.n_x = UnitField(t["n_x"])
         self.n_y = UnitField(t["n_y"])
@@ -274,6 +287,9 @@ class SetupView(QWidget):
             self._method_cells.append(cell)
             self._cells_by_scope[scope].append(cell)
         method.body.addLayout(self.method_grid)
+        self.preview_note = Note(PREVIEW_NOTE) if self.preview else None
+        if self.preview_note is not None:
+            method.body.addWidget(self.preview_note)
         self.r3_note = Note(R3_NOTE)
         self.r4_note = Note(R4_NOTE, "testdata")
         method.body.addWidget(self.r3_note)
