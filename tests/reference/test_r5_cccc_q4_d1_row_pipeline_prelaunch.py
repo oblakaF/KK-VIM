@@ -1158,8 +1158,14 @@ def test_guard_against_d1(tmp_path):
         if nx >= 3 and ny >= 3:
             with pytest.raises(pl.D1Refused):
                 pl.guard_config(TC(1.0, nx, 1.0, ny, 1, s_max=1))
-    with pytest.raises(pl.D1Refused):
-        pl.guard_config(TC(1.0, 8, 1.25, 10, 2, s_max=1))
+    pl.guard_config(TC(1.0, 8, 1.25, 10, 2, s_max=1))  # D-057.1: N = 2, 3 allowed at s = 1 on a non-D1 grid
+    pl.guard_row(TC(1.0, 8, 1.25, 10, 3, s_max=1), 1)
+    for N, s in ((2, 2), (3, 2), (3, 8)):  # N >= 2, s >= 2: refused before any computation (D-057.1 item 2)
+        with pytest.raises(pl.RankGuardRefused):
+            pl.guard_row(TC(1.0, 8, 1.25, 10, N, s_max=8), s)
+        with pytest.raises(pl.RankGuardRefused):
+            pl.compute_row(TC(1.0, 8, 1.25, 10, N, s_max=8), s, np.zeros((9 if s % 2 else 7, N)), np.zeros((7 if s % 2 else 9, N)),
+                           np.zeros((7 if s % 2 else 9, N)))
     with pytest.raises(pl.D1Refused):
         pl.guard_out(ROOT / "docs" / "results" / "x")
     with pytest.raises(pl.D1Refused):
@@ -1445,11 +1451,11 @@ def test_i2_guard_precedes_every_half_step_on_a_d1_grid(d1_journal, tmp_path, se
              lambda: pl.analyse_journal(d1_journal), lambda: pl._row_job(spec), lambda: pl._inputs_from_spec(spec),
              lambda: pl.bind_journal(j, {}),
              lambda: pl.run_trajectory_journal(TC(1.0, 9, 1.0, 11, 1, s_max=1), tmp_path / "o"),
-             lambda: pl.run_trajectory_journal(TC(1.0, 8, 1.25, 10, 2, s_max=1), tmp_path / "o"),
+             lambda: pl.run_trajectory_journal(TC(1.0, 14, 1.0, 6, 3, s_max=1), tmp_path / "o"),
              lambda: pl.analyse({"kind": "arrays", "arrays_npz": str(tmp_path / "absent.npz"), "arrays_sha256": {}, "s": 1,
                                  "config": arrays_cfg}),
-             lambda: pl.analyse({"kind": "arrays", "arrays_npz": str(tmp_path / "absent.npz"), "arrays_sha256": {}, "s": 1,
-                                 "config": {**arrays_cfg, "nx": 8, "ny": 10, "N": 3}})]
+             lambda: pl.analyse({"kind": "arrays", "arrays_npz": str(tmp_path / "absent.npz"), "arrays_sha256": {}, "s": 2,
+                                 "config": {**arrays_cfg, "nx": 8, "ny": 10, "N": 3}})]  # D-057.1: N = 3, s = 2
     for i, call in enumerate(calls):
         with pytest.raises(pl.D1Refused):
             call()

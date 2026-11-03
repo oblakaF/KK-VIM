@@ -82,10 +82,18 @@ def test_n1_own_sequence_with_I4(runs):
 
 @pytest.mark.parametrize("N", [2, 3])
 def test_n23_own_sequences_qr_transfer_orientation(runs, N):
+    """D-057.1 (variant V): s = 1 with the QR of the start set; s = 2 stops BEFORE the QR of the solved set of s = 1
+    (STOPPED_RANK_GUARD_UNCERTIFIED, trajectory status), its input is still the B-C result of s = 1 (bitwise link)."""
     tr = runs[N]
     cfg = tr.config
-    assert tr.status.startswith("COMPLETED") and len(tr.records) == 4
-    for k, (rec, arr) in enumerate(zip(tr.records, tr.arrays)):
+    assert tr.status.startswith(f"{tj.RANK_GUARD} at s = 2:") and len(tr.records) == 2
+    g = tr.records[1]
+    assert g["status"] == tj.STOP_RANK_GUARD and g["qr_executed"] is False and g["N"] == N and g["input_link_bitwise"] is True
+    assert set(tr.arrays[1]) == {"given_in", "companion_in"} and "S-1" not in g["status"].split(";")[0]
+    assert g["config_S1_RN3"]["all_hold"] is False and g["given_exact_rank"] == N
+    assert np.array_equal(tr.arrays[1]["given_in"], tr.arrays[0]["V_bc"])
+    assert np.array_equal(tr.arrays[1]["companion_in"], tr.arrays[0]["solved_set"])
+    for k, (rec, arr) in enumerate(zip(tr.records[:1], tr.arrays[:1])):
         s = k + 1
         n_f, n_s = (cfg.nx, cfg.ny) if s % 2 else (cfg.ny, cfg.nx)
         assert (rec["direction"], rec["n_f"], rec["n_s"]) == (tj.direction_of(s), n_f, n_s)
@@ -113,7 +121,7 @@ def test_n23_own_sequences_qr_transfer_orientation(runs, N):
 @pytest.mark.parametrize("cfg", [CFG1, CFG2])
 def test_input_of_next_step_is_the_bc_result_not_rac(runs, cfg, monkeypatch):
     ref = runs[cfg.N]
-    for k, arr in enumerate(ref.arrays):
+    for k, arr in enumerate(a for a in ref.arrays if "V_bc" in a):
         s_bc = arr["V_bc"].T.reshape(-1)
         ac = hs.solve_ac(_halfstep(cfg, k + 1, arr["solved_set"]))  # R-AC on the same solved system
         assert ac.s is not None and not np.array_equal(ac.s, s_bc)  # the trajectory value is not the R-AC value
@@ -147,8 +155,9 @@ def test_c3plus_is_assembled_on_the_solved_set_after_qr(cfg, monkeypatch):
 
     monkeypatch.setattr(ca, "c3plus", spy)
     tr = tj.run_trajectory(cfg)
-    assert len(seen) == len(tr.records)
-    for k, (rec, arr) in enumerate(zip(tr.records, tr.arrays)):
+    executed = [(r, a) for r, a in zip(tr.records, tr.arrays) if r["status"] == tj.OK]
+    assert len(seen) == len(executed) == (len(tr.records) if cfg.N == 1 else 1)  # N >= 2: no C-3+ at the guarded s = 2
+    for k, (rec, arr) in enumerate(executed):
         assert np.array_equal(seen[k], arr["solved_set"])
         if cfg.N >= 2:
             assert not np.array_equal(seen[k], arr["given_in"])  # after QR, not the set before QR
@@ -173,7 +182,7 @@ def test_c3plus_is_assembled_on_the_solved_set_after_qr(cfg, monkeypatch):
 def test_only_c_is_replaced(cfg):
     """E (Б-1): A, B, F bitwise those of the prototype's own path; only C replaced; the code of solve_bc is the prototype's."""
     tr = tj.run_trajectory(cfg)
-    for k, (rec, arr) in enumerate(zip(tr.records, tr.arrays)):
+    for k, (rec, arr) in enumerate((r, a) for r, a in zip(tr.records, tr.arrays) if r["status"] == tj.OK):
         solved = _halfstep(cfg, k + 1, arr["solved_set"])
         A, B, C_old, F = bc.bc_coefficients(solved)
         assert rec["only_C_replaced"] is True and rec["bc_coefficients_calls"] == 1 and rec["solve_isolation"] == tj.ISOLATION
@@ -517,7 +526,7 @@ def test_p4_is_never_declared_established(tmp_path, runs):
     """Б-2: in the code constants and in the JSON journal P-4 is ASSUMED only; the summary is conditional on P-4."""
     tj.write_journal(runs[2], tmp_path)
     data = json.loads((tmp_path / "journal.json").read_text(encoding="utf-8"))
-    for rec in data["steps"]:
+    for rec in [r for r in data["steps"] if r["status"] == tj.OK]:
         prem = rec["c3plus_premises"]
         assert prem["classes"]["P-4"] == "ASSUMED" and prem["P-4"].startswith("ASSUMED")
         assert rec["c3plus_premises_status"] == "ESTABLISHED_CONDITIONAL_ON_P4" and "P-4 assumed" in rec["c3plus_premises_summary"]
@@ -613,16 +622,19 @@ def test_zero_load_and_zero_field():
 # --- G. small control (14, 6), N = 3 (test configuration, not block D) ---------------------------------------------------------
 
 def test_small_control_14x6_n3_with_independent_check():
+    """D-057.1: (14, 6), N = 3 - N = floor(n_y/2) is an equality, the configurational S-1 of RN-3 does NOT hold; s = 1 runs, s = 2
+    stops before QR (STOPPED_RANK_GUARD_UNCERTIFIED), never S-1."""
     tr = tj.run_trajectory(CTRL, independent=True)
-    assert tr.status.startswith("COMPLETED s = 1..8") and len(tr.records) == 8
+    assert tr.status.startswith(f"{tj.RANK_GUARD} at s = 2:") and len(tr.records) == 2
     r1 = tr.records[0]
     assert r1["start_independence_condition"] == "N <= floor(n_x/2): 3 <= 7 -> True"
     assert r1["start_exact_formulas_condition"] == "2N < n_x: 6 < 14 -> True"
-    for rec in tr.records:
-        assert rec["status"] == tj.OK and "S-1" not in rec["status"]  # no S-1 without a proven dependence (n_y = 6 is no reason)
-        assert rec["given_exact_rank"] == 3 and rec["V_exact_rank"] == 3 and rec["rank_decision"].startswith("UNRESOLVED")
-        assert rec["independent_check"]["status"] == "CONSISTENT"
-    assert [r["n_s"] for r in tr.records] == [6, 14] * 4
+    c = r1["config_S1_RN3"]
+    assert (c["n_s"], c["floor_n_s_half"], c["N_gt_floor_n_s_half"], c["all_hold"]) == (6, 3, False, False)
+    assert r1["status"] == tj.OK and r1["given_exact_rank"] == 3 and r1["V_exact_rank"] == 3
+    assert r1["rank_decision"].startswith("UNRESOLVED") and r1["independent_check"]["status"] == "CONSISTENT"
+    assert tr.records[1]["status"] == tj.STOP_RANK_GUARD and "S-1" not in tr.records[1]["status"].split(";")[0]
+    assert [r["n_s"] for r in tr.records] == [6, 14]
 
 
 # --- H. independent check of small half-steps (exact system, R-H) -----------------------------------------------------------------
@@ -630,7 +642,7 @@ def test_small_control_14x6_n3_with_independent_check():
 @pytest.mark.parametrize("cfg", [CFG1, CFG2, CFG3])
 def test_independent_check_of_small_half_steps(cfg):
     tr = tj.run_trajectory(cfg, independent=True)
-    for rec in tr.records:
+    for rec in [r for r in tr.records if r["status"] == tj.OK]:
         ic = rec["independent_check"]
         assert ic["status"] == "CONSISTENT" and ic["rh_status"] == hs.INDEPENDENT
         assert ic["exact_solution_identity_Kx_eq_b"] and ic["bc_within_certified_bound"] and ic["rh_within_certified_bound"]
@@ -663,12 +675,12 @@ def test_journal_restores_the_next_input(tmp_path, runs):
     assert all(v.startswith("NOT_CHECKED") for v in prov["loaded_project_modules_not_checked"].values())
     assert not set(prov["loaded_project_modules_not_checked"]) & set(tj.USED_MODULES)
     assert "not a mechanism that prevents a D1 run" in data["meta"]["d1_guard"] == prov["d1_guard"]
-    assert len(data["steps"]) == 4 and meta["arrays_sha256"] == {k: tj.array_sha(v) for k, v in z.items()}
-    for s in range(1, 4):
-        g, c = z[f"s{s}_next_given"], z[f"s{s}_next_companion"]
-        assert np.array_equal(g, z[f"s{s + 1}_given_in"]) and np.array_equal(c, z[f"s{s + 1}_companion_in"])
-        res = tj.run_step(tr.config, s + 1, g, c)  # independent restoration of half-step s + 1 from the stored arrays
-        assert np.array_equal(res.arrays["V_bc"], z[f"s{s + 1}_V_bc"])
+    assert len(data["steps"]) == 2 and meta["arrays_sha256"] == {k: tj.array_sha(v) for k, v in z.items()}
+    g, c = z["s1_next_given"], z["s1_next_companion"]
+    assert np.array_equal(g, z["s2_given_in"]) and np.array_equal(c, z["s2_companion_in"])
+    res = tj.run_step(tr.config, 2, g, c)  # independent restoration of half-step 2: the same protective stop, nothing solved
+    assert res.record["status"] == tj.STOP_RANK_GUARD == data["steps"][1]["status"] and "V_bc" not in res.arrays
+    assert data["meta"]["status"].startswith(f"{tj.RANK_GUARD} at s = 2:") and prov["rank_guard"] == tj.RANK_GUARD_RULE
 
 
 def test_trajectory_is_deterministic_in_one_process(runs):
@@ -684,7 +696,8 @@ def test_command_line_runs_small_and_refuses_d1(tmp_path):
                          timeout=600)
     assert res.returncode == 0, res.stderr[-2000:]
     steps = json.loads((out / "journal.json").read_text(encoding="utf-8"))["steps"]
-    assert [s["status"] for s in steps] == [tj.OK, tj.OK] and all(s["independent_check"]["status"] == "CONSISTENT" for s in steps)
+    assert [s["status"] for s in steps] == [tj.OK, tj.STOP_RANK_GUARD] and steps[0]["independent_check"]["status"] == "CONSISTENT"
+    assert "independent_check" not in steps[1]
     for nx, ny in ((14, 6), (50, 50), (320, 1280), (400, 1600)):
         ref = subprocess.run([sys.executable, str(SCRIPT), "run", "--lx", "1", "--nx", str(nx), "--ly", "1", "--ny", str(ny), "--N", "1",
                               "--out", str(tmp_path / "d1")], cwd=ROOT, capture_output=True, text=True, timeout=600)
@@ -713,6 +726,67 @@ def test_no_import_of_the_working_kkvim():
             " print(sorted(m.loaded_modules_check()))")
     res = subprocess.run([sys.executable, "-c", code, str(SCRIPT)], cwd=ROOT, capture_output=True, text=True, timeout=300)
     assert res.returncode == 0 and res.stdout.split("\n")[:2] == ["[]", "[]"], (res.stdout, res.stderr[-2000:])  # N-5: all listed
+
+
+# --- D-057.1: rank protection (QA-D1-READY) ------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("nx,ny", [(12, 4), (10, 4), (14, 4)])
+def test_rt3_configurational_s1_before_any_computation(nx, ny, monkeypatch):
+    """RT-3 (PR #49 study 7): N = 3 > floor(n_y/2) = 2 - S-1 by the configuration (RN-3) before the first half-step: no QR, no C-3+
+    assembly, no B-C solve. On (12, 4), (10, 4) the tool without this check continued QR (PR #49 review)."""
+    def boom(*a, **k):
+        raise AssertionError("computation before the configurational S-1")
+
+    for mod, name in ((bc, "orthonormalise"), (ca, "c3plus"), (tj, "solve_with_c")):
+        monkeypatch.setattr(mod, name, boom)
+    tr = tj.run_trajectory(tj.TrajectoryConfig(1.0, nx, 1.0, ny, 3))
+    rec = tr.records[0]
+    assert len(tr.records) == 1 and rec["status"] == tj.STOP_CONFIG and rec["qr_executed"] is False
+    assert set(tr.arrays[0]) == {"given_in", "companion_in"} and tr.status == f"STOPPED at s = 1: {tj.STOP_CONFIG}"
+    c = rec["config_S1_RN3"]
+    assert c["all_hold"] and (c["n_s"], c["floor_n_s_half"], c["N"]) == (ny, 2, 3) and c["given_set_independent"]
+    assert c["uniform_grid"] and c["clamped_both_ends_of_solved_direction"] and c["q_const"]
+
+
+def test_configurational_s1_needs_every_condition():
+    cfg = tj.TrajectoryConfig(1.0, 12, 1.0, 4, 3)
+    assert tj.config_s1_conditions(cfg, 3, 4, 3)["all_hold"] is True
+    assert tj.config_s1_conditions(cfg, 3, 4, 2)["all_hold"] is False  # given set not independent: the exact rank decides (S-1)
+    assert tj.config_s1_conditions(cfg, 3, 6, 3)["all_hold"] is False  # equality N = floor(n_s/2): no S-1
+    assert tj.config_s1_conditions(cfg, 1, 3, 1)["all_hold"] is False  # N = 1 never (n_s >= 3)
+    start = tj.run_trajectory(tj.TrajectoryConfig(1.0, 4, 1.0, 10, 3))  # the start condition first (VBC-13 item 4)
+    assert start.records[0]["status"] == tj.STOP_START and "config_S1_RN3" not in start.records[0]
+
+
+@pytest.mark.parametrize("N", [2, 3])
+def test_rank_guard_stops_before_qr_on_any_input(N, monkeypatch):
+    """D-057.1 item 2: N >= 2, s >= 2 - no QR of the solved set, no C-3+, no B-C solve, no field diagnostic, whatever the
+    (independent) input; no bypass in the tool."""
+    calls = []
+
+    def sensor(name):
+        def f(*a, **k):
+            calls.append(name)
+            raise AssertionError(name)
+        return f
+
+    for mod, name in ((bc, "orthonormalise"), (ca, "c3plus"), (tj, "solve_with_c"), (seq, "_rank_diagnostic")):
+        monkeypatch.setattr(mod, name, sensor(name))
+    rng = np.random.default_rng(N)
+    cfg = tj.TrajectoryConfig(1.0, 8, 1.25, 10, N, s_max=8)
+    for s in (2, 3, 8):
+        n_f, n_s = (8, 10) if s % 2 else (10, 8)
+        res = tj.run_step(cfg, s, rng.standard_normal((n_f - 1, N)), rng.standard_normal((n_s - 1, N)))
+        assert res.record["status"] == tj.STOP_RANK_GUARD and res.next_given is None
+        assert set(res.arrays) == {"given_in", "companion_in"}
+    assert not calls
+    assert tj.RANK_GUARD == "STOPPED_RANK_GUARD_UNCERTIFIED" and "not S-1, not S-2" in tj.STOP_RANK_GUARD
+    assert "no bypass" in tj.RANK_GUARD_RULE
+
+
+def test_n1_records_carry_the_rank_protection_without_effect(runs):
+    for rec in runs[1].records:
+        assert rec["config_S1_RN3"]["all_hold"] is False and rec["rank_guard"].startswith("N = 1: no QR")
 
 
 def test_used_modules_and_data_unchanged():

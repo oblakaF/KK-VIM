@@ -153,10 +153,14 @@ def _strip_platform(m: dict, same_platform: bool) -> dict:
     m = json.loads(json.dumps(m))
     m["hash_platform"] = None
     _self_entry(m)["blob"] = None
+    d = m.get("d057") or {}
+    d["platform"] = d["freeze"] = None  # the record of the generating process (OD-6), compared in the QA-D1-READY results
     if not same_platform:
-        for x in [r["inputs"] for r in m["mandatory_rows"] if r["s"] == 1] + m["blocked_probes_N23"]["probes"]:
+        for x in [r["inputs"] for r in m["mandatory_rows"] if r["s"] == 1] + m["blocked_probes_N23"]["probes"] +                 d.get("input_hashes_s1", []):
             assert _SHA.fullmatch(x["given_in_sha"]), x["given_in_sha"]
             x["given_in_sha"] = PLATFORM_DEPENDENT
+        if d.get("start_archive"):
+            d["start_archive"]["content_sha256"] = PLATFORM_DEPENDENT
     return m
 
 
@@ -290,20 +294,30 @@ def test_sha_inventory_against_git(manifest):
             continue
         assert c["blob"] == pf.git_blob_id(ROOT / c["path"])
     missing = {c["id"] for c in inv["components"] if c["state"] == "MISSING"}
-    assert missing == {"classifier_campaign", "row_pipeline", "block_C_driver", "B_E_independent_recount", "control_V_harness",
-                       "control_G_harness"}
-    assert all(c["blob"] is None and c["path"] is None for c in inv["components"] if c["state"] == "MISSING")
+    assert missing == set() and inv["missing"] == []  # QA-D1-READY: every component of PR #48's list is present (D-057.6)
 
 
 def test_sha_inventory_blobs_at_the_base_commit(manifest):
-    """The used files are the ones of BASE_COMMIT (git history; the tool itself is new in the branch)."""
-    _require_history(pf.BASE_COMMIT)
+    """The used files are the ones of READY_BASE_COMMIT (main at the start of QA-D1-READY), except the files QA-D1-READY declares
+    changed (READY_CHANGED: they must differ from the base) or new (READY_NEW: absent at the base). PR #48's own base is kept in the
+    inventory (base_commit) and checked by the package-range test."""
+    _require_history(pf.READY_BASE_COMMIT)
     inv = manifest["sha_inventory"]
+    assert inv["base_commit"] == pf.BASE_COMMIT and inv["ready_base_commit"] == pf.READY_BASE_COMMIT
+    seen = set()
     for c in inv["components"] + inv["other_used_files"]:
-        if c.get("path") and c["path"] != pf.SELF:
-            b = _git("rev-parse", f"{pf.BASE_COMMIT}:{c['path']}")
-            assert b.returncode == 0, (c["path"], b.stderr)
-            assert b.stdout.strip() == c["blob"], c["path"]
+        path = c.get("path")
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        b = _git("rev-parse", f"{pf.READY_BASE_COMMIT}:{path}")
+        if path in pf.READY_NEW:
+            assert b.returncode != 0, path
+        elif path in pf.READY_CHANGED:
+            assert b.returncode == 0 and b.stdout.strip() != c["blob"], path
+        else:
+            assert b.returncode == 0, (path, b.stderr)
+            assert b.stdout.strip() == c["blob"], path
 
 
 def test_dependency_closure_contains_the_op8_list(manifest):
@@ -340,20 +354,28 @@ def test_second_path_sample_integrity(manifest, committed):
 
 
 def test_owner_decisions_are_not_frozen(manifest):
-    assert manifest["manifest_state"].startswith("INCOMPLETE - NOT FROZEN")
+    """D-057: OD-1...OD-12 decided by the owner; the manifest is a freeze candidate, NOT frozen; D1_START = BLOCKED."""
+    assert manifest["manifest_state"].startswith("FREEZE_CANDIDATE - NOT FROZEN")
     assert manifest["d1_start"] == "BLOCKED"
     assert {d["id"] for d in manifest["owner_decisions"]} == {f"OD-{i}" for i in range(1, 13)}
-    assert all(d["status"] == "OWNER_DECISION_REQUIRED" for d in manifest["owner_decisions"])
+    assert all(d["status"] == "DECIDED" and d["decision"].startswith("D-057.") for d in manifest["owner_decisions"])
     assert "FROZEN" not in manifest["manifest_state"].replace("NOT FROZEN", "")
+    d = manifest["d057"]
+    assert d["frozen"] is False and d["D"] == d["q"] == (1.0).hex() and d["block_D_geometry"] == {"lx": "0x1.0000000000000p+0",
+                                                                                                 "ly": "0x1.0000000000000p+0"}
+    assert d["row_plan_counts"]["mandatory"] == d["row_plan_counts"]["mandatory_executable"] == 102
+    assert d["subsets"]["counts"]["SP-GAMMA"] == 102 and d["start_archive"]["state"] == "PRESENT"
+    sec13 = PROTOCOL[PROTOCOL.index("## 13. "):]
+    assert "STOPPED_RANK_GUARD_UNCERTIFIED" in sec13 and "D1_START = BLOCKED" in sec13
 
 
 def test_n3_probes_are_planned_not_executed(manifest):
     b = manifest["blocked_probes_N23"]
-    assert b["status"] == "NOT_EXECUTED"
+    assert b["status"].startswith("PERMITTED_N3_S1 (D-057.4)")
     assert {p["probe"] for p in b["probes"]} == {k for k in pf.REFUSED if k.endswith(":N3")}
     sec8 = _section("**Обязательные пробы перед запуском**", "Для планирования")
     for p in b["probes"]:
-        assert f"({p['nx']}, {p['ny']})" in sec8 and p["N"] == 3 and p["state"].startswith("BLOCKED: PRE_D1_RANK")
+        assert f"({p['nx']}, {p['ny']})" in sec8 and p["N"] == 3 and p["s"] == 1 and p["state"].startswith("PERMITTED (D-057.4")
 
 
 # --- classifier and controls A, B ---------------------------------------------------------------------------------------------------

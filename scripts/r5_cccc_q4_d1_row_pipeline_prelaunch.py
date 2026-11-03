@@ -61,10 +61,19 @@ OD-8.
 Controls (scripts/r5_cccc_q4_d1_controls_prelaunch.py) use ``compute_row`` with a named injection or mutation (INJECTIONS,
 MUTATIONS); such rows are marked and never enter a campaign.
 
-Not done here: N >= 2 (PRE_D1_RANK), blocks B, C, D, the separate recount of B_E (OD-11), the D1 rows and any campaign verdict.
-Guard (API and command line): the D1 grids of protocol 2.2, 2.3, 3, N != 1 and output under docs/ are refused, before any binding,
-loading of arrays, re-run of an OP-8 half-step or child process (``analyse``, ``analyse_journal``, ``bind_journal``, ``compute_row``,
-``run_trajectory_journal``, the internal ``_row`` entry). Data of this tool:
+QA-D1-READY extension (D-057.1...D-057.6; the integrated layer is scripts/r5_cccc_q4_d1_ready.py):
+- rows N = 2, 3 at s = 1 (the solved set after the QR of the start set; D-057.1 variant V); a row N >= 2, s >= 2 is never computed:
+  from a journal it is UNRESOLVED with the reason STOPPED_RANK_GUARD_UNCERTIFIED (``rank_guard_reason``), on given arrays it is
+  refused before any computation (``guard_row``, ``RankGuardRefused``);
+- paired rows of block C (kind "paired", ``bcd().paired_inputs``): the R-AC chain state as input, the paired B-C half-step by the EQ
+  functions, its isolated OP-8 twin bitwise (OD-3);
+- recorded on every row: ``actual_inputs`` (F-2), optionally the full second path of gamma with inclusion and narrowness (F-3,
+  ``sp_gamma="all"``) and the second path of B_E (``sp_be``); their enforcement (П-а, Z-4, verdict) is in the integrated layer.
+  ``analyse`` itself keeps its PR #50 decisions (П-а from binding and reproduction, classify_row unchanged).
+Not done here: the D1 rows and any campaign verdict.
+Guard (API and command line): the D1 grids of protocol 2.2, 2.3, 3, N outside 1..3, rows N >= 2 at s >= 2 and output under docs/
+are refused, before any binding, loading of arrays, re-run of an OP-8 half-step or child process (``analyse``, ``analyse_journal``,
+``bind_journal``, ``compute_row``, ``run_trajectory_journal``, the internal ``_row`` entry). Data of this tool:
 PRELAUNCH research observation, NOT D1 data, never D1_RESULT.
 
 Usage (repository root; small non-D1 configurations only):
@@ -102,21 +111,32 @@ OP8_TOOL = "scripts/r5_cccc_q4_d1_c3plus_trajectories.py"
 QAEB_TOOL = "scripts/r5_cccc_q4_energy_bound_premises_audit.py"
 PREFLIGHT_TOOL = "scripts/r5_cccc_q4_d1_preflight.py"
 USED_TOOLS = (OP8_TOOL, QAEB_TOOL, "scripts/r5_cccc_q4_energy_bc_audit.py", "scripts/r5_cccc_q4_gamma_interval_audit.py",
-              "scripts/r5_cccc_q4_gamma_audit.py", "scripts/r5_cccc_q4_c_assembly_e4_audit.py", PREFLIGHT_TOOL)
+              "scripts/r5_cccc_q4_gamma_audit.py", "scripts/r5_cccc_q4_c_assembly_e4_audit.py", PREFLIGHT_TOOL,
+              "scripts/r5_cccc_q4_be_second_path_research.py", "scripts/r5_cccc_q4_d1_block_c_driver.py")
 SECOND_PATH_MAX_NODES = 4096  # cost limit of the exact second path of gamma (small-grid rule of protocol 5 item 9); not a threshold
 D1_START = "BLOCKED"
-DATA_STATUS = "PRELAUNCH research observation (N = 1); NOT D1 data, never D1_RESULT (D1_START = BLOCKED, protocol 12)"
+DATA_STATUS = ("PRELAUNCH research observation (N = 1; N = 2, 3 at s = 1 only, D-057.1); NOT D1 data, never D1_RESULT "
+               "(D1_START = BLOCKED, protocol 12)")
 ESTABLISHED, NOT_ESTABLISHED, NOT_CHECKABLE = "ESTABLISHED", "NOT_ESTABLISHED", "NOT_CHECKABLE"
 UNDETERMINED = "UNDETERMINED"
 PREMISES_COMPUTED = ("P-b", "P-c", "P-d", "P-e", "P-f")  # П-б...П-е; П-а is set from binding and reproduction
 INJECTIONS = ("perturb_field_s_rel_2^-40", "scale_field_s_2^1000", "subnormal_field_s_node", "grid_D_2^-1074", "prev_factors_2^-600",
               "mu_low_zero", "B_E_sqrt_negative_D")
-MUTATIONS = ("gamma_sign_flip", "gamma_from_step", "Q_from_field_s", "P_prev_from_field_s", "B_E_drop_B1")
+MUTATIONS = ("gamma_sign_flip", "gamma_from_step", "Q_from_field_s", "P_prev_from_field_s", "B_E_drop_B1",
+             # QA-D1-READY (D-057.3): defects INSIDE a bound call (the binding of the call is consistent; only a second path sees them)
+             # and a call on the arrays of another half-step (seen by the binding of the actual inputs, F-2)
+             "gamma_function_sign_flip", "gamma_interval_widened", "B_E_function_drop_B1", "gamma_from_step_arrays")
+BE2_TOOL = "scripts/r5_cccc_q4_be_second_path_research.py"
+BLOCK_C_TOOL = "scripts/r5_cccc_q4_d1_block_c_driver.py"
 MODES = {"round_up": (0x200, 0x300), "ftz_daz": (0x01000000, 0x03000000)}  # _controlfp(new, mask): _RC_UP; _DN_FLUSH
 
 
 class D1Refused(ValueError):
-    """The configuration or the output is refused (D1_START = BLOCKED; N = 1 only)."""
+    """The configuration or the output is refused (D1_START = BLOCKED; N in 1..3; N >= 2 only at s = 1)."""
+
+
+class RankGuardRefused(D1Refused):
+    """A row of N >= 2 at s >= 2 asked for computation on given arrays: refused before any computation (D-057.1, items 2-3)."""
 
 
 def _load(rel: str, name: str):
@@ -153,6 +173,16 @@ def pf():
     return _load(PREFLIGHT_TOOL, "_pl_preflight")
 
 
+def be2():
+    """The second path of B_E (PR #51, hardened N-1, N-2; read-only use; SP-BE, the channel of G-5)."""
+    return _load(BE2_TOOL, "_pl_be2")
+
+
+def bcd():
+    """The block-C driver (R-AC chain, paired half-steps; QA-D1-READY)."""
+    return _load(BLOCK_C_TOOL, "_pl_block_c")
+
+
 def git_blob_id(path: Path) -> str:
     data = path.read_bytes().replace(b"\r\n", b"\n")
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
@@ -163,10 +193,22 @@ def git_blob_id(path: Path) -> str:
 # ---------------------------------------------------------------------------------------------------------------------------------
 
 def guard_config(cfg) -> None:
+    """Configuration guard (before any loading or computation): the D1 grids are refused (D1_START = BLOCKED), N must be 1, 2 or 3.
+    Rows of N >= 2 exist only at s = 1 (D-057.1; ``guard_row``)."""
     if (cfg.nx, cfg.ny) in op8().D1_GRIDS:
         raise D1Refused(f"({cfg.nx}, {cfg.ny}) is a grid of the D1 sample (protocol 2.2, 2.3, 3); D1_START = BLOCKED")
-    if cfg.N != 1:
-        raise D1Refused("N = 1 only: N = 2, 3 are blocked by PRE_D1_RANK (D-049.5; QR without a qualified rank decision)")
+    if isinstance(cfg.N, bool) or cfg.N not in (1, 2, 3):
+        raise D1Refused(f"N = {cfg.N!r}: N must be 1, 2 or 3")
+
+
+def guard_row(cfg, s) -> None:
+    """Row guard of D-057.1 (variant V): N = 2, 3 only at s = 1; a computation of a row N >= 2, s >= 2 is refused before any
+    computation (its row is UNRESOLVED with the reason STOPPED_RANK_GUARD_UNCERTIFIED, ``rank_guard_not_executed``)."""
+    guard_config(cfg)
+    if isinstance(s, bool) or not isinstance(s, int) or s < 1:
+        raise D1Refused(f"s = {s!r} is not a half-step number")
+    if cfg.N >= 2 and s >= 2:
+        raise RankGuardRefused(f"N = {cfg.N}, s = {s}: refused before any computation - {op8().STOP_RANK_GUARD}")
 
 
 def guard_out(path: Path) -> None:
@@ -381,6 +423,28 @@ def gamma_interval_tight(gamma: Fraction, gd: float, gu: float) -> bool:
     return Fraction(gd) < gamma < Fraction(gu) and math.nextafter(gd, math.inf) == gu
 
 
+def _canon_sha(o) -> str:
+    def enc(x):
+        if isinstance(x, Fraction):
+            return f"F:{x.numerator}/{x.denominator}"
+        if isinstance(x, float):
+            return f"f:{x.hex()}"
+        if isinstance(x, (np.bool_, np.integer, np.floating)):
+            return enc(x.item())
+        raise TypeError(type(x).__name__)
+    return hashlib.sha256(json.dumps(o, sort_keys=True, default=enc, separators=(",", ":")).encode()).hexdigest()
+
+
+def grid_constants_sha(kc: dict) -> str:
+    """sha256 of the grid constants object of U-3 passed to b_e (exact values in a canonical text)."""
+    return _canon_sha({k: v for k, v in kc.items()})
+
+
+def gridq_sha(gq) -> str:
+    """sha256 of the exact grid object of QA-EB passed to b_e (its public exact attributes)."""
+    return _canon_sha({k: v for k, v in sorted(vars(gq).items()) if isinstance(v, (Fraction, int, float)) and not isinstance(v, bool)})
+
+
 def fault_text(f: dict) -> str:
     return f"FAULT at stage {f['stage']} (source: {f['source']}; {f['effect']}; no premise attributed): {f['error']}"
 
@@ -399,21 +463,52 @@ def _node(a: np.ndarray) -> tuple[int, int]:
 
 
 def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.ndarray, injection: str | None = None,
-                mutation: str | None = None, gamma_other: Fraction | None = None) -> dict:
-    """Steps 2-5 of the module docstring on the arrays of one half-step (N = 1: given = solved set). ``injection`` (control B) or
-    ``mutation`` (control G) names one of INJECTIONS / MUTATIONS; None for an ordinary row."""
-    guard_config(cfg)
+                mutation: str | None = None, gamma_other: Fraction | None = None, gamma_arrays_other: tuple | None = None,
+                sp_gamma: str | None = None, sp_be: bool = False) -> dict:
+    """The row computation behind the guard of the configuration and of the row (``guard_row``: D1 grids refused, D1_START =
+    BLOCKED; N >= 2 only at s = 1). See ``_compute_row_core``."""
+    guard_row(cfg, s)
+    return _compute_row_core(cfg, s, given, companion, V, injection, mutation, gamma_other, gamma_arrays_other, sp_gamma, sp_be)
+
+
+def _compute_row_core(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.ndarray, injection: str | None = None,
+                      mutation: str | None = None, gamma_other: Fraction | None = None, gamma_arrays_other: tuple | None = None,
+                      sp_gamma: str | None = None, sp_be: bool = False) -> dict:
+    """Steps 2-5 of the module docstring on the arrays of one half-step (given = solved set: N = 1 the given set, N >= 2 the set
+    after the QR of s = 1). ``injection`` (control B) or ``mutation`` (control G) names one of INJECTIONS / MUTATIONS; None for an
+    ordinary row. ``gamma_arrays_other`` (given, companion, V) of another half-step for the mutation gamma_from_step_arrays.
+
+    QA-D1-READY (D-057.3), recorded on every row, used by the integrated layer (scripts/r5_cccc_q4_d1_ready.py):
+    - ``actual_inputs`` (F-2): sha256 of the arrays ACTUALLY passed to each computation (formation of both fields, the subtraction,
+      pi_double twice, q_double, gamma_b1, b_e with its grid objects, the second paths) and of the value each call returned and the
+      row used; ``inputs_sha`` of (given, companion, V). The check is ``actual_input_defects``;
+    - ``sp_gamma`` = "all": the second path of gamma (VOK-2 identity, energies_path_b) on any grid, with the inclusion of the exact
+      gamma_B in [gamma_down, gamma_up] and the narrowness gamma_down = RD(gamma_B), gamma_up = RU(gamma_B) bitwise (F-3; RD, RU by
+      the own integer rounding of the second B_E path, not by the directed() of path B1). None: the earlier small-grid diagnostic only;
+    - ``sp_be``: the second path of B_E (PR #51, N-1/N-2 hardened) on the actual arrays with P^ mandatory (N-3); its B_E in the
+      documented representation of QA-EB (80-bit roots, N-5) must equal the B_E of the row exactly (channel of G-5).
+    Called without the D1-grid guard ONLY by the resource probes of the integrated layer (values discarded, never recorded); the
+    rank guard of D-057.1 is applied here as well."""
+    if cfg.N >= 2 and s >= 2:
+        raise RankGuardRefused(f"N = {cfg.N}, s = {s}: refused before any computation - {op8().STOP_RANK_GUARD}")
     if injection is not None and injection not in INJECTIONS:
         raise ValueError(f"unknown injection {injection!r}")
     if mutation is not None and mutation not in MUTATIONS:
         raise ValueError(f"unknown mutation {mutation!r}")
+    if sp_gamma not in (None, "all"):
+        raise ValueError(f"sp_gamma must be None or 'all', got {sp_gamma!r}")
     Q_ = qa()
     lx, nx, ly, ny, D, q = float(cfg.lx), cfg.nx, float(cfg.ly), cfg.ny, float(cfg.D), float(cfg.q)
     direction = op8().direction_of(s)
     given, companion, V = (np.array(a, dtype=float, copy=True) for a in (given, companion, V))
     N = given.shape[1]
+    if N != cfg.N:
+        raise ValueError(f"the given set has N = {N}, the configuration N = {cfg.N}")
     g = en.Grid(lx, nx, ly, ny, D=D, q=q)
     out = {"s": s, "direction": direction, "N": N, "injection": injection, "mutation": mutation}
+    sha = op8().array_sha
+    out["inputs_sha"] = {"given": sha(given), "companion": sha(companion), "V": sha(V)}
+    ai = {}  # F-2: actual inputs and outputs of every bound computation
     faults = []
     reasons = {p: [] for p in PREMISES_COMPUTED}
     checkable = {p: True for p in PREMISES_COMPUTED}
@@ -428,6 +523,8 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
         Xp, Yp = np.full_like(Xp, 2.0**-600), np.full_like(Yp, 2.0**-600)
     with np.errstate(all="ignore"):
         wh_prev, wh_s = Xp @ Yp.T, Xs @ Ys.T
+        ai["formation_prev"] = {"X": sha(Xp), "Y": sha(Yp), "out": sha(wh_prev)}
+        ai["formation_s"] = {"X": sha(Xs), "Y": sha(Ys), "out": sha(wh_s)}
         if injection == "perturb_field_s_rel_2^-40":
             i, j = _node(wh_s)
             wh_s[i, j] = wh_s[i, j] * (1.0 + 2.0**-40)
@@ -441,13 +538,24 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
         q_field = wh_s if mutation == "Q_from_field_s" else dh
         # --- 3. path G-4
         Pp, Ps, Qd = en.pi_double(g, p_field), en.pi_double(g, wh_s), en.q_double(g, q_field)
-    sha = op8().array_sha
+    ai["subtraction"] = {"a": sha(wh_prev), "b": sha(wh_s), "out": sha(dh)}
+    ai["pi_double_p"] = {"field": sha(p_field), "out": fhex(Pp)}
+    ai["pi_double_s"] = {"field": sha(wh_s), "out": fhex(Ps)}
+    ai["q_double"] = {"field": sha(q_field), "out": fhex(Qd)}
     out.update({"field_prev_sha": sha(wh_prev), "field_s_sha": sha(wh_s), "d_hat_sha": sha(dh), "P_hat_p": fhex(Pp),
                 "P_hat_s": fhex(Ps), "Q_hat": fhex(Qd)})
     # --- 4. gamma of path B1
-    gamma = None
+    gamma = gamma_call = None
+    g_in = (given, companion, V)
+    if mutation == "gamma_from_step_arrays":  # the call receives the arrays of another half-step (F-2 sees its inputs)
+        if gamma_arrays_other is None:
+            raise ValueError("gamma_from_step_arrays needs gamma_arrays_other")
+        g_in = tuple(np.array(a, dtype=float, copy=True) for a in gamma_arrays_other)
     try:
-        gamma = gi().gamma_b1(lx, nx, ly, ny, direction, given, companion, V, D=D, q=q)
+        gamma_call = gi().gamma_b1(lx, nx, ly, ny, direction, *g_in, D=D, q=q)
+        if mutation == "gamma_function_sign_flip":  # a defect inside the call: its output is wrong, its binding consistent
+            gamma_call = -gamma_call
+        gamma = gamma_call
     except (ValueError, ArithmeticError) as exc:  # Gamma_up is not built; recorded as a fault, no premise attributed (protocol 4.1)
         out["gamma_error"] = f"{type(exc).__name__}: {exc}"
         faults.append(_fault("gamma_B1", exc))
@@ -457,9 +565,13 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
         if gamma_other is None:
             raise ValueError("gamma_from_step needs gamma_other")
         gamma = gamma_other
+    ai["gamma_b1"] = {"given": sha(g_in[0]), "companion": sha(g_in[1]), "V": sha(g_in[2]), "direction": direction,
+                      "out": fsha(gamma_call), "used": fsha(gamma)}
     G_up = gd = gu = None
     if gamma is not None:
         gd, gu = gi().directed(gamma)
+        if mutation == "gamma_interval_widened":  # a defect of the directed rounding: a wider enclosing interval
+            gd = math.nextafter(gd, -math.inf)
         G_up = gi().gamma_up(gd, gu)
         broken = gamma_contract(gamma, gd, gu, G_up)
         out["gamma_contract"] = {"holds": not broken, "violations": broken}
@@ -532,7 +644,8 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
             if not out["N7_ok"]:
                 reasons["P-e"].append("N-7: computed previous field 0 without an exact zero product of an exactly zero factor")
     # П-е B_E
-    BE, be = None, None
+    BE, be, BE_call = None, None, None
+    ai["b_e"] = {"performed": False}
     if fp is None or fs_ is None:
         checkable["P-f"] = False
         reasons["P-f"].append("B_E not checkable: the formation integers of U-1 are not available")
@@ -543,8 +656,13 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
                 gq.mu_low = Fraction(0)
             elif injection == "B_E_sqrt_negative_D":
                 gq.D = Fraction(-1)
+            ai["b_e"] = {"performed": True, "formation_prev": [sha(Xp), sha(Yp), sha(wh_prev)], "formation_s": [sha(Xs), sha(Ys), sha(wh_s)],
+                         "dh": sha(dh), "N": N, "grid_constants": grid_constants_sha(kc), "GridQ": gridq_sha(gq)}
             be = Q_.b_e(gq, kc, N, fp, fs_, dh)
             BE = be["BE"]
+            if BE is not None and mutation == "B_E_function_drop_B1":  # a defect inside the call: binding consistent
+                BE = BE - be["bnd"]["B1"]
+            BE_call = BE
             if BE is None:
                 reasons["P-f"].append("B_E: denominator D^(1/2) mu_low not positive")
         except ValueError as exc:
@@ -552,6 +670,7 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
             reasons["P-f"].append(f"B_E not checkable (root domain): {exc}")
     if BE is not None and mutation == "B_E_drop_B1":
         BE = BE - be["bnd"]["B1"]
+    ai["b_e"].update({"out": fsha(BE_call), "used": fsha(BE)})
     BE_up = None
     if BE is not None:
         BE_up = gi().directed(BE)[1]
@@ -574,21 +693,38 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
     out["components"] = {"P_p": Pp, "P_s": Ps, "Q": Qd, "Gamma_up": G_up, "B_E": BE_up}
     # --- diagnostics (contradictions)
     contra, diag = [], {}
-    if (nx - 1) * (ny - 1) <= SECOND_PATH_MAX_NODES and gamma is not None:
+    if ((nx - 1) * (ny - 1) <= SECOND_PATH_MAX_NODES or sp_gamma == "all") and gamma is not None:
         try:
+            ai["second_path_gamma"] = {"Xp": sha(Xp), "Yp": sha(Yp), "Xs": sha(Xs), "Ys": sha(Ys)}
             Pe, Se, Qe = ga().energies_path_b(lx, nx, ly, ny, D, q, Xp, Yp, Xs, Ys)
             gB = Qe - (Pe - Se)
+            ai["second_path_gamma"]["out"] = fsha(gB)
             ok = gB == gamma and Fraction(gd) <= gB <= Fraction(gu)
             diag["second_path_gamma"] = {"performed": True, "consistent": bool(ok), "gamma_B_sha256": fsha(gB)}
             if not ok:
                 contra.append(_contra("second_path_gamma", "second path of gamma (VOK-2 identity, path B) differs from the gamma used "
                                       "(path B1) or lies outside [gamma_down, gamma_up]"))
+            if sp_gamma == "all":  # F-3: inclusion and narrowness against the independent gamma_B (own rounding of the B_E path)
+                rd, ru = be2().round_down(gB), be2().round_up(gB)
+                diag["sp_gamma"] = {"performed": True, "gamma_B_sha256": fsha(gB), "equals_B1_used": gB == gamma,
+                                    "inclusion": bool(_le(gd, gB) and _ge(gu, gB)),
+                                    "tight": bool(gd.hex() == rd.hex() and gu.hex() == ru.hex()),
+                                    "RD_gamma_B": rd.hex(), "RU_gamma_B": ru.hex(), "gamma_down": gd.hex(), "gamma_up": gu.hex(),
+                                    "rounding": "RD, RU of the second B_E path (own integer rule, checked by neighbours)"}
         except (ValueError, ArithmeticError, OverflowError) as exc:
             diag["second_path_gamma"] = {"performed": False, "consistent": None, "reason": f"{type(exc).__name__}: {exc}"}
             faults.append(_fault("gamma_second_path", exc))
     else:
         diag["second_path_gamma"] = {"performed": False, "consistent": None,
                                      "reason": f"NOT_PERFORMED ((n_x - 1)(n_y - 1) > {SECOND_PATH_MAX_NODES}) or no gamma"}
+    if sp_gamma == "all" and "sp_gamma" not in diag:
+        diag["sp_gamma"] = {"performed": False, "inclusion": None, "tight": None,
+                            "reason": "no gamma of path B1 or the second path failed (see faults)"}
+    if sp_be:
+        diag["second_path_BE"] = _second_path_be(lx, nx, ly, ny, D, q, Xp, Yp, Xs, Ys, wh_prev, wh_s, dh, Pp, Ps, Qd, BE, ai)
+        if diag["second_path_BE"].get("match") is False:
+            contra.append(_contra("second_path_BE", "second path of B_E (PR #51) in the documented QA-EB representation differs "
+                                  "from the B_E of the row"))
     if gamma is not None:
         diag["gamma_interval_tightness"] = {
             "tight": gamma_interval_tight(gamma, gd, gu), "normative": False,
@@ -628,12 +764,101 @@ def compute_row(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: np.nda
     out["diagnostics"] = diag
     out["contradictions"] = contra
     out["faults"] = faults
+    out["actual_inputs"] = ai
     return out
+
+
+def _second_path_be(lx, nx, ly, ny, D, q, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, Pp, Ps, Qd, BE, ai) -> dict:
+    """SP-BE / channel of G-5 (D-057.3, OD-4, OD-11): the second path of B_E (PR #51) on the actual arrays of the row, P^ mandatory
+    (N-3: the replication of G-4 is bound to the values of the row). Comparison contract (N-5): the B_E of the row (QA-EB, 80-bit
+    roots) against the second path's value in the documented QA-EB representation, exactly. ``match`` None when no comparison."""
+    sha = op8().array_sha
+    ai["second_path_BE"] = {"Xp": sha(Xp), "Yp": sha(Yp), "Xs": sha(Xs), "Ys": sha(Ys), "wh_p": sha(wh_p), "wh_s": sha(wh_s),
+                            "dh": sha(dh), "P_hat": [fhex(Pp), fhex(Ps), fhex(Qd)]}
+    mesh = {"lx": lx, "nx": nx, "ly": ly, "ny": ny, "D": D, "q": q}
+    try:
+        sp = be2().second_path(mesh, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, P_hat={"P_p": Pp, "P_s": Ps, "Q": Qd})
+    except Exception as exc:  # recorded, never hidden: no comparison
+        ai["second_path_BE"]["out"] = None
+        return {"performed": False, "match": None, "reason": f"{type(exc).__name__}: {str(exc)[-300:]}"}
+    BE2 = (sp.get("assembly_qaeb80") or {}).get("BE")
+    ai["second_path_BE"]["out"] = fsha(BE2) if isinstance(BE2, Fraction) else None
+    res = {"performed": True, "status": sp.get("status"), "reasons": [str(r) for r in sp.get("reasons", [])][:20],
+           "B_E2_qaeb80_sha256": fsha(BE2) if isinstance(BE2, Fraction) else None,
+           "B_E_row_sha256": fsha(BE), "E_s_le_B_E2": sp.get("E_s_le_B_E")}
+    res["match"] = None if (BE is None or not isinstance(BE2, Fraction)) else bool(BE2 == BE)
+    return res
+
+
+F2_LABEL = "binding of the actual inputs (F-2, D-057.3)"
+
+
+def actual_input_defects(row: dict, cfg) -> list[str]:
+    """F-2 (D-057.3, OD-4): every computed quantity is bound to the arrays ACTUALLY passed to its computation and the row uses the
+    value that computation returned. Checked against the inputs of the row (given, companion, V), the fields of the row and the grid
+    objects recomputed from the configuration. Empty when every binding holds; a defect makes П-а not established (protocol 4.2:
+    UNRESOLVED_CERTIFICATE), never PASS."""
+    ai, bad = row.get("actual_inputs"), []
+    if not isinstance(ai, dict):
+        return [f"{F2_LABEL}: not recorded"]
+    ins = row.get("inputs_sha") or {}
+    s = row.get("s")
+    d = op8().direction_of(s) if isinstance(s, int) else None
+    X_p, Y_p = (ins.get("given"), ins.get("companion")) if d == "Y" else (ins.get("companion"), ins.get("given"))
+    X_s, Y_s = (ins.get("given"), ins.get("V")) if d == "Y" else (ins.get("V"), ins.get("given"))
+
+    def need(cond: bool, text: str):
+        if not cond:
+            bad.append(f"{F2_LABEL}: {text}")
+
+    fpv, fsv = ai.get("formation_prev") or {}, ai.get("formation_s") or {}
+    need(fpv.get("X") == X_p and fpv.get("Y") == Y_p, "formation of w^_p did not receive the factors of the row")
+    need(fsv.get("X") == X_s and fsv.get("Y") == Y_s, "formation of w^_s did not receive the factors of the row")
+    need(fpv.get("out") == row.get("field_prev_sha"), "the previous field used is not the output of its formation")
+    need(fsv.get("out") == row.get("field_s_sha"), "the current field used is not the output of its formation")
+    sub = ai.get("subtraction") or {}
+    need(sub.get("a") == row.get("field_prev_sha") and sub.get("b") == row.get("field_s_sha") and sub.get("out") == row.get("d_hat_sha"),
+         "d^ is not fl(w^_p - w^_s) of the fields of the row")
+    for k, field, val in (("pi_double_p", "field_prev_sha", "P_hat_p"), ("pi_double_s", "field_s_sha", "P_hat_s"),
+                          ("q_double", "d_hat_sha", "Q_hat")):
+        c = ai.get(k) or {}
+        need(c.get("field") == row.get(field), f"{k} received an array that is not {field.replace('_sha', '')} of the row")
+        need(c.get("out") == row.get(val), f"{val} is not the output of {k}")
+    gb = ai.get("gamma_b1") or {}
+    need(gb.get("given") == ins.get("given") and gb.get("companion") == ins.get("companion") and gb.get("V") == ins.get("V")
+         and gb.get("direction") == d, "gamma_b1 did not receive the sets and the direction of this half-step")
+    need(gb.get("used") == gb.get("out"), "the gamma used is not the output of the bound gamma_b1 call")
+    need(gb.get("used") == row.get("gamma_exact_sha256"), "the recorded exact gamma is not the gamma used")
+    be = ai.get("b_e") or {}
+    if be.get("performed"):
+        need(be.get("formation_prev") == [X_p, Y_p, row.get("field_prev_sha")] and be.get("formation_s") == [X_s, Y_s, row.get("field_s_sha")],
+             "b_e did not receive the formation of the fields of the row")
+        need(be.get("dh") == row.get("d_hat_sha"), "b_e did not receive d^ of the row")
+        need(be.get("N") == cfg.N, "b_e did not receive N of the configuration")
+        Q_ = qa()
+        kc = Q_.grid_constants(float(cfg.lx), cfg.nx, float(cfg.ly), cfg.ny, float(cfg.D), float(cfg.q), cfg.N)
+        need(be.get("grid_constants") == grid_constants_sha(kc), "b_e did not receive the grid constants of the configuration")
+        need(be.get("GridQ") == gridq_sha(Q_.GridQ(float(cfg.lx), cfg.nx, float(cfg.ly), cfg.ny, float(cfg.D), float(cfg.q))),
+             "b_e did not receive the exact grid of the configuration")
+        need(be.get("used") == be.get("out"), "the B_E used is not the output of the bound b_e call")
+        need(be.get("used") == row.get("B_E_exact_sha256"), "the recorded exact B_E is not the B_E used")
+    for k in ("second_path_gamma", "second_path_BE"):
+        c = ai.get(k)
+        if c:
+            need(c.get("Xp") == X_p and c.get("Yp") == Y_p and c.get("Xs") == X_s and c.get("Ys") == Y_s,
+                 f"{k} did not receive the factors of the row")
+    spb = ai.get("second_path_BE")
+    if spb:
+        need([spb.get("wh_p"), spb.get("wh_s"), spb.get("dh")] == [row.get("field_prev_sha"), row.get("field_s_sha"), row.get("d_hat_sha")],
+             "second_path_BE did not receive the fields of the row")
+        need(spb.get("P_hat") == [row.get("P_hat_p"), row.get("P_hat_s"), row.get("Q_hat")],
+             "second_path_BE did not receive P^ of the row (N-3)")
+    return bad
 
 
 REPRO_KEYS = ("field_prev_sha", "field_s_sha", "d_hat_sha", "P_hat_p", "P_hat_s", "Q_hat", "gamma_exact", "gamma_exact_sha256",
               "gamma_down", "gamma_up", "Gamma_up", "Gamma_up_withheld", "gamma_contract", "B_E_up_withheld", "B_E_exact", "B_E_exact_sha256", "B_E_up",
-              "U3_grid_bits", "N7_applicable")
+              "U3_grid_bits", "N7_applicable", "inputs_sha", "actual_inputs")
 SELF_CONSISTENT = (("gamma_exact", "gamma_exact_sha256"), ("B_E_exact", "B_E_exact_sha256"))
 COMPONENT_FIELDS = {"P_p": "P_hat_p", "P_s": "P_hat_s", "Q": "Q_hat", "Gamma_up": "Gamma_up", "B_E": "B_E_up"}
 
@@ -665,6 +890,11 @@ def reproduced_values(row: dict) -> dict:
     out["contradictions"] = list(row["contradictions"])
     out["faults"] = [{k: f[k] for k in ("stage", "error")} for f in row.get("faults", [])]
     out["second_path_gamma_consistent"] = row["diagnostics"].get("second_path_gamma", {}).get("consistent")
+    spg, spb = row["diagnostics"].get("sp_gamma"), row["diagnostics"].get("second_path_BE")
+    if spg is not None:
+        out["sp_gamma"] = {k: spg.get(k) for k in ("performed", "gamma_B_sha256", "inclusion", "tight", "RD_gamma_B", "RU_gamma_B")}
+    if spb is not None:
+        out["second_path_BE"] = {k: spb.get(k) for k in ("performed", "status", "B_E2_qaeb80_sha256", "match")}
     return out
 
 
@@ -694,7 +924,7 @@ def spec_config(spec: dict):
     if spec.get("kind") == "journal":
         with open(Path(spec["journal"]) / "journal.json", encoding="utf-8") as f:
             return config_of(json.load(f)["meta"])
-    if spec.get("kind") == "arrays":
+    if spec.get("kind") in ("arrays", "paired"):
         return op8().TrajectoryConfig(**spec["config"])
     raise ValueError(f"unknown row specification kind {spec.get('kind')!r}")
 
@@ -850,7 +1080,7 @@ def journal_structure(j: dict) -> dict:
         reasons.append(f"{n} records for s_max = {s_max}")
     mst = str(meta.get("status"))
     if stop is not None and stop["s"] == n and steps[-1].get("s") == n:
-        if not mst.startswith(f"STOPPED at s = {n}:"):
+        if not (mst.startswith(f"STOPPED at s = {n}:") or mst.startswith(f"{o.RANK_GUARD} at s = {n}:")):
             reasons.append(f"meta status {mst!r} is not the stop at s = {n}")
     elif stop is None and not (n == s_max and mst.startswith("COMPLETED")):
         reasons.append(f"meta status {mst!r} with {n} executed half-steps of s_max = {s_max}")
@@ -977,9 +1207,13 @@ def _inputs_from_spec(spec: dict):
                      "c3plus_record": _c3plus_of_record(res.record), "arrays_equal": equal,
                      "reproduced": res.record.get("status") == op8().OK and "V_bc" in res.arrays
                      and res.arrays["V_bc"].tobytes() == np.asarray(V).tobytes() and all(equal.values())}
+    elif spec["kind"] == "paired":
+        cfg = op8().TrajectoryConfig(**spec["config"])
+        guard_row(cfg, s)
+        given, companion, V, reasons, rerun = bcd().paired_inputs(spec, cfg, s)
     else:
         cfg = op8().TrajectoryConfig(**spec["config"])
-        guard_config(cfg)
+        guard_row(cfg, s)
         with np.load(spec["arrays_npz"]) as z:
             given, companion, V = z["given"], z["companion"], z["V"]
         for name, a in (("given", given), ("companion", companion), ("V", V)):
@@ -988,14 +1222,26 @@ def _inputs_from_spec(spec: dict):
     return cfg, s, given, companion, V, reasons, rerun
 
 
+def _gamma_arrays_other(spec: dict):
+    """Arrays (solved set, companion, V) of another half-step of the same journal for the mutation gamma_from_step_arrays."""
+    k = spec.get("gamma_other_step")
+    if k is None:
+        return None
+    _, arrays = load_journal(Path(spec["journal"]))
+    return arrays[f"s{k}_solved_set"], arrays[f"s{k}_companion_solved"], arrays[f"s{k}_V_bc"]
+
+
 def _row_job(spec: dict) -> dict:
     """The row in this process (child entry and in-process primary)."""
     guard_config(spec_config(spec))
     mode = _set_mode(spec.get("mode"))
     cfg, s, given, companion, V, reasons, rerun = _inputs_from_spec(spec)
     go = parse_recorded(spec["gamma_other"]) if spec.get("gamma_other") is not None else None
-    row = compute_row(cfg, s, given, companion, V, spec.get("injection"), spec.get("mutation"), go)
-    return {"row": row, "input_binding_reasons": reasons, "op8_rerun": rerun, "mode": mode, "pid": os.getpid()}
+    row = compute_row(cfg, s, given, companion, V, spec.get("injection"), spec.get("mutation"), go, _gamma_arrays_other(spec),
+                      sp_gamma=spec.get("sp_gamma"), sp_be=bool(spec.get("sp_be", False)))
+    rec = rerun.pop("op8_record", None) if isinstance(rerun, dict) else None  # the full OP-8 record of a paired row: not a
+    # reproduced value (its float diagnostics are observations); its C-3+ fields are compared through c3plus_record
+    return {"row": row, "input_binding_reasons": reasons, "op8_rerun": rerun, "op8_record": rec, "mode": mode, "pid": os.getpid()}
 
 
 def _json_default(o):
@@ -1074,10 +1320,13 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
     A journal row that is not an executed half-step of the sequence of its journal (stopped, absent, after a stop, out of order;
     ``journal_structure``) is not executed -> UNRESOLVED, never computed; an executed row is bound to its sequence
     (``sequence_binding``: predecessors, record chain, structure) as a part of П-а."""
-    guard_config(spec_config(spec))
+    cfg0 = spec_config(spec)
+    guard_config(cfg0)
     seq_reasons = []
     if spec["kind"] == "journal":
         s = spec["s"]
+        if cfg0.N >= 2 and isinstance(s, int) and s >= 2:  # D-057.1: never computed, whatever the journal says
+            return not_executed(None, s, reason=rank_guard_reason(cfg0, s))
         try:
             j, arrays = load_journal(Path(spec["journal"]))
             st = journal_structure(j)
@@ -1090,6 +1339,10 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
             seq_reasons = sequence_binding(j, arrays, s, spec.get("rerun_op8", True), _seq_cache)
         except Exception as exc:  # recorded, never hidden: the binding is then not established
             seq_reasons = [f"sequence binding not checkable: {type(exc).__name__}: {str(exc)[-300:]}"]
+    else:
+        guard_row(cfg0, spec["s"])  # arrays / paired: N >= 2, s >= 2 refused before any computation (D-057.1)
+        if spec["kind"] == "paired":
+            seq_reasons = bcd().paired_chain_binding(spec)
     try:
         if spec.get("mode") is not None:
             primary = run_child(spec)
@@ -1118,6 +1371,13 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
             diff = sorted(a for a, v in (rr.get("arrays_equal") or {}).items() if not v)
             pa.append(f"the OP-8 half-step re-run does not reproduce V_bc and the arrays of the record bitwise ({rr['status']}; "
                       f"differing: {', '.join(diff) or 'V_bc'})")
+    elif spec["kind"] == "paired":
+        rr = primary.get("op8_rerun") or {}
+        rec = primary.get("op8_record")
+        if not rr.get("reproduced"):
+            diff = sorted(a for a, v in (rr.get("arrays_equal") or {}).items() if not v)
+            pa.append(f"the paired half-step (EQ path) re-run or its isolated OP-8 twin does not reproduce the stored arrays bitwise "
+                      f"({rr.get('status')}; differing: {', '.join(diff) or 'V'})")
     c3, c3_bad = c3plus_status(rec, primary.get("op8_rerun"))
     pa += c3_bad
     repro = None
@@ -1169,6 +1429,12 @@ def _p4_of_record(rec: dict) -> str:
     return f"INVALID_RECORD (P-4 recorded as {classes['P-4']!r}; OP-8 records ASSUMED only)"
 
 
+def rank_guard_reason(cfg, s: int) -> str:
+    """The precise reason of a row N >= 2, s >= 2 that is not executed (D-057.1, items 2-4; protocol 4.2)."""
+    return (f"not executed: N = {cfg.N}, s = {s} - trajectory {op8().RANK_GUARD} at s = 2 (D-057.1 variant V: protective stop "
+            "before the QR of the solved set; rank of N = 2, 3 not certified, O4 UNRESOLVED; not S-1, not S-2)")
+
+
 def _absent_reason(st: dict, s: int) -> str:
     if st["stop"] is not None and s > st["stop"]["s"]:
         return f"OP-8 half-step s = {s}: absent after the stop of the trajectory at s = {st['stop']['s']} ({st['stop']['status']})"
@@ -1205,7 +1471,8 @@ def analyse_journal(jdir: Path, s_max: int | None = None, reproduce: bool = True
 
 
 def run_trajectory_journal(cfg, out: Path) -> Path:
-    """OP-8 trajectory of a non-D1 N = 1 configuration, journal written to out/journal (OP-8 write_journal)."""
+    """OP-8 trajectory of a non-D1 configuration (N = 2, 3 stop before the QR of s = 2, D-057.1), journal written to out/journal
+    (OP-8 write_journal)."""
     guard_config(cfg)
     guard_out(out)
     tr = op8().run_trajectory(cfg)
@@ -1243,6 +1510,7 @@ def main(argv=None) -> int:
     r.add_argument("--D", type=float, default=1.0)
     r.add_argument("--q", type=float, default=1.0)
     r.add_argument("--s-max", type=int, default=3)
+    r.add_argument("--N", type=int, default=1)
     r.add_argument("--out", type=Path, required=True)
     c = sub.add_parser("_row")
     c.add_argument("spec", type=Path)
@@ -1258,7 +1526,7 @@ def main(argv=None) -> int:
         print(json.dumps(job, default=_json_default))
         return 0
     try:
-        cfg = op8().TrajectoryConfig(a.lx, a.nx, a.ly, a.ny, 1, a.D, a.q, a.s_max)
+        cfg = op8().TrajectoryConfig(a.lx, a.nx, a.ly, a.ny, a.N, a.D, a.q, a.s_max)
         guard_config(cfg)
         guard_out(a.out)
     except D1Refused as exc:
