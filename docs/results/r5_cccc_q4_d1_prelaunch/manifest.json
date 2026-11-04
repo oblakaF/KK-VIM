@@ -1,6 +1,6 @@
 {
  "document": "R5-V Q4 D1 PRELAUNCH manifest (protocol 12, item 3)",
- "manifest_state": "FREEZE_CANDIDATE - NOT FROZEN (D-057 decisions recorded; QA-D1-READY components present; awaiting the Reviewer check of D-057.1 item 7 and the owner)",
+ "manifest_state": "FROZEN (D-058, owner, 2026-11-04; PRELAUNCH baseline main 2e0aac6; section d057 authoritative; D1_START = BLOCKED: the freeze is not a campaign permission)",
  "d1_start": "BLOCKED",
  "data_status": "PRELAUNCH preparation, not D1 data (D1_START = BLOCKED; protocol 12)",
  "sha_inventory": {
@@ -5699,7 +5699,45 @@
    "controls": "docs/results/r5_cccc_q4_d1_ready/controls_summary.json",
    "probes": "docs/results/r5_cccc_q4_d1_ready/resource_probes.json"
   },
-  "frozen": false,
-  "freeze_condition": "approved platform (OD-6) AND Reviewer check of the OP-8 change (D-057.1 item 7) AND owner acceptance; D1_START = BLOCKED"
+  "frozen": true,
+  "freeze_condition": "met by D-058 (owner, 2026-11-04): approved platform (OD-6, recorded) AND Reviewer check of the OP-8 change (D-057.1 item 7; conversation-supplied review accepted by the owner) AND owner acceptance; D1_START = BLOCKED"
+ },
+ "freeze_act": {
+  "decision": "D-058 (owner, 2026-11-04; docs/DECISIONS.md)",
+  "state": "FROZEN",
+  "baseline": {
+   "main_commit": "2e0aac636f73e1148f6c1db8201034299a035f7f",
+   "manifest_blob": "5a794e6e4c3e0031e0bbd496635b27d31bb02e44",
+   "mandatory_rows_csv_blob": "76c4443b750c82893c35b50dcabe4d44573c5a5b",
+   "basis": [
+    "PR #60 QA-D1-READY: head 878d3ec9397e91d6fc9d3cab4800eb58f871bbbb, merge 58f9c7e337018405efad2753f2e52ed81443a04a",
+    "PR #61 freeze precheck: head ed30c13d3d451f3886d54a9f216f102154ab9488, merge 2e0aac636f73e1148f6c1db8201034299a035f7f"
+   ]
+  },
+  "accepted": {
+   "12.3": "manifest",
+   "12.4": "controls A and B",
+   "12.5": "mandatory resource probes within PL 6.3"
+  },
+  "od6_rule": "BLAS threads != 1 or unverified for a row: P-a not established, the row is UNRESOLVED_CERTIFICATE (protocol 4.2)",
+  "authoritative_section": "d057",
+  "historical_sections": [
+   "second_path",
+   "dynamic_hash_procedure"
+  ],
+  "limitations_retained": [
+   "B_E coverage partial (N-4, N-6)",
+   "SP-OP measured on one probe (320 x 1280)",
+   "process provenance of the BLAS thread count",
+   "limited reviewer independence (D-053.2 item 6)"
+  ],
+  "review": "Reviewer REVIEW_PASS_READY_FOR_OWNER on QA HEAD 878d3ec9397e91d6fc9d3cab4800eb58f871bbbb (OP-8, block C): conversation-supplied, accepted by the owner; not a repository-hosted review",
+  "supersedes": {
+   "manifest_state": "FREEZE_CANDIDATE - NOT FROZEN (D-057 decisions recorded; QA-D1-READY components present; awaiting the Reviewer check of D-057.1 item 7 and the owner)",
+   "d057.frozen": false,
+   "d057.freeze_condition": "approved platform (OD-6) AND Reviewer check of the OP-8 change (D-057.1 item 7) AND owner acceptance; D1_START = BLOCKED"
+  },
+  "unchanged": "every other field: scientific inputs, hashes, keys, subsets, tool blobs, platform record; mandatory_rows.csv",
+  "d1_start": "BLOCKED (protocol 12 item 6: no campaign permission)"
  }
 }
