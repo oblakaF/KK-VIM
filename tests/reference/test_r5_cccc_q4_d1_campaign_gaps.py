@@ -104,10 +104,10 @@ def test_selected_and_nonselected_rows(dry_out):
 
 
 def test_selected_row_not_run_is_listed_never_covered():
-    rec = c._not_executed_record({"key": "k", "block": "A", "N": 1, "s": 1, "mandatory": True}, "stopped", None, c.EXEC_FAILED)
+    rec = c._not_executed_record({"key": "k", "block": "A", "N": 1, "s": 1, "mandatory": True}, "stopped", None, c.EXEC_RESOURCES)
     cov = c.second_path_coverage([rec], {"k": ["SP-RH"]})["SP-RH"]
     assert cov["complete"] is False and cov["pass"] == 0 and cov["not_established"][0]["status"] == "NOT_RUN"
-    assert c.EXEC_FAILED in cov["not_established"][0]["reason"]
+    assert c.EXEC_RESOURCES in cov["not_established"][0]["reason"]
 
 
 def test_second_path_is_never_a_call_of_the_solver(monkeypatch, inp):
@@ -270,10 +270,10 @@ def test_accuracy_on_paired_and_n2_rows(tmp_path):
 # --- status of the row against the checks (OD-7), contradictions --------------------------------------------------------------------------
 
 def _fake_jobs(monkeypatch, second):
-    def fake(job, work, limit, signal, factorization_limit_s=None):
+    def fake(job, work, limit, signal, factorization_limit_s=None, ctx=None):
         if job["kind"] == "row":
             return {"analysis": {"row": {"inputs_sha": {"given": "x"}}, "status": "PASS", "classification": {"reasons": []}, "tool_defects": [],
-                                 "reproduction": {"child_pid": 1}}, "input": {"executed": True}, "process": {}, "resources": {}, "seconds": 0}
+                                 "reproduction": {"child_pid": 1, "bitwise_equal": True}}, "input": {"executed": True}, "process": {}, "resources": {}, "seconds": 0}
         return second
     monkeypatch.setattr(c, "run_job", fake)
 
@@ -440,8 +440,9 @@ def test_stage_timers_do_not_change_the_numbers_and_replay_is_measured(dry_out, 
 
 def test_no_d1_row_through_a_job_child(tmp_path, dry_out):
     for signal in (None, "D-059:" + "0" * 40):
-        r = c.run_job({"kind": "journal", "config": D1_CFG, "out": str(dry_out / "d1"), "dry_run": False}, tmp_path / "w", 0, signal)
-        assert "failed" in r and "D1_START = BLOCKED" in r["tail"] and not (dry_out / "d1").exists()
+        with pytest.raises(c.CampaignRefused, match="D1_START = BLOCKED"):
+            c.run_job({"kind": "journal", "config": D1_CFG, "out": str(dry_out / "d1"), "dry_run": False}, tmp_path / "w", 0, signal)
+        assert not (dry_out / "d1").exists()
     env = {**os.environ, pl.STAGE_LOG_ENV: str(tmp_path / "x.jsonl")}  # the stage log authorises nothing
     p = subprocess.run([sys.executable, str(CAMPAIGN), "run", "--out", "scratch/never"], cwd=ROOT, capture_output=True, text=True, env=env)
     assert p.returncode == 2 and "D1_START = BLOCKED" in p.stderr

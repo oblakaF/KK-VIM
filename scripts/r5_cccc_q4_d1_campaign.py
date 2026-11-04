@@ -25,11 +25,22 @@ against 50 % of the physical RAM, and every factorization stage against 30 min (
 the tree is stopped on a violation and the rows of a row or preparation job become UNRESOLVED_RESOURCES with the measured values, the
 responsible process and stage. A violation in the second-path job leaves the status of the row unchanged (OD-7). The convergence of the
 refinement stays where the contract has it: a reference that does not converge is UNRESOLVED as an observation.
+Memory evidence (``memory_evidence``): the working sets are sampled while a process lives (a peak read after its exit is not valid), so
+a process that lives shorter than a poll, or its last interval, is not seen; the OS high-water mark of the job (Windows job object:
+commit of every process of the job over its whole life) is recorded beside them. Compliance is not claimed where this does not reach.
+
+Tool failures (B-4) are not numerical results. A child's refusal stops the run before anything is committed (CampaignRefused). A crash,
+a killed process, malformed output, a timeout of the runner, orphan processes or an internal exception stop the run with state
+STOPPED_TOOL_FAILURE and no verdict (ToolFailure); the unit is not stored, and a restart computes it again. A numerical exception of the
+row keeps its status by the unchanged tree of protocol 4.2. Stored units are validated before reuse; a change of the source, of the
+environment or of the authorisation during the run gives STOPPED_EXECUTION_CHANGED, never a verdict.
 
 Gate: a real run (``dry_run`` False) is refused before anything is computed unless ``pipeline.campaign_gate`` authorises it (D-059:
-launch signal + owner's re-freeze act + addendum + frozen manifest + tool blobs), the platform is the approved one (Windows,
-Python 3.13.15, one BLAS thread read from the libraries of NumPy and SciPy) and the plan equals the frozen manifest. Every child that
-touches a D1 grid validates the gate again in its own process. ``dry_run`` accepts only non-D1 grids (tests: launch, interruption,
+launch signal + owner's re-freeze act, current at origin/main + addendum + frozen manifest + tool blobs + the bytes on disk), the code
+actually imported and the environment are the approved ones (``pipeline.runtime_defects``: OD-6 fields pinned by the addendum, one BLAS
+thread read from the libraries of NumPy and SciPy) and the plan equals the frozen manifest. Every child that touches a D1 grid validates
+all of it again in its own process, and reports what it loaded and ran on. Trust: this detects accidents, substitutions and stale state
+in a repository and an interpreter that are themselves trusted; it is not a security boundary. ``dry_run`` accepts only non-D1 grids (tests: launch, interruption,
 restart); its data is never D1 data. Output only under scratch/ (no published data during the run).
 
 Usage (repository root; refused while D1_START = BLOCKED):
@@ -73,11 +84,16 @@ BLOCKED_FOR_OWNER = "BLOCKED_FOR_OWNER_DECISION"
 PASS_MEANS = ("the second path was computed on the row's bound arrays and no certified value contradicts the row; NOT a statement of "
               "accuracy: no acceptance tolerance is assigned (D-054.4), measured values are recorded")
 ACCURACY = "BC-1/TS-1"
-EXEC_DONE, EXEC_PLAN, EXEC_GUARD, EXEC_RESOURCES, EXEC_FAILED = ("EXECUTED", "NOT_EXECUTED_PLAN", "NOT_EXECUTED_RANK_GUARD",
-                                                                 "NOT_EXECUTED_RESOURCES", "NOT_EXECUTED_JOB_FAILED")
+EXEC_DONE, EXEC_PLAN, EXEC_GUARD, EXEC_RESOURCES = "EXECUTED", "NOT_EXECUTED_PLAN", "NOT_EXECUTED_RANK_GUARD", "NOT_EXECUTED_RESOURCES"
+NUMERICAL_EXCEPTIONS = ("LinAlgError", "FloatingPointError", "ZeroDivisionError", "OverflowError")
+INTERNAL_EXCEPTION = "INTERNAL_EXCEPTION"
+STOPPED_TOOL_FAILURE, STOPPED_CHANGED = "STOPPED_TOOL_FAILURE", "STOPPED_EXECUTION_CHANGED"
+COMPLETED = "COMPLETED"
+CONTROLS_VALID, CONTROLS_INVALID = "VALID", "INVALID"
 HS_MODULE, BC_MODULE = "src/kkvim_reference/r5_cccc_halfstep.py", "src/kkvim_reference/r5_cccc_bc.py"
 CA_TOOL, BR_TOOL = "scripts/r5_cccc_q4_c_assembly_e4_audit.py", "scripts/r5_cccc_q4_bc_reference_audit.py"
 LAUNCH_ENV = {k: "1" for k in THREAD_VARS}
+IMPORT_ENV = ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONINSPECT", "PYTHONUSERBASE")
 
 
 class CampaignRefused(RuntimeError):
@@ -86,6 +102,14 @@ class CampaignRefused(RuntimeError):
 
 class CampaignInterrupted(RuntimeError):
     """Test hook: the run stopped after the requested number of jobs (state kept for the restart)."""
+
+
+class ToolFailure(RuntimeError):
+    """A defect of the tools, not a numerical result: no row status is derived from it and the unit is not stored."""
+
+    def __init__(self, kind: str, **evidence):
+        super().__init__(f"{kind}: {evidence.get('reason')}")
+        self.record = {"kind": kind, **evidence}
 
 
 def _load(rel: str, name: str):
@@ -116,6 +140,10 @@ def bcd():
 
 def adapter():
     return _load(ADAPTER_TOOL, "_d1_br_adapter")
+
+
+def controls_tool():
+    return _load(CONTROLS_TOOL, "_d1_controls")
 
 
 def _dump(o) -> str:
@@ -263,8 +291,95 @@ def _process_table() -> dict[int, int]:
     return out
 
 
-def _peak_of(pid: int) -> int | None:
-    """Peak working set (resident set) of a running process in bytes; None when it cannot be read."""
+class _JobAccounting:
+    """Windows job object around the job tree: the OS high-water marks of commit (per process and of the job, over the whole life of every
+    process, short-lived ones included), the count of the processes and the guaranteed end of the tree (kill on close). It sets no limit
+    but the end of the tree. ``available`` False: no such evidence here (never assumed)."""
+
+    def __init__(self, proc):
+        self.h, self.k = None, None
+        if sys.platform != "win32":
+            return
+        import ctypes
+        from ctypes import wintypes as w
+
+        class Basic(ctypes.Structure):
+            _fields_ = [("a", ctypes.c_longlong), ("b", ctypes.c_longlong), ("LimitFlags", w.DWORD), ("c", ctypes.c_size_t),
+                        ("d", ctypes.c_size_t), ("e", w.DWORD), ("f", ctypes.c_size_t), ("g", w.DWORD), ("i", w.DWORD)]
+
+        class Ext(ctypes.Structure):
+            _fields_ = [("Basic", Basic), ("Io", ctypes.c_ulonglong * 6), ("ProcessMemoryLimit", ctypes.c_size_t),
+                        ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+        class Acc(ctypes.Structure):
+            _fields_ = [("t", ctypes.c_longlong * 4), ("PageFaults", w.DWORD), ("TotalProcesses", w.DWORD), ("ActiveProcesses", w.DWORD),
+                        ("Terminated", w.DWORD)]
+
+        self.ctypes, self.Ext, self.Acc = ctypes, Ext, Acc
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        k.CreateJobObjectW.restype = w.HANDLE
+        k.CreateJobObjectW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
+        k.SetInformationJobObject.argtypes = [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD]
+        k.QueryInformationJobObject.argtypes = [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD, ctypes.c_void_p]
+        k.AssignProcessToJobObject.argtypes = [w.HANDLE, w.HANDLE]
+        k.TerminateJobObject.argtypes = [w.HANDLE, w.UINT]
+        k.CloseHandle.argtypes = [w.HANDLE]
+        h = k.CreateJobObjectW(None, None)
+        if not h:
+            return
+        e = Ext()
+        e.Basic.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not k.SetInformationJobObject(h, 9, ctypes.byref(e), ctypes.sizeof(e)) or not k.AssignProcessToJobObject(h, int(proc._handle)):
+            k.CloseHandle(h)
+            return
+        self.h, self.k = h, k
+
+    @property
+    def available(self) -> bool:
+        return self.h is not None
+
+    def read(self) -> dict | None:
+        if not self.available:
+            return None
+        e, a = self.Ext(), self.Acc()
+        if not (self.k.QueryInformationJobObject(self.h, 9, self.ctypes.byref(e), self.ctypes.sizeof(e), None) and
+                self.k.QueryInformationJobObject(self.h, 1, self.ctypes.byref(a), self.ctypes.sizeof(a), None)):
+            return None
+        return {"total_processes": int(a.TotalProcesses), "active_processes": int(a.ActiveProcesses),
+                "peak_process_commit_bytes": int(e.PeakProcessMemoryUsed), "peak_job_commit_bytes": int(e.PeakJobMemoryUsed)}
+
+    def terminate(self) -> None:
+        if self.available:
+            self.k.TerminateJobObject(self.h, 1)
+
+    def close(self) -> None:
+        if self.available:
+            self.k.CloseHandle(self.h)
+            self.h = None
+
+
+def memory_evidence(sampled_max: int | None, sampled_processes: int, accounting: dict | None, limit: int, poll_s: float) -> dict:
+    """What the measurements establish, without overstating it. The rule of PL 6.3 is the peak of a process (D-057.4); its working set is
+    sampled, the commit high-water mark comes from the OS. Commit and working set are different quantities: commit over the limit is
+    recorded, it is not a violation of the rule and no limit is derived from it."""
+    out = {"rule": "PL 6.3: peak of a process <= 50 % of the physical RAM (D-057.4)", "working_set_basis": f"sampled every {poll_s} s while the "
+           "process lives; a peak read after the exit is not valid", "sampled_max_process_peak_bytes": sampled_max,
+           "sampled_processes": sampled_processes, "os_high_water": accounting}
+    if accounting is None or sampled_max is None or limit <= 0:
+        return {**out, "status": "NOT_MEASURED", "compliance": "NOT_CLAIMED",
+                "reason": "no OS high-water mark of the job, no sample or no limit on this platform"}
+    unseen = max(0, accounting["total_processes"] - sampled_processes)
+    out["processes_not_sampled"] = unseen
+    if accounting["peak_process_commit_bytes"] > limit:
+        return {**out, "status": "COMMIT_OVER_LIMIT_RECORDED", "compliance": "NOT_CLAIMED",
+                "reason": "the commit high-water mark of a process exceeds the limit; the working-set rule is not established by it either way"}
+    return {**out, "status": "SAMPLED_AND_OS_BOUNDED", "compliance": "WITHIN_LIMIT_BY_THIS_EVIDENCE" if sampled_max <= limit else "NOT_CLAIMED",
+            "reason": f"{unseen} short-lived process(es) of the job were not sampled: their working set is NOT_MEASURED, their commit is under "
+                      "the high-water mark" if unseen else "every process of the job was sampled; its last interval only under the high-water mark"}
+
+
+def _memory_of(pid: int) -> tuple[int, int] | None:
+    """(peak, current) working set of a running process in bytes; None when it cannot be read."""
     if sys.platform == "win32":
         import ctypes
         from ctypes import wintypes
@@ -286,15 +401,18 @@ def _peak_of(pid: int) -> int | None:
         c.cb = ctypes.sizeof(c)
         ok = ps.GetProcessMemoryInfo(h, ctypes.byref(c), c.cb)
         k.CloseHandle(h)
-        return int(c.PeakWorkingSetSize) if ok else None
+        return (int(c.PeakWorkingSetSize), int(c.WorkingSetSize)) if ok else None
     try:
         with open(f"/proc/{pid}/status", encoding="utf-8", errors="replace") as f:
-            for line in f:
-                if line.startswith("VmHWM:"):
-                    return int(line.split()[1]) * 1024
+            found = {x.split(":")[0]: int(x.split()[1]) * 1024 for x in f if x.startswith(("VmHWM:", "VmRSS:"))}
+        return (found["VmHWM"], found["VmRSS"]) if len(found) == 2 else None
     except (OSError, IndexError, ValueError):
         return None
-    return None
+
+
+def _peak_of(pid: int) -> int | None:
+    m = _memory_of(pid)
+    return None if m is None else m[0]
 
 
 def memory_measurement_works() -> bool:
@@ -302,7 +420,9 @@ def memory_measurement_works() -> bool:
     return os.getpid() in _process_table() and bool(_peak_of(os.getpid()))
 
 
-def _stop_tree(root: int, pids) -> None:
+def _stop_tree(root: int, pids, job: _JobAccounting | None = None) -> None:
+    if job is not None:
+        job.terminate()
     if sys.platform == "win32":
         subprocess.run(["taskkill", "/PID", str(root), "/T", "/F"], capture_output=True)
     table = _process_table()
@@ -336,25 +456,30 @@ def monitor_job(proc, limit_bytes: int, factorization_limit_s: float, stage_log:
     """PL 6.3 from the parent (limits unchanged, D-057.4): the peak of EVERY process of the job tree (replay children included) against
     the memory limit, and every factorization stage of the stage log against the time limit, while it runs and when it ends. On a
     violation the tree is stopped; the record names the rule, the measured value, the process and its last stage. The sum over the tree
-    is a measurement only (D-057.4 states the limit per process)."""
+    is a measurement only (D-057.4 states the limit per process); so is the largest sum of the working sets seen at one moment. Processes
+    alive after the root ended or after the stop are named (orphans)."""
     t0 = time.perf_counter()
     root = proc.pid
+    job = _JobAccounting(proc)
     known, peaks, last_stage, active, stages = {root}, {}, {}, {}, {}
-    pos, violation, sum_peak, safety = 0, None, 0, False
+    pos, violation, sum_peak, safety, concurrent = 0, None, 0, False, 0
 
     def check_memory():
+        nonlocal concurrent
         table = _process_table()
         grew = True
         while grew:
             kids = {p for p, pp in table.items() if pp in known and p not in known}
             grew = bool(kids)
             known.update(kids)
-        total = 0
+        total, now = 0, 0
         for pid in known:
-            pk = _peak_of(pid) if pid in table else None
-            if pk is not None:
-                peaks[pid] = max(peaks.get(pid, 0), pk)
-                total += pk
+            m = _memory_of(pid) if pid in table else None
+            if m is not None:
+                peaks[pid] = max(peaks.get(pid, 0), m[0])
+                total += m[0]
+                now += m[1]
+        concurrent = max(concurrent, now)
         worst = max(peaks, key=peaks.get, default=None)
         if limit_bytes > 0 and worst is not None and peaks[worst] > limit_bytes:
             return {"aborted": "memory", "working_set_bytes": peaks[worst], "limit_bytes": limit_bytes, "pid": worst,
@@ -400,43 +525,125 @@ def monitor_job(proc, limit_bytes: int, factorization_limit_s: float, stage_log:
             safety = True
             break
         time.sleep(poll_s)
-    if violation or safety:
-        _stop_tree(root, set(known))
+    stopped = bool(violation or safety)
+    if stopped:
+        _stop_tree(root, set(known), job)
     try:
         proc.wait(timeout=30)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
-    return {"violation": violation, "safety_timeout": safety, "wall_s": round(time.perf_counter() - t0, 2),
+
+    def alive() -> list[int]:
+        table = _process_table()
+        return sorted(p for p in known if p in table and p != root)
+
+    accounting = job.read()
+    orphans = alive() if accounting is None else (alive() if accounting["active_processes"] else [])
+    if orphans:
+        _stop_tree(root, set(known), job)
+    deadline = time.perf_counter() + 10
+    while time.perf_counter() < deadline and (alive() or ((job.read() or {}).get("active_processes") or 0)):
+        time.sleep(0.05)
+    accounting = job.read() or accounting
+    surviving = alive()
+    job.close()
+    return {"violation": violation, "safety_timeout": safety, "wall_s": round(time.perf_counter() - t0, 2), "returncode": proc.returncode,
+            "stopped_by_monitor": stopped, "orphans_found": orphans, "orphans_surviving": surviving,
             "processes": {str(k): v for k, v in peaks.items()}, "max_process_peak_bytes": max(peaks.values(), default=None),
-            "max_tree_sum_bytes": sum_peak, "limit_bytes": limit_bytes, "factorization_limit_s": factorization_limit_s,
+            "max_tree_sum_bytes": sum_peak, "max_concurrent_working_set_bytes": concurrent,
+            "tree_measurement_over_limit": bool(limit_bytes > 0 and concurrent > limit_bytes),
+            "tree_measurement_note": "recorded only: D-057.4 states the limit per process (owner decision I3)",
+            "memory_evidence": memory_evidence(max(peaks.values(), default=None), len(peaks), accounting, limit_bytes, poll_s),
+            "limit_bytes": limit_bytes, "factorization_limit_s": factorization_limit_s,
             "factorization_stages": stages, "last_stage_by_process": {str(k): v for k, v in last_stage.items()}}
 
 
-def run_job(job: dict, work: Path, limit: int, signal: str | None, factorization_limit_s: float | None = None) -> dict:
-    """One job in a child process under ``monitor_job``. Returns its result, or {"aborted": record} (PL 6.3), or {"failed": ...}."""
-    work.mkdir(parents=True, exist_ok=True)
-    spec, log, stage_log = work / "job.json", work / "job.out", work / "stages.jsonl"
-    stage_log.unlink(missing_ok=True)
-    spec.write_text(_dump(job), encoding="utf-8")
-    env = {k: v for k, v in os.environ.items() if k != pl().CAMPAIGN_AUTH_ENV}
+def child_env(signal: str | None = None) -> dict:
+    """The environment of every child: OD-6 thread variables; imports only from the intended source root (B-2)."""
+    env = {k: v for k, v in os.environ.items() if k != pl().CAMPAIGN_AUTH_ENV and k not in IMPORT_ENV}
     env.update(LAUNCH_ENV)
-    env[pl().STAGE_LOG_ENV] = str(stage_log)
+    env.update(PYTHONPATH=str(ROOT / "src"), PYTHONNOUSERSITE="1")
     if signal:
         env[pl().CAMPAIGN_AUTH_ENV] = signal
-    with open(log, "w", encoding="utf-8") as f:
-        p = subprocess.Popen([sys.executable, str(ROOT / SELF), "_job", str(spec)], cwd=ROOT, stdout=f, stderr=subprocess.STDOUT, text=True,
-                             env=env)
+    return env
+
+
+def _child_command(spec: Path) -> list[str]:
+    return [sys.executable, str(ROOT / SELF), "_job", str(spec)]
+
+
+def _tail(text: str, n: int = 1500) -> str:
+    return text[-n:]
+
+
+def _output_defects(job: dict, res, pids) -> list[str]:
+    """Is this the result of this job? Anything else is malformed output, never a row."""
+    if not isinstance(res, dict) or not isinstance(res.get("process"), dict):
+        return ["no process record in the output"]
+    # a process of this job tree (on Windows the python.exe of a virtual environment starts the real interpreter as its child)
+    bad = [] if res["process"].get("pid") in pids else [f"the output names process {res['process'].get('pid')}, not one of this job {sorted(pids)}"]
+    kind = job["kind"]
+    if kind == "journal" and not (isinstance(res.get("journal"), str) and Path(res["journal"]).is_dir()):
+        bad.append("no journal directory in the output")
+    elif kind == "paired" and not (isinstance(res.get("paired"), dict) and isinstance(res["paired"].get("rows"), list)):
+        bad.append("no paired rows in the output")
+    elif kind == "row" and not (isinstance(res.get("analysis"), dict) and isinstance(res.get("input"), dict) and
+                                isinstance(res["analysis"].get("classification"), dict) and "status" in res["analysis"]):
+        bad.append("no analysis of the row in the output")
+    elif kind == "second_paths":
+        checks = res.get("checks")
+        names = [ACCURACY, *[p for p in SECOND_PATHS if p in (job.get("subset_paths") or [])]]
+        if not isinstance(checks, dict) or any(not isinstance(checks.get(n), dict) or "status" not in checks[n] for n in names):
+            bad.append(f"the output does not hold every selected check: {names}")
+    return bad
+
+
+def _process_defects(environment, loaded, ctx: dict | None, label: str) -> list[str]:
+    """A child's own account of what it ran on, against the approved record (real run) or against the start of the run (dry run)."""
+    if ctx is None:
+        return []
+    if not ctx["real"] and isinstance(loaded, dict):
+        for path, blob in (loaded.get("loaded") or {}).items():
+            ctx["code"].setdefault(path, blob)
+    return [f"{label}: {x}" for x in pl().environment_defects(environment, ctx["environment"]) + pl().loaded_code_defects(loaded, ctx["code"])]
+
+
+def run_job(job: dict, work: Path, limit: int, signal: str | None, factorization_limit_s: float | None = None, ctx: dict | None = None) -> dict:
+    """One job in a child process under ``monitor_job``. Returns its result or {"aborted": record} (PL 6.3); raises CampaignRefused when the
+    child refuses or ran on something else than approved, and ToolFailure when the job did not give a valid result."""
+    work.mkdir(parents=True, exist_ok=True)
+    spec, log, err, stage_log = work / "job.json", work / "job.out", work / "job.err", work / "stages.jsonl"
+    stage_log.unlink(missing_ok=True)
+    spec.write_text(_dump(job), encoding="utf-8")
+    env = child_env(signal)
+    env[pl().STAGE_LOG_ENV] = str(stage_log)
+    with open(log, "w", encoding="utf-8") as f, open(err, "w", encoding="utf-8") as e:
+        p = subprocess.Popen(_child_command(spec), cwd=ROOT, stdout=f, stderr=e, text=True, env=env)
         mon = monitor_job(p, limit, rd().PL63_FACTORIZATION_S if factorization_limit_s is None else factorization_limit_s, stage_log)
-    text = log.read_text(encoding="utf-8", errors="replace")
+    text, errs = log.read_text(encoding="utf-8", errors="replace"), err.read_text(encoding="utf-8", errors="replace")
+    ev = {"job": job["kind"], "returncode": p.returncode, "resources": mon, "seconds": mon["wall_s"], "stdout_tail": _tail(text), "stderr_tail": _tail(errs)}
+    if mon["orphans_surviving"] or (mon["orphans_found"] and not mon["stopped_by_monitor"]):
+        raise ToolFailure("ORPHAN_PROCESSES", reason=f"found {mon['orphans_found']}, surviving {mon['orphans_surviving']}", **ev)
     if mon["violation"]:
         return {"aborted": mon["violation"], "resources": mon, "seconds": mon["wall_s"]}
     if mon["safety_timeout"]:
-        return {"failed": f"operational safety timeout of the runner ({rd().SAFETY_TIMEOUT_S} s; not a PL 6.3 limit)",
-                "tail": text[-1500:], "resources": mon, "seconds": mon["wall_s"]}
+        raise ToolFailure("TIMEOUT", reason=f"operational safety timeout of the runner ({rd().SAFETY_TIMEOUT_S} s; not a PL 6.3 limit); killed", **ev)
+    if p.returncode == 2 and "refused:" in errs:
+        raise CampaignRefused(f"a child process of the campaign refused: {errs.strip()[:3000]}")
     if p.returncode != 0:
-        return {"failed": f"child job exited with {p.returncode}", "tail": text[-1500:], "resources": mon, "seconds": mon["wall_s"]}
-    return {**json.loads(text.strip().splitlines()[-1]), "resources": mon, "seconds": mon["wall_s"]}
+        raise ToolFailure("CHILD_CRASH", reason=f"child job exited with {p.returncode}", **ev)
+    try:
+        res = json.loads(text.strip().splitlines()[-1])
+    except (IndexError, ValueError) as exc:
+        raise ToolFailure("MALFORMED_OUTPUT", reason=f"the last line of the output is not JSON: {type(exc).__name__}", **ev) from exc
+    bad = _output_defects(job, res, {p.pid, *map(int, mon["processes"])})
+    if bad:
+        raise ToolFailure("MALFORMED_OUTPUT", reason="; ".join(bad), **ev)
+    bad = _process_defects(res["process"].get("environment"), res["process"].get("loaded_code"), ctx, f"job process {p.pid}")
+    if bad:
+        raise CampaignRefused("a process of the campaign did not run on the approved code and environment: " + "; ".join(bad))
+    return {**res, "resources": mon, "seconds": mon["wall_s"]}
 
 
 def _job_child(spec_path: str) -> dict:
@@ -461,7 +668,7 @@ def _job_child(spec_path: str) -> dict:
         out["checks"] = json.loads(_dump(second_paths(job)))
     else:
         raise ValueError(f"unknown job kind {job['kind']!r}")
-    out["process"]["peak"] = pf()._mem()
+    out["process"].update(peak=pf()._mem(), environment=pl().environment_record(), loaded_code=pl().loaded_code_record())
     return out
 
 
@@ -668,10 +875,18 @@ CHECK_METHODS = {
     "SP-OP": ("exact node-wise operator D2 against the tensor K^C", (READY_TOOL,), sp_op),
 }
 SECOND_PATHS = ("SP-RH", "SP-LARGE", "SP-C", "SP-BR", "SP-OP")
+EMBEDDED_PATHS = ("SP-GAMMA", "SP-BE")  # run inside the row by ready.analyse_ready
 
 
 def _blobs(paths) -> dict:
     return {t: pl().git_blob_id(ROOT / t) for t in paths}
+
+
+def _exception_record(exc: Exception) -> dict:
+    """A numerical exception leaves the check UNRESOLVED; any other one is a defect of the tool, recorded as such (B-4)."""
+    kind = type(exc).__name__
+    rec = {"status": UNRESOLVED, "reason": f"{kind}: {str(exc)[-300:]}"}
+    return rec if kind in NUMERICAL_EXCEPTIONS else {**rec, "failure_kind": INTERNAL_EXCEPTION}
 
 
 def second_paths(job: dict) -> dict:
@@ -685,7 +900,7 @@ def second_paths(job: dict) -> dict:
         raise
     except Exception as exc:  # recorded, never hidden
         reason = f"the arrays of the row are not readable: {type(exc).__name__}: {str(exc)[-300:]}"
-        return {name: {"check": name, "status": UNRESOLVED, "reason": reason} for name in [*selected, ACCURACY]}
+        return {name: {"check": name, "status": UNRESOLVED, "reason": reason, "failure_kind": INTERNAL_EXCEPTION} for name in [*selected, ACCURACY]}
     common = {"row_key": job.get("row_key"), "input_hashes": inp["input_hashes"]}
     for name in selected:
         if spec["kind"] != "journal":
@@ -705,7 +920,7 @@ def second_paths(job: dict) -> dict:
         except pl().D1Refused:
             raise
         except Exception as exc:  # recorded, never hidden
-            out[name] = {**rec, "status": UNRESOLVED, "reason": f"{type(exc).__name__}: {str(exc)[-300:]}"}
+            out[name] = {**rec, **_exception_record(exc)}
     pl().stage_event("reference BR", "start")
     method = "BR: exact assembly, decimal band Cholesky, exact residual, lambda_low, budget 1/100 (reference adapter)"
     rec = {**common, "method": method, "implementation": _blobs((ADAPTER_TOOL, BR_TOOL, HS_MODULE))}
@@ -715,8 +930,11 @@ def second_paths(job: dict) -> dict:
     except pl().D1Refused:
         raise
     except Exception as exc:  # recorded, never hidden
-        ref = {"result": f"{UNRESOLVED}: {type(exc).__name__}: {str(exc)[-300:]}"}
+        er = _exception_record(exc)
+        ref = {"result": f"{UNRESOLVED}: {er['reason']}", **({"failure_kind": er["failure_kind"]} if "failure_kind" in er else {})}
     out[ACCURACY] = {"check": ACCURACY, **rec, **accuracy_record(ref, selected_br)}
+    if "failure_kind" in ref:
+        out[ACCURACY]["failure_kind"] = ref["failure_kind"]
     if selected_br:
         res = str(ref.get("result"))
         st = PASS if res.startswith("RESOLVED") else CONTRADICTION if "CONTRADICTION" in res else UNRESOLVED
@@ -743,23 +961,46 @@ def _planned_reason(row: dict, cfg) -> str:
 
 
 def _job_fault(r: dict, what: str) -> tuple[str, dict | None, str]:
-    if "aborted" in r:
-        a = r["aborted"]
-        who = f"stage {a.get('stage') or a.get('process_stage')!r}, process {a.get('pid')}"
-        return f"PL 6.3: {what} job stopped ({a['aborted']}; {who})", {**a, "seconds": r.get("seconds")}, EXEC_RESOURCES
-    return f"not executed: {what} job failed ({r.get('failed')}): {str(r.get('tail', ''))[-400:]}", None, EXEC_FAILED
+    a = r["aborted"]
+    who = f"stage {a.get('stage') or a.get('process_stage')!r}, process {a.get('pid')}"
+    return f"PL 6.3: {what} job stopped ({a['aborted']}; {who})", {**a, "seconds": r.get("seconds")}, EXEC_RESOURCES
 
 
-def _row_job(row: dict, spec: dict, subsets: dict, work: Path, limit: int, signal, dry_run: bool, factorization_limit_s=None) -> dict:
+def _analysis_tool_failure(a: dict) -> tuple[str, str] | None:
+    """Did the analysis of a row report a failure of the tools? An unresolved numerical assumption stays with the row (B-4)."""
+    exc = a.get("exception")
+    if exc and exc.split(":")[0] not in NUMERICAL_EXCEPTIONS:
+        return INTERNAL_EXCEPTION, f"pipeline exception {exc[-500:]}"
+    reason = str(a.get("not_executed_reason") or "")
+    if reason.startswith("journal not readable"):
+        return "UNREADABLE_DATA", reason
+    pa = str(((a.get("premises") or {}).get("P-a") or {}).get("reason") or "")
+    if "sequence binding not checkable" in pa:
+        return INTERNAL_EXCEPTION, pa[-500:]
+    rep_ = a.get("reproduction")
+    if isinstance(rep_, dict) and rep_.get("bitwise_equal") is None:
+        return "REPLAY_FAILED", f"the replay process failed: {rep_.get('error')}"
+    return None
+
+
+def _row_job(row: dict, spec: dict, subsets: dict, work: Path, limit: int, signal, dry_run: bool, factorization_limit_s=None, ctx=None) -> dict:
     paths = list(subsets.get(row["key"], []))
     job = {"kind": "row", "spec": spec, "mandatory": row["mandatory"], "sp_be": "SP-BE" in paths, "dry_run": dry_run}
-    r = run_job(job, work / "row", limit, signal, factorization_limit_s)
-    if "aborted" in r or "failed" in r:
+    r = run_job(job, work / "row", limit, signal, factorization_limit_s, ctx)
+    if "aborted" in r:
         reason, measured, ex = _job_fault(r, "row")
         rec = _not_executed_record(row, reason, measured, ex)
         rec["resources"] = r.get("resources")
         return rec
     a = r["analysis"]
+    failure = _analysis_tool_failure(a)
+    if failure:
+        raise ToolFailure(failure[0], reason=failure[1], job="row", row=row["key"], resources=r["resources"])
+    rep_ = a.get("reproduction")
+    if isinstance(rep_, dict):
+        bad = _process_defects(rep_.get("child_environment"), rep_.get("child_loaded_code"), ctx, f"replay process {rep_.get('child_pid')}")
+        if bad:
+            raise CampaignRefused("a replay process did not run on the approved code and environment: " + "; ".join(bad))
     rec = {"key": row["key"], "block": row["block"], "N": row["N"], "s": row["s"], "mandatory": row["mandatory"],
            "executed": a.get("row") is not None, "execution_status": EXEC_DONE if a.get("row") is not None else EXEC_PLAN,
            "status": a["status"], "reasons": a["classification"].get("reasons"), "input": r["input"], "z4": a.get("z4"),
@@ -771,21 +1012,21 @@ def _row_job(row: dict, spec: dict, subsets: dict, work: Path, limit: int, signa
                          for name in names}
         return rec
     sjob = {"kind": "second_paths", "spec": spec, "row_key": row["key"], "subset_paths": paths, "dry_run": dry_run}
-    sp = run_job(sjob, work / "checks", limit, signal, factorization_limit_s)
-    if "aborted" in sp or "failed" in sp:  # OD-7: of the checks, not of the row
-        st = UNRESOLVED_RESOURCES_OF_CHECK if "aborted" in sp else UNRESOLVED
-        why = sp.get("aborted") or {"failed": sp.get("failed"), "tail": sp.get("tail", "")[-400:]}
-        rec["checks"] = {name: {"check": name, "status": st, "reason": why} for name in names}
+    sp = run_job(sjob, work / "checks", limit, signal, factorization_limit_s, ctx)
+    if "aborted" in sp:  # OD-7: of the checks, not of the row
+        rec["checks"] = {name: {"check": name, "status": UNRESOLVED_RESOURCES_OF_CHECK, "reason": sp["aborted"]} for name in names}
     else:
         rec["checks"] = sp["checks"]
     rec["checks_resources"] = sp.get("resources")
     for name, c_ in rec["checks"].items():
+        if c_.get("failure_kind"):
+            raise ToolFailure(c_["failure_kind"], reason=f"{name}: {c_.get('reason')}", job="second_paths", row=row["key"])
         if c_.get("status") == CONTRADICTION:  # a defect of a tool: the verdict is not issued until it is removed (D-057.3 item 4)
             rec["tool_defects"].append(f"SECOND_PATH_CONTRADICTION {name}: {c_.get('reason')}")
     return rec
 
 
-def run_unit(unit: dict, work: Path, limit: int, signal, subsets: dict, dry_run: bool, jobs: list, factorization_limit_s=None) -> dict:
+def run_unit(unit: dict, work: Path, limit: int, signal, subsets: dict, dry_run: bool, jobs: list, factorization_limit_s=None, ctx=None) -> dict:
     cfg = _cfg(unit)
     rows = [None] * len(unit["rows"])
     execs = [i for i, r in enumerate(unit["rows"]) if r["executable"]]
@@ -798,9 +1039,9 @@ def run_unit(unit: dict, work: Path, limit: int, signal, subsets: dict, dry_run:
         return {"unit": unit["id"], "rows": rows, "rac": rac, "prep": None}
     kind = "paired" if unit["block"] == "C" else "journal"
     prep = run_job({"kind": kind, "config": unit["config"], "out": str(work / "data"), "dry_run": dry_run}, work / "prep", limit,
-                   signal, factorization_limit_s)
+                   signal, factorization_limit_s, ctx)
     jobs.append(unit["id"] + "|prep")
-    if "aborted" in prep or "failed" in prep:
+    if "aborted" in prep:
         reason, measured, ex = _job_fault(prep, kind)
         for i in execs:
             rows[i] = _not_executed_record(unit["rows"][i], reason, measured, ex)
@@ -816,7 +1057,7 @@ def run_unit(unit: dict, work: Path, limit: int, signal, subsets: dict, dry_run:
                 rows[i] = _not_executed_record(r, (x or {}).get("reason") or f"paired half-step s = {r['s']} absent")
                 continue
             spec = x["spec"]
-        rows[i] = _row_job(r, spec, subsets, work / f"s{r['s']}", limit, signal, dry_run, factorization_limit_s)
+        rows[i] = _row_job(r, spec, subsets, work / f"s{r['s']}", limit, signal, dry_run, factorization_limit_s, ctx)
         jobs.append(f"{unit['id']}|s{r['s']}")
     if kind == "paired":
         recs = {x.get("s"): x for x in (prep.get("chain") or {}).get("records", []) if isinstance(x, dict)}
@@ -828,16 +1069,35 @@ def run_unit(unit: dict, work: Path, limit: int, signal, subsets: dict, dry_run:
                      "chain_status": (prep.get("paired") or {}).get("chain_status")}}
 
 
+def _embedded_path(rec: dict, name: str) -> tuple[str, str | None]:
+    """SP-GAMMA and SP-BE run inside the row (``ready.analyse_ready``); their results are in its diagnostics."""
+    d = ((rec.get("analysis") or {}).get("row") or {}).get("diagnostics") or {}
+    if name == "SP-GAMMA":
+        x = d.get("sp_gamma") or {}
+        ok = x.get("inclusion") is True and x.get("tight") is True
+    else:
+        x = d.get("second_path_BE") or {}
+        ok = x.get("match") is True
+    if not x:
+        return "NOT_RUN", f"no result of {name} in the row"
+    return (PASS, None) if ok else (UNRESOLVED, f"{name}: {x}")
+
+
 def second_path_coverage(records: list[dict], subsets: dict) -> dict:
-    """For each check: the selected rows and what happened on each; a row that was not established is listed with its reason, so that
-    missing coverage can never read as protocol coverage. OBSERVATION: it does not change a status of a row."""
+    """For each check: the selected rows and what happened on each; a row that was not established or is absent is listed with its reason,
+    so that missing coverage can never read as protocol coverage. OBSERVATION: it does not change a status of a row."""
     by = {r["key"]: r for r in records}
     out = {}
-    for name in SECOND_PATHS:
+    for name in (*SECOND_PATHS, *EMBEDDED_PATHS):
         sel = sorted(k for k, v in subsets.items() if name in v and k in by)
-        entry = {"selected": len(sel), "pass": 0, "not_established": [], "contradictions": []}
+        entry = {"selected": len(sel), "pass": 0, "not_established": [], "contradictions": [],
+                 "selected_without_a_row": sorted(k for k, v in subsets.items() if name in v and k not in by)}
         for k in sel:
-            c_ = (by[k].get("checks") or {}).get(name)
+            if name in EMBEDDED_PATHS:
+                st, why = _embedded_path(by[k], name)
+                c_ = {"status": st, "reason": why} if by[k].get("execution_status") == EXEC_DONE else None
+            else:
+                c_ = (by[k].get("checks") or {}).get(name)
             st = (c_ or {}).get("status")
             if st == PASS:
                 entry["pass"] += 1
@@ -846,7 +1106,7 @@ def second_path_coverage(records: list[dict], subsets: dict) -> dict:
             else:
                 entry["not_established"].append({"key": k, "status": st or "NOT_RUN", "reason": (c_ or {}).get("reason") or
                                                  f"row {by[k].get('execution_status')}: {by[k].get('status')}"})
-        entry["complete"] = entry["pass"] == entry["selected"]
+        entry["complete"] = entry["pass"] == entry["selected"] and not entry["selected_without_a_row"]
         out[name] = entry
     acc = [r for r in records if r.get("execution_status") == EXEC_DONE]
     res = [r for r in acc if ((r.get("checks") or {}).get(ACCURACY) or {}).get("status") == "RESOLVED"]
@@ -874,6 +1134,8 @@ def relabel(o, status: str):
 # ---------------------------------------------------------------------------------------------------------------------------------
 
 def platform_defects() -> list[str]:
+    """Real run: the frozen OD-6 rule, the PL 6.3 monitor, the code actually imported and the environment against the addendum, and
+    whether origin/main is current. Evidence that is unavailable is a defect, never a match."""
     ap = rd().APPROVED_PLATFORM
     bad = []
     if sys.platform != ap["sys_platform"] or platform.python_version() != ap["python"]:
@@ -886,34 +1148,92 @@ def platform_defects() -> list[str]:
     for k in THREAD_VARS:
         if os.environ.get(k) != "1":
             bad.append(f"{k} is not 1")
+    bad += pl().runtime_defects(pl().campaign_gate())
+    bad += pl().remote_main_defects()
     return bad
+
+
+def _controls_command(cdir: Path) -> list[str]:
+    return [sys.executable, str(ROOT / CONTROLS_TOOL), "run", "--out", str(cdir)]
+
+
+def read_controls(returncode, cdir: Path, stderr: str = "") -> dict:
+    """The results of the controls child, read whatever its exit code was: the tool exits with 1 when a control does not match, which is a
+    result. VALID: a complete report of this run, consistent with its exit code. INVALID: missing, corrupt or inconsistent data, or a child
+    that crashed: nothing can be concluded from it, neither a pass nor a FAIL of control V (a defect of the tool)."""
+
+    def invalid(reason: str) -> dict:
+        return {"state": CONTROLS_INVALID, "ready_ok": False, "v_fail": False, "returncode": returncode, "reason": reason, "detail": _tail(stderr, 800)}
+
+    if returncode not in (0, 1):
+        return invalid(f"the controls child exited with {returncode}")
+    try:
+        res = json.loads((Path(cdir) / "controls_results.json").read_text(encoding="utf-8"))
+    except OSError as exc:
+        return invalid(f"no results of the controls: {type(exc).__name__} (exit code {returncode})")
+    except ValueError as exc:
+        return invalid(f"the results of the controls are not JSON: {exc}")
+    if not isinstance(res, dict):
+        return invalid("the results of the controls are not a JSON object")
+    ct = controls_tool()
+    if res.get("expected_sha256") != ct.EXPECTED_SHA256:
+        return invalid(f"the results were made against other expectations: {res.get('expected_sha256')!r}")
+    am = res.get("all_match")
+    if not isinstance(am, bool) or (returncode == 0) != am:
+        return invalid(f"exit code {returncode} and all_match = {am!r} do not agree")
+    want = [c_["id"] for c_ in ct.load_expected()["control_V"]]
+    cv, sm = res.get("control_V"), (res.get("summary") or {}).get("control_V") if isinstance(res.get("summary"), dict) else None
+    if not isinstance(cv, list) or any(not isinstance(x, dict) or not isinstance(x.get("verdict"), str) for x in cv) or [x.get("id") for x in cv] != want:
+        return invalid(f"control V does not report exactly the cases {want}")
+    if not isinstance(sm, dict) or sm.get("cases") != len(want) or sm.get("match") != sum(x.get("match") is True for x in cv):
+        return invalid("the summary of control V does not agree with its cases")
+    blobs = ((res.get("provenance") or {}).get("tool_blobs")) if isinstance(res.get("provenance"), dict) else None
+    if not isinstance(blobs, dict) or not blobs:
+        return invalid("the results record no tool blobs")
+    other = sorted(t for t, b in blobs.items() if pl()._disk_blob(ROOT / t) != b)
+    if other:
+        return invalid(f"the results were made by other tools: {other}")
+    v_fail = any(x["verdict"].startswith("UNEXPECTED") for x in cv)
+    if am and (v_fail or any(x.get("match") is not True for x in cv)):
+        return invalid("all_match is true with a control V that did not pass")
+    return {"state": CONTROLS_VALID, "ready_ok": am, "v_fail": v_fail, "returncode": returncode, "reason": None, "detail": res["summary"]}
 
 
 def prerun_checks(plan: list[dict], frozen: dict, work: Path) -> dict:
     """Protocol 4.4, 6, 12.4: s = 1 input hashes and the start archive against the frozen manifest; controls of PR #48 and of
-    QA-D1-READY (A/B/V/G) against their frozen expectations, in a child process without the launch signal."""
+    QA-D1-READY (A/B/V/G) against their frozen expectations, in a child process without the launch signal. A check that could not be made
+    is reported as a defect (``tool_defects``), never as a pass."""
     want = {x["key"]: x for x in frozen["d057"]["input_hashes_s1"]}
-    have = rd().input_hashes(plan)
-    mism = [x["key"] for x in have if want.get(x["key"]) != x]
-    mism += [f"missing s = 1 hash: {k}" for k in sorted(set(want) - {x["key"] for x in have})]
-    arch = json.loads((ROOT / frozen["d057"]["start_archive"]["path"]).read_text(encoding="utf-8"))
-    mism += [f"start archive: {x}" for x in rd().verify_archive(arch)]
-    pr48 = pf().run_controls()
-    s48 = pr48["summary"]
-    pr48_ok = all(s48.get(k) for k in ("control_A_all_match", "control_B_synthetic_all_match", "control_B_detector_functions_all_match"))
-    env = {k: v for k, v in os.environ.items() if k != pl().CAMPAIGN_AUTH_ENV}
-    env.update(LAUNCH_ENV)
-    cdir = work / "controls"
-    p = subprocess.run([sys.executable, str(ROOT / CONTROLS_TOOL), "run", "--out", str(cdir)], cwd=ROOT, capture_output=True, text=True,
-                       env=env)
-    ready_ok, v_fail, detail = False, False, f"controls child exited with {p.returncode}: {p.stderr[-800:]}"
-    if p.returncode == 0:
-        res = json.loads((cdir / "controls_results.json").read_text(encoding="utf-8"))
-        ready_ok = res["all_match"] is True
-        v_fail = any(str(x.get("verdict", "")).startswith("UNEXPECTED") for x in res["control_V"])
-        detail = res["summary"]
-    return {"input_hash_mismatch": mism, "pr48_controls_all_match": pr48_ok, "ready_controls_all_match": ready_ok,
-            "control_v_fail": v_fail, "controls_detail": detail}
+    tool_defects, mism = [], []
+    try:
+        have = rd().input_hashes(plan)
+        mism = [x["key"] for x in have if want.get(x["key"]) != x]
+        mism += [f"missing s = 1 hash: {k}" for k in sorted(set(want) - {x["key"] for x in have})]
+        arch = json.loads((ROOT / frozen["d057"]["start_archive"]["path"]).read_text(encoding="utf-8"))
+        mism += [f"start archive: {x}" for x in rd().verify_archive(arch)]
+    except pl().D1Refused:
+        raise
+    except Exception as exc:  # recorded, never hidden
+        tool_defects.append(f"the input hashes could not be checked: {type(exc).__name__}: {str(exc)[-300:]}")
+    pr48_ok = False
+    try:
+        s48 = pf().run_controls()["summary"]
+        pr48_ok = all(s48.get(k) for k in ("control_A_all_match", "control_B_synthetic_all_match", "control_B_detector_functions_all_match"))
+    except Exception as exc:  # recorded, never hidden
+        tool_defects.append(f"the controls of PR #48 did not run: {type(exc).__name__}: {str(exc)[-300:]}")
+    cdir = Path(work) / "controls"
+    shutil.rmtree(cdir, ignore_errors=True)  # results of an earlier attempt are never read
+    cdir.mkdir(parents=True, exist_ok=True)
+    try:
+        p = subprocess.run(_controls_command(cdir), cwd=ROOT, capture_output=True, text=True, env=child_env(), timeout=rd().SAFETY_TIMEOUT_S)
+        ctl = read_controls(p.returncode, cdir, p.stderr)
+    except subprocess.TimeoutExpired:
+        ctl = {"state": CONTROLS_INVALID, "ready_ok": False, "v_fail": False, "returncode": None, "reason": "the controls child timed out; killed", "detail": None}
+    if ctl["state"] != CONTROLS_VALID:
+        tool_defects.append(f"QA-D1-READY controls: {ctl['reason']}")
+    return {"input_hash_mismatch": mism, "pr48_controls_all_match": pr48_ok, "ready_controls_all_match": ctl["ready_ok"],
+            "control_v_fail": ctl["v_fail"], "controls_state": ctl["state"], "controls_returncode": ctl["returncode"],
+            "tool_defects": tool_defects, "controls_detail": ctl["detail"]}
 
 
 def campaign_verdict(records: list[dict], input_hash_mismatch=(), control_v_fail: bool = False) -> dict:
@@ -928,11 +1248,36 @@ def campaign_verdict(records: list[dict], input_hash_mismatch=(), control_v_fail
 # the campaign
 # ---------------------------------------------------------------------------------------------------------------------------------
 
+def _code_paths() -> list[str]:
+    tools = {READY_TOOL, SELF, pl().SELF, CONTROLS_TOOL, ADAPTER_TOOL, BR_TOOL, HS_MODULE, BC_MODULE, *pl().USED_TOOLS}
+    pkg = ROOT / pl().REFERENCE_PACKAGE
+    tools |= {p.relative_to(ROOT).as_posix() for p in pkg.rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+    return sorted(tools)
+
+
 def _provenance(dry_run: bool, signal) -> dict:
-    tools = sorted({READY_TOOL, SELF, pl().SELF, CONTROLS_TOOL, ADAPTER_TOOL, BR_TOOL, HS_MODULE, BC_MODULE, *pl().USED_TOOLS})
+    env = pl().environment_record()
     return {"dry_run": dry_run, "head": pl()._git_out(ROOT, "rev-parse", "HEAD")[1].strip(), "launch_signal": signal,
-            "tool_blobs": {t: pl().git_blob_id(ROOT / t) for t in tools}, "python": platform.python_version(),
-            "sys_platform": sys.platform, "numpy": np.__version__}
+            "tool_blobs": {t: pl()._disk_blob(ROOT / t) for t in _code_paths()}, "python": platform.python_version(),
+            "sys_platform": sys.platform, "numpy": np.__version__, "environment": env}
+
+
+def _prov_sha(prov: dict) -> str:
+    return hashlib.sha256(_dump(prov).encode()).hexdigest()
+
+
+def _changed_since_start(prov: dict, dry_run: bool, signal) -> list[str]:
+    """Has the source, the environment or the authorisation changed since the run began? Asked after every unit and before the verdict."""
+    now = _provenance(dry_run, signal)
+    bad = [f"{k} changed during the run" for k in prov if k != "tool_blobs" and now.get(k) != prov[k]]
+    bad += [f"{t}: blob changed during the run" for t in sorted(set(now["tool_blobs"]) | set(prov["tool_blobs"]))
+            if now["tool_blobs"].get(t) != prov["tool_blobs"].get(t)]
+    if not dry_run:
+        gate = pl().campaign_gate(fresh=True)
+        if not gate["authorized"]:
+            bad += [f"gate: {x}" for x in gate["reasons"]]
+        bad += platform_defects()
+    return bad
 
 
 def _plan_sha(plan: list[dict]) -> str:
@@ -950,8 +1295,71 @@ def block_d_rh(plan: list[dict]) -> dict:
     return {r["key"]: ["SP-RH"] for r in plan if r["kind"] == "row" and r["block"] == "D" and r["executable"]}
 
 
+def frozen_subsets(plan: list[dict], frozen: dict) -> dict:
+    """The frozen selection and block D (protocol 5 item 9): rows are added to it, a path is never removed; a path the runner does not have
+    refuses the run instead of being skipped."""
+    subsets = {x["key"]: list(x["paths"]) for x in frozen["d057"]["subsets"]["rows"]}
+    for k, v in block_d_rh(plan).items():
+        subsets[k] = sorted({*subsets.get(k, []), *v})
+    unknown = sorted({p for v in subsets.values() for p in v} - {*SECOND_PATHS, *EMBEDDED_PATHS})
+    if unknown:
+        raise CampaignRefused(f"the frozen subsets name checks this runner does not have: {unknown}")
+    return subsets
+
+
 def _sha_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _read_json(path: Path):
+    """None when the file is not readable JSON."""
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def stored_unit_defects(path: Path, unit: dict, prov_sha: str, status: str) -> list[str]:
+    """Before a stored unit is reused: it is the result of this unit in this run, carries no failure, and every status is what the unchanged
+    classifier gives on its stored input."""
+    doc = _read_json(path)
+    if not isinstance(doc, dict) or not isinstance(doc.get("rows"), list):
+        return ["not a readable unit"]
+    bad = []
+    if doc.get("unit") != unit["id"]:
+        bad.append(f"it is the result of {doc.get('unit')!r}")
+    if doc.get("run_provenance_sha256") != prov_sha:
+        bad.append("it was made under another provenance")
+    if [r.get("key") for r in doc["rows"] if isinstance(r, dict)] != [r["key"] for r in unit["rows"]]:
+        bad.append("its rows are not the rows of the plan")
+    for r in doc["rows"]:
+        if not isinstance(r, dict):
+            bad.append("a row is not a record")
+            continue
+        try:
+            st = pf().classify_row(decode_input(r["input"]))["status"]
+        except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
+            bad.append(f"{r.get('key')}: the stored input is not readable ({type(exc).__name__})")
+            continue
+        if st != r.get("status"):
+            bad.append(f"{r.get('key')}: stored status {r.get('status')}, the classifier gives {st}")
+        if any((c_ or {}).get("failure_kind") for c_ in (r.get("checks") or {}).values()):
+            bad.append(f"{r.get('key')}: a check holds a failure of the tools")
+    return bad
+
+
+def resource_evidence(records: list[dict]) -> dict:
+    """Per executed job what the memory evidence establishes, summed up: compliance is not claimed for what was not measured."""
+    jobs = [m for r in records for m in (r.get("resources"), r.get("checks_resources")) if isinstance(m, dict) and "memory_evidence" in m]
+    count: dict = {}
+    for m in jobs:
+        k = m["memory_evidence"]["status"]
+        count[k] = count.get(k, 0) + 1
+    return {"jobs": len(jobs), "by_status": count, "max_process_peak_bytes": max((m.get("max_process_peak_bytes") or 0 for m in jobs), default=None),
+            "max_concurrent_working_set_bytes": max((m.get("max_concurrent_working_set_bytes") or 0 for m in jobs), default=None),
+            "tree_measurement_over_limit_jobs": sum(bool(m.get("tree_measurement_over_limit")) for m in jobs),
+            "compliance": "WITHIN_LIMIT_BY_THIS_EVIDENCE" if jobs and all(m["memory_evidence"]["compliance"] == "WITHIN_LIMIT_BY_THIS_EVIDENCE" for m in jobs)
+            else "NOT_CLAIMED"}
 
 
 def run_campaign(out: Path, plan: list[dict] | None = None, dry_run: bool = False, memory_limit_bytes: int | None = None,
@@ -975,7 +1383,7 @@ def run_campaign(out: Path, plan: list[dict] | None = None, dry_run: bool = Fals
     else:
         if plan is not None or memory_limit_bytes is not None or subsets is not None or factorization_limit_s is not None:
             raise CampaignRefused("a real run uses the frozen plan, subsets and the PL 6.3 memory limit only")
-        gate = pl().campaign_gate()
+        gate = pl().campaign_gate(fresh=True)
         if not gate["authorized"]:
             raise CampaignRefused(f"D1_START = BLOCKED (D-059 gate {gate['state']}: {'; '.join(gate['reasons'])})")
         bad = platform_defects()
@@ -984,78 +1392,122 @@ def run_campaign(out: Path, plan: list[dict] | None = None, dry_run: bool = Fals
         bad += plan_defects(plan, frozen)
         if bad:
             raise CampaignRefused("; ".join(bad))
-        subsets = {x["key"]: x["paths"] for x in frozen["d057"]["subsets"]["rows"]}
-        subsets.update(block_d_rh(plan))
+        subsets = frozen_subsets(plan, frozen)
     subsets = subsets or {}
     limit = memory_limit_bytes if memory_limit_bytes is not None else memory_limit()
     prov = _provenance(dry_run, signal)
-    state_path, ledger_path = out / "state.json", out / "ledger.json"
+    prov_sha = _prov_sha(prov)
+    state_path, ledger_path, result_path = out / "state.json", out / "ledger.json", out / "campaign_result.json"
+    result_path.unlink(missing_ok=True)  # the result of an earlier attempt never stands for this one
     ledger = {}
     if state_path.exists():
-        st = json.loads(state_path.read_text(encoding="utf-8"))
-        if st["provenance"] != prov or st["plan_sha256"] != _plan_sha(plan):
+        st = _read_json(state_path)
+        if not isinstance(st, dict) or st.get("provenance") != json.loads(_dump(prov)) or st.get("plan_sha256") != _plan_sha(plan):
             raise CampaignRefused("restart refused: provenance or plan differs from the interrupted run")
-        ledger = json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else {}
+        ledger = (_read_json(ledger_path) if ledger_path.exists() else {})
+        if not isinstance(ledger, dict):
+            raise CampaignRefused("restart refused: the ledger is not readable")
         stored = {p.stem: p for p in (out / "units").glob("*.json")} if (out / "units").exists() else {}
-        changed = sorted(k for k, p in stored.items() if ledger.get(k) != _sha_file(p)) + sorted(set(ledger) - set(stored))
+        changed = sorted(k for k, p in stored.items() if k in ledger and ledger[k] != _sha_file(p)) + sorted(set(ledger) - set(stored))
         if changed:
             raise CampaignRefused(f"restart refused: stored units differ from the ledger: {changed}")
+        for k in set(stored) - set(ledger):  # written, not committed (interrupted between the two): computed again
+            stored[k].unlink()
         st["starts"].append(time.strftime("%Y-%m-%dT%H:%M:%S"))
     else:
         st = {"provenance": prov, "plan_sha256": _plan_sha(plan), "starts": [time.strftime("%Y-%m-%dT%H:%M:%S")]}
     _write_json(state_path, st)
     _write_json(out / "PROVENANCE_README.json", {"text": PROVENANCE_README})
     status = DATA_STATUS_DRY if dry_run else DATA_STATUS_CAMPAIGN
+
+    def stop(state: str, reasons, **extra) -> dict:
+        doc = {"data_status": status, "state": state, "reasons": list(reasons), "provenance": prov, "scope": "stopped: no campaign result",
+               "verdict": {"verdict": rd().VERDICT_NOT_ISSUED, "defects": list(reasons), "z4_pending": [], "rule": "D-059 (B-4): no verdict from a "
+                           "stopped run; restart after the repair, source and authorisation unchanged, or a new re-freeze"}, **extra}
+        _write_json(result_path, doc)
+        return doc
+
     pre = None
     if not dry_run:
         pre_path = out / "prerun.json"
-        if pre_path.exists():
-            pre = json.loads(pre_path.read_text(encoding="utf-8"))
-        else:
-            pre = prerun_checks(plan, frozen, out / "work_prerun")
+        pre = _read_json(pre_path) if pre_path.exists() else None
+        if not (isinstance(pre, dict) and pre.get("controls_state") == CONTROLS_VALID and not pre.get("tool_defects") and pre.get("pr48_controls_all_match")
+                and pre.get("ready_controls_all_match") and not pre.get("input_hash_mismatch") and pre.get("control_v_fail") is False):
+            pre = prerun_checks(plan, frozen, out / "work_prerun")  # only a clean pre-run is ever reused (same provenance: state.json)
             _write_json(pre_path, pre)
         if pre["input_hash_mismatch"] or pre["control_v_fail"]:
             recs = [_not_executed_record(r, "not executed: the campaign is blocked before the run (protocol 4.4)")
                     for r in plan if r["kind"] == "row"]
             doc = {"data_status": status, "state": "BLOCKED_BEFORE_THE_RUN", "prerun": pre, "scope": "no row was computed", "accounting": plan_accounting(plan),
                    "verdict": campaign_verdict(recs, pre["input_hash_mismatch"], pre["control_v_fail"]), "provenance": prov}
-            _write_json(out / "campaign_result.json", doc)
+            _write_json(result_path, doc)
             return doc
+        if pre["controls_state"] != CONTROLS_VALID or pre["tool_defects"]:
+            return stop("NOT_STARTED_CONTROLS_INVALID (a mandatory control could not be read: no row is computed)", pre["tool_defects"], prerun=pre)
         if not (pre["pr48_controls_all_match"] and pre["ready_controls_all_match"]):
             doc = {"data_status": status, "state": "NOT_STARTED_CONTROLS_MISMATCH (protocol 12 item 4)", "prerun": pre,
                    "provenance": prov}
-            _write_json(out / "campaign_result.json", doc)
+            _write_json(result_path, doc)
             return doc
+    if dry_run:  # against the start of this run, the threads by the rule of OD-6 (the parent may have imported NumPy before this module)
+        ctx = {"real": False, "environment": {**prov["environment"], "blas_threads": {"numpy": 1, "scipy": 1}, "thread_env": LAUNCH_ENV}, "code": {}}
+    else:
+        approved = pl().campaign_gate()["approved"]
+        ctx = {"real": True, "environment": approved["environment"], "code": dict(approved["code"])}
     jobs = []
     results = []
     for u in units(plan):
         upath = out / "units" / f"{_safe(u['id'])}.json"
         if upath.exists():
-            results.append(json.loads(upath.read_text(encoding="utf-8")))
+            bad = stored_unit_defects(upath, u, prov_sha, status)
+            if bad:
+                raise CampaignRefused(f"restart refused: stored unit {upath.stem}: {'; '.join(bad)}")
+            results.append(_read_json(upath))
             continue
         work = out / "work" / _safe(u["id"])
         if work.exists():
             shutil.rmtree(work)  # the partial work of an interrupted unit (always under out/)
-        res = relabel(run_unit(u, work, limit, signal, subsets, dry_run, jobs, factorization_limit_s), status)
+        try:
+            res = relabel(run_unit(u, work, limit, signal, subsets, dry_run, jobs, factorization_limit_s, ctx), status)
+        except ToolFailure as exc:  # never a completed unit: the restart computes it again
+            rec = relabel(exc.record, status)
+            n = len(list((out / "failures").glob(f"{_safe(u['id'])}_*.json"))) if (out / "failures").exists() else 0
+            _write_json(out / "failures" / f"{_safe(u['id'])}_{n}.json", {"unit": u["id"], **rec})
+            return stop(STOPPED_TOOL_FAILURE, [f"{u['id']}: {exc}"], failure={k: v for k, v in rec.items() if k != "resources"}, completed_units=len(results))
+        except CampaignRefused as exc:
+            _write_json(out / "last_refusal.json", {"unit": u["id"], "reason": str(exc)})  # nothing of the unit is committed
+            raise
+        bad = _changed_since_start(prov, dry_run, signal)
+        if bad:  # the unit ran under something that no longer holds: not committed
+            return stop(STOPPED_CHANGED, bad, completed_units=len(results))
+        res["run_provenance_sha256"] = prov_sha
         _write_json(upath, res)
         ledger[upath.stem] = _sha_file(upath)
         _write_json(ledger_path, ledger)
         results.append(res)
         if stop_after_jobs is not None and len(jobs) >= stop_after_jobs:
             raise CampaignInterrupted(f"stopped after {len(jobs)} jobs (test hook)")
+    bad = _changed_since_start(prov, dry_run, signal)
+    if bad:
+        return stop(STOPPED_CHANGED, bad, completed_units=len(results))
     records = [x for u in results for x in u["rows"]]
-    doc = {"data_status": status, "state": "COMPLETED", "accounting": plan_accounting(plan), "prerun": pre, "provenance": prov,
-           "restarts": st["starts"], "memory_limit_bytes": limit, "second_path_coverage": second_path_coverage(records, subsets),
+    coverage = second_path_coverage(records, subsets)
+    doc = {"data_status": status, "state": COMPLETED, "accounting": plan_accounting(plan), "prerun": pre, "provenance": prov,
+           "restarts": st["starts"], "memory_limit_bytes": limit, "second_path_coverage": coverage,
+           "second_path_coverage_complete": all(v.get("complete", True) for v in coverage.values()),
+           "resource_evidence": resource_evidence(records),
            "scope": "no scientific qualification and no owner acceptance is claimed; N = 2, 3 RESEARCH_ONLY / NOT_QUALIFIED; second paths and "
                     "BC-1 / TS-1 are observations",
            "limitations": ["PASS of a second path means established without contradiction, not accuracy (no tolerance assigned)",
-                           "A, B, F of SP-LARGE: measured differences only (no approved bound)"],
+                           "A, B, F of SP-LARGE: measured differences only (no approved bound)",
+                           "second_path_coverage_complete false: the listed rows are not covered; the verdict logic of protocol 4.3 and 4.4 is unchanged",
+                           "memory: see resource_evidence; compliance is not claimed where the evidence is NOT_MEASURED"],
            "rows": [{k: x.get(k) for k in ("key", "block", "N", "s", "mandatory", "executed", "execution_status", "status", "z4", "tool_defects")}
                     for x in records],
            "rac": [x for u in results for x in u["rac"]]}
     if not dry_run:
         doc["verdict"] = campaign_verdict(records)
-    _write_json(out / "campaign_result.json", doc)
+    _write_json(result_path, doc)
     return doc
 
 
@@ -1078,6 +1530,8 @@ def build_addendum(controls_results: Path, base_commit: str, surrogate_costs: Pa
              "unchanged": {t: {"blob": b} for t, b in sorted(d058.items()) if t not in CHANGED}}
     for t in ADDED_UNCHANGED:
         tools["unchanged"][t] = {"blob": p.git_blob_id(ROOT / t), "note": "added to the frozen set unchanged (D-059, C3)"}
+    pkg = p._git_out(ROOT, "ls-tree", "-r", "--name-only", "HEAD", p.REFERENCE_PACKAGE)[1].split()
+    tools["reference_package"] = {t: {"blob": p.git_blob_id(ROOT / t)} for t in pkg}
     raw = Path(controls_results).read_bytes()
     res = json.loads(raw)
     plan = rd().row_plan()
@@ -1104,6 +1558,11 @@ def build_addendum(controls_results: Path, base_commit: str, surrogate_costs: Pa
         "plan": {"counts": rd().plan_counts(plan), "accounting": plan_accounting(plan),
                  "mandatory_keys_sha256": frozen["mandatory_keys_sha256"]},
         "platform": {**rd().platform_record(), "blas_threads_both_libraries": p.blas_threads_both()},
+        "environment": p.environment_record(),
+        "trust_assumptions": "The gate and the runtime checks read the local repository and the running interpreter. They detect accidents, "
+                             "substitutions (PYTHONPATH, wrong package path, assume-unchanged, skip-worktree, replaced files) and stale state; they "
+                             "are not a security boundary against someone who can rewrite the repository, its refs or the interpreter. A pyc file "
+                             "next to approved source is trusted through Python's own source check.",
         "controls": {"results_sha256": hashlib.sha256(raw).hexdigest(), "all_match": res["all_match"], "summary": res["summary"],
                      "expected_sha256": res["expected_sha256"], "pr48": pf().run_controls()["summary"],
                      "run": "QA-D1-READY controls A/B/V/G and PR #48 harness on the changed tools, approved platform, no launch signal"},
@@ -1114,7 +1573,9 @@ def build_addendum(controls_results: Path, base_commit: str, surrogate_costs: Pa
                                     "non-D1 grids of comparable size (second_path_costs_on_non_D1_grids)",
                    "second_path_costs_on_non_D1_grids": None if surrogate_costs is None else json.loads(Path(surrogate_costs).read_text(encoding="utf-8")),
                    "runtime_enforcement": "monitor_job: peak of every process of the job tree against 50 % RAM, every factorization stage "
-                                          "against 30 min, from the parent; limits unchanged (D-057.4)"},
+                                          "against 30 min, from the parent; limits unchanged (D-057.4)",
+                   "memory_evidence": "working sets sampled while a process lives; OS commit high-water marks of the job object beside them; "
+                                      "compliance not claimed beyond this (memory_evidence, resource_evidence); the sum over the tree recorded, not limited"},
         "second_paths": {"SP-RH": "hs.solve_hessian, hs.error_bound, hs.certify_lambda_min", "SP-LARGE": "hs.exact_coefficients, "
                          "bc.bc_coefficients, hs.residual_exact, hs.certify_lambda_min, check_c3plus", "SP-C": "hs.exact_coefficients, "
                          "c3plus, c_control, check_c3plus", "SP-BR": "reference adapter (BR)", "SP-OP": "ready.sp_op_check",
@@ -1124,7 +1585,9 @@ def build_addendum(controls_results: Path, base_commit: str, surrogate_costs: Pa
                         "BC-1 / TS-1 outside SP-BR: reading of protocol 5.1 and D-057.3 item 1, to be confirmed by the Reviewer",
                         "SP-RH on (14, 6), N = 3, s = 1: the protocol names the grid, the frozen rule predates D-057.1",
                         "D-058.5 retained: B_E coverage partial (N-4, N-6); SP-OP measured on one probe; limited reviewer independence",
-                        "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary"],
+                        "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary",
+                        "memory limit per process (D-057.4); protocol 8 says RAM of the machine: tree sum recorded only (owner decision I3)",
+                        "a real run needs the remote at start and before the verdict (git ls-remote); unreachable refuses or withholds the verdict"],
     }
 
 
@@ -1146,7 +1609,7 @@ def main(argv=None) -> int:
         except pl().D1Refused as exc:
             print(f"refused: {exc}", file=sys.stderr)
             return 2
-        print(_dump(res))
+        print(json.dumps(res, default=pl()._json_default))  # ASCII: the console encoding of a child must not decide whether a result survives
         return 0
     if a.cmd == "addendum":
         _write_json(ROOT / pl().CAMPAIGN_ADDENDUM, build_addendum(a.controls_results, a.base_commit, a.surrogate_costs))
@@ -1157,7 +1620,7 @@ def main(argv=None) -> int:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
     print(json.dumps({"state": doc["state"], "verdict": (doc.get("verdict") or {}).get("verdict")}, default=str))
-    return 0
+    return 0 if doc["state"] == COMPLETED else 3
 
 
 if __name__ == "__main__":
