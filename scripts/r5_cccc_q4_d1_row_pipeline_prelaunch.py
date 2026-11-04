@@ -230,8 +230,8 @@ def _git_out(root: Path, *args: str) -> tuple[int, str]:
     return p.returncode, p.stdout
 
 
-def _git_blob(root: Path, path: str) -> str | None:
-    rc, out = _git_out(root, "rev-parse", "--verify", "--quiet", f"HEAD:{path}")
+def _git_blob(root: Path, path: str, rev: str = "HEAD") -> str | None:
+    rc, out = _git_out(root, "rev-parse", "--verify", "--quiet", f"{rev}:{path}")
     return out.strip() if rc == 0 and re.fullmatch(r"[0-9a-f]{40}", out.strip()) else None
 
 
@@ -243,19 +243,23 @@ def _git_bytes(root: Path, spec: str) -> bytes | None:
     return p.stdout if p.returncode == 0 else None
 
 
-def campaign_gate(root: Path | None = None, environ=None) -> dict:
+def campaign_gate(root: Path | None = None, environ=None, fresh: bool = False) -> dict:
     """D-059 / F3: is a D1 campaign row authorised in THIS process? Validated from git, never from the signal alone; every failed
     condition is listed. ``authorized`` is True only when the launch signal names D-059 and the git blob of the addendum, and:
     the tracked tree is clean; HEAD is contained in origin/main (integration); docs/DECISIONS.md at HEAD has the heading of D-059 and
     exactly one re-freeze act line (REFREEZE_ACT) of an owner decision whose heading exists, naming the same addendum blob; the
     addendum at HEAD has that blob, records D-059 and the D-058 frozen manifest blob; the frozen manifest at HEAD has that blob; every
-    tool blob the addendum records (changed, new and unchanged) is the blob at HEAD, and every tool of the D-058 manifest is covered.
-    Cached per process and signal (a replay child validates again in its own process)."""
+    tool blob the addendum records (changed, new, unchanged, reference package) is the blob at HEAD, and every tool of the D-058 manifest
+    is covered. The act, the addendum, the manifest and the tools must hold at origin/main as well: an act withdrawn there or tools
+    changed there refuse an older HEAD (``authoritative_defects``). The bytes on disk must be the recorded blobs, whatever git's index
+    says (assume-unchanged, skip-worktree; ``code_identity_defects``). Trust: the gate reads the local repository and detects accidents,
+    substitutions and stale state; it is not a security boundary against someone who can rewrite this repository or this interpreter.
+    Cached per process and signal (a replay child validates again in its own process); ``fresh`` validates again."""
     root = Path(root or ROOT)
     environ = os.environ if environ is None else environ
     signal = environ.get(CAMPAIGN_AUTH_ENV)
     key = (str(root.resolve()), signal)
-    if key in _GATE_CACHE:
+    if key in _GATE_CACHE and not fresh:
         return _GATE_CACHE[key]
     out = {"authorized": False, "state": "NOT_REQUESTED", "signal": signal, "reasons": []}
     _GATE_CACHE[key] = out
@@ -307,12 +311,197 @@ def campaign_gate(root: Path | None = None, environ=None) -> dict:
         add = json.loads(_git_bytes(root, f"HEAD:{CAMPAIGN_ADDENDUM}") or b"null")
         frozen = json.loads(_git_bytes(root, f"HEAD:{FROZEN_MANIFEST}") or b"null")
         bad += addendum_defects(add, frozen, lambda p: _git_blob(root, p))
+        bad += code_identity_defects(root, add)
+        bad += authoritative_defects(root, add, acts, want_blob)
+        out["approved"] = {"code": recorded_code(add), "environment": add.get("environment")}
     except (ValueError, TypeError, AttributeError, KeyError) as exc:
         bad.append(f"the addendum or the frozen manifest is not readable: {type(exc).__name__}: {exc}")
     if not bad:
         state = "AUTHORIZED"
     out.update(authorized=not bad, state=state, reasons=bad)
     return out
+
+
+CODE_GROUPS = ("changed", "new", "unchanged", "reference_package")
+REFERENCE_PACKAGE = "src/kkvim_reference"
+ENVIRONMENT_KEYS = ("sys_platform", "platform", "machine", "processor", "python", "numpy", "scipy", "numpy_blas", "scipy_blas",
+                    "numpy_blas_library_sha256", "scipy_blas_library_sha256", "blas_threads", "thread_env", "total_ram_bytes", "node_sha256")
+_ENV_CACHE: dict = {}
+
+
+def recorded_code(add: dict) -> dict:
+    """path -> approved git blob: everything the addendum records as code of the campaign."""
+    tools = add.get("tools") or {}
+    return {path: e["blob"] for group in CODE_GROUPS for path, e in (tools.get(group) or {}).items()}
+
+
+def _disk_blob(path: Path) -> str | None:
+    try:
+        return git_blob_id(path)
+    except OSError:
+        return None
+
+
+def code_identity_defects(root: Path, add: dict) -> list[str]:
+    """The actual bytes on disk against the blobs of the addendum (git's index may be told to look away), the frozen manifest included;
+    every file of the reference package on disk and at HEAD must be recorded."""
+    root = Path(root)
+    bad, code = [], recorded_code(add)
+    for path, blob in code.items():
+        have = _disk_blob(root / path)
+        if have != blob:
+            bad.append(f"on-disk bytes of {path} are blob {have or 'ABSENT'}, not the approved {blob}")
+    have = _disk_blob(root / FROZEN_MANIFEST)
+    if have != FROZEN_MANIFEST_BLOB:
+        bad.append(f"on-disk bytes of {FROZEN_MANIFEST} are blob {have or 'ABSENT'}, not {FROZEN_MANIFEST_BLOB}")
+    rc, listed = _git_out(root, "ls-tree", "-r", "--name-only", "HEAD", REFERENCE_PACKAGE)
+    tracked = {x for x in listed.splitlines() if x} if rc == 0 else set()
+    on_disk = {p.relative_to(root).as_posix() for p in (root / REFERENCE_PACKAGE).rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+    for path in sorted((tracked | on_disk) - set(code)):
+        bad.append(f"{path} of the reference package is not recorded by the addendum (untracked substitution or unapproved file)")
+    if not tracked:
+        bad.append(f"no reference package at HEAD ({REFERENCE_PACKAGE})")
+    return bad
+
+
+def authoritative_defects(root: Path, add: dict, acts_at_head: list, want_blob: str) -> list[str]:
+    """origin/main decides: the act must still stand there (a withdrawn or replaced act refuses an older HEAD holding the former one),
+    with the same addendum, manifest and tools."""
+    root = Path(root)
+    dec = _git_bytes(root, f"{INTEGRATION_REF}:{DECISIONS_DOC}")
+    if dec is None:
+        return [f"{DECISIONS_DOC} is not readable at {INTEGRATION_REF}: the act cannot be checked against the authoritative branch"]
+    acts = REFREEZE_ACT.findall(dec.decode("utf-8", "replace").replace("\r\n", "\n"))
+    if acts != list(acts_at_head):
+        return [f"the re-freeze act at {INTEGRATION_REF} is {acts!r}, at HEAD {list(acts_at_head)!r}: withdrawn, replaced or not integrated"]
+    bad = []
+    if _git_blob(root, CAMPAIGN_ADDENDUM, INTEGRATION_REF) != want_blob:
+        bad.append(f"the addendum at {INTEGRATION_REF} is not the approved {want_blob}")
+    if _git_blob(root, FROZEN_MANIFEST, INTEGRATION_REF) != FROZEN_MANIFEST_BLOB:
+        bad.append(f"the D-058 frozen manifest at {INTEGRATION_REF} is not {FROZEN_MANIFEST_BLOB}")
+    for path, blob in recorded_code(add).items():
+        if _git_blob(root, path, INTEGRATION_REF) != blob:
+            bad.append(f"tool {path}: the blob at {INTEGRATION_REF} differs from the addendum (the source changed after the act)")
+    return bad
+
+
+def remote_main_defects(root: Path | None = None) -> list[str]:
+    """Is the local origin/main the current one? Asked from the campaign parent only (a child must not depend on the network). Unknown
+    is a defect: without the answer the act is not established as current."""
+    root = Path(root or ROOT)
+    rc, out = _git_out(root, "ls-remote", "origin", "refs/heads/main")
+    rc2, local = _git_out(root, "rev-parse", "--verify", "--quiet", INTEGRATION_REF)
+    remote = out.split()[0] if rc == 0 and out.split() else None
+    if remote is None or rc2 != 0:
+        return ["origin/main could not be read from the remote: the current state of the re-freeze act is NOT VERIFIED"]
+    if remote != local.strip():
+        return [f"the local {INTEGRATION_REF} is {local.strip()}, the remote main is {remote}: stale; fetch and validate again"]
+    return []
+
+
+def _build_identity(module) -> dict | None:
+    try:
+        blas = module.show_config(mode="dicts")["Build Dependencies"]["blas"]
+    except Exception:  # unavailable, never assumed
+        return None
+    out = {k: blas.get(k) for k in ("name", "version", "openblas configuration")}
+    return out if all(out.values()) else None
+
+
+def _library_sha(pkg: str) -> str | None:
+    """sha256 of the BLAS library the package ships (the file ``blas_threads_both`` reads the thread count from)."""
+    try:
+        site = Path(importlib.util.find_spec(pkg).origin).resolve().parent.parent
+    except (ImportError, AttributeError, TypeError, ValueError):
+        return None
+    libs = [lib for d in _OPENBLAS[pkg][1] if (site / d).is_dir() for lib in sorted((site / d).glob("*openblas*"))]
+    return hashlib.sha256(libs[0].read_bytes()).hexdigest() if len(libs) == 1 else None
+
+
+def environment_record() -> dict:
+    """OD-6 (D-057.2 item 3): the identity of the numerical environment read in THIS process. None: not available, hence not verified."""
+    import scipy
+
+    if "static" not in _ENV_CACHE:
+        _ENV_CACHE["static"] = {
+            "sys_platform": sys.platform, "platform": platform.platform(), "machine": platform.machine(), "processor": platform.processor(),
+            "python": platform.python_version(), "numpy": np.__version__, "scipy": scipy.__version__, "numpy_blas": _build_identity(np),
+            "scipy_blas": _build_identity(scipy), "numpy_blas_library_sha256": _library_sha("numpy"),
+            "scipy_blas_library_sha256": _library_sha("scipy"), "total_ram_bytes": pf().total_ram_bytes(),
+            "node_sha256": hashlib.sha256(platform.node().encode()).hexdigest() if platform.node() else None}
+    return {**_ENV_CACHE["static"], "blas_threads": blas_threads_both(), "thread_env": {k: os.environ.get(k) for k in THREAD_VARS}}
+
+
+def environment_defects(record: dict | None, approved: dict | None) -> list[str]:
+    """Every field of ENVIRONMENT_KEYS is compared; evidence that is unavailable is reported as such, never as a match. D-058.3 stays
+    with the row: a replay with unverified threads does not establish P-a (``replay_blas_defects``)."""
+    if not isinstance(record, dict):
+        return ["OD-6: the process recorded no environment (NOT VERIFIED)"]
+    if not isinstance(approved, dict):
+        return ["OD-6: the addendum approves no environment (NOT VERIFIED)"]
+    bad = []
+    for k in ENVIRONMENT_KEYS:
+        want, have = approved.get(k), record.get(k)
+        if want is None:
+            bad.append(f"OD-6: {k} is not pinned by the addendum (NOT VERIFIED)")
+        elif have is None:
+            bad.append(f"OD-6: {k} is unavailable in this process (NOT VERIFIED; approved {want!r})")
+        elif have != want:
+            bad.append(f"OD-6: {k} = {have!r}, approved {want!r}")
+    return bad
+
+
+def loaded_code_record(root: Path | None = None) -> dict:
+    """What THIS process has actually loaded: every module of the reference package (wherever it came from) and every module under the
+    repository root, with the blob of its bytes on disk now; ``outside`` lists the reference-package modules not from the source root and
+    the numerical packages not from this interpreter's environment."""
+    root = Path(root or ROOT).resolve()
+    src = (root / REFERENCE_PACKAGE).resolve()
+    prefix = Path(sys.prefix).resolve()
+    loaded, outside = {}, []
+    for name, mod in list(sys.modules.items()):
+        f = getattr(mod, "__file__", None)
+        if not f:
+            continue
+        p = Path(f).resolve()
+        top = name.split(".")[0]
+        if top in ("numpy", "scipy") and prefix not in p.parents:
+            outside.append(f"{top}: {p} is outside the environment of the interpreter ({prefix})")
+        if top == "kkvim_reference" and src not in p.parents:
+            outside.append(f"{name}: {p} is not under the intended source root {src}")
+        elif root in p.parents and prefix not in p.parents:
+            rel = p.relative_to(root).as_posix()
+            loaded[rel] = _disk_blob(p) if p.suffix == ".py" else f"NOT_SOURCE:{p.suffix}"
+    return {"root": str(root), "loaded": loaded, "outside": sorted(set(outside))}
+
+
+def loaded_code_defects(record: dict | None, approved: dict | None) -> list[str]:
+    if not isinstance(record, dict) or not isinstance(approved, dict) or not approved:
+        return ["the loaded code of the process is not recorded or nothing is approved (NOT VERIFIED)"]
+    bad = list(record.get("outside") or [])
+    for path, blob in (record.get("loaded") or {}).items():
+        if path not in approved:
+            bad.append(f"loaded module {path} is not recorded by the addendum")
+        elif approved[path] != blob:
+            bad.append(f"loaded module {path}: bytes are blob {blob}, approved {approved[path]}")
+    return bad
+
+
+def import_path_defects(root: Path | None = None) -> list[str]:
+    """Environment variables that redirect imports: PYTHONPATH may name the intended source root only."""
+    root = Path(root or ROOT).resolve()
+    bad = [f"{k} is set" for k in ("PYTHONHOME", "PYTHONSTARTUP", "PYTHONINSPECT") if os.environ.get(k)]
+    pp = [x for x in os.environ.get("PYTHONPATH", "").split(os.pathsep) if x]
+    if any(Path(x).resolve() != (root / "src").resolve() for x in pp):
+        bad.append(f"PYTHONPATH = {os.environ['PYTHONPATH']!r} names more than the intended source root {root / 'src'}")
+    return bad
+
+
+def runtime_defects(gate: dict, root: Path | None = None) -> list[str]:
+    """In THIS process, beyond the git record of the gate: import paths, the code actually loaded, the numerical environment."""
+    approved = gate.get("approved") or {}
+    return (import_path_defects(root) + loaded_code_defects(loaded_code_record(root), approved.get("code")) +
+            environment_defects(environment_record(), approved.get("environment")))
 
 
 def addendum_defects(add: dict, frozen: dict, blob_at_head) -> list[str]:
@@ -327,7 +516,7 @@ def addendum_defects(add: dict, frozen: dict, blob_at_head) -> list[str]:
         bad.append("the addendum does not record the D-058 frozen manifest blob")
     tools = add.get("tools") or {}
     recorded = {}
-    for group in ("changed", "new", "unchanged"):
+    for group in CODE_GROUPS:
         for path, e in (tools.get(group) or {}).items():
             recorded[path] = e["blob"]
             if blob_at_head(path) != e["blob"]:
@@ -346,6 +535,11 @@ def addendum_defects(add: dict, frozen: dict, blob_at_head) -> list[str]:
     for path in CAMPAIGN_TOOLS:  # outside the D-058 manifest: the runner (new) and the reference adapter (added unchanged)
         if path not in recorded:
             bad.append(f"the addendum does not record the campaign tool {path}")
+    if not tools.get("reference_package"):
+        bad.append(f"the addendum does not record the reference package {REFERENCE_PACKAGE}")
+    env = add.get("environment")
+    if not isinstance(env, dict) or any(env.get(k) is None for k in ENVIRONMENT_KEYS):
+        bad.append("the addendum does not pin the numerical environment (OD-6)")
     return bad
 
 
@@ -358,6 +552,10 @@ def guard_config(cfg) -> None:
         if not gate["authorized"]:
             raise D1Refused(f"({cfg.nx}, {cfg.ny}) is a grid of the D1 sample (protocol 2.2, 2.3, 3); D1_START = BLOCKED "
                             f"(D-059 gate {gate['state']}: {'; '.join(gate['reasons'])})")
+        bad = runtime_defects(gate)
+        if bad:
+            raise D1Refused(f"({cfg.nx}, {cfg.ny}) is a grid of the D1 sample; D1_START = BLOCKED for this process (D-059 execution "
+                            f"provenance: {'; '.join(bad)})")
     if isinstance(cfg.N, bool) or cfg.N not in (1, 2, 3):
         raise D1Refused(f"N = {cfg.N!r}: N must be 1, 2 or 3")
 
@@ -1404,7 +1602,8 @@ def _row_job(spec: dict) -> dict:
     rec = rerun.pop("op8_record", None) if isinstance(rerun, dict) else None  # the full OP-8 record of a paired row: not a
     # reproduced value (its float diagnostics are observations); its C-3+ fields are compared through c3plus_record
     return {"row": row, "input_binding_reasons": reasons, "op8_rerun": rerun, "op8_record": rec, "mode": mode, "pid": os.getpid(),
-            "blas_threads": blas_threads_both(), "process_peak": pf()._mem()}
+            "blas_threads": blas_threads_both(), "process_peak": pf()._mem(), "environment": environment_record(),
+            "loaded_code": loaded_code_record()}
 
 
 # D-059 (PL 6.3, per factorization stage): stage log of the campaign runner. The wrappers only record start and end of the function;
@@ -1509,7 +1708,7 @@ def run_child(spec: dict, timeout: float = 1800) -> dict:
         p = subprocess.run([sys.executable, str(ROOT / SELF), "_row", str(sp)], cwd=ROOT, capture_output=True, text=True,
                            timeout=None if os.environ.get(STAGE_LOG_ENV) else timeout)
     if p.returncode == 2 and "refused:" in p.stderr:
-        raise D1Refused(p.stderr.strip()[-500:])
+        raise D1Refused(p.stderr.strip()[:3000])  # the head of the message names the refusal; the reasons may be many
     if p.returncode != 0:
         raise RuntimeError(f"child row failed ({p.returncode}): {p.stderr[-3000:]}")
     return json.loads(p.stdout.strip().splitlines()[-1])
@@ -1578,6 +1777,8 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
         try:
             j, arrays = load_journal(Path(spec["journal"]))
             st = journal_structure(j)
+        except D1Refused:
+            raise
         except Exception as exc:  # an unreadable journal: the row is not executed, never PASS
             return not_executed(None, s, reason=f"journal not readable: {type(exc).__name__}: {str(exc)[-300:]}")
         rec = next((r for r in j["steps"] if isinstance(r, dict) and r.get("s") == s), None)
@@ -1585,6 +1786,8 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
             return not_executed(rec, s, reason=st["not_executed"].get(s) or _absent_reason(st, s))
         try:
             seq_reasons = sequence_binding(j, arrays, s, spec.get("rerun_op8", True), _seq_cache)
+        except D1Refused:
+            raise
         except Exception as exc:  # recorded, never hidden: the binding is then not established
             seq_reasons = [f"sequence binding not checkable: {type(exc).__name__}: {str(exc)[-300:]}"]
     else:
@@ -1638,7 +1841,8 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
             a, b = _comparable(primary), _comparable(second)
             repro = {"bitwise_equal": a == b, "differences": sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k)),
                      "child_pid": second["pid"], "child_blas_threads": second.get("blas_threads"),
-                     "child_peak": second.get("process_peak")}
+                     "child_peak": second.get("process_peak"), "child_environment": second.get("environment"),
+                     "child_loaded_code": second.get("loaded_code")}
             if not repro["bitwise_equal"]:
                 pa.append("separate process: values differ: " + ", ".join(repro["differences"]))
         except (RuntimeError, subprocess.TimeoutExpired) as exc:
