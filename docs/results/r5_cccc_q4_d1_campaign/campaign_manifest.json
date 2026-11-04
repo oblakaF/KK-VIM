@@ -1,0 +1,337 @@
+{
+ "document": "R5-V Q4 D1 campaign - re-freeze addendum (D-059, C4)",
+ "decision": "D-059",
+ "state": "PENDING_REFREEZE",
+ "d1_start": "BLOCKED",
+ "activation": {
+  "proposed_state": "AUTHORIZED only through pipeline.campaign_gate after the owner's re-freeze act, Reviewer PASS and integration (D-059.4); until then every D1 grid is refused",
+  "refreeze_act_line": "D1_CAMPAIGN_REFREEZE_ACT: decision=D-NNN; authorizes=D-059; addendum=docs/results/r5_cccc_q4_d1_campaign/campaign_manifest.json; addendum_blob=<git blob of this file>; state=ACCEPTED",
+  "launch_signal": "KKVIM_D1_CAMPAIGN_AUTH=D-059:<git blob of this file>",
+  "identity": "the git blob of this file named by the owner's act (no self-referential field)"
+ },
+ "frozen_baseline": {
+  "main_commit": "cef3d3c6de5fb61c552d7ae421f3407fe38977c3",
+  "d058_frozen_manifest": {
+   "path": "docs/results/r5_cccc_q4_d1_prelaunch/manifest.json",
+   "blob": "b3b9e9382a2413af3c90f9ae390af0e10b548a5c",
+   "decision": "D-058",
+   "state": "FROZEN, unchanged (byte-identical)"
+  },
+  "prelaunch_candidate_manifest": {
+   "path": "docs/results/r5_cccc_q4_d1_prelaunch/manifest.json",
+   "blob": "5a794e6e4c3e0031e0bbd496635b27d31bb02e44",
+   "commit": "2e0aac636f73e1148f6c1db8201034299a035f7f",
+   "state": "candidate before the D-058 freeze act; NOT the frozen manifest"
+  },
+  "mandatory_rows_csv": {
+   "path": "docs/results/r5_cccc_q4_d1_prelaunch/mandatory_rows.csv",
+   "blob": "76c4443b750c82893c35b50dcabe4d44573c5a5b"
+  }
+ },
+ "tools": {
+  "changed": {
+   "scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py": {
+    "d058_blob": "ee9a36d293882453d7d2909cfc101ba7f468e418",
+    "blob": "7102abb1237495d0272e775274b1a4b6c8bf5c31"
+   },
+   "scripts/r5_cccc_q4_d1_ready.py": {
+    "d058_blob": "3dcdce54e582de36fc3cf60c97609bb9026d1c7b",
+    "blob": "ee3b06036f3f10f6760a65d526da9732f922d3a0"
+   }
+  },
+  "new": {
+   "scripts/r5_cccc_q4_d1_campaign.py": {
+    "blob": "2a646b430de997f289390ed6c59ab63b2424302e"
+   }
+  },
+  "unchanged": {
+   "docs/R5_CCCC_PREQUALIFICATION.plan.md": {
+    "blob": "7a6a48a86bae2b56f25262964bab92595ad66d5c"
+   },
+   "docs/R5_CCCC_Q4_D1_PROTOCOL.md": {
+    "blob": "ae7e9cdc3e7c06224a1007c6d25e289dae8381c6"
+   },
+   "scripts/r5_cccc_q3_prequalification.py": {
+    "blob": "5eb027f2444b2e72fcb007c7ce050d71b360b295"
+   },
+   "scripts/r5_cccc_q4_bc_reference_audit.py": {
+    "blob": "5df282246c99362ead5da6b524987e59528c7f58"
+   },
+   "scripts/r5_cccc_q4_be_second_path_research.py": {
+    "blob": "6f0b06047fd5dbac18c1b11b5c79fbf54d2c08f2"
+   },
+   "scripts/r5_cccc_q4_c_assembly_e4_audit.py": {
+    "blob": "89b009b463324775e139d4781f60ab3665e60aa3"
+   },
+   "scripts/r5_cccc_q4_d1_block_c_driver.py": {
+    "blob": "8e5ca4be69361480b873f3838de7fa7c3389a513"
+   },
+   "scripts/r5_cccc_q4_d1_c3plus_trajectories.py": {
+    "blob": "7015c6dec2a3cf2e175d24771896915f35935b89"
+   },
+   "scripts/r5_cccc_q4_d1_preflight.py": {
+    "blob": "b2b06add6c3ce987df5573595fcd5bb88fb93df7"
+   },
+   "scripts/r5_cccc_q4_d1_ready_controls.py": {
+    "blob": "caa5b727867321c6e600905b420557850fde0f49"
+   },
+   "scripts/r5_cccc_q4_energy_bc_audit.py": {
+    "blob": "57ba0bed736d8f50d3b86dce987b6bad0e127ffb"
+   },
+   "scripts/r5_cccc_q4_energy_bound_premises_audit.py": {
+    "blob": "d360be47ce3dec578cc1ca3730d9897876b7d88f"
+   },
+   "scripts/r5_cccc_q4_gamma_audit.py": {
+    "blob": "8ef2f154b94aaf37d19d2a6726c5f1c80d016f43"
+   },
+   "scripts/r5_cccc_q4_gamma_interval_audit.py": {
+    "blob": "34541b7603dd26e5d9b81c1f02ec52d36c1c49e4"
+   },
+   "src/kkvim_reference/__init__.py": {
+    "blob": "661a7c6e7771cca2d95485b2a7e3c1affa8e7f1b"
+   },
+   "src/kkvim_reference/r5_cccc_bc.py": {
+    "blob": "1303c7d301cd8e5f799813795eb8fe1c5f5ed10c"
+   },
+   "src/kkvim_reference/r5_cccc_d2.py": {
+    "blob": "a910fd291fdafdb1b8a6d568dd7b4bf589409758"
+   },
+   "src/kkvim_reference/r5_cccc_dst_cert.py": {
+    "blob": "0169b8f43a0efdd1ae949c371301ef1d8087e744"
+   },
+   "src/kkvim_reference/r5_cccc_e2.py": {
+    "blob": "1a51a71cd139306273d2e259acfef4d20cb59752"
+   },
+   "src/kkvim_reference/r5_cccc_energy.py": {
+    "blob": "a2085bebf3d3879d3ccae26118c78f26c5e5a21c"
+   },
+   "src/kkvim_reference/r5_cccc_halfstep.py": {
+    "blob": "619e63926015e6214ee923b27424fca977519113"
+   },
+   "src/kkvim_reference/r5_cccc_q3_e4e6.py": {
+    "blob": "1282a02cf7433ec7fb8d9db6673e1ee944ef345a"
+   },
+   "src/kkvim_reference/r5_cccc_sequence.py": {
+    "blob": "a175b5071bfa376042b62815781adba3701a902b"
+   },
+   "tests/reference/r5_cccc_q4_d1_ready_controls_expected.json": {
+    "blob": "459db8730dcb487411a7991674684d5b9bfba276"
+   },
+   "tests/reference/test_r5_cccc_q4_d1_c3plus_trajectories.py": {
+    "blob": "ea36486979952effa46d1863828d1a7549a94bd6"
+   },
+   "scripts/r5_cccc_q4_d1_bc_reference_adapter.py": {
+    "blob": "051903de37eeda063c31ed530f278829659644ec",
+    "note": "added to the frozen set unchanged (D-059, C3)"
+   }
+  }
+ },
+ "plan": {
+  "counts": {
+   "A": {
+    "rows": 272,
+    "executable": 272,
+    "not_executed_rank_guard": 0
+   },
+   "B": {
+    "rows": 336,
+    "executable": 42,
+    "not_executed_rank_guard": 294
+   },
+   "D": {
+    "rows": 32,
+    "executable": 25,
+    "not_executed_rank_guard": 7
+   },
+   "S": {
+    "rows": 16,
+    "executable": 16,
+    "not_executed_rank_guard": 0
+   },
+   "C_paired": {
+    "rows": 168,
+    "executable": 70,
+    "not_executed_rank_guard": 98
+   },
+   "C_RAC_reference_chain": {
+    "half_steps": 168,
+    "executable": 70,
+    "stopped_rank_guard": 98
+   },
+   "classified": 824,
+   "mandatory": 102,
+   "mandatory_executable": 102
+  },
+  "accounting": {
+   "classified_rows": 824,
+   "mandatory_keys": 102,
+   "classified_executable": 425,
+   "classified_not_executed": 399,
+   "rac_half_steps_not_campaign_rows": 168,
+   "rac_executable": 70,
+   "n23_s2plus": {
+    "classified_rows": 399,
+    "rac_half_steps": 98,
+    "total": 497
+   }
+  },
+  "mandatory_keys_sha256": "213e83726827fbef822f3b0044b13d0811344beaf07cccd209711587c1a601ef"
+ },
+ "platform": {
+  "sys_platform": "win32",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "python": "3.13.15",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "blas_lapack": {
+   "blas": {
+    "name": "scipy-openblas",
+    "found": true,
+    "version": "0.3.34.106.0",
+    "detection method": "pkgconfig",
+    "include directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-_ivn3drs/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/include",
+    "lib directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-_ivn3drs/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/lib",
+    "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=24",
+    "pc file directory": "D:/a/numpy-release/numpy-release/.openblas"
+   },
+   "lapack": {
+    "name": "scipy-openblas",
+    "found": true,
+    "version": "0.3.34.106.0",
+    "detection method": "pkgconfig",
+    "include directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-_ivn3drs/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/include",
+    "lib directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-_ivn3drs/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/lib",
+    "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=24",
+    "pc file directory": "D:/a/numpy-release/numpy-release/.openblas"
+   }
+  },
+  "blas_threads_read_from_library": 1,
+  "thread_env_vars": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  },
+  "thread_env_set_before_numpy_import": "by this tool at import (OD-6: by the launching process); effective count read",
+  "blas_threads_both_libraries": {
+   "numpy": 1,
+   "scipy": 1
+  }
+ },
+ "controls": {
+  "results_sha256": "b445e709786ad994c8ed9473c06ba055f0487ac66d6e8e1b0eb64fca3cc25076",
+  "all_match": true,
+  "summary": {
+   "rank_guard": {
+    "cases": 4,
+    "match": 4,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "rt3": {
+    "cases": 5,
+    "match": 5,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "rt15": {
+    "cases": 4,
+    "match": 4,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "forbidden": {
+    "cases": 7,
+    "match": 7,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "clean_rows": {
+    "cases": 10,
+    "match": 10,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "control_B": {
+    "cases": 12,
+    "match": 12,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "control_V": {
+    "cases": 3,
+    "match": 3,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "control_G": {
+    "cases": 11,
+    "match": 11,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "z4_procedure": {
+    "cases": 7,
+    "match": 7,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "sp_op": {
+    "cases": 4,
+    "match": 4,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "block_C_crosscheck": {
+    "cases": 2,
+    "match": 2,
+    "not_executed": 0,
+    "mismatch": []
+   },
+   "control_A": {
+    "pr48_harness_all_match": true,
+    "z4_aggregation_match": 8,
+    "z4_aggregation_cases": 8,
+    "mismatch": []
+   },
+   "row_plan": {
+    "match": true
+   },
+   "rt17": {
+    "match": true
+   },
+   "platform": {
+    "match": true
+   }
+  },
+  "expected_sha256": "b12f3157ad0f13d85dd46ef22d166fbacf981fef2de707215dbbda37d6eae89e",
+  "pr48": {
+   "row_cases": 213,
+   "row_cases_matching": 213,
+   "aggregation_cases": 18,
+   "aggregation_matching": 18,
+   "detector_cases": 12,
+   "detector_matching": 12,
+   "detector_not_executed": [],
+   "control_A_all_match": true,
+   "control_B_synthetic_all_match": true,
+   "control_B_detector_functions_all_match": true
+  },
+  "run": "QA-D1-READY controls A/B/V/G and PR #48 harness on the changed tools, approved platform, no launch signal"
+ },
+ "probes": {
+  "accepted": "16 PL 6.3 probes of D-058.2 (docs/results/r5_cccc_q4_d1_ready/resource_probes.json)",
+  "carry_forward": "applicable to the computation: _compute_row_core, OP-8, the block-C driver, the BR tool and the numerical environment are unchanged; the launch (child process, launcher environment, memory watchdog at 50 % RAM) is the one of the probes and is tested separately (tests/reference/test_r5_cccc_q4_d1_campaign.py); the probes do not establish new behaviour",
+  "not_established": [
+   "replay processes of analyse are not under the job watchdog",
+   "the 30 min factorization limit is not measured per stage during the run (probes: <= 4.62 s)"
+  ]
+ },
+ "limitations": [
+  "SP-RH, SP-LARGE, SP-C: no row-level implementation in the frozen tools: recorded UNRESOLVED, never PASS",
+  "BC-1 / TS-1 are recorded on the rows of SP-BR only (reference adapter; journal rows)",
+  "D-058.5 retained: B_E coverage partial (N-4, N-6); SP-OP measured on one probe; limited reviewer independence",
+  "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary"
+ ]
+}

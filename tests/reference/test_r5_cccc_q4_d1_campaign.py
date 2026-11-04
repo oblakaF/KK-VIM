@@ -477,3 +477,31 @@ def test_frozen_manifest_and_inputs_unchanged():
     for path, blob in frozen["d057"]["tool_blobs"].items():
         if path not in ("scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py", "scripts/r5_cccc_q4_d1_ready.py"):
             assert pl.git_blob_id(ROOT / path) == blob, path
+
+
+# --- the re-freeze addendum (C4) ------------------------------------------------------------------------------------------------------
+
+def test_addendum_is_pending_and_consistent(monkeypatch):
+    add = json.loads((ROOT / pl.CAMPAIGN_ADDENDUM).read_text(encoding="utf-8"))
+    assert add["decision"] == "D-059" and add["state"] == pl.PENDING_REFREEZE and add["d1_start"] == "BLOCKED"
+    fb = add["frozen_baseline"]
+    assert fb["main_commit"] == BASE_COMMIT
+    assert fb["d058_frozen_manifest"]["blob"] == pl.FROZEN_MANIFEST_BLOB and fb["prelaunch_candidate_manifest"]["blob"] == CANDIDATE_BLOB
+    assert fb["mandatory_rows_csv"]["blob"] == CSV_BLOB
+    frozen = c.frozen_manifest()
+    assert pl.addendum_defects(add, frozen, lambda p: pl.git_blob_id(ROOT / p)) == []
+    t = add["tools"]
+    assert set(t["changed"]) == set(c.CHANGED) and set(t["new"]) == {"scripts/r5_cccc_q4_d1_campaign.py"}
+    assert t["changed"]["scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py"]["d058_blob"].startswith("ee9a36d")
+    assert t["changed"]["scripts/r5_cccc_q4_d1_ready.py"]["d058_blob"].startswith("3dcdce5")
+    assert add["plan"]["accounting"]["classified_rows"] == 824 and add["plan"]["accounting"]["mandatory_keys"] == 102
+    assert add["plan"]["accounting"]["n23_s2plus"] == {"classified_rows": 399, "rac_half_steps": 98, "total": 497}
+    assert add["controls"]["all_match"] is True and add["controls"]["expected_sha256"] == ct.EXPECTED_SHA256
+    assert add["platform"]["sys_platform"] == "win32" and add["platform"]["python"] == "3.13.15"
+    assert add["platform"]["blas_threads_both_libraries"] == {"numpy": 1, "scipy": 1}
+    # the addendum alone authorises nothing: no owner re-freeze act exists
+    monkeypatch.setenv(pl.CAMPAIGN_AUTH_ENV, "D-059:" + pl.git_blob_id(ROOT / pl.CAMPAIGN_ADDENDUM))
+    g = pl.campaign_gate()
+    assert g["authorized"] is False and g["state"] == pl.PENDING_REFREEZE
+    with pytest.raises(pl.D1Refused, match="D1_START = BLOCKED"):
+        pl.guard_config(pl.op8().TrajectoryConfig(**D1_CFG))
