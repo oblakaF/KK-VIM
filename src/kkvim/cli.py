@@ -21,7 +21,7 @@ writes what they return. It computes no quantity of the method itself:
 Values are written with ``repr`` and read back bit for bit; non-finite values are empty (CSV) or null (JSON).
 Units are SI: lengths in m, E and q in Pa, D in N·m, w in m.
 
-``python -m kkvim run-ssss`` (explicit N = 1..6, ``kkvim.cli_ssss``) uses the writer of this module; ``run`` stays as it is.
+``python -m kkvim run-ssss`` (explicit N = 1..6, ``kkvim.cli_ssss``) has its own all-or-nothing saving; ``run`` stays as it is.
 """
 
 import argparse

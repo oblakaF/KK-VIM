@@ -13,17 +13,27 @@ Routes, each unchanged and each with the status of its own decision:
 
 N is never reduced and CONVERGED is never given to N >= 2 (D-048.4). Fields: field.csv only for CONVERGED of R3 (``kkvim.cli``);
 field_research.csv for a research run that ended as requested; field_diagnostic.csv for any other run with a formed field.
-Files are written by ``kkvim.cli.write_results``. Units are SI as in ``kkvim.cli``.
+Units are SI as in ``kkvim.cli``, except the energies of N = 4-6: they stay in the unit q^2 a^6 / D of the studied cell. history.csv
+says so in a comment line, result.json per column; the column names are the same for every N >= 2.
+
+Saving (``replace_results``) is all or nothing, also with --overwrite. A refused input (invalid, outside the domain, S-1), an ERROR_*
+run and an interrupted run replace nothing: earlier result files stay as they are and the status and the reason go to stderr. If the
+folder has no earlier results, such a run writes its result.json as usual. A run stopped by a rule of its route (MAX_HALF_STEPS,
+STAGNATED, a guard, E1) is a valid replacement. ``kkvim.cli.write_results`` of ``run`` is not used.
 
 Exit codes: those of ``kkvim.cli``, and for N >= 2: 0 - the requested research run ended (PROVISIONAL_FIELD_STABILIZED,
 RESEARCH_LIMIT_REACHED; not convergence); 1 - MAX_HALF_STEPS; 2 - also an input outside the domain, nothing computed, the reason
-in result.json; 3 - ERROR_*; 6 - a guard, energy or proven rank stop.
+in result.json or, with earlier results kept, in stderr; 3 - ERROR_*; 6 - a guard, energy or proven rank stop; for any N: 130 - interrupted.
 """
 
 import json
 import math
+import os
+import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -49,6 +59,13 @@ METHOD = ("КК-МВИ: w = Σ_j X_j(x) Y_j(y), N фиксировано; пол
 MARK = cr.MARK
 NOT_EXECUTED = "NOT_EXECUTED_OUTSIDE_DOMAIN"
 EXIT_GUARD_STOP = 6
+EXIT_INTERRUPTED = 130  # interrupted by the user (Ctrl+C); earlier results are kept
+STAGE_PREFIX = ".kkvim-run-"  # the folder of one save inside --out
+REPLACING_MARK = "replacing"  # present in that folder while result files may differ from the originals
+REPLACING = ("COMPLETED", "STOPPED")  # executions whose files may replace earlier results
+ENERGY = "energy"  # placeholder of COUPLED_COLUMNS: the unit depends on the route
+ENERGY_PHYSICAL = "N·m"
+ENERGY_NORMALIZED = "q^2 a^6 / D"
 
 REQUESTED_END = (cr.PROVISIONAL_FIELD_STABILIZED, cr.RESEARCH_LIMIT_REACHED)
 PROTECTIVE_STOPS = (cr.PROVISIONAL_RANK_GUARD_STOP, cr.PROVISIONAL_SET_GUARD_STOP, cr.PROVISIONAL_ENERGY_E1_STOP,
@@ -103,12 +120,12 @@ COUPLED_COLUMNS = (
     ("eps_inf", "", "max|w_s - w_{s-1}| / max|w_s|"), ("eps_E", "", "|w_s - w_{s-1}|_a / |w_s|_a"),
     ("stabilization_ok", "", "eps_inf <= tol_inf and eps_E <= tol_E at this s"),
     ("energy_status", "", "energy test: NOT_APPLICABLE, UNRESOLVED, E1_E2_HOLD_PROVISIONAL, ..."),
-    ("P", "energy", "Pi_h(w_s)"), ("delta_P", "energy", "Delta P_s"), ("Q", "energy", "Q_s"),
-    ("gamma_s", "energy", "gamma_s"), ("tau", "energy", "tau_s^(N)"), ("m_s", "", "Q_s / (10 tau_s)"),
+    ("P", ENERGY, "Pi_h(w_s)"), ("delta_P", ENERGY, "Delta P_s"), ("Q", ENERGY, "Q_s"),
+    ("gamma_s", ENERGY, "gamma_s"), ("tau", ENERGY, "tau_s^(N)"), ("m_s", "", "Q_s / (10 tau_s)"),
     ("guard_applicable", "", "K u kappa_rep < 1"), ("guard_rank_ok", "", "rho_N > K u kappa_rep"),
     ("guard_set_ok", "", "sigma_min(R_V D_c) > K u"), ("rank_threshold", "", "K u kappa_rep"), ("set_threshold", "", "K u"),
     ("qr_done", "", "the QR was done after the guards"), ("qr_field_error", "", "field change of the QR"),
-    ("P_after_qr", "energy", "Pi_h from the transformed sets"), ("stop_reason", "", "status taken at this half-step"),
+    ("P_after_qr", ENERGY, "Pi_h from the transformed sets"), ("stop_reason", "", "status taken at this half-step"),
     ("mark", "", "mark of the record"),
 )
 
@@ -133,7 +150,8 @@ def add_parser(commands) -> None:
     run.add_argument("--nx", type=int, required=True, metavar="N", help="число интервалов сетки по x")
     run.add_argument("--ny", type=int, required=True, metavar="N", help="число интервалов сетки по y")
     run.add_argument("--out", type=Path, required=True, metavar="DIR", help="папка результатов (создаётся)")
-    run.add_argument("--overwrite", action="store_true", help="разрешить замену файлов результатов, уже имеющихся в папке")
+    run.add_argument("--overwrite", action="store_true",
+                     help="разрешить замену файлов результатов, уже имеющихся в папке; отказ, ошибка расчёта или прерывание их не меняют")
     run.add_argument("--half-steps", type=int, metavar="S",
                      help=f"N = 2–3: не более S полушагов, S ≤ {cr.S_MAX} (по умолчанию {cr.S_MAX}, раньше — при стабилизации); "
                           f"N = 4–6: обязательно, ровно S ≤ {S_STUDY}; N = 1: не применяется")
@@ -184,19 +202,38 @@ def check_options(args) -> None:
                           "правила остановки для N = 4–6 не приняты.")
 
 
+def _git(root: Path, *command: str) -> bytes:
+    return subprocess.run(["git", *command], cwd=root, capture_output=True, timeout=30, check=True).stdout
+
+
+def _git_failure(what: str, exc: Exception) -> str:
+    return f"{what}: {type(exc).__name__}: " + str(exc).encode("utf-8", "replace").decode("utf-8")
+
+
 def software_provenance() -> dict:
-    """Versions, and the commit if the package runs from a source checkout (an installed copy has no commit of its own)."""
-    root = Path(__file__).resolve().parents[2]
-    commit = dirty = None
-    if Path(__file__).resolve().parents[1].name == "src" and (root / "pyproject.toml").is_file():
+    """Versions, and the commit if the package runs from a source checkout (an installed copy has no commit of its own).
+
+    Git output stays bytes (file names in it can have any encoding). No failure of git costs a calculation: what is not known is
+    null and ``git_diagnostic`` says why.
+    """
+    source = Path(__file__).resolve()
+    root = source.parents[2]
+    commit = dirty = diagnostic = None
+    if source.parents[1].name != "src" or not (root / "pyproject.toml").is_file():
+        diagnostic = "коммит неизвестен: пакет запущен не из рабочей копии исходного кода"
+    else:
         try:
-            commit, status = (subprocess.run(["git", *git], cwd=root, capture_output=True, text=True, timeout=30,
-                                             check=True).stdout.strip()
-                              for git in (("rev-parse", "HEAD"), ("status", "--porcelain")))
-            dirty = bool(status)
-        except (OSError, subprocess.SubprocessError):
-            commit = dirty = None
-    return {"versions": _versions(), "git_commit": commit, "git_worktree_modified": dirty,
+            commit = _git(root, "rev-parse", "HEAD").decode("ascii").strip()
+            if not re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", commit):
+                raise ValueError("вывод git rev-parse не является SHA")
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            commit, diagnostic = None, _git_failure("версия Git недоступна", exc)
+        else:
+            try:
+                dirty = bool(_git(root, "status", "--porcelain").strip())
+            except (OSError, subprocess.SubprocessError) as exc:
+                diagnostic = _git_failure("состояние рабочей копии неизвестно", exc)
+    return {"versions": _versions(), "git_commit": commit, "git_worktree_modified": dirty, "git_diagnostic": diagnostic,
             "module": "kkvim.cli_ssss"}
 
 
@@ -369,10 +406,20 @@ def _research_field(call: _Run, a: float, name: str) -> tuple[str, dict]:
     return _research_field_csv(x, y, w, w_bar, comments), record
 
 
-def _history_record(rows: int, call_cell_units: bool, comments) -> dict:
+def _energy_comment(cell_units: bool) -> str:
+    names = ", ".join(n for n, u, _ in COUPLED_COLUMNS if u == ENERGY)
+    if cell_units:
+        return (f"Энергии {names}: НОРМИРОВАННЫЕ, в единицах {ENERGY_NORMALIZED} (ячейка a = 1, b = r, q = D = 1); в N·m — умножить на "
+                "energy_scale_q2_a6_over_D из result.json.")
+    return f"Энергии {names}: ФИЗИЧЕСКИЕ, в {ENERGY_PHYSICAL}."
+
+
+def _history_record(rows: int, cell_units: bool, comments) -> dict:
+    unit = ENERGY_NORMALIZED if cell_units else ENERGY_PHYSICAL
     return {"file": cli.HISTORY, "rows": rows, "comments": list(comments),
-            "energy_unit": "q^2 a^6 / D (cell a = 1, b = r, q = D = 1)" if call_cell_units else "N·m",
-            "columns": [{"name": n, "unit": u, "meaning": m} for n, u, m in COUPLED_COLUMNS]}
+            "energy_kind": "normalized" if cell_units else "physical", "energy_unit": unit,
+            "energy_note": _energy_comment(cell_units),
+            "columns": [{"name": n, "unit": unit if u == ENERGY else u, "meaning": m} for n, u, m in COUPLED_COLUMNS]}
 
 
 def _exit_code(status: str) -> int:
@@ -389,7 +436,7 @@ def _exit_code(status: str) -> int:
 
 def _not_computed(args, argv, status, reason, D, half_steps, fixed, applicability) -> tuple[str, dict, int]:
     """result.json with the reason and history.csv without rows: no value of a solution exists, none is written."""
-    comments = (f"Полушагов нет: {status}.",)
+    comments = (f"Полушагов нет: {status}.", _energy_comment(args.N in N_RESEARCH))
     document = {
         **_common(args, status, STATUS_NOTES.get(status, ERROR_NOTE), "NOT_EXECUTED", 0, reason),
         "program": _program(argv), "input": _input_record(args, half_steps, fixed),
@@ -440,7 +487,7 @@ def execute_research(args, argv) -> tuple[str, dict, int]:
     status = run.status
     if run.parameters is None or (status == ERROR_INPUT and not run.steps):
         return _not_computed(args, argv, status, run.reason, D, half_steps, fixed, applicability)
-    comments = (f"{MARK}; N = {args.N}; {_route(args.N)['mode']}; статус {status}.",)
+    comments = (f"{MARK}; N = {args.N}; {_route(args.N)['mode']}; статус {status}.", _energy_comment(call.cell_units))
     texts, field = {}, None
     if run.x is not None:
         name = cli.FIELD_RESEARCH if status in REQUESTED_END else cli.FIELD_DIAGNOSTIC
@@ -461,6 +508,9 @@ def execute_research(args, argv) -> tuple[str, dict, int]:
         "D": {"value": cli._number(D), "unit": "N·m"},
         "w_scale_q_a4_over_D": {"value": cli._number(w_scale), "unit": "m",
                                 "use": "w = w_bar * value" + ("; поле считалось в ячейке" if call.cell_units else "")},
+        **({"energy_scale_q2_a6_over_D": {"value": cli._number(w_scale * rectangle.q * rectangle.a * rectangle.a),
+                                          "unit": ENERGY_PHYSICAL, "use": "energy [N·m] = energy of history.csv * value"}}
+           if call.cell_units else {}),
         "cycles_k": run.s // 2,
         "converged": False,
         "first_stabilization_s": run.first_stabilization_s,
@@ -476,6 +526,128 @@ def execute_research(args, argv) -> tuple[str, dict, int]:
     return status, texts, _exit_code(status)
 
 
+# --- saving --------------------------------------------------------------------------------------------------------------------
+
+def check_no_interrupted_save(out: Path) -> None:
+    """Refuse a folder where a replacement was not finished (a killed process, a failed restoration): the originals are in old.
+
+    A save folder without the mark changed no result file (for example a file in it was held by another program): it is removed.
+    """
+    stages = sorted(out.glob(STAGE_PREFIX + "*")) if out.is_dir() else []
+    unfinished = [stage.name for stage in stages if (stage / REPLACING_MARK).exists()]
+    if unfinished:
+        raise cli.OutputExistsError(f"в {out} осталась незавершённая замена результатов: {', '.join(unfinished)}. Файлы результатов могут "
+                                    "быть от разных расчётов; прежние файлы лежат в old этого каталога. Проверьте их, верните при "
+                                    "необходимости и удалите каталог.")
+    for stage in stages:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def _write_file(path: Path, text: str) -> None:
+    with open(path, "x", encoding="utf-8", newline="") as file:
+        file.write(text)
+        file.flush()
+        os.fsync(file.fileno())
+
+
+def _keep(source: Path, copy: Path) -> None:
+    """Keep the original under another name; the result file itself stays in place until it is replaced."""
+    try:
+        os.link(source, copy)
+    except OSError:
+        shutil.copy2(source, copy)
+
+
+def _restore(out: Path, old: Path, changed) -> list:
+    """Undo the changed names; the names that could not be undone."""
+    failed = []
+    for name in reversed(changed):
+        try:
+            if (old / name).exists():
+                os.replace(old / name, out / name)
+            else:
+                (out / name).unlink(missing_ok=True)
+        except (OSError, KeyboardInterrupt):
+            failed.append(name)
+    return failed
+
+
+def _finish_stage(stage: Path) -> bool:
+    """The result files are consistent again: drop the mark and the folder; False if something of the folder remains."""
+    try:
+        (stage / REPLACING_MARK).unlink(missing_ok=True)
+        shutil.rmtree(stage, ignore_errors=True)
+    except (OSError, KeyboardInterrupt):  # the outcome is already decided; the next run looks at what is left
+        pass
+    return not stage.exists()
+
+
+def replace_results(out: Path, texts: dict) -> dict:
+    """All files of one run in place of the earlier ones, or no change at all; on a failure raise ``OutputWriteError``.
+
+    1. The new files are written completely (and synced) in a new folder ``out/.kkvim-run-*/new``.
+    2. Every earlier result file gets a second name in ``old`` (a hard link, or a copy); it stays in place meanwhile.
+    3. The files are moved into place, then stale earlier files are removed.
+
+    Any failure or an interrupt in 1-3 restores the names changed so far. If that fails too, the error names the files and ``old``
+    is kept. A process killed in step 3 leaves the folder of the save with the mark and the originals, and the next run refuses until
+    it is dealt with (``check_no_interrupted_save``); each result file is then complete old or complete new, never half-written.
+    """
+    current = [name for name in cli.OUTPUTS if (out / name).exists()]
+    stage, changed, step = None, [], ("создание временного каталога в", str(out))
+    try:
+        stage = Path(tempfile.mkdtemp(dir=out, prefix=STAGE_PREFIX))
+        new, old = stage / "new", stage / "old"
+        new.mkdir()
+        old.mkdir()
+        for name, text in texts.items():
+            step = ("запись временного файла для", name)
+            _write_file(new / name, text)
+        for name in current:
+            step = ("сохранение копии прежнего файла", name)
+            _keep(out / name, old / name)
+        step = ("начало замены в", str(out))
+        (stage / REPLACING_MARK).touch()
+        for name in texts:
+            step = ("замена", name)
+            os.replace(new / name, out / name)
+            changed.append(name)
+        for name in current:
+            if name not in texts:
+                step = ("удаление устаревшего файла", name)
+                os.remove(out / name)
+                changed.append(name)
+    except BaseException as exc:
+        action, name = step
+        failed = [] if stage is None else _restore(out, stage / "old", changed)
+        if failed:
+            raise cli.OutputWriteError(action, name, exc if isinstance(exc, OSError) else OSError(repr(exc)), (), failed, (), (),
+                                       [f"{stage.name}/old (здесь прежние файлы результатов)"]) from exc
+        left = [] if stage is None or _finish_stage(stage) else [stage.name]
+        if isinstance(exc, OSError):
+            raise cli.OutputWriteError(action, name, exc, (), (), (), (), left) from exc
+        raise
+    if not _finish_stage(stage):
+        cli._say(sys.stderr, f"Результаты записаны, но не удалось удалить временный каталог {out / stage.name}; следующий запуск удалит его.")
+    return {name: out / name for name in texts}
+
+
+def _kept(out: Path) -> list:
+    return [name for name in cli.OUTPUTS if (out / name).exists()]
+
+
+def _say_kept(out: Path) -> None:
+    kept = _kept(out)
+    if kept:
+        cli._say(sys.stderr, f"Прежние файлы результатов в {out} не изменены: {', '.join(kept)}.")
+
+
+def _interrupted(out: Path) -> int:
+    cli._say(sys.stderr, "Расчёт прерван пользователем; результаты этого расчёта не сохранены.")
+    _say_kept(out)
+    return EXIT_INTERRUPTED
+
+
 # --- the command ---------------------------------------------------------------------------------------------------------------
 
 def main(args, argv) -> int:
@@ -486,6 +658,7 @@ def main(args, argv) -> int:
         return cli.EXIT_USAGE
     try:
         cli.check_output_folder(args.out, args.overwrite)
+        check_no_interrupted_save(args.out)
     except cli.OutputExistsError as exc:
         cli._say(sys.stderr, f"Расчёт не выполнен: {exc}")
         return cli.EXIT_USAGE
@@ -496,16 +669,37 @@ def main(args, argv) -> int:
         return cli.EXIT_OUTPUT_ERROR
     try:
         status, texts, code = execute_r3(args, argv) if args.N == 1 else execute_research(args, argv)
+        document = json.loads(texts[cli.RESULT])
+    except KeyboardInterrupt:
+        return _interrupted(args.out)
     except Exception:  # noqa: BLE001 - reported as an internal error, never as a status of the solver
-        return cli._internal_error("расчёт или подготовка результатов")
+        code = cli._internal_error("расчёт или подготовка результатов")
+        _say_kept(args.out)
+        return code
+    if (document["execution"] not in REPLACING or document["half_steps_completed"] == 0) and _kept(args.out):
+        cli._say(sys.stderr, f"Результат не заменён: статус {status}. {document['status_note']}")
+        if document["reason"]:
+            cli._say(sys.stderr, f"Причина: {document['reason']}")
+        _say_kept(args.out)
+        cli._say(sys.stderr, "Запись этого расчёта не сохранена; чтобы получить её, укажите новую папку.")
+        return code
     try:
-        paths = cli.write_results(args.out, texts, args.overwrite)
+        if not args.overwrite:  # another run may have written here during this one
+            cli.check_output_folder(args.out, False)
+        paths = replace_results(args.out, texts)
+    except KeyboardInterrupt:
+        return _interrupted(args.out)
+    except cli.OutputExistsError as exc:
+        cli._say(sys.stderr, f"Результаты не сохранены: {exc}")
+        return cli.EXIT_USAGE
     except cli.OutputWriteError as exc:
         for line in cli.output_error_lines(args.out, exc, status):
             cli._say(sys.stderr, line)
         return cli.EXIT_OUTPUT_ERROR
     except Exception:  # noqa: BLE001
-        return cli._internal_error("запись результатов")
+        code = cli._internal_error("запись результатов")
+        _say_kept(args.out)
+        return code
     summary(args, status, texts, paths)
     return code
 
@@ -532,6 +726,15 @@ def summary(args, status, texts, paths) -> None:
     area = document["scientific_applicability"]["domain"]
     if isinstance(area, dict) and area.get("inside_area") is False:
         cli._say(stream, "Вне области D-048 (D-048.9): расчёт диагностический.")
+    energy_s2 = document.get("energy_s2")
+    if energy_s2 and energy_s2["mandatory_unresolved"]:
+        cli._say(stream, f"ВНИМАНИЕ: обязательная проверка энергии при s = 2 не разрешена (UNRESOLVED, D-048.1): "
+                         f"{energy_s2['reason']}. Статус расчёта от этого не меняется.")
+    if document["history"].get("energy_note"):
+        cli._say(stream, document["history"]["energy_note"])
+    diagnostic = document["provenance"]["git_diagnostic"]
+    if diagnostic:
+        cli._say(stream, f"Версия: {diagnostic}")
     cli._say(stream, f"Результаты: {args.out.resolve()}")
     for name in paths:
         cli._say(stream, f"  {name}")

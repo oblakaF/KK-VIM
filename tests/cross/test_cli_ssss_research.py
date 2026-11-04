@@ -92,6 +92,20 @@ def test_the_orchestration_equals_run_coupled_on_n2_n3_bitwise(N, r, nx, ny):
     assert run.first_stabilization_s == direct.first_stabilization_s
 
 
+def test_the_refinement_branch_is_the_same_on_every_route(monkeypatch):
+    """ETA_MAX is lowered below eta_N of s = 1 only to enter the branch of D-048.2 here; the value is no criterion of anything."""
+    eta = research_ssss.run_research(1.0, 24, 24, 4, half_steps=1).steps[0].eta_N
+    monkeypatch.setattr(cr, "ETA_MAX", 0.5 * eta)
+    run = research_ssss.run_research(1.0, 24, 24, 4, half_steps=3)
+    cell = study.run_cell(4, "1", "I", 24, 24, half_steps=3, keep=())
+    assert run.steps[0].refined is True and run.status == cell.status and run.reason == cell.reason
+    assert_equal_logs(run.steps, cell.steps)
+    run = research_ssss._orchestrate(1.0, 24, 24, 3, 3)
+    direct = cr.run_coupled(1.0, 1.0, 1.0, 1.0, 24, 24, 3, transform="fft", half_steps=3, research_mode=True, stop_on_stabilization=False)
+    assert run.steps[0].refined is True and run.status == direct.status and run.reason == direct.reason
+    assert_equal_logs(run.steps, direct.steps)
+
+
 def test_the_route_refuses_the_production_range():
     for N in (1, 2, 3, 7, True):
         assert research_ssss.run_research(1.0, 40, 40, N, half_steps=1).status == ERROR_INPUT
