@@ -32,7 +32,7 @@
   "changed": {
    "scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py": {
     "d058_blob": "ee9a36d293882453d7d2909cfc101ba7f468e418",
-    "blob": "7102abb1237495d0272e775274b1a4b6c8bf5c31"
+    "blob": "12d917de9d329c51a91fe594f47f8da79d645b60"
    },
    "scripts/r5_cccc_q4_d1_ready.py": {
     "d058_blob": "3dcdce54e582de36fc3cf60c97609bb9026d1c7b",
@@ -41,7 +41,7 @@
   },
   "new": {
    "scripts/r5_cccc_q4_d1_campaign.py": {
-    "blob": "2a646b430de997f289390ed6c59ab63b2424302e"
+    "blob": "b1f2a407fb1ee8e0154ca4eef6feb764c68e7f2f"
    }
   },
   "unchanged": {
@@ -220,7 +220,7 @@
   }
  },
  "controls": {
-  "results_sha256": "b445e709786ad994c8ed9473c06ba055f0487ac66d6e8e1b0eb64fca3cc25076",
+  "results_sha256": "b1359319e66a16cca371e950757a0c43609c0f3904094906ceb9e7b4168c2da8",
   "all_match": true,
   "summary": {
    "rank_guard": {
@@ -322,15 +322,159 @@
  },
  "probes": {
   "accepted": "16 PL 6.3 probes of D-058.2 (docs/results/r5_cccc_q4_d1_ready/resource_probes.json)",
-  "carry_forward": "applicable to the computation: _compute_row_core, OP-8, the block-C driver, the BR tool and the numerical environment are unchanged; the launch (child process, launcher environment, memory watchdog at 50 % RAM) is the one of the probes and is tested separately (tests/reference/test_r5_cccc_q4_d1_campaign.py); the probes do not establish new behaviour",
-  "not_established": [
-   "replay processes of analyse are not under the job watchdog",
-   "the 30 min factorization limit is not measured per stage during the run (probes: <= 4.62 s)"
-  ]
+  "carry_forward": "applicable to the unchanged computation: _compute_row_core, OP-8, the block-C driver, the BR tool and the numerical environment; they do not establish the behaviour of the runtime monitor, tested separately (tests/reference/test_r5_cccc_q4_d1_campaign_gaps.py), nor the cost of SP-RH, SP-LARGE and SP-C, measured only on non-D1 grids of comparable size (second_path_costs_on_non_D1_grids)",
+  "second_path_costs_on_non_D1_grids": {
+   "label": "non-D1 grids, not D1 data; measured by the runner's monitor on the approved platform",
+   "rows": [
+    {
+     "row": "D1-A|r=4|321x1279|N1|s2",
+     "status": "PASS",
+     "row_job_seconds": 221.0,
+     "row_job_peak_bytes": 547459072,
+     "checks_job_seconds": 23.79,
+     "checks_job_peak_bytes": 931250176,
+     "longest_factorization_s": 0.045,
+     "checks": {
+      "SP-LARGE": "PASS",
+      "SP-C": "PASS",
+      "SP-OP": "PASS",
+      "BC-1/TS-1": "RESOLVED",
+      "SP-BR": "PASS"
+     }
+    },
+    {
+     "row": "D1-A|r=4|321x1279|N1|s3",
+     "status": "PASS",
+     "row_job_seconds": 216.07,
+     "row_job_peak_bytes": 559030272,
+     "checks_job_seconds": 25.48,
+     "checks_job_peak_bytes": 929484800,
+     "longest_factorization_s": 0.153,
+     "checks": {
+      "SP-LARGE": "PASS",
+      "SP-C": "PASS",
+      "SP-OP": "PASS",
+      "BC-1/TS-1": "RESOLVED",
+      "SP-BR": "PASS"
+     }
+    },
+    {
+     "row": "D1-A|r=5/2|101x40|N1|s2",
+     "status": "PASS",
+     "row_job_seconds": 3.96,
+     "row_job_peak_bytes": 72138752,
+     "checks_job_seconds": 1.34,
+     "checks_job_peak_bytes": 190906368,
+     "longest_factorization_s": 0.139,
+     "checks": {
+      "SP-RH": "PASS",
+      "SP-C": "PASS",
+      "BC-1/TS-1": "RESOLVED",
+      "SP-BR": "PASS"
+     }
+    },
+    {
+     "row": "D1-A|r=5/2|101x40|N1|s3",
+     "status": "PASS",
+     "row_job_seconds": 3.76,
+     "row_job_peak_bytes": 72155136,
+     "checks_job_seconds": 1.34,
+     "checks_job_peak_bytes": 182059008,
+     "longest_factorization_s": 0.091,
+     "checks": {
+      "SP-RH": "PASS",
+      "SP-C": "PASS",
+      "BC-1/TS-1": "RESOLVED",
+      "SP-BR": "PASS"
+     }
+    },
+    {
+     "row": "D1-B|r=4|161x639|N3|s1",
+     "status": "PASS",
+     "row_job_seconds": 51.1,
+     "row_job_peak_bytes": 182337536,
+     "checks_job_seconds": 4.39,
+     "checks_job_peak_bytes": 159825920,
+     "longest_factorization_s": 0.791,
+     "checks": {
+      "BC-1/TS-1": "RESOLVED"
+     }
+    },
+    {
+     "row": "D1-S|r=4|401x1601|N1|s3",
+     "status": "PASS",
+     "row_job_seconds": 353.22,
+     "row_job_peak_bytes": 832565248,
+     "checks_job_seconds": 3.85,
+     "checks_job_peak_bytes": 149934080,
+     "longest_factorization_s": 0.178,
+     "checks": {
+      "BC-1/TS-1": "RESOLVED"
+     }
+    }
+   ],
+   "coverage": {
+    "SP-RH": {
+     "selected": 2,
+     "pass": 2,
+     "not_established": [],
+     "contradictions": [],
+     "complete": true
+    },
+    "SP-LARGE": {
+     "selected": 2,
+     "pass": 2,
+     "not_established": [],
+     "contradictions": [],
+     "complete": true
+    },
+    "SP-C": {
+     "selected": 4,
+     "pass": 4,
+     "not_established": [],
+     "contradictions": [],
+     "complete": true
+    },
+    "SP-BR": {
+     "selected": 4,
+     "pass": 4,
+     "not_established": [],
+     "contradictions": [],
+     "complete": true
+    },
+    "SP-OP": {
+     "selected": 2,
+     "pass": 2,
+     "not_established": [],
+     "contradictions": [],
+     "complete": true
+    },
+    "BC-1/TS-1": {
+     "semantics": "OBSERVATION",
+     "executed_rows": 6,
+     "resolved": 6,
+     "unresolved_keys": []
+    }
+   }
+  },
+  "runtime_enforcement": "monitor_job: peak of every process of the job tree against 50 % RAM, every factorization stage against 30 min, from the parent; limits unchanged (D-057.4)"
+ },
+ "second_paths": {
+  "SP-RH": "hs.solve_hessian, hs.error_bound, hs.certify_lambda_min",
+  "SP-LARGE": "hs.exact_coefficients, bc.bc_coefficients, hs.residual_exact, hs.certify_lambda_min, check_c3plus",
+  "SP-C": "hs.exact_coefficients, c3plus, c_control, check_c3plus",
+  "SP-BR": "reference adapter (BR)",
+  "SP-OP": "ready.sp_op_check",
+  "pass_means": "the second path was computed on the row's bound arrays and no certified value contradicts the row; NOT a statement of accuracy: no acceptance tolerance is assigned (D-054.4), measured values are recorded",
+  "contradiction": "tool defect: verdict not issued (D-057.3 item 4)"
+ },
+ "accuracy_observations": {
+  "BC-1, TS-1": "BR reference on every executed classified row; OBSERVATION"
  },
  "limitations": [
-  "SP-RH, SP-LARGE, SP-C: no row-level implementation in the frozen tools: recorded UNRESOLVED, never PASS",
-  "BC-1 / TS-1 are recorded on the rows of SP-BR only (reference adapter; journal rows)",
+  "A, B, F of SP-LARGE and the CONTROL error: measured values only (no approved bound)",
+  "BC-1 / TS-1 outside SP-BR: reading of protocol 5.1 and D-057.3 item 1, to be confirmed by the Reviewer",
+  "SP-RH on (14, 6), N = 3, s = 1: the protocol names the grid, the frozen rule predates D-057.1",
   "D-058.5 retained: B_E coverage partial (N-4, N-6); SP-OP measured on one probe; limited reviewer independence",
   "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary"
  ]
