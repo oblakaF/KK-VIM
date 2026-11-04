@@ -173,6 +173,23 @@ def _strip_platform_csv(text: str) -> list[dict]:
     return rows
 
 
+FREEZE_BASE_COMMIT = "2e0aac636f73e1148f6c1db8201034299a035f7f"  # the PRELAUNCH baseline frozen by D-058 (main after PR #61)
+FREEZE_BASE_MANIFEST_BLOB = "5a794e6e4c3e0031e0bbd496635b27d31bb02e44"
+
+
+def _unfreeze(m: dict) -> dict:
+    """The committed manifest without the D-058 freeze record: freeze_act removed, the three state fields it superseded restored.
+    The tool writes the freeze candidate; the freeze is the owner decision D-058 recorded on top of it (nothing else changes)."""
+    m = json.loads(json.dumps(m))
+    act = m.pop("freeze_act", None)
+    if act is not None:
+        s = act["supersedes"]
+        m["manifest_state"] = s["manifest_state"]
+        m["d057"]["frozen"] = s["d057.frozen"]
+        m["d057"]["freeze_condition"] = s["d057.freeze_condition"]
+    return m
+
+
 def _git(*args: str, cwd: Path = ROOT) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
 
@@ -195,7 +212,7 @@ def _require_history(*commits: str) -> None:
 
 def test_committed_manifest_is_reproduced(manifest, committed):
     same = pf._same_hash_platform(committed["hash_platform"])
-    assert _strip_platform(manifest, same) == _strip_platform(committed, same)  # same platform: every input hash strictly
+    assert _strip_platform(manifest, same) == _strip_platform(_unfreeze(committed), same)  # same platform: every input hash strictly
     assert _self_entry(manifest)["blob"] == pf.git_blob_id(TOOL)  # committed blob: test_manifest_tool_blob_is_the_historical_one
     text = (OUT / "mandatory_rows.csv").read_text(encoding="utf-8")
     if same:
@@ -220,6 +237,26 @@ def test_committed_manifest_written_on_the_approved_platform(committed):
     assert d["platform"]["blas_threads_read_from_library"] == 1
     assert d["freeze"] == {"allowed": True, "state": "APPROVED_PLATFORM",
                            "approved": {"sys_platform": "win32", "python": "3.13.15", "blas_threads": 1}}
+
+
+def test_committed_manifest_frozen_by_d058(committed):
+    """D-058 (owner, 2026-11-04): PRELAUNCH frozen on the baseline main 2e0aac6; d057 authoritative; D1_START = BLOCKED (the freeze is
+    not a campaign permission). Without the freeze record the committed manifest is the baseline byte for byte (LF)."""
+    assert committed["manifest_state"].startswith("FROZEN (D-058") and committed["d1_start"] == "BLOCKED"
+    d, act = committed["d057"], committed["freeze_act"]
+    assert d["frozen"] is True and d["freeze_condition"].startswith("met by D-058") and "D1_START = BLOCKED" in d["freeze_condition"]
+    assert act["state"] == "FROZEN" and act["decision"].startswith("D-058") and act["d1_start"].startswith("BLOCKED")
+    assert act["authoritative_section"] == "d057" and act["historical_sections"] == ["second_path", "dynamic_hash_procedure"]
+    assert set(act["accepted"]) == {"12.3", "12.4", "12.5"} and "UNRESOLVED_CERTIFICATE" in act["od6_rule"]
+    assert "conversation-supplied" in act["review"] and "not a repository-hosted review" in act["review"]
+    assert act["baseline"]["main_commit"] == FREEZE_BASE_COMMIT and act["baseline"]["manifest_blob"] == FREEZE_BASE_MANIFEST_BLOB
+    base = (json.dumps(_unfreeze(committed), ensure_ascii=False, indent=1) + "\n").encode("utf-8")
+    assert hashlib.sha1(b"blob %d" % len(base) + bytes(1) + base).hexdigest() == FREEZE_BASE_MANIFEST_BLOB
+    _require_history(FREEZE_BASE_COMMIT)
+    rel = "docs/results/r5_cccc_q4_d1_prelaunch"
+    assert _git("rev-parse", f"{FREEZE_BASE_COMMIT}:{rel}/manifest.json").stdout.strip() == FREEZE_BASE_MANIFEST_BLOB
+    csv_blob = _git("rev-parse", f"{FREEZE_BASE_COMMIT}:{rel}/mandatory_rows.csv").stdout.strip()
+    assert act["baseline"]["mandatory_rows_csv_blob"] == csv_blob == pf.git_blob_id(OUT / "mandatory_rows.csv")
 
 
 PR48_MANIFEST = ("30463a4", "a7a69bfe5a1dcd78e9bd10cbf0a4b9cc24596f3a")  # the PR #48 manifest: commit, git blob
@@ -378,7 +415,8 @@ def test_second_path_sample_integrity(manifest, committed):
 
 
 def test_owner_decisions_are_not_frozen(manifest):
-    """D-057: OD-1...OD-12 decided by the owner; the manifest is a freeze candidate, NOT frozen; D1_START = BLOCKED."""
+    """D-057: OD-1...OD-12 decided by the owner; the tool writes the freeze candidate, NOT frozen; D1_START = BLOCKED. The freeze is
+    the owner decision D-058 recorded in the committed manifest (test_committed_manifest_frozen_by_d058)."""
     assert manifest["manifest_state"].startswith("FREEZE_CANDIDATE - NOT FROZEN")
     assert manifest["d1_start"] == "BLOCKED"
     assert {d["id"] for d in manifest["owner_decisions"]} == {f"OD-{i}" for i in range(1, 13)}
