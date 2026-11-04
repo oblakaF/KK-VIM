@@ -20,6 +20,8 @@ writes what they return. It computes no quantity of the method itself:
 
 Values are written with ``repr`` and read back bit for bit; non-finite values are empty (CSV) or null (JSON).
 Units are SI: lengths in m, E and q in Pa, D in N·m, w in m.
+
+``python -m kkvim run-ssss`` (explicit N = 1..6, ``kkvim.cli_ssss``) uses the writer of this module; ``run`` stays as it is.
 """
 
 import argparse
@@ -39,7 +41,8 @@ from kkvim.rectangle_run import CENTRE, halfstep_report, run_rectangle_physical
 
 SCHEMA = "kkvim.cli.r3/1"
 RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC = "result.json", "history.csv", "field.csv", "field_diagnostic.csv"
-OUTPUTS = (RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC)
+FIELD_RESEARCH = "field_research.csv"  # run-ssss, N >= 2: a research field, never an accepted solution
+OUTPUTS = (RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC, FIELD_RESEARCH)
 CALLS = ("kkvim.rectangle_run.run_rectangle_physical", "kkvim.rectangle_run.halfstep_report")
 
 # exit codes
@@ -126,7 +129,8 @@ class OutputWriteError(OSError):
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m kkvim",
-        description="KK-VIM: расчёт принятым решателем R3 (D-043) — прямоугольная пластина a × b, SSSS, q = const, N = 1.",
+        description="KK-VIM: run — расчёт принятым решателем R3 (D-043): пластина a × b, SSSS, q = const, N = 1; "
+                    "run-ssss — SSSS при явно выбранном N = 1…6 с указанием научного статуса.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser(
@@ -150,6 +154,8 @@ def build_parser() -> argparse.ArgumentParser:
     stopping.add_argument("--tol-E", type=float, metavar="VALUE", help=f"tol_E (по умолчанию {TOL_E:g})")
     stopping.add_argument("--s-min", type=int, metavar="N", help=f"s_min (по умолчанию {S_MIN})")
     stopping.add_argument("--s-max", type=int, metavar="N", help=f"s_max (по умолчанию {S_MAX})")
+    from kkvim import cli_ssss  # imports this module
+    cli_ssss.add_parser(commands)
     return parser
 
 
@@ -450,6 +456,9 @@ def main(argv=None) -> int:
     _utf8_streams()
     argv = list(sys.argv[1:] if argv is None else argv)
     args = build_parser().parse_args(argv)
+    if args.command == "run-ssss":
+        from kkvim import cli_ssss
+        return cli_ssss.main(args, argv)
     try:
         check_output_folder(args.out, args.overwrite)
     except OutputExistsError as exc:
