@@ -123,7 +123,7 @@ def test_permanent_guards_hold_under_an_authorised_gate(monkeypatch, tmp_path):
     with pytest.raises(pl.D1Refused, match="docs/"):
         pl.guard_out(ROOT / "docs" / "results" / "x")
     with pytest.raises(c.CampaignRefused):
-        c.run_campaign(tmp_path / "outside_scratch", plan=[], dry_run=True)
+        c.run_campaign(ROOT.parent / "outside_scratch_never", plan=[], dry_run=True)  # explicit: tmp_path may lie under scratch/
 
 
 # --- the gate on a throw-away repository: authorised only with everything in place ---------------------------------------------------
