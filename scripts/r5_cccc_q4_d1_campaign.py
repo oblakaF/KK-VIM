@@ -822,6 +822,7 @@ def run_unit(unit: dict, work: Path, limit: int, signal, subsets: dict, dry_run:
         recs = {x.get("s"): x for x in (prep.get("chain") or {}).get("records", []) if isinstance(x, dict)}
         for x in rac:
             x["chain_record_status"] = (recs.get(x["s"]) or {}).get("status")
+            x["chain_certificate"] = (recs.get(x["s"]) or {}).get("certificate")  # of the R-AC reference; OD-7: not of the row
     return {"unit": unit["id"], "rows": rows, "rac": rac,
             "prep": {"process": prep.get("process"), "resources": prep.get("resources"), "seconds": prep.get("seconds"),
                      "chain_status": (prep.get("paired") or {}).get("chain_status")}}

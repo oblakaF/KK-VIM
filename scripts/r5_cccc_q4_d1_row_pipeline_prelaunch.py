@@ -1505,8 +1505,9 @@ def run_child(spec: dict, timeout: float = 1800) -> dict:
     with tempfile.TemporaryDirectory() as td:
         sp = Path(td) / "spec.json"
         sp.write_text(json.dumps(spec), encoding="utf-8")
+        # under the campaign monitor (D-059) the limits are those of PL 6.3 per stage: no total limit on the row (protocol 8)
         p = subprocess.run([sys.executable, str(ROOT / SELF), "_row", str(sp)], cwd=ROOT, capture_output=True, text=True,
-                           timeout=timeout)
+                           timeout=None if os.environ.get(STAGE_LOG_ENV) else timeout)
     if p.returncode == 2 and "refused:" in p.stderr:
         raise D1Refused(p.stderr.strip()[-500:])
     if p.returncode != 0:

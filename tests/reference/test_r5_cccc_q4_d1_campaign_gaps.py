@@ -390,6 +390,24 @@ def test_factorization_refusal_gives_unresolved_resources_with_evidence(dry_out)
     assert m["aborted"] == "factorization_time" and m["stage"] == "B-C solve (OP-8 half-step)" and m["limit_seconds"] == 0.0 and m["pid"]
 
 
+def test_replay_has_no_total_limit_under_the_monitor(monkeypatch):
+    """Protocol 8: no time limit for the exact B_E; under the monitor the replay is limited per factorization stage only."""
+    seen = []
+
+    def run(*a, **k):
+        seen.append(k.get("timeout"))
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr(pl.subprocess, "run", run)
+    spec = {"kind": "arrays", "arrays_npz": "absent.npz", "arrays_sha256": {}, "config": {**D1_CFG, "nx": 10, "ny": 12}, "s": 1}
+    with pytest.raises(RuntimeError):
+        pl.run_child(spec)
+    monkeypatch.setenv(pl.STAGE_LOG_ENV, "log")
+    with pytest.raises(RuntimeError):
+        pl.run_child(spec)
+    assert seen == [1800, None]
+
+
 def test_real_run_refuses_changed_limits_and_unmeasurable_platform(monkeypatch, dry_out):
     with pytest.raises(c.CampaignRefused, match="PL 6.3 memory limit"):
         c.run_campaign(dry_out, factorization_limit_s=1.0)

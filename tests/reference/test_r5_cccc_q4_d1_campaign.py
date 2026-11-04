@@ -558,5 +558,5 @@ def test_dry_run_block_c_keeps_rac_apart(dry_out):
     assert not any("RAC" in k for k in st) and st["D1-C|r=1|10x12|N1|s1"] == st["D1-C|r=1|10x12|N1|s2"] == "PASS"
     assert st["D1-C|r=1|10x12|N2|s1"] == "PASS" and st["D1-C|r=1|10x12|N2|s2"] == "UNRESOLVED"
     rac = {x["key"]: x for x in doc["rac"]}
-    assert rac["D1-C-RAC|r=1|10x12|N1|s2"]["chain_record_status"] == "OK"
+    assert rac["D1-C-RAC|r=1|10x12|N1|s2"]["chain_record_status"] == "OK" and rac["D1-C-RAC|r=1|10x12|N1|s2"]["chain_certificate"]
     assert "STOPPED_RANK_GUARD_UNCERTIFIED" in rac["D1-C-RAC|r=1|10x12|N2|s2"]["trajectory_reason"]
