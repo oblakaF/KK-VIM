@@ -19,7 +19,8 @@ says so in a comment line, result.json per column; the column names are the same
 Saving (``replace_results``) is all or nothing, also with --overwrite. A refused input (invalid, outside the domain, S-1), an ERROR_*
 run and an interrupted run replace nothing: earlier result files stay as they are and the status and the reason go to stderr. If the
 folder has no earlier results, such a run writes its result.json as usual. A run stopped by a rule of its route (MAX_HALF_STEPS,
-STAGNATED, a guard, E1) is a valid replacement. ``kkvim.cli.write_results`` of ``run`` is not used.
+STAGNATED, a guard, E1) is a valid replacement. result.json is written last and is absent while the data are replaced, also after a
+killed process; such a folder is refused until it is dealt with. ``kkvim.cli.write_results`` of ``run`` is not used.
 
 Exit codes: those of ``kkvim.cli``, and for N >= 2: 0 - the requested research run ended (PROVISIONAL_FIELD_STABILIZED,
 RESEARCH_LIMIT_REACHED; not convergence); 1 - MAX_HALF_STEPS; 2 - also an input outside the domain, nothing computed, the reason
@@ -61,7 +62,7 @@ NOT_EXECUTED = "NOT_EXECUTED_OUTSIDE_DOMAIN"
 EXIT_GUARD_STOP = 6
 EXIT_INTERRUPTED = 130  # interrupted by the user (Ctrl+C); earlier results are kept
 STAGE_PREFIX = ".kkvim-run-"  # the folder of one save inside --out
-REPLACING_MARK = "replacing"  # present in that folder while result files may differ from the originals
+REPLACING_MARK = "replacing"  # written and synced in that folder before the first result file changes
 REPLACING = ("COMPLETED", "STOPPED")  # executions whose files may replace earlier results
 ENERGY = "energy"  # placeholder of COUPLED_COLUMNS: the unit depends on the route
 ENERGY_PHYSICAL = "N·m"
@@ -529,16 +530,17 @@ def execute_research(args, argv) -> tuple[str, dict, int]:
 # --- saving --------------------------------------------------------------------------------------------------------------------
 
 def check_no_interrupted_save(out: Path) -> None:
-    """Refuse a folder where a replacement was not finished (a killed process, a failed restoration): the originals are in old.
+    """Refuse a folder with an unfinished replacement (a killed process, a failed restoration); it is never recovered silently.
 
     A save folder without the mark changed no result file (for example a file in it was held by another program): it is removed.
     """
     stages = sorted(out.glob(STAGE_PREFIX + "*")) if out.is_dir() else []
     unfinished = [stage.name for stage in stages if (stage / REPLACING_MARK).exists()]
     if unfinished:
-        raise cli.OutputExistsError(f"в {out} осталась незавершённая замена результатов: {', '.join(unfinished)}. Файлы результатов могут "
-                                    "быть от разных расчётов; прежние файлы лежат в old этого каталога. Проверьте их, верните при "
-                                    "необходимости и удалите каталог.")
+        raise cli.OutputExistsError(f"в {out} осталась незавершённая замена результатов: {', '.join(unfinished)}. Файлы результатов в этой "
+                                    "папке нельзя считать результатом завершённого расчёта. Чтобы вернуть прежний результат, удалите из "
+                                    f"папки {', '.join(cli.OUTPUTS)}, перенесите в неё файлы из old этого каталога и удалите каталог. "
+                                    "Чтобы начать заново, удалите те же файлы и каталог.")
     for stage in stages:
         shutil.rmtree(stage, ignore_errors=True)
 
@@ -550,25 +552,75 @@ def _write_file(path: Path, text: str) -> None:
         os.fsync(file.fileno())
 
 
+def _sync_folder(path: Path) -> None:
+    """Make the changes of names in a folder durable before the next step, where a folder can be synced (not on Windows)."""
+    if os.name == "nt":
+        return
+    try:
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except OSError:  # not every file system syncs a folder; the order of a killed process does not depend on it
+        pass
+
+
 def _keep(source: Path, copy: Path) -> None:
     """Keep the original under another name; the result file itself stays in place until it is replaced."""
     try:
         os.link(source, copy)
     except OSError:
-        shutil.copy2(source, copy)
+        shutil.copyfile(source, copy)
+        with open(copy, "r+b") as file:
+            os.fsync(file.fileno())
+        shutil.copystat(source, copy)
+
+
+def _change(changed: list, name: str, action, *paths) -> None:
+    """Do one change of a result file, its name recorded once and before it: an interrupt right after the change must not lose it."""
+    recorded = name in changed
+    if not recorded:
+        changed.append(name)
+    try:
+        action(*paths)
+    except OSError:  # this action changed nothing
+        if not recorded:
+            changed.remove(name)
+        raise
+
+
+def _undo(out: Path, old: Path, name: str) -> bool:
+    """Put one name back through a second name of the original: ``old`` stays complete until the end, also for a killed restoration."""
+    try:
+        if (old / name).exists():
+            spare = old.parent / name
+            _keep(old / name, spare)
+            os.replace(spare, out / name)
+        else:
+            (out / name).unlink(missing_ok=True)
+    except (OSError, KeyboardInterrupt):
+        return False
+    return True
 
 
 def _restore(out: Path, old: Path, changed) -> list:
-    """Undo the changed names; the names that could not be undone."""
-    failed = []
-    for name in reversed(changed):
+    """Undo the changed names; the names that could not be undone.
+
+    result.json goes first and comes back last, and only when all the data are back, so that a killed or failed restoration leaves no
+    result.json beside data of another run. If it cannot be removed, the data stay as they are: nothing is undone.
+    """
+    if cli.RESULT in changed:
         try:
-            if (old / name).exists():
-                os.replace(old / name, out / name)
-            else:
-                (out / name).unlink(missing_ok=True)
+            (out / cli.RESULT).unlink(missing_ok=True)
         except (OSError, KeyboardInterrupt):
-            failed.append(name)
+            return list(changed)
+        _sync_folder(out)
+    failed = [name for name in reversed(changed) if name != cli.RESULT and not _undo(out, old, name)]
+    if cli.RESULT in changed and (old / cli.RESULT).exists():
+        _sync_folder(out)
+        if failed or not _undo(out, old, cli.RESULT):
+            failed.append(cli.RESULT)
     return failed
 
 
@@ -587,11 +639,16 @@ def replace_results(out: Path, texts: dict) -> dict:
 
     1. The new files are written completely (and synced) in a new folder ``out/.kkvim-run-*/new``.
     2. Every earlier result file gets a second name in ``old`` (a hard link, or a copy); it stays in place meanwhile.
-    3. The files are moved into place, then stale earlier files are removed.
+    3. The mark ``replacing`` is written and synced: from here on the folder is an unfinished transaction.
+    4. The earlier result.json is removed, so that it does not vouch for what follows.
+    5. The other new files are moved into place, stale earlier files are removed.
+    6. The new result.json is moved into place, last: only now does the folder hold a result, and it is complete.
+    7. The mark and the folder of the save are removed.
 
-    Any failure or an interrupt in 1-3 restores the names changed so far. If that fails too, the error names the files and ``old``
-    is kept. A process killed in step 3 leaves the folder of the save with the mark and the originals, and the next run refuses until
-    it is dealt with (``check_no_interrupted_save``); each result file is then complete old or complete new, never half-written.
+    result.json next to the data without the mark therefore always means one complete run. Any failure or an interrupt in 1-6 restores
+    the names changed so far (``_restore``). If that fails too, the error names the files, and the mark and ``old`` are kept. A process
+    killed in 4-7 leaves the mark and the originals, and the next run refuses until it is dealt with (``check_no_interrupted_save``).
+    Two runs saving into one folder at the same moment are not guarded against each other.
     """
     current = [name for name in cli.OUTPUTS if (out / name).exists()]
     stage, changed, step = None, [], ("создание временного каталога в", str(out))
@@ -607,28 +664,42 @@ def replace_results(out: Path, texts: dict) -> dict:
             step = ("сохранение копии прежнего файла", name)
             _keep(out / name, old / name)
         step = ("начало замены в", str(out))
-        (stage / REPLACING_MARK).touch()
+        _sync_folder(new)
+        _sync_folder(old)
+        _write_file(stage / REPLACING_MARK, f"{', '.join(texts)}\n")
+        _sync_folder(stage)
+        _sync_folder(out)
+        if cli.RESULT in current:
+            step = ("снятие прежнего файла", cli.RESULT)
+            _change(changed, cli.RESULT, os.remove, out / cli.RESULT)
+            _sync_folder(out)
         for name in texts:
-            step = ("замена", name)
-            os.replace(new / name, out / name)
-            changed.append(name)
+            if name != cli.RESULT:
+                step = ("замена", name)
+                _change(changed, name, os.replace, new / name, out / name)
         for name in current:
             if name not in texts:
                 step = ("удаление устаревшего файла", name)
-                os.remove(out / name)
-                changed.append(name)
+                _change(changed, name, os.remove, out / name)
+        _sync_folder(out)
+        step = ("замена", cli.RESULT)
+        _change(changed, cli.RESULT, os.replace, new / cli.RESULT, out / cli.RESULT)
+        _sync_folder(out)
     except BaseException as exc:
         action, name = step
         failed = [] if stage is None else _restore(out, stage / "old", changed)
         if failed:
-            raise cli.OutputWriteError(action, name, exc if isinstance(exc, OSError) else OSError(repr(exc)), (), failed, (), (),
+            raise cli.OutputWriteError(action, name, exc if isinstance(exc, OSError) else OSError(repr(exc)), (),
+                                       [item for item in failed if (out / item).exists()],
+                                       [item for item in failed if not (out / item).exists()], (),
                                        [f"{stage.name}/old (здесь прежние файлы результатов)"]) from exc
         left = [] if stage is None or _finish_stage(stage) else [stage.name]
         if isinstance(exc, OSError):
             raise cli.OutputWriteError(action, name, exc, (), (), (), (), left) from exc
         raise
     if not _finish_stage(stage):
-        cli._say(sys.stderr, f"Результаты записаны, но не удалось удалить временный каталог {out / stage.name}; следующий запуск удалит его.")
+        cli._say(sys.stderr, f"Результаты записаны, но не удалось удалить временный каталог {out / stage.name}; следующий запуск удалит его "
+                             "или сообщит, что делать.")
     return {name: out / name for name in texts}
 
 
@@ -657,8 +728,8 @@ def main(args, argv) -> int:
         cli._say(sys.stderr, f"Расчёт не выполнен: {exc}")
         return cli.EXIT_USAGE
     try:
-        cli.check_output_folder(args.out, args.overwrite)
         check_no_interrupted_save(args.out)
+        cli.check_output_folder(args.out, args.overwrite)
     except cli.OutputExistsError as exc:
         cli._say(sys.stderr, f"Расчёт не выполнен: {exc}")
         return cli.EXIT_USAGE
@@ -686,6 +757,7 @@ def main(args, argv) -> int:
     try:
         if not args.overwrite:  # another run may have written here during this one
             cli.check_output_folder(args.out, False)
+        check_no_interrupted_save(args.out)  # a save may have been killed here during this run
         paths = replace_results(args.out, texts)
     except KeyboardInterrupt:
         return _interrupted(args.out)

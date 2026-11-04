@@ -15,6 +15,7 @@ import dataclasses
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -527,12 +528,28 @@ def test_a_failure_during_the_replacement_restores_everything(earlier, monkeypat
 
 @pytest.mark.parametrize("error, code", [(PermissionError("locked"), cli.EXIT_OUTPUT_ERROR), (KeyboardInterrupt(), cli_ssss.EXIT_INTERRUPTED)])
 def test_a_failure_removing_a_stale_file_restores_everything(earlier, monkeypatch, error, code):
+    real, count = os.remove, [0]
+
+    def remove(path):
+        count[0] += 1
+        if count[0] == 2:  # the first one takes away the earlier result.json
+            raise error
+        real(path)
+
+    before = snapshot(earlier)
+    monkeypatch.setattr(os, "remove", remove)
+    assert cli.main(command(earlier, 1, "--overwrite")) == code
+    assert snapshot(earlier) == before
+
+
+@pytest.mark.parametrize("error, code", [(PermissionError("locked"), cli.EXIT_OUTPUT_ERROR), (KeyboardInterrupt(), cli_ssss.EXIT_INTERRUPTED)])
+def test_a_failure_taking_away_the_earlier_result_changes_nothing(earlier, monkeypatch, error, code):
     def remove(path):
         raise error
 
     before = snapshot(earlier)
     monkeypatch.setattr(os, "remove", remove)
-    assert cli.main(command(earlier, 1, "--overwrite")) == code
+    assert cli.main(command(earlier, 3, "--overwrite", half_steps=3)) == code
     assert snapshot(earlier) == before
 
 
@@ -553,60 +570,263 @@ def test_a_failure_writing_the_new_files_changes_nothing(earlier, monkeypatch):
 
 def test_a_failed_restoration_is_reported_and_keeps_the_originals(earlier, monkeypatch, capsys):
     before = snapshot(earlier)
-    monkeypatch.setattr(os, "replace", failing_at(3, PermissionError("locked"), always=True))  # history.csv cannot be put back
+    monkeypatch.setattr(os, "replace", failing_at(3, PermissionError("locked"), always=True))  # the install and all putting back fail
     capsys.readouterr()
     assert cli.main(command(earlier, 1, "--overwrite")) == cli.EXIT_OUTPUT_ERROR
     err = capsys.readouterr().err
     assert "ВНИМАНИЕ" in err and "прежние файлы результатов" in err
     monkeypatch.undo()
+    assert not (earlier / "result.json").exists()  # never beside data of another run
     stage = next(earlier.glob(cli_ssss.STAGE_PREFIX + "*"))
     assert {name: (stage / "old" / name).read_bytes() for name in ("field_research.csv", "history.csv", "result.json")} == \
            {name: before[name] for name in ("field_research.csv", "history.csv", "result.json")}
     assert cli.main(command(earlier, 3, "--overwrite", half_steps=2)) == cli.EXIT_USAGE  # refused until the save is dealt with
 
 
-KILLED_DURING_THE_SAVE = """
-import os, sys
-from kkvim import cli
-real, count = os.replace, [0]
-def replace(*args, **kwargs):
-    count[0] += 1
-    if count[0] == 2:
-        os._exit(9)
-    return real(*args, **kwargs)
-os.replace = replace
-sys.exit(cli.main(sys.argv[1:]))
+def test_result_json_stays_away_while_a_data_file_cannot_be_put_back(earlier, monkeypatch, capsys):
+    """Only history.csv fails: the earlier result.json could come back, but it must not vouch for the new history.csv."""
+    before, real = snapshot(earlier), os.replace
+
+    def replace(source, target):
+        name, folder = os.path.basename(target), os.path.basename(os.path.dirname(source))
+        if (name == "result.json" and folder == "new") or (name == "history.csv" and folder != "new"):
+            raise PermissionError("locked")
+        real(source, target)
+
+    monkeypatch.setattr(os, "replace", replace)
+    capsys.readouterr()
+    assert cli.main(command(earlier, 3, "--overwrite", half_steps=3)) == cli.EXIT_OUTPUT_ERROR
+    assert "ВНИМАНИЕ" in capsys.readouterr().err
+    monkeypatch.undo()
+    assert not (earlier / "result.json").exists()
+    assert (earlier / "field_research.csv").read_bytes() == before["field_research.csv"]
+    assert (earlier / "history.csv").read_bytes() != before["history.csv"]
+    assert (next(earlier.glob(cli_ssss.STAGE_PREFIX + "*")) / cli_ssss.REPLACING_MARK).exists()
+    assert cli.main(command(earlier, 3, "--overwrite", half_steps=2)) == cli.EXIT_USAGE
+
+
+def test_the_order_of_the_replacement(tmp_path, monkeypatch):
+    """Stale files too: N = 1 over N = 3. The mark is on disk before the first change, result.json goes first and comes last."""
+    out = tmp_path / "out"
+    assert cli.main(command(out, 3, half_steps=2)) == cli.EXIT_CONVERGED
+    log, real_remove, real_replace = [], os.remove, os.replace
+
+    def marked():
+        return [(stage / cli_ssss.REPLACING_MARK).exists() for stage in out.glob(cli_ssss.STAGE_PREFIX + "*")] == [True]
+
+    def remove(path):
+        log.append(("remove", os.path.basename(path), marked()))
+        real_remove(path)
+
+    def replace(source, target):
+        log.append(("replace", os.path.basename(target), marked()))
+        real_replace(source, target)
+
+    monkeypatch.setattr(os, "remove", remove)
+    monkeypatch.setattr(os, "replace", replace)
+    assert cli.main(command(out, 1, "--overwrite")) == cli.EXIT_CONVERGED
+    assert log[0] == ("remove", "result.json", True) and log[-1] == ("replace", "result.json", True)
+    assert sorted(log[1:-1]) == [("remove", "field_research.csv", True), ("replace", "field.csv", True), ("replace", "history.csv", True)]
+
+
+def test_a_failed_install_of_result_json_keeps_one_record_of_it_and_restores_it(earlier, monkeypatch):
+    """A second record of result.json would undo it twice: the second time, with nothing left in old, it would delete the restored file."""
+    before = snapshot(earlier)
+    records, real = [], cli_ssss._restore
+
+    def restore(out, old, changed):
+        records.extend(changed)
+        return real(out, old, changed)
+
+    monkeypatch.setattr(cli_ssss, "_restore", restore)
+    monkeypatch.setattr(os, "replace", failing_at(3, PermissionError("locked")))
+    assert cli.main(command(earlier, 3, "--overwrite", half_steps=3)) == cli.EXIT_OUTPUT_ERROR
+    assert sorted(records) == ["field_research.csv", "history.csv", "result.json"]
+    assert snapshot(earlier) == before
+
+
+def test_a_failed_change_is_not_recorded_but_an_interrupted_one_is():
+    changed = []
+
+    def fail():
+        raise PermissionError("locked")
+
+    def interrupt():
+        raise KeyboardInterrupt
+
+    with pytest.raises(PermissionError):
+        cli_ssss._change(changed, "a", fail)
+    assert changed == []
+    with pytest.raises(KeyboardInterrupt):
+        cli_ssss._change(changed, "a", interrupt)
+    cli_ssss._change(changed, "a", lambda: None)
+    with pytest.raises(PermissionError):
+        cli_ssss._change(changed, "a", fail)
+    assert changed == ["a"]
+
+
+def test_originals_without_hard_links_are_copied_and_restored(earlier, monkeypatch):
+    def no_link(*args):
+        raise OSError("no hard links here")
+
+    before = snapshot(earlier)
+    monkeypatch.setattr(os, "link", no_link)
+    with monkeypatch.context() as patched:
+        patched.setattr(os, "replace", failing_at(3, PermissionError("locked")))
+        assert cli.main(command(earlier, 3, "--overwrite", half_steps=3)) == cli.EXIT_OUTPUT_ERROR
+    assert snapshot(earlier) == before
+    assert cli.main(command(earlier, 3, "--overwrite", half_steps=3)) == cli.EXIT_CONVERGED
+    assert document(earlier)["half_steps_completed"] == 3
+
+
+# --- a process killed for real at a known point of the save ----------------------------------------------------------------------
+
+# argv: the kind of point, its number, before or after, then the command. The process stops there and the test kills it (TerminateProcess
+# or SIGKILL), so no handler, finally or rollback of the program runs. "change" counts os.remove and os.replace, "write" the synced files.
+# "rollback": the change of that number fails, as a locked file does, and the process stops at the first putting back through os.replace,
+# before or after it.
+STOPPED_AT = """
+import os, sys, time
+from kkvim import cli, cli_ssss
+kind, number, moment = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+def stop():
+    print("STOPPED", flush=True)
+    time.sleep(3600)
+count = {"change": 0, "write": 0}
+failed = []
+def hooked(real, group):
+    def call(*args, **kwargs):
+        if failed:
+            if moment == "after":
+                real(*args, **kwargs)
+            stop()
+        count[group] += 1
+        here = kind == group and count[group] == number
+        if kind == "rollback" and group == "change" and count[group] == number:
+            failed.append(True)
+            raise PermissionError("locked")
+        if here and moment == "before":
+            stop()
+        done = real(*args, **kwargs)
+        if here and moment == "after":
+            stop()
+        return done
+    return call
+os.remove, os.replace = hooked(os.remove, "change"), hooked(os.replace, "change")
+cli_ssss._write_file = hooked(cli_ssss._write_file, "write")
+sys.exit(cli.main(sys.argv[4:]))
 """
 
+OLD, ABSENT, NEW = "complete earlier run", "no result.json", "complete new run"
+A1 = (5, ("field_research.csv", "history.csv", "result.json"))  # N = 5 over N = 4: the finding of the review
+STALE = (1, ("field.csv", "history.csv", "result.json"))  # N = 1 over N = 4: a new name and a stale name
 
-def test_a_process_killed_during_the_save_keeps_the_originals_and_the_next_run_refuses(earlier, capsys):
-    before = snapshot(earlier)
-    done = subprocess.run([sys.executable, "-c", KILLED_DURING_THE_SAVE, *command(earlier, 3, "--overwrite", half_steps=3)],
-                          check=False)
-    assert done.returncode == 9
-    stage = next(earlier.glob(cli_ssss.STAGE_PREFIX + "*"))
-    for name in ("field_research.csv", "history.csv", "result.json"):
-        assert (stage / "old" / name).read_bytes() == before[name]
-        assert (earlier / name).stat().st_size > 0
+
+def stop_and_kill(out, N, point):
+    kind, number, moment = point
+    half_steps = None if N == 1 else 3
+    process = subprocess.Popen([sys.executable, "-c", STOPPED_AT, kind, str(number), moment, *command(out, N, "--overwrite", half_steps=half_steps)],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    line = process.stdout.readline()
+    process.kill()
+    process.communicate()
+    assert line.strip() == "STOPPED", line
+
+
+def snapshot_all(out):
+    return {str(path.relative_to(out)): path.read_bytes() for path in out.rglob("*") if path.is_file()}
+
+
+def assert_never_mixed(out, before, new_names, state):
+    """What a reader of the folder sees: the earlier set, the new set or no result.json, as this point requires."""
+    earlier_names = [name for name in before if name in cli.OUTPUTS]
+    present = [name for name in cli.OUTPUTS if (out / name).exists()]
+    if state == OLD:
+        assert sorted(present) == sorted(earlier_names)
+        assert all((out / name).read_bytes() == before[name] for name in present)
+    elif state == ABSENT:
+        assert "result.json" not in present
+    else:
+        assert sorted(present) == sorted(new_names)
+        assert all((out / name).read_bytes() != before.get(name) for name in present)
+        assert document(out)["half_steps_completed"] > 0
+    assert (out / "other.txt").read_bytes() == before["other.txt"]
+
+
+def assert_refused_and_recoverable(out, before, capsys):
+    """Detected on restart, with and without --overwrite, nothing computed or changed; the instruction printed gives back the earlier set."""
+    stage = next(out.glob(cli_ssss.STAGE_PREFIX + "*"))
+    assert (stage / cli_ssss.REPLACING_MARK).exists()
+    for name in before:
+        if name in cli.OUTPUTS:
+            assert (stage / "old" / name).read_bytes() == before[name]
+    left = snapshot_all(out)
+    for extra in (("--overwrite",), ()):
+        capsys.readouterr()
+        assert cli.main(command(out, 3, *extra, half_steps=2)) == cli.EXIT_USAGE
+        err = capsys.readouterr().err
+        assert stage.name in err and "незавершённая замена" in err and "перенесите" in err
+        assert snapshot_all(out) == left
+    for name in cli.OUTPUTS:
+        (out / name).unlink(missing_ok=True)
+    for path in (stage / "old").iterdir():
+        os.replace(path, out / path.name)
+    shutil.rmtree(stage)
+    assert snapshot(out) == before
+
+
+@pytest.fixture
+def earlier_n4(tmp_path):
+    out = tmp_path / "out"
+    assert cli.main(command(out, 4, half_steps=2)) == cli.EXIT_CONVERGED
+    (out / "other.txt").write_text("kept", encoding="utf-8")
+    return out
+
+
+# Changes of N = 5 over N = 4: 1 remove result.json, 2-3 data, 4 install. Of N = 1 over N = 4: 1 remove result.json, 2-3 data, 4 stale, 5 install.
+@pytest.mark.parametrize("new, point, state", [
+    (A1, ("change", 1, "before"), OLD), (A1, ("change", 1, "after"), ABSENT),
+    (A1, ("change", 2, "before"), ABSENT), (A1, ("change", 2, "after"), ABSENT),  # the state of the review: one data file of N = 5
+    (A1, ("change", 3, "before"), ABSENT), (A1, ("change", 3, "after"), ABSENT),  # all data of N = 5, result.json not yet
+    (A1, ("change", 4, "before"), ABSENT), (A1, ("change", 4, "after"), NEW),
+    (STALE, ("change", 1, "after"), ABSENT), (STALE, ("change", 2, "after"), ABSENT), (STALE, ("change", 3, "after"), ABSENT),
+    (STALE, ("change", 4, "after"), ABSENT), (STALE, ("change", 5, "before"), ABSENT), (STALE, ("change", 5, "after"), NEW),
+    (A1, ("write", 4, "after"), OLD),  # the mark is on disk, nothing has changed
+    (A1, ("rollback", 3, "before"), ABSENT), (A1, ("rollback", 3, "after"), ABSENT),  # killed while undoing a failed replacement
+    (A1, ("rollback", 4, "after"), ABSENT), (STALE, ("rollback", 4, "before"), ABSENT), (STALE, ("rollback", 5, "after"), ABSENT),
+])
+def test_a_killed_replacement_never_shows_a_mixed_run_and_is_refused(earlier_n4, capsys, new, point, state):
+    N, new_names = new
+    before = snapshot(earlier_n4)
+    stop_and_kill(earlier_n4, N, point)
+    assert_never_mixed(earlier_n4, before, new_names, state)
+    assert_refused_and_recoverable(earlier_n4, before, capsys)
+    assert cli.main(command(earlier_n4, 3, "--overwrite", half_steps=2)) == cli.EXIT_CONVERGED  # the folder works again
+
+
+@pytest.mark.parametrize("point", [("write", 1, "before"), ("write", 2, "after"), ("write", 4, "before")])
+def test_a_process_killed_before_the_mark_does_not_block_the_next_run(earlier_n4, point):
+    """The new files are not complete or the mark is not yet written: no result file has changed and the save is simply dropped."""
+    before = snapshot(earlier_n4)
+    stop_and_kill(earlier_n4, 5, point)
+    stage = next(earlier_n4.glob(cli_ssss.STAGE_PREFIX + "*"))
+    assert not (stage / cli_ssss.REPLACING_MARK).exists()
+    assert_never_mixed(earlier_n4, before, A1[1], OLD)
+    assert cli.main(command(earlier_n4, 5, "--overwrite", half_steps=3)) == cli.EXIT_CONVERGED
+    assert not list(earlier_n4.glob(cli_ssss.STAGE_PREFIX + "*")) and document(earlier_n4)["half_steps_completed"] == 3
+
+
+def test_a_save_killed_during_a_longer_run_stops_that_run_from_saving(earlier_n4, monkeypatch, capsys):
+    real = cli_ssss.run_research
+
+    def run(*args, **kwargs):
+        stop_and_kill(earlier_n4, 5, ("change", 2, "after"))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(cli_ssss, "run_research", run)
     capsys.readouterr()
-    assert cli.main(command(earlier, 3, "--overwrite", half_steps=2)) == cli.EXIT_USAGE
-    assert stage.name in capsys.readouterr().err
-
-
-KILLED_BEFORE_THE_REPLACEMENT = KILLED_DURING_THE_SAVE.replace("count[0] == 2", "count[0] == 1")
-
-
-def test_a_process_killed_before_any_file_changed_does_not_block_the_next_run(earlier):
-    before = snapshot(earlier)
-    done = subprocess.run([sys.executable, "-c", KILLED_BEFORE_THE_REPLACEMENT, *command(earlier, 3, "--overwrite", half_steps=3)],
-                          check=False)
-    assert done.returncode == 9
-    stage = next(earlier.glob(cli_ssss.STAGE_PREFIX + "*"))
-    assert (stage / cli_ssss.REPLACING_MARK).exists()  # killed right after the mark: the check cannot know that no file changed
-    assert {name: before[name] for name in before} == {name: (earlier / name).read_bytes() for name in before}
-    (stage / cli_ssss.REPLACING_MARK).unlink()  # what is left of a save killed while it wrote its new files
-    assert cli.main(command(earlier, 3, "--overwrite", half_steps=3)) == cli.EXIT_CONVERGED
-    assert not list(earlier.glob(cli_ssss.STAGE_PREFIX + "*"))
+    assert cli.main(command(earlier_n4, 6, "--overwrite", half_steps=2)) == cli.EXIT_USAGE
+    assert "незавершённая замена" in capsys.readouterr().err and not (earlier_n4 / "result.json").exists()
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="an open file blocks its replacement only on Windows")
@@ -619,6 +839,17 @@ def test_a_result_file_held_open_by_another_program(earlier, capsys):
     assert {name: (earlier / name).read_bytes() for name in before} == before
     assert cli.main(command(earlier, 1, "--overwrite")) == cli.EXIT_CONVERGED  # closed: the run works, nothing is left of the failed save
     assert names(earlier) == ["field.csv", "history.csv", "other.txt", "result.json"]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="an open file blocks its removal only on Windows")
+def test_the_earlier_result_json_held_open_by_another_program(earlier, capsys):
+    before = snapshot(earlier)
+    capsys.readouterr()
+    with open(earlier / "result.json", "rb"):
+        assert cli.main(command(earlier, 3, "--overwrite", half_steps=3)) == cli.EXIT_OUTPUT_ERROR
+        assert "не изменены" in capsys.readouterr().err
+    assert {name: (earlier / name).read_bytes() for name in before} == before
+    assert cli.main(command(earlier, 3, "--overwrite", half_steps=3)) == cli.EXIT_CONVERGED
 
 
 def test_a_process_killed_during_the_calculation_changes_nothing(tmp_path):
