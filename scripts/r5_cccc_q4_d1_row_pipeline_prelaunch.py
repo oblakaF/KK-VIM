@@ -102,6 +102,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from fractions import Fraction
 from pathlib import Path
 
@@ -1403,7 +1404,51 @@ def _row_job(spec: dict) -> dict:
     rec = rerun.pop("op8_record", None) if isinstance(rerun, dict) else None  # the full OP-8 record of a paired row: not a
     # reproduced value (its float diagnostics are observations); its C-3+ fields are compared through c3plus_record
     return {"row": row, "input_binding_reasons": reasons, "op8_rerun": rerun, "op8_record": rec, "mode": mode, "pid": os.getpid(),
-            "blas_threads": blas_threads_both()}
+            "blas_threads": blas_threads_both(), "process_peak": pf()._mem()}
+
+
+# D-059 (PL 6.3, per factorization stage): stage log of the campaign runner. The wrappers only record start and end of the function;
+# nothing else is touched (no argument, no result; the frozen tools are not edited). Active only with the environment variable below,
+# set by the runner for its jobs and inherited by their replay children; the variable authorises nothing.
+STAGE_LOG_ENV = "KKVIM_D1_STAGE_LOG"
+
+
+def stage_event(name: str, event: str, factorization: bool = False) -> None:
+    path = os.environ.get(STAGE_LOG_ENV)
+    if not path:
+        return
+    line = json.dumps({"pid": os.getpid(), "stage": name, "event": event, "factorization": factorization, "t": time.time()})
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+def _timed_stage(module, attr: str, name: str) -> None:
+    fn = getattr(module, attr)
+    if getattr(fn, "_d1_stage_timer", False):
+        return
+
+    def timed(*a, **k):
+        stage_event(name, "start", True)
+        try:
+            return fn(*a, **k)
+        finally:
+            stage_event(name, "end", True)
+
+    timed._d1_stage_timer = True
+    timed.__wrapped__ = fn
+    setattr(module, attr, timed)
+
+
+def install_stage_timers(extra=()) -> bool:
+    """The factorization stages of PL 6.3 (the stages marked as factorization in the accepted probes, at the level of the function
+    that factorizes): B-C of OP-8, EQ paired half-step, R-AC, R-H, certificate of lambda_low, decimal Cholesky of BR (``extra``)."""
+    if not os.environ.get(STAGE_LOG_ENV):
+        return False
+    for module, attr, name in ((op8(), "solve_with_c", "B-C solve (OP-8 half-step)"), (hs, "solve_ac", "R-AC factorization"),
+                               (hs, "solve_hessian", "R-H factorization"), (hs, "certify_lambda_min", "lambda_low certificate"),
+                               (bcd(), "eq_paired", "EQ paired half-step"), *extra):
+        _timed_stage(module, attr, name)
+    return True
 
 
 _OPENBLAS = {"numpy": ("numpy", ("numpy.libs", "numpy/.dylibs"), ("scipy_openblas_get_num_threads64_", "openblas_get_num_threads64_",
@@ -1591,7 +1636,8 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
             pa += replay_blas_defects(second, "replay process")
             a, b = _comparable(primary), _comparable(second)
             repro = {"bitwise_equal": a == b, "differences": sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k)),
-                     "child_pid": second["pid"]}
+                     "child_pid": second["pid"], "child_blas_threads": second.get("blas_threads"),
+                     "child_peak": second.get("process_peak")}
             if not repro["bitwise_equal"]:
                 pa.append("separate process: values differ: " + ", ".join(repro["differences"]))
         except (RuntimeError, subprocess.TimeoutExpired) as exc:
@@ -1725,6 +1771,8 @@ def main(argv=None) -> int:
         spec = json.loads(a.spec.read_text(encoding="utf-8"))
         try:
             guard_config(spec_config(spec))
+            stage_event("replay process of the row", "start")
+            install_stage_timers()
             job = _row_job(spec)
         except D1Refused as exc:
             print(f"refused: {exc}", file=sys.stderr)
