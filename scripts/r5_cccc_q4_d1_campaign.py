@@ -31,9 +31,19 @@ commit of every process of the job over its whole life) is recorded beside them.
 
 Tool failures (B-4) are not numerical results. A child's refusal stops the run before anything is committed (CampaignRefused). A crash,
 a killed process, malformed output, a timeout of the runner, orphan processes or an internal exception stop the run with state
-STOPPED_TOOL_FAILURE and no verdict (ToolFailure); the unit is not stored, and a restart computes it again. A numerical exception of the
-row keeps its status by the unchanged tree of protocol 4.2. Stored units are validated before reuse; a change of the source, of the
-environment or of the authorisation during the run gives STOPPED_EXECUTION_CHANGED, never a verdict.
+STOPPED_TOOL_FAILURE and no verdict (ToolFailure); the unit is not stored, and a restart computes it again. The same holds for an
+exception the tools recorded instead of raising (OP-8 trajectory and re-runs, replay process, second path of B_E, Z-4 repeat): it is read
+from ``caught_exceptions`` and the journal, not from the status of the row. A numerical exception (NUMERICAL_EXCEPTIONS) of the row keeps
+its status by the unchanged tree of protocol 4.2. Stored units are validated before reuse; a change of the source, of the environment or
+of the authorisation during the run gives STOPPED_EXECUTION_CHANGED, never a verdict.
+
+Process identity: pid and creation time. A pid alone says nothing once its process has ended: Windows reuses pids quickly and keeps the
+parent pid of a child after the parent ended. Membership of the tree: the job object where it exists; otherwise a live process whose parent
+is a live member, identified, and not younger than the child. Memory is read and a process is killed only through its verified identity;
+a process that has exited (even when a handle holds it) is not alive.
+
+Exit code of ``run``: 0 only for a completed run with complete mandatory second-path coverage; 4 completed with incomplete coverage (an
+operational state beside the verdict, which it does not change); 3 stopped or blocked; 2 refused.
 
 Gate: a real run (``dry_run`` False) is refused before anything is computed unless ``pipeline.campaign_gate`` authorises it (D-059:
 launch signal + owner's re-freeze act, current at origin/main + addendum + frozen manifest + tool blobs + the bytes on disk), the code
@@ -89,6 +99,8 @@ NUMERICAL_EXCEPTIONS = ("LinAlgError", "FloatingPointError", "ZeroDivisionError"
 INTERNAL_EXCEPTION = "INTERNAL_EXCEPTION"
 STOPPED_TOOL_FAILURE, STOPPED_CHANGED = "STOPPED_TOOL_FAILURE", "STOPPED_EXECUTION_CHANGED"
 COMPLETED = "COMPLETED"
+EXIT_OK, EXIT_REFUSED, EXIT_NOT_COMPLETED, EXIT_COVERAGE_INCOMPLETE = 0, 2, 3, 4
+ORPHAN_SETTLE_S = 2.0  # how long a process of a finished job may take to end before it counts as an orphan; engineering, not a PL 6.3 limit
 CONTROLS_VALID, CONTROLS_INVALID = "VALID", "INVALID"
 HS_MODULE, BC_MODULE = "src/kkvim_reference/r5_cccc_halfstep.py", "src/kkvim_reference/r5_cccc_bc.py"
 CA_TOOL, BR_TOOL = "scripts/r5_cccc_q4_c_assembly_e4_audit.py", "scripts/r5_cccc_q4_bc_reference_audit.py"
@@ -291,6 +303,105 @@ def _process_table() -> dict[int, int]:
     return out
 
 
+_WIN32_API = None
+_QUERY, _SYNCHRONIZE, _TERMINATE = 0x1000, 0x00100000, 0x0001  # PROCESS_QUERY_LIMITED_INFORMATION, SYNCHRONIZE, PROCESS_TERMINATE
+
+
+def _win32():
+    """Own instances of kernel32 and psapi: the signatures set here touch nobody else."""
+    global _WIN32_API
+    if _WIN32_API is None:
+        import ctypes
+        from ctypes import wintypes as w
+
+        k, ps = ctypes.WinDLL("kernel32", use_last_error=True), ctypes.WinDLL("psapi")
+        k.OpenProcess.restype = w.HANDLE
+        k.OpenProcess.argtypes = [w.DWORD, w.BOOL, w.DWORD]
+        k.CloseHandle.argtypes = [w.HANDLE]
+        k.WaitForSingleObject.argtypes = [w.HANDLE, w.DWORD]
+        k.WaitForSingleObject.restype = w.DWORD
+        k.GetProcessTimes.argtypes = [w.HANDLE, *[ctypes.POINTER(w.FILETIME)] * 4]
+        k.TerminateProcess.argtypes = [w.HANDLE, w.UINT]
+        k.IsProcessInJob.argtypes = [w.HANDLE, w.HANDLE, ctypes.POINTER(w.BOOL)]
+        _WIN32_API = (k, ps)
+    return _WIN32_API
+
+
+def _win_running(pid: int, extra_access: int = 0) -> tuple | None:
+    """(handle, creation time) of a RUNNING process, the caller closes the handle; None otherwise. A process that has exited can stay open
+    through a handle somebody holds: it is not alive."""
+    import ctypes
+    from ctypes import wintypes as w
+
+    k = _win32()[0]
+    h = k.OpenProcess(_QUERY | _SYNCHRONIZE | extra_access, False, pid)
+    if not h:
+        return None
+    c, e, x, u = w.FILETIME(), w.FILETIME(), w.FILETIME(), w.FILETIME()
+    if k.WaitForSingleObject(h, 0) == 258 and k.GetProcessTimes(h, ctypes.byref(c), ctypes.byref(e), ctypes.byref(x), ctypes.byref(u)):  # WAIT_TIMEOUT
+        return h, (int(c.dwHighDateTime) << 32) | int(c.dwLowDateTime)
+    k.CloseHandle(h)
+    return None
+
+
+def _creation_time(pid: int) -> int | None:
+    """With the pid, the identity of a running process (Windows: FILETIME; else: start time in clock ticks); None when it does not run."""
+    if sys.platform == "win32":
+        r = _win_running(pid)
+        if r is None:
+            return None
+        _win32()[0].CloseHandle(r[0])
+        return r[1]
+    try:
+        with open(f"/proc/{pid}/stat", encoding="utf-8", errors="replace") as f:
+            fields = f.read().rsplit(")", 1)[1].split()
+        return None if fields[0] in ("Z", "X") else int(fields[19])
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def _kill_identified(pid: int, created: int) -> bool:
+    """Ends the process only if it still is this one (pid and creation time). Windows: through the handle that was verified."""
+    if sys.platform == "win32":
+        r = _win_running(pid, _TERMINATE)
+        if r is None:
+            return False
+        k = _win32()[0]
+        done = r[1] == created and bool(k.TerminateProcess(r[0], 1))
+        k.CloseHandle(r[0])
+        return done
+    if _creation_time(pid) != created:
+        return False
+    try:
+        os.kill(pid, 9)
+    except OSError:
+        return False
+    return True
+
+
+def tree_members(table: dict[int, int], known: set[tuple[int, int]], creation_time=None, in_job: dict[int, int] | None = None) -> dict[int, int]:
+    """pid -> creation time of the running members of a job tree; ``known`` (pid, creation time) grows by the new ones. A member stays one
+    only while its pid still has its creation time. New: what the job object lists; a process whose parent is a running member and which is
+    not older than it (a parent pid can name a process that ended and whose pid now belongs to someone else, in either direction)."""
+    creation_time = creation_time or _creation_time
+    live = {pid: t for pid, t in known if pid in table and creation_time(pid) == t}
+    for pid, t in (in_job or {}).items():
+        live[pid] = t
+        known.add((pid, t))
+    grew = True
+    while grew:
+        grew = False
+        for pid, ppid in table.items():
+            if pid in live or ppid not in live or pid == ppid:
+                continue
+            t = creation_time(pid)
+            if t is not None and t >= live[ppid]:
+                live[pid] = t
+                known.add((pid, t))
+                grew = True
+    return live
+
+
 class _JobAccounting:
     """Windows job object around the job tree: the OS high-water marks of commit (per process and of the job, over the whole life of every
     process, short-lived ones included), the count of the processes and the guaranteed end of the tree (kill on close). It sets no limit
@@ -348,6 +459,29 @@ class _JobAccounting:
         return {"total_processes": int(a.TotalProcesses), "active_processes": int(a.ActiveProcesses),
                 "peak_process_commit_bytes": int(e.PeakProcessMemoryUsed), "peak_job_commit_bytes": int(e.PeakJobMemoryUsed)}
 
+    def members(self) -> dict[int, int] | None:
+        """pid -> creation time of the running processes of the job, each verified in the job through its own handle; None: not available."""
+        if not self.available:
+            return None
+        ct = self.ctypes
+
+        class Listed(ct.Structure):
+            _fields_ = [("assigned", ct.c_ulong), ("listed", ct.c_ulong), ("ids", ct.c_size_t * 4096)]
+
+        ids = Listed()
+        if not self.k.QueryInformationJobObject(self.h, 3, ct.byref(ids), ct.sizeof(ids), None):  # JobObjectBasicProcessIdList
+            return None
+        k, out = _win32()[0], {}
+        for pid in ids.ids[:ids.listed]:
+            r = _win_running(int(pid))
+            if r is None:
+                continue
+            flag = ct.c_long(0)
+            if k.IsProcessInJob(r[0], self.h, ct.byref(flag)) and flag.value:
+                out[int(pid)] = r[1]
+            k.CloseHandle(r[0])
+        return out
+
     def terminate(self) -> None:
         if self.available:
             self.k.TerminateJobObject(self.h, 1)
@@ -378,8 +512,9 @@ def memory_evidence(sampled_max: int | None, sampled_processes: int, accounting:
                       "the high-water mark" if unseen else "every process of the job was sampled; its last interval only under the high-water mark"}
 
 
-def _memory_of(pid: int) -> tuple[int, int] | None:
-    """(peak, current) working set of a running process in bytes; None when it cannot be read."""
+def _memory_of(pid: int, created: int | None = None) -> tuple[int, int] | None:
+    """(peak, current) working set of a running process in bytes; None when it cannot be read or, with ``created``, when the pid no longer
+    belongs to that process: the memory of somebody else is never attributed."""
     if sys.platform == "win32":
         import ctypes
         from ctypes import wintypes
@@ -389,25 +524,27 @@ def _memory_of(pid: int) -> tuple[int, int] | None:
                         ("WorkingSetSize", ctypes.c_size_t), ("a", ctypes.c_size_t), ("b", ctypes.c_size_t), ("c", ctypes.c_size_t),
                         ("d", ctypes.c_size_t), ("e", ctypes.c_size_t), ("f", ctypes.c_size_t)]
 
-        k, ps = ctypes.WinDLL("kernel32"), ctypes.WinDLL("psapi")
-        k.OpenProcess.restype = wintypes.HANDLE
-        k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-        k.CloseHandle.argtypes = [wintypes.HANDLE]
+        k, ps = _win32()
         ps.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(C), wintypes.DWORD]
-        h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-        if not h:
+        r = _win_running(pid)
+        if r is None:
             return None
+        h, t = r
         c = C()
         c.cb = ctypes.sizeof(c)
-        ok = ps.GetProcessMemoryInfo(h, ctypes.byref(c), c.cb)
+        ok = (created is None or t == created) and ps.GetProcessMemoryInfo(h, ctypes.byref(c), c.cb)
         k.CloseHandle(h)
         return (int(c.PeakWorkingSetSize), int(c.WorkingSetSize)) if ok else None
+    if created is not None and _creation_time(pid) != created:
+        return None
     try:
         with open(f"/proc/{pid}/status", encoding="utf-8", errors="replace") as f:
             found = {x.split(":")[0]: int(x.split()[1]) * 1024 for x in f if x.startswith(("VmHWM:", "VmRSS:"))}
-        return (found["VmHWM"], found["VmRSS"]) if len(found) == 2 else None
     except (OSError, IndexError, ValueError):
         return None
+    if len(found) != 2 or (created is not None and _creation_time(pid) != created):
+        return None
+    return found["VmHWM"], found["VmRSS"]
 
 
 def _peak_of(pid: int) -> int | None:
@@ -420,18 +557,12 @@ def memory_measurement_works() -> bool:
     return os.getpid() in _process_table() and bool(_peak_of(os.getpid()))
 
 
-def _stop_tree(root: int, pids, job: _JobAccounting | None = None) -> None:
+def _stop_tree(members, job: _JobAccounting | None = None) -> None:
+    """Ends the job and the identified members (pid, creation time); no process is looked up by its pid or its parent pid alone."""
     if job is not None:
         job.terminate()
-    if sys.platform == "win32":
-        subprocess.run(["taskkill", "/PID", str(root), "/T", "/F"], capture_output=True)
-    table = _process_table()
-    for pid in pids:
-        if pid in table:
-            try:
-                os.kill(pid, 9)
-            except OSError:
-                pass
+    for pid, created in members:
+        _kill_identified(pid, created)
 
 
 def _read_stages(path: Path, pos: int) -> tuple[list[dict], int]:
@@ -457,33 +588,33 @@ def monitor_job(proc, limit_bytes: int, factorization_limit_s: float, stage_log:
     the memory limit, and every factorization stage of the stage log against the time limit, while it runs and when it ends. On a
     violation the tree is stopped; the record names the rule, the measured value, the process and its last stage. The sum over the tree
     is a measurement only (D-057.4 states the limit per process); so is the largest sum of the working sets seen at one moment. Processes
-    alive after the root ended or after the stop are named (orphans)."""
+    of the tree (``tree_members``: pid and creation time) alive after the root ended and after ORPHAN_SETTLE_S, or after the stop, are named
+    (orphans); nothing else is measured or stopped."""
     t0 = time.perf_counter()
     root = proc.pid
     job = _JobAccounting(proc)
-    known, peaks, last_stage, active, stages = {root}, {}, {}, {}, {}
+    created = _creation_time(root)
+    known = set() if created is None else {(root, created)}
+    peaks, last_stage, active, stages = {}, {}, {}, {}
     pos, violation, sum_peak, safety, concurrent = 0, None, 0, False, 0
+
+    def members() -> dict[int, int]:
+        return tree_members(_process_table(), known, _creation_time, job.members())
 
     def check_memory():
         nonlocal concurrent
-        table = _process_table()
-        grew = True
-        while grew:
-            kids = {p for p, pp in table.items() if pp in known and p not in known}
-            grew = bool(kids)
-            known.update(kids)
         total, now = 0, 0
-        for pid in known:
-            m = _memory_of(pid) if pid in table else None
+        for pid, t in members().items():
+            m = _memory_of(pid, t)
             if m is not None:
-                peaks[pid] = max(peaks.get(pid, 0), m[0])
+                peaks[(pid, t)] = max(peaks.get((pid, t), 0), m[0])
                 total += m[0]
                 now += m[1]
         concurrent = max(concurrent, now)
         worst = max(peaks, key=peaks.get, default=None)
         if limit_bytes > 0 and worst is not None and peaks[worst] > limit_bytes:
-            return {"aborted": "memory", "working_set_bytes": peaks[worst], "limit_bytes": limit_bytes, "pid": worst,
-                    "process_stage": last_stage.get(worst), "rule": "PL 6.3: peak of a process <= 50 % of the physical RAM (D-057.4)"}, total
+            return {"aborted": "memory", "working_set_bytes": peaks[worst], "limit_bytes": limit_bytes, "pid": worst[0],
+                    "process_stage": last_stage.get(worst[0]), "rule": "PL 6.3: peak of a process <= 50 % of the physical RAM (D-057.4)"}, total
         return None, total
 
     def check_stages():
@@ -527,30 +658,33 @@ def monitor_job(proc, limit_bytes: int, factorization_limit_s: float, stage_log:
         time.sleep(poll_s)
     stopped = bool(violation or safety)
     if stopped:
-        _stop_tree(root, set(known), job)
+        _stop_tree(set(known), job)
     try:
         proc.wait(timeout=30)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
 
-    def alive() -> list[int]:
-        table = _process_table()
-        return sorted(p for p in known if p in table and p != root)
+    def alive_after(seconds: float) -> list[int]:
+        end = time.perf_counter() + seconds
+        while True:
+            left = sorted(p for p in members() if p != root)
+            if not left or time.perf_counter() >= end:
+                return left
+            time.sleep(0.05)
 
-    accounting = job.read()
-    orphans = alive() if accounting is None else (alive() if accounting["active_processes"] else [])
+    orphans = alive_after(ORPHAN_SETTLE_S)
     if orphans:
-        _stop_tree(root, set(known), job)
-    deadline = time.perf_counter() + 10
-    while time.perf_counter() < deadline and (alive() or ((job.read() or {}).get("active_processes") or 0)):
-        time.sleep(0.05)
-    accounting = job.read() or accounting
-    surviving = alive()
+        _stop_tree(set(known), job)
+    surviving = alive_after(10) if orphans else []
+    accounting = job.read()
     job.close()
+    by_pid: dict[str, int] = {}
+    for (pid, _), peak in peaks.items():
+        by_pid[str(pid)] = max(by_pid.get(str(pid), 0), peak)
     return {"violation": violation, "safety_timeout": safety, "wall_s": round(time.perf_counter() - t0, 2), "returncode": proc.returncode,
             "stopped_by_monitor": stopped, "orphans_found": orphans, "orphans_surviving": surviving,
-            "processes": {str(k): v for k, v in peaks.items()}, "max_process_peak_bytes": max(peaks.values(), default=None),
+            "processes": by_pid, "max_process_peak_bytes": max(peaks.values(), default=None),
             "max_tree_sum_bytes": sum_peak, "max_concurrent_working_set_bytes": concurrent,
             "tree_measurement_over_limit": bool(limit_bytes > 0 and concurrent > limit_bytes),
             "tree_measurement_note": "recorded only: D-057.4 states the limit per process (owner decision I3)",
@@ -967,19 +1101,39 @@ def _job_fault(r: dict, what: str) -> tuple[str, dict | None, str]:
 
 
 def _analysis_tool_failure(a: dict) -> tuple[str, str] | None:
-    """Did the analysis of a row report a failure of the tools? An unresolved numerical assumption stays with the row (B-4)."""
-    exc = a.get("exception")
-    if exc and exc.split(":")[0] not in NUMERICAL_EXCEPTIONS:
-        return INTERNAL_EXCEPTION, f"pipeline exception {exc[-500:]}"
-    reason = str(a.get("not_executed_reason") or "")
-    if reason.startswith("journal not readable"):
-        return "UNREADABLE_DATA", reason
-    pa = str(((a.get("premises") or {}).get("P-a") or {}).get("reason") or "")
-    if "sequence binding not checkable" in pa:
-        return INTERNAL_EXCEPTION, pa[-500:]
-    rep_ = a.get("reproduction")
-    if isinstance(rep_, dict) and rep_.get("bitwise_equal") is None:
-        return "REPLAY_FAILED", f"the replay process failed: {rep_.get('error')}"
+    """Did the analysis of a row, or the repeat of its Z-4, report a failure of the tools? The exceptions the tools recorded instead of raising
+    are read here (OP-8 re-runs, replay process, second path of B_E): one outside NUMERICAL_EXCEPTIONS is a failure whatever status the row got
+    from it; a numerical one, like an unresolved numerical assumption, stays with the row (B-4)."""
+    for view in (a, (a.get("z4") or {}).get("repeat") or {}):
+        exc = view.get("exception")
+        if exc and exc.split(":")[0] not in NUMERICAL_EXCEPTIONS:
+            return INTERNAL_EXCEPTION, f"pipeline exception {exc[-500:]}"
+        for x in view.get("caught_exceptions") or []:
+            if x.get("type") not in NUMERICAL_EXCEPTIONS:
+                return INTERNAL_EXCEPTION, f"{x.get('where')}: {x.get('type')}: {x.get('message')}"
+        reason = str(view.get("not_executed_reason") or "")
+        if reason.startswith("journal not readable"):
+            return "UNREADABLE_DATA", reason
+        rep_ = view.get("reproduction")
+        if isinstance(rep_, dict) and rep_.get("bitwise_equal") is None:
+            return "REPLAY_FAILED", f"the replay process failed: {rep_.get('error')}"
+    return None
+
+
+def _journal_tool_failure(jdir) -> tuple[str, str] | None:
+    """OP-8 records a failure of a half-step as the status of its trajectory, whose rows then read as not executed: a status FAIL_TOOL is a
+    failure of the tools unless it reports a numerical exception."""
+    doc = _read_json(Path(jdir) / "journal.json")
+    if not isinstance(doc, dict) or not isinstance(doc.get("steps"), list):
+        return "UNREADABLE_DATA", f"the journal {jdir} is not readable"
+    fail, marker = pl().op8().FAIL_TOOL, f"{pl().op8().FAIL_TOOL}: exception "
+    for rec in doc["steps"]:
+        st = str(rec.get("status") if isinstance(rec, dict) else None)
+        if st.startswith(marker):
+            if st[len(marker):].split(":")[0] not in NUMERICAL_EXCEPTIONS:
+                return INTERNAL_EXCEPTION, f"OP-8 half-step s = {rec.get('s')}: {st[-500:]}"
+        elif st.startswith(fail):
+            return fail, f"OP-8 half-step s = {rec.get('s')}: {st[-500:]}"
     return None
 
 
@@ -1046,6 +1200,9 @@ def run_unit(unit: dict, work: Path, limit: int, signal, subsets: dict, dry_run:
         for i in execs:
             rows[i] = _not_executed_record(unit["rows"][i], reason, measured, ex)
         return {"unit": unit["id"], "rows": rows, "rac": rac, "prep": {k: prep[k] for k in prep if k != "tail"}}
+    failure = _journal_tool_failure(prep["journal"]) if kind == "journal" else None
+    if failure:
+        raise ToolFailure(failure[0], reason=failure[1], job="journal", unit=unit["id"], resources=prep["resources"])
     by_s = {x["s"]: x for x in prep["paired"]["rows"]} if kind == "paired" else {}
     for i in execs:
         r = unit["rows"][i]
@@ -1113,6 +1270,19 @@ def second_path_coverage(records: list[dict], subsets: dict) -> dict:
     out[ACCURACY] = {"semantics": "OBSERVATION", "executed_rows": len(acc), "resolved": len(res),
                      "unresolved_keys": sorted(r["key"] for r in acc if r not in res)}
     return out
+
+
+def coverage_gaps(coverage: dict) -> dict:
+    """The checks whose mandatory coverage is incomplete and the rows concerned. Operational, beside the verdict: it changes no status and no
+    candidate verdict, it only says that the run did not establish everything the frozen selection asks for."""
+    return {name: {"not_established": [x["key"] for x in v["not_established"]], "contradictions": [x["key"] for x in v["contradictions"]],
+                   "selected_without_a_row": v["selected_without_a_row"]} for name, v in coverage.items() if v.get("complete") is False}
+
+
+def exit_code(doc: dict) -> int:
+    if doc["state"] != COMPLETED:
+        return EXIT_NOT_COMPLETED
+    return EXIT_OK if doc.get("second_path_coverage_complete") is True else EXIT_COVERAGE_INCOMPLETE
 
 
 def relabel(o, status: str):
@@ -1345,6 +1515,8 @@ def stored_unit_defects(path: Path, unit: dict, prov_sha: str, status: str) -> l
             bad.append(f"{r.get('key')}: stored status {r.get('status')}, the classifier gives {st}")
         if any((c_ or {}).get("failure_kind") for c_ in (r.get("checks") or {}).values()):
             bad.append(f"{r.get('key')}: a check holds a failure of the tools")
+        if isinstance(r.get("analysis"), dict) and _analysis_tool_failure(r["analysis"]):
+            bad.append(f"{r.get('key')}: the analysis holds a failure of the tools")
     return bad
 
 
@@ -1492,9 +1664,10 @@ def run_campaign(out: Path, plan: list[dict] | None = None, dry_run: bool = Fals
         return stop(STOPPED_CHANGED, bad, completed_units=len(results))
     records = [x for u in results for x in u["rows"]]
     coverage = second_path_coverage(records, subsets)
+    gaps = coverage_gaps(coverage)
     doc = {"data_status": status, "state": COMPLETED, "accounting": plan_accounting(plan), "prerun": pre, "provenance": prov,
            "restarts": st["starts"], "memory_limit_bytes": limit, "second_path_coverage": coverage,
-           "second_path_coverage_complete": all(v.get("complete", True) for v in coverage.values()),
+           "second_path_coverage_complete": not gaps, "second_path_coverage_gaps": gaps,
            "resource_evidence": resource_evidence(records),
            "scope": "no scientific qualification and no owner acceptance is claimed; N = 2, 3 RESEARCH_ONLY / NOT_QUALIFIED; second paths and "
                     "BC-1 / TS-1 are observations",
@@ -1587,7 +1760,12 @@ def build_addendum(controls_results: Path, base_commit: str, surrogate_costs: Pa
                         "D-058.5 retained: B_E coverage partial (N-4, N-6); SP-OP measured on one probe; limited reviewer independence",
                         "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary",
                         "memory limit per process (D-057.4); protocol 8 says RAM of the machine: tree sum recorded only (owner decision I3)",
-                        "a real run needs the remote at start and before the verdict (git ls-remote); unreachable refuses or withholds the verdict"],
+                        "a real run needs the remote at start and before the verdict (git ls-remote); unreachable refuses or withholds the verdict",
+                        "exceptions at the boundaries of OP-8, the replay and B_E: numerical = NUMERICAL_EXCEPTIONS (engineering choice); ValueError counts as a "
+                        "failure of the tools there; the (ValueError, ArithmeticError) handlers inside the row computation keep their faults (protocol 4.1)",
+                        "process tree: job object on Windows; elsewhere a descendant is known only while its parent runs and is identified, so a process "
+                        "reparented before the first poll is not seen",
+                        "exit code 4: completed with incomplete mandatory second-path coverage; operational, beside the verdict"],
     }
 
 
@@ -1618,9 +1796,11 @@ def main(argv=None) -> int:
         doc = run_campaign(a.out)
     except CampaignRefused as exc:
         print(f"refused: {exc}", file=sys.stderr)
-        return 2
-    print(json.dumps({"state": doc["state"], "verdict": (doc.get("verdict") or {}).get("verdict")}, default=str))
-    return 0 if doc["state"] == COMPLETED else 3
+        return EXIT_REFUSED
+    print(json.dumps({"state": doc["state"], "verdict": (doc.get("verdict") or {}).get("verdict"),
+                      "second_path_coverage_complete": doc.get("second_path_coverage_complete") is True,
+                      "second_path_coverage_gaps": {k: sum(map(len, v.values())) for k, v in (doc.get("second_path_coverage_gaps") or {}).items()}}, default=str))
+    return exit_code(doc)
 
 
 if __name__ == "__main__":

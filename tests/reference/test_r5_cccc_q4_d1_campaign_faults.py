@@ -309,7 +309,38 @@ def test_the_real_gate_path_refuses_a_wrong_environment_and_no_remote(monkeypatc
 # --- B-4: tool failures against unresolved numerical results ------------------------------------------------------------------------------------
 
 FAULT = """
-    import json, os, runpy, subprocess, sys, time
+    import json, os, runpy, subprocess, sys, tempfile, time
+
+    def plant(p, what, row_s=None):
+        # a failure inside a boundary of the tools: name:exception
+        import numpy as np
+        name, cls = what.rsplit(":", 1)
+        exc = dict(TypeError=TypeError("injected"), MemoryError=MemoryError("injected"), KeyError=KeyError("injected"), ValueError=ValueError("injected"),
+                   LinAlgError=np.linalg.LinAlgError("injected"), OverflowError=OverflowError("injected"))[cls]
+        def bad(*a, **k):
+            raise exc
+        if name in ("op8", "traj"):
+            p.op8().run_step = bad
+        elif name == "be":
+            p.be2().second_path = bad
+        elif name == "seq" and row_s == 2:  # the predecessor s = 1 of the row s = 2
+            real = p.op8().run_step
+            def only(cfg, k, *a, **kw):
+                if k == 1:
+                    raise exc
+                return real(cfg, k, *a, **kw)
+            p.op8().run_step = only
+
+    if sys.argv[1] == "_replay":  # a real replay process with the failure planted in it
+        import importlib.util
+        what, tool, sp = sys.argv[2:5]
+        s = importlib.util.spec_from_file_location("_d1_pipeline_replay", tool)
+        m = importlib.util.module_from_spec(s)
+        sys.modules["_d1_pipeline_replay"] = m
+        s.loader.exec_module(m)
+        plant(m, what)
+        sys.exit(m.main(["_row", sp]))
+
     mode, target, runner, spec = sys.argv[1:5]
     kind = json.load(open(spec, encoding="utf-8"))["kind"]
     if kind == target:
@@ -348,6 +379,18 @@ FAULT = """
         s.loader.exec_module(m)
         what = mode.split(":", 1)[1]
         p = m.pl()
+        if what.startswith(("op8:", "seq:", "traj:", "be:")):
+            plant(p, what, (json.load(open(spec, encoding="utf-8")).get("spec") or {{}}).get("s"))
+        if what.startswith("replay:"):
+            def child(spec_, timeout=1800):
+                with tempfile.TemporaryDirectory() as td:
+                    sp = os.path.join(td, "spec.json")
+                    json.dump(spec_, open(sp, "w", encoding="utf-8"))
+                    r = subprocess.run([sys.executable, __file__, "_replay", what.split(":", 1)[1], p.__file__, sp], capture_output=True, text=True)
+                if r.returncode:
+                    raise RuntimeError(f"child row failed ({{r.returncode}}): {{r.stderr[-3000:]}}")
+                return json.loads(r.stdout.strip().splitlines()[-1])
+            p.run_child = child
         if what == "replay_crash":
             def bad(*a, **k):
                 raise RuntimeError("child row failed (1): injected")
@@ -438,6 +481,71 @@ def test_numerical_exception_of_a_check_stays_an_observation(monkeypatch, tmp_pa
     assert doc["second_path_coverage"][c.ACCURACY]["resolved"] == 0
 
 
+# --- exceptions recorded instead of raised: OP-8, replay, second path of B_E ------------------------------------------------------------------
+
+PATHS = [("op8", "row"), ("seq", "row"), ("be", "row"), ("replay:op8", "row"), ("replay:be", "row"), ("traj", "journal")]
+
+
+def _be_subsets(plan):
+    return {r["key"]: ["SP-BE"] for r in plan}
+
+
+@pytest.mark.parametrize("cls", ["TypeError", "MemoryError", "KeyError", "ValueError"])
+@pytest.mark.parametrize("path, target", PATHS)
+def test_non_numerical_exception_of_each_path_stops_the_run(path, target, cls, monkeypatch, tmp_path, dry_out):
+    """Each of them used to end as a completed row (UNRESOLVED, or PASS with SP-BE not performed) without a tool defect."""
+    _inject(monkeypatch, tmp_path, f"patch:{path}:{cls}", target)
+    plan = _plan()
+    doc = c.run_campaign(dry_out, plan=plan, dry_run=True, subsets=_be_subsets(plan))
+    assert doc["state"] == c.STOPPED_TOOL_FAILURE and doc["failure"]["kind"] == c.INTERNAL_EXCEPTION and cls in doc["failure"]["reason"], doc.get("failure")
+    assert doc["verdict"]["verdict"] == rd.VERDICT_NOT_ISSUED and "rows" not in doc and not _units(dry_out)
+    _clean(monkeypatch)
+    after = c.run_campaign(dry_out, plan=plan, dry_run=True, subsets=_be_subsets(plan))
+    assert after["state"] == c.COMPLETED and {r["status"] for r in after["rows"]} == {"PASS"} and after["second_path_coverage_complete"] is True
+
+
+@pytest.mark.parametrize("path, target, cls, statuses, covered", [
+    ("op8", "row", "LinAlgError", {"UNRESOLVED_CERTIFICATE"}, True), ("seq", "row", "OverflowError", {"PASS", "UNRESOLVED_CERTIFICATE"}, True),
+    # only the first process fails: the replay computes B_E, so the values of the two processes differ and П-а is not established (protocol 4.2)
+    ("be", "row", "OverflowError", {"UNRESOLVED_CERTIFICATE"}, False), ("be", "row", "LinAlgError", {"UNRESOLVED_CERTIFICATE"}, False),
+    ("replay:be", "row", "OverflowError", {"UNRESOLVED_CERTIFICATE", "PASS"}, True), ("traj", "journal", "LinAlgError", {"UNRESOLVED"}, False)])
+def test_numerical_exception_of_each_path_stays_with_the_row(path, target, cls, statuses, covered, monkeypatch, tmp_path, dry_out):
+    _inject(monkeypatch, tmp_path, f"patch:{path}:{cls}", target)
+    plan = _plan()
+    doc = c.run_campaign(dry_out, plan=plan, dry_run=True, subsets=_be_subsets(plan))
+    assert doc["state"] == c.COMPLETED and {r["status"] for r in doc["rows"]} <= statuses, doc.get("failure") or doc["rows"]
+    assert all(not r["tool_defects"] for r in doc["rows"]) and len(_units(dry_out)) == 1
+    if not covered:
+        assert doc["second_path_coverage_complete"] is False
+
+
+def test_failure_in_the_repeat_of_z4_is_seen(monkeypatch):
+    repeat = {"row": None, "premises": {}, "status": "UNRESOLVED", "exception": None, "reproduction": None,
+              "caught_exceptions": [{"where": "replay process: second path of B_E", "type": "TypeError", "message": "injected"}]}
+    monkeypatch.setattr(pl, "analyse", lambda *a, **k: repeat)
+    z4 = rd.z4_confirm({"kind": "journal", "journal": "x", "s": 1}, {"row": {}, "premises": {}})
+    assert c._analysis_tool_failure({"z4": z4})[0] == c.INTERNAL_EXCEPTION
+    repeat["caught_exceptions"] = [{"where": "x", "type": "OverflowError", "message": "m"}]
+    assert c._analysis_tool_failure({"z4": rd.z4_confirm({"kind": "journal", "journal": "x", "s": 1}, {"row": {}, "premises": {}})}) is None
+    repeat.update(caught_exceptions=[], reproduction={"bitwise_equal": None, "error": "child row failed (1)"})
+    assert c._analysis_tool_failure({"z4": rd.z4_confirm({"kind": "journal", "journal": "x", "s": 1}, {"row": {}, "premises": {}})})[0] == "REPLAY_FAILED"
+
+
+@pytest.mark.parametrize("status, kind", [("FAIL_TOOL: exception TypeError: x", "INTERNAL_EXCEPTION"), ("FAIL_TOOL: exception MemoryError: ", "INTERNAL_EXCEPTION"),
+                                          ("FAIL_TOOL: only-C replacement not confirmed", "FAIL_TOOL"), ("FAIL_TOOL: exception LinAlgError: x", None),
+                                          ("OK", None), ("STOP_ZERO_FIELD: computed factor exactly 0 (N = 1, I-4 undefined)", None)])
+def test_status_of_a_journal(status, kind, tmp_path):
+    (tmp_path / "journal.json").write_text(json.dumps({"meta": {}, "steps": [{"s": 1, "status": status}]}), encoding="utf-8")
+    got = c._journal_tool_failure(tmp_path)
+    assert (got[0] if got else None) == kind
+
+
+def test_unreadable_journal_is_a_tool_failure(tmp_path):
+    assert c._journal_tool_failure(tmp_path)[0] == "UNREADABLE_DATA"
+    (tmp_path / "journal.json").write_text("{not json", encoding="utf-8")
+    assert c._journal_tool_failure(tmp_path)[0] == "UNREADABLE_DATA"
+
+
 def _gone(pid: int, seconds: float = 10) -> bool:
     end = time.time() + seconds
     while time.time() < end:
@@ -523,6 +631,8 @@ CORRUPT = {
     "row removed": (lambda d: d["rows"].pop(), "not the rows of the plan"),
     "input removed": (lambda d: d["rows"][0].pop("input"), "not readable"),
     "failure inside": (lambda d: d["rows"][0]["checks"][c.ACCURACY].update(failure_kind=c.INTERNAL_EXCEPTION), "failure of the tools"),
+    "exception of the tools recorded in the row": (lambda d: d["rows"][0]["analysis"].update(
+        caught_exceptions=[{"where": "second path of B_E", "type": "TypeError", "message": "x"}]), "the analysis holds a failure of the tools"),
 }
 
 
@@ -586,11 +696,25 @@ def test_a_stale_result_never_stands_for_a_stopped_attempt(monkeypatch, tmp_path
     assert json.loads((dry_out / "campaign_result.json").read_text(encoding="utf-8"))["state"] == c.STOPPED_TOOL_FAILURE
 
 
-def test_exit_code_of_the_command_line(monkeypatch):
-    monkeypatch.setattr(c, "run_campaign", lambda out: {"state": c.STOPPED_TOOL_FAILURE})
-    assert c.main(["run", "--out", "scratch/x"]) == 3
-    monkeypatch.setattr(c, "run_campaign", lambda out: {"state": c.COMPLETED})
-    assert c.main(["run", "--out", "scratch/x"]) == 0
+@pytest.mark.parametrize("doc, code, shown", [
+    ({"state": c.STOPPED_TOOL_FAILURE}, c.EXIT_NOT_COMPLETED, False),
+    ({"state": "BLOCKED_BEFORE_THE_RUN", "verdict": {"verdict": "BLOCKED_CAMPAIGN"}}, c.EXIT_NOT_COMPLETED, False),
+    ({"state": c.COMPLETED, "second_path_coverage_complete": True, "second_path_coverage_gaps": {}}, c.EXIT_OK, True),
+    ({"state": c.COMPLETED, "second_path_coverage_complete": False, "verdict": {"verdict": "PASS"},
+      "second_path_coverage_gaps": {"SP-C": {"not_established": ["a"], "contradictions": [], "selected_without_a_row": ["b"]}}}, c.EXIT_COVERAGE_INCOMPLETE, False),
+    ({"state": c.COMPLETED}, c.EXIT_COVERAGE_INCOMPLETE, False)])
+def test_exit_code_of_the_command_line_and_what_it_displays(doc, code, shown, monkeypatch, capsys):
+    monkeypatch.setattr(c, "run_campaign", lambda out: doc)
+    assert c.main(["run", "--out", "scratch/x"]) == code
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line["second_path_coverage_complete"] is shown and line["state"] == doc["state"]
+    assert line["verdict"] == (doc.get("verdict") or {}).get("verdict")
+    if doc.get("second_path_coverage_gaps"):
+        assert line["second_path_coverage_gaps"] == {"SP-C": 2}
+
+
+def test_only_complete_coverage_is_the_ordinary_success():
+    assert {c.EXIT_OK, c.EXIT_REFUSED, c.EXIT_NOT_COMPLETED, c.EXIT_COVERAGE_INCOMPLETE} == {0, 2, 3, 4}
 
 
 # --- resource evidence ---------------------------------------------------------------------------------------------------------------------------
@@ -649,6 +773,138 @@ def test_concurrent_processes_over_the_limit_together_are_recorded_not_stopped(t
     assert mon["tree_measurement_over_limit"] is True and "owner decision I3" in mon["tree_measurement_note"]
 
 
+# --- process identity: pid and creation time --------------------------------------------------------------------------------------------------
+
+def test_members_by_identity_simulated_pid_reuse():
+    t = {100: 10, 200: 20, 300: 30, 400: 5, 500: 50, 600: 60}
+    when = t.get
+    # real descendants, grandchild included
+    known = {(100, 10)}
+    assert c.tree_members({100: 1, 200: 100, 300: 200}, known, when) == {100: 10, 200: 20, 300: 30}
+    assert known == {(100, 10), (200, 20), (300, 30)}
+    # the pid of a member that ended now belongs to someone else: neither it nor its child is a member
+    known = {(100, 7)}
+    assert c.tree_members({100: 1, 200: 100}, known, when) == {}
+    assert known == {(100, 7)}
+    # the parent pid of an old process names a younger member by accident
+    assert c.tree_members({100: 1, 400: 100}, {(100, 10)}, when) == {100: 10}
+    # the parent has ended and its pid is free: nobody is adopted through it
+    assert c.tree_members({200: 100}, {(100, 10)}, when) == {}
+    # a process that no longer runs (no identity) is not a member, whatever the table says
+    assert c.tree_members({100: 1, 200: 100}, {(100, 10)}, {100: 10}.get) == {100: 10}
+    # the job object lists exactly its members, a dead intermediate does not lose them
+    known = {(100, 10)}
+    assert c.tree_members({500: 999, 600: 500}, known, when, {500: 50}) == {500: 50, 600: 60}
+    assert (500, 50) in known and (600, 60) in known
+
+
+def _unrelated(seconds=120):
+    """A process of nobody's tree, with a large working set."""
+    u = subprocess.Popen([sys.executable, "-c", f"import time; x = bytearray(150 * 2**20); [x.__setitem__(i, 1) for i in range(0, len(x), 4096)]; time.sleep({seconds})"])
+    time.sleep(1.0)
+    assert u.poll() is None
+    return u
+
+
+def test_reused_pid_is_not_measured_stopped_or_an_orphan(monkeypatch, tmp_path):
+    """The unrelated process first looks like a young child of the job, as a member would; then its pid has the real, other creation time, as
+    if the member ended and the system gave its pid to someone else."""
+    u = _unrelated()
+    try:
+        root = _spawn(tmp_path, "import time; time.sleep(1.5)")
+        table, when, created = c._process_table, c._creation_time, c._creation_time(root.pid)
+        end = time.time() + 0.7
+
+        def fake_table():
+            out = table()
+            if time.time() < end:
+                out[u.pid] = root.pid
+            return out
+
+        monkeypatch.setattr(c, "_process_table", fake_table)
+        monkeypatch.setattr(c, "_creation_time", lambda pid: created + 1 if pid == u.pid and time.time() < end else when(pid))
+        mon = c.monitor_job(root, 0, 1e9, tmp_path / "none.jsonl", poll_s=0.05)
+        assert mon["orphans_found"] == [] and mon["orphans_surviving"] == [] and u.poll() is None
+        if sys.platform == "win32":  # the memory is read through the handle of the real process
+            assert str(u.pid) not in mon["processes"]
+    finally:
+        u.kill()
+        u.wait()
+
+
+def test_older_process_naming_the_job_as_parent_is_left_alone(monkeypatch, tmp_path):
+    u = _unrelated()
+    try:
+        root = _spawn(tmp_path, "import time; time.sleep(1.5)")
+        table = c._process_table
+        monkeypatch.setattr(c, "_process_table", lambda: {**table(), u.pid: root.pid})
+        limit = 100 * 2**20  # the memory of u would be a violation of the job
+        mon = c.monitor_job(root, limit, 1e9, tmp_path / "none.jsonl", poll_s=0.05)
+        assert mon["violation"] is None and not mon["stopped_by_monitor"] and mon["orphans_found"] == [] and u.poll() is None
+        assert str(u.pid) not in mon["processes"]
+    finally:
+        u.kill()
+        u.wait()
+
+
+def test_stopping_verifies_the_identity(tmp_path):
+    u = _unrelated()
+    try:
+        created = c._creation_time(u.pid)
+        assert created is not None and c._memory_of(u.pid, created) is not None and c._memory_of(u.pid, created + 1) is None
+        assert c._kill_identified(u.pid, created + 1) is False
+        c._stop_tree({(u.pid, created + 1)})
+        time.sleep(0.3)
+        assert u.poll() is None
+        assert c._kill_identified(u.pid, created) is True
+        assert u.wait(timeout=20) is not None
+    finally:
+        u.kill()
+        u.wait()
+
+
+def test_an_ended_process_has_no_identity_even_when_a_handle_holds_it():
+    p = subprocess.Popen([sys.executable, "-c", "pass"])
+    assert p.wait(timeout=60) == 0  # Popen keeps its handle on Windows
+    assert c._creation_time(p.pid) is None and c._memory_of(p.pid) is None
+
+
+def test_real_descendants_are_measured_and_a_clean_exit_has_no_orphan(tmp_path):
+    (tmp_path / "grand.py").write_text(textwrap.dedent(ALLOC.format(n=50, sleep=1)), encoding="utf-8")
+    p = _spawn(tmp_path, f"""
+        import subprocess, sys
+        subprocess.run([sys.executable, {str(tmp_path / "grand.py")!r}])
+    """)
+    mon = c.monitor_job(p, 0, 1e9, tmp_path / "none.jsonl", poll_s=0.05)
+    assert mon["returncode"] == 0 and mon["orphans_found"] == [] and mon["orphans_surviving"] == []
+    assert mon["max_process_peak_bytes"] > 50 * 2**20 and len(mon["processes"]) >= 2
+
+
+def test_many_clean_exits_with_process_churn_have_no_false_orphan(tmp_path):
+    """The intermittent ORPHAN_PROCESSES: short trees, ended processes held by handles, unrelated processes started all the time, pids reused."""
+    import threading
+    stop = threading.Event()
+
+    def churn():
+        while not stop.is_set():
+            subprocess.run([sys.executable, "-c", "pass"], capture_output=True)
+
+    th = threading.Thread(target=churn)
+    th.start()
+    try:
+        for i in range(25):
+            p = _spawn(tmp_path, f"""
+                import subprocess, sys
+                ps = [subprocess.Popen([sys.executable, "-c", "pass"]) for _ in range({1 + i % 3})]
+                [x.wait() for x in ps]
+            """)
+            mon = c.monitor_job(p, 0, 1e9, tmp_path / "none.jsonl", poll_s=0.02)
+            assert mon["orphans_found"] == [] and mon["orphans_surviving"] == [] and mon["returncode"] == 0, mon
+    finally:
+        stop.set()
+        th.join()
+
+
 def test_campaign_summary_carries_the_evidence(dry_out):
     doc = c.run_campaign(dry_out, plan=_plan(), dry_run=True)
     ev = doc["resource_evidence"]
@@ -672,6 +928,44 @@ def test_coverage_of_the_real_subsets_is_complete_as_selection():
     assert set(subsets) <= keys
     for row in frozen["d057"]["subsets"]["rows"]:
         assert set(row["paths"]) <= set(subsets[row["key"]])
+
+
+def test_every_frozen_selection_can_be_established_by_the_runner():
+    """Complete coverage must be reachable: a mandatory check on a row that is never executed, or a journal-only check on a paired row, would turn
+    every real run into incomplete coverage."""
+    plan = {r["key"]: r for r in rd.row_plan() if r["kind"] == "row"}
+    subsets = c.frozen_subsets(list(plan.values()) + [r for r in rd.row_plan() if r["kind"] != "row"], c.frozen_manifest())
+    gaps = {k: v for k, v in subsets.items() if not plan[k]["executable"] or (plan[k]["block"] == "C" and set(v) & set(c.SECOND_PATHS))}
+    assert gaps == {}
+
+
+def _coverage_run(out, subsets):
+    return c.run_campaign(out, plan=_plan(), dry_run=True, subsets=subsets)
+
+
+def test_complete_synthetic_coverage_is_the_ordinary_success(dry_out):
+    keys = [r["key"] for r in _plan()]
+    doc = _coverage_run(dry_out, {keys[0]: ["SP-OP", "SP-BE"], keys[1]: ["SP-GAMMA"]})
+    assert doc["state"] == c.COMPLETED and doc["second_path_coverage_complete"] is True and doc["second_path_coverage_gaps"] == {}
+    assert c.exit_code(doc) == c.EXIT_OK
+
+
+def test_incomplete_coverage_is_not_the_ordinary_success_and_changes_no_status(dry_out):
+    keys = [r["key"] for r in _plan()]
+    full = _coverage_run(dry_out, {keys[0]: ["SP-BE"]})
+    shutil.rmtree(dry_out)
+    doc = _coverage_run(dry_out, {keys[0]: ["SP-BE"], "absent selected row": ["SP-C"]})
+    assert doc["state"] == c.COMPLETED and doc["second_path_coverage_complete"] is False and c.exit_code(doc) == c.EXIT_COVERAGE_INCOMPLETE
+    assert doc["second_path_coverage_gaps"] == {"SP-C": {"not_established": [], "contradictions": [], "selected_without_a_row": ["absent selected row"]}}
+    assert [(r["key"], r["status"], r["tool_defects"]) for r in doc["rows"]] == [(r["key"], r["status"], r["tool_defects"]) for r in full["rows"]]
+    assert "state" in doc and doc["state"] not in (c.STOPPED_TOOL_FAILURE, c.STOPPED_CHANGED)
+
+
+def test_a_selected_row_not_established_is_listed_as_a_gap():
+    rec = {"key": "x", "execution_status": c.EXEC_DONE, "status": "PASS", "checks": {"SP-C": {"status": c.UNRESOLVED, "reason": "r"}}}
+    cov = c.second_path_coverage([rec, {"key": "y", "execution_status": c.EXEC_DONE, "status": "PASS", "checks": {"SP-C": {"status": c.CONTRADICTION, "reason": "r"}}}],
+                                 {"x": ["SP-C"], "y": ["SP-C"], "z": ["SP-C"]})
+    assert c.coverage_gaps(cov)["SP-C"] == {"not_established": ["x"], "contradictions": ["y"], "selected_without_a_row": ["z"]}
 
 
 def test_selected_row_without_a_row_and_embedded_paths_are_never_covered(dry_out):

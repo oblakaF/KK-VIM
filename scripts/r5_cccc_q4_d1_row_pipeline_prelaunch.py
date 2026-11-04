@@ -1128,6 +1128,12 @@ def _compute_row_core(cfg, s: int, given: np.ndarray, companion: np.ndarray, V: 
     return out
 
 
+def _caught(where: str, exc: Exception) -> dict:
+    """An exception a boundary of this tool recorded instead of raising. What it means (numerical, or a failure of the tool) is decided
+    by the integrated layer from ``caught_exceptions``, never from the status of the row (D-059, B-4)."""
+    return {"where": where, "type": type(exc).__name__, "message": str(exc)[-300:]}
+
+
 def _second_path_be(lx, nx, ly, ny, D, q, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, Pp, Ps, Qd, BE, ai) -> dict:
     """SP-BE / channel of G-5 (D-057.3, OD-4, OD-11): the second path of B_E (PR #51) on the actual arrays of the row, P^ mandatory
     (N-3: the replication of G-4 is bound to the values of the row). Comparison contract (N-5): the B_E of the row (QA-EB, 80-bit
@@ -1140,7 +1146,8 @@ def _second_path_be(lx, nx, ly, ny, D, q, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, Pp, Ps
         sp = be2().second_path(mesh, Xp, Yp, Xs, Ys, wh_p, wh_s, dh, P_hat={"P_p": Pp, "P_s": Ps, "Q": Qd})
     except Exception as exc:  # recorded, never hidden: no comparison
         ai["second_path_BE"]["out"] = None
-        return {"performed": False, "match": None, "reason": f"{type(exc).__name__}: {str(exc)[-300:]}"}
+        return {"performed": False, "match": None, "reason": f"{type(exc).__name__}: {str(exc)[-300:]}",
+                "exception": _caught("second path of B_E", exc)}
     BE2 = (sp.get("assembly_qaeb80") or {}).get("BE")
     ai["second_path_BE"]["out"] = fsha(BE2) if isinstance(BE2, Fraction) else None
     res = {"performed": True, "status": sp.get("status"), "reasons": [str(r) for r in sp.get("reasons", [])][:20],
@@ -1464,7 +1471,8 @@ def _fields_of_record(rec: dict, arrays: dict, s: int) -> list[str]:
     return bad
 
 
-def sequence_binding(j: dict, arrays: dict, s: int, rerun_op8: bool = True, cache: dict | None = None) -> list[str]:
+def sequence_binding(j: dict, arrays: dict, s: int, rerun_op8: bool = True, cache: dict | None = None,
+                     caught: list | None = None) -> list[str]:
     """П-а of row s as a part of its sequence (review N-3): the journal structure; the record-level chain given_in_sha(k) =
     next_given_sha(k - 1), companion_in_sha(k) = next_companion_sha(k - 1) up to k = s; every predecessor k = 1..s - 1 executed
     (OK), bound (hashes, chain, start), with the canonical C-3+ record and field hashes; with ``rerun_op8``, OP-8 re-run on the bound
@@ -1504,11 +1512,13 @@ def sequence_binding(j: dict, arrays: dict, s: int, rerun_op8: bool = True, cach
                 res = {"status": r.record.get("status"), "c3plus": _c3plus_of_record(r.record),
                        "arrays": {a: (r.arrays[a].tobytes(), r.arrays[a].shape) for a in RERUN_ARRAYS if a in r.arrays}}
             except Exception as exc:  # recorded, never hidden
-                res = {"error": f"{type(exc).__name__}: {exc}"}
+                res = {"error": f"{type(exc).__name__}: {exc}", "exception": _caught(f"OP-8 re-run of the predecessor s = {k}", exc)}
             if cache is not None:
                 cache[key] = res
         if "error" in res:
             out.append(f"predecessor s = {k}: OP-8 re-run failed: {res['error']}")
+            if caught is not None:
+                caught.append(res["exception"])
             continue
         if res["status"] != op8().OK:
             out.append(f"predecessor s = {k}: OP-8 re-run status {res['status']!r}, the record says OK")
@@ -1557,7 +1567,8 @@ def _inputs_from_spec(spec: dict):
             except Exception as exc:  # the bound input is not one OP-8 accepts (e.g. s = 1 not T_1): a binding fault, not a stop
                 rerun = {"status": f"OP-8 re-run raised {type(exc).__name__}: {str(exc)[-300:]}", "V_bc_sha": None,
                          "c3plus_premises_status": None, "c3plus_premise_classes": None, "c3plus_record": None,
-                         "arrays_equal": {a: False for a in RERUN_ARRAYS}, "reproduced": False}
+                         "arrays_equal": {a: False for a in RERUN_ARRAYS}, "reproduced": False,
+                         "exception": _caught("OP-8 re-run of the half-step", exc)}
                 return cfg, s, given, companion, V, reasons, rerun
             equal = {a: bool(a in res.arrays and f"s{s}_{a}" in arrays and res.arrays[a].shape == arrays[f"s{s}_{a}"].shape
                              and res.arrays[a].tobytes() == arrays[f"s{s}_{a}"].tobytes()) for a in RERUN_ARRAYS}
@@ -1759,6 +1770,12 @@ def c3plus_status(rec: dict | None, rerun: dict | None) -> tuple[dict, list[str]
             "record_defects": bad, "applicability": applicability, "summary": rec.get("c3plus_premises_summary")}, bad
 
 
+def _job_exceptions(job: dict, label: str) -> list[dict]:
+    """What the boundaries inside a row job (this process or the replay) recorded instead of raising."""
+    found = [(job.get("op8_rerun") or {}).get("exception"), (((job.get("row") or {}).get("diagnostics") or {}).get("second_path_BE") or {}).get("exception")]
+    return [{**x, "where": f"{label}: {x['where']}"} for x in found if x]
+
+
 def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None, recorded: dict | None = None,
             _seq_cache: dict | None = None) -> dict:
     """One row from a specification: {"kind": "journal", "journal": dir, "s": s} or {"kind": "arrays", "arrays_npz": path,
@@ -1769,7 +1786,7 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
     (``sequence_binding``: predecessors, record chain, structure) as a part of П-а."""
     cfg0 = spec_config(spec)
     guard_config(cfg0)
-    seq_reasons = []
+    seq_reasons, caught = [], []
     if spec["kind"] == "journal":
         s = spec["s"]
         if cfg0.N >= 2 and isinstance(s, int) and s >= 2:  # D-057.1: never computed, whatever the journal says
@@ -1785,15 +1802,18 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
         if s not in st["executed"]:
             return not_executed(rec, s, reason=st["not_executed"].get(s) or _absent_reason(st, s))
         try:
-            seq_reasons = sequence_binding(j, arrays, s, spec.get("rerun_op8", True), _seq_cache)
+            seq_reasons = sequence_binding(j, arrays, s, spec.get("rerun_op8", True), _seq_cache, caught)
         except D1Refused:
             raise
         except Exception as exc:  # recorded, never hidden: the binding is then not established
             seq_reasons = [f"sequence binding not checkable: {type(exc).__name__}: {str(exc)[-300:]}"]
+            caught.append(_caught("sequence binding", exc))
     else:
         guard_row(cfg0, spec["s"])  # arrays / paired: N >= 2, s >= 2 refused before any computation (D-057.1)
         if spec["kind"] == "paired":
             seq_reasons = bcd().paired_chain_binding(spec)
+            caught += [{"where": "chain binding", "type": x.split(": ")[1], "message": x} for x in seq_reasons
+                       if x.startswith("chain binding not checkable: ")]
     try:
         if spec.get("mode") is not None:
             primary = run_child(spec)
@@ -1806,8 +1826,10 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
         res = {**pf().classify_row(inp), "input": inp}  # D-059 (C1): the exact classifier input
         return {"data_status": DATA_STATUS, "spec": {k: v for k, v in spec.items() if k != "arrays_sha256"}, "row": None,
                 "reproduction": None, "premises": {}, "classification": res, "status": res["status"], "contradictions": [],
-                "faults": [], "op8_rerun": None, "c3plus": None, "scope": SCOPE, "exception": f"{type(exc).__name__}: {exc}"}
+                "faults": [], "op8_rerun": None, "c3plus": None, "scope": SCOPE, "exception": f"{type(exc).__name__}: {exc}",
+                "caught_exceptions": [*caught, _caught("row", exc)]}
     row = primary["row"]
+    caught += _job_exceptions(primary, "row")
     pa = list(primary["input_binding_reasons"]) + seq_reasons + row_self_consistency(row)
     rec = None
     if spec["kind"] == "journal":
@@ -1837,6 +1859,7 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
     if reproduce:
         try:
             second = run_child(spec)
+            caught += _job_exceptions(second, "replay process")
             pa += replay_blas_defects(second, "replay process")
             a, b = _comparable(primary), _comparable(second)
             repro = {"bitwise_equal": a == b, "differences": sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k)),
@@ -1869,7 +1892,7 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
     return {"data_status": DATA_STATUS, "spec": {k: v for k, v in spec.items() if k != "arrays_sha256"}, "row": row,
             "reproduction": repro, "premises": premises, "classification": res, "status": res["status"],
             "contradictions": row["contradictions"], "faults": row.get("faults", []), "op8_rerun": primary.get("op8_rerun"),
-            "c3plus": c3, "scope": {**SCOPE, "c3plus_applicability": c3["applicability"]}}
+            "c3plus": c3, "scope": {**SCOPE, "c3plus_applicability": c3["applicability"]}, "caught_exceptions": caught}
 
 
 def _p4_of_record(rec: dict) -> str:

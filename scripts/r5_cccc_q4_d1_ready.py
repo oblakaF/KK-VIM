@@ -487,7 +487,11 @@ def z4_confirm(spec: dict, first: dict, reproduce: bool = True, recorded: dict |
         outcome = "BINDING_MISMATCH"
     else:
         outcome = "CONFIRMED"
+    rep_ = repeat.get("reproduction")
     return {"outcome": outcome, "checks": checks, "binding_differences": diffs, "repeat_status": repeat.get("status"),
+            "repeat": {"exception": repeat.get("exception"), "caught_exceptions": repeat.get("caught_exceptions") or [],
+                       "not_executed_reason": repeat.get("not_executed_reason"),
+                       "reproduction": {k: rep_.get(k) for k in ("bitwise_equal", "error")} if isinstance(rep_, dict) else None},
             "rule": "D-057.3 item 4: status by the tree of protocol 4.2; a binding difference -> П-а not established; a defect -> "
                     "the candidate verdict is not issued until the cause is removed"}
 
