@@ -505,3 +505,58 @@ def test_addendum_is_pending_and_consistent(monkeypatch):
     assert g["authorized"] is False and g["state"] == pl.PENDING_REFREEZE
     with pytest.raises(pl.D1Refused, match="D1_START = BLOCKED"):
         pl.guard_config(pl.op8().TrajectoryConfig(**D1_CFG))
+
+
+# --- the real-run path before the first row: no D1 row is computed (a started unit fails the test) ---------------------------------------
+
+def _authorised_until_prerun(monkeypatch, prerun):
+    monkeypatch.setattr(pl, "campaign_gate", lambda *a, **k: {"authorized": True, "state": "AUTHORIZED", "reasons": []})
+    monkeypatch.setattr(c, "platform_defects", lambda: [])
+    monkeypatch.setattr(c, "prerun_checks", lambda *a, **k: prerun)
+
+    def no_unit(*a, **k):
+        raise AssertionError("a unit of the campaign was started")
+    monkeypatch.setattr(c, "run_unit", no_unit)
+
+
+@pytest.mark.parametrize("mismatch, v_fail", [(["D1-A|r=1|50x50|N1|s1"], False), ([], True)])
+def test_blocked_before_the_run_gives_blocked_campaign(mismatch, v_fail, monkeypatch, dry_out):
+    _authorised_until_prerun(monkeypatch, {"input_hash_mismatch": mismatch, "pr48_controls_all_match": True,
+                                           "ready_controls_all_match": not v_fail, "control_v_fail": v_fail})
+    doc = c.run_campaign(dry_out)
+    assert doc["state"] == "BLOCKED_BEFORE_THE_RUN" and doc["verdict"]["verdict"] == "BLOCKED_CAMPAIGN"
+    assert doc["accounting"]["classified_rows"] == 824 and not (dry_out / "units").exists()
+
+
+def test_controls_mismatch_does_not_start_the_campaign(monkeypatch, dry_out):
+    _authorised_until_prerun(monkeypatch, {"input_hash_mismatch": [], "pr48_controls_all_match": True,
+                                           "ready_controls_all_match": False, "control_v_fail": False})
+    doc = c.run_campaign(dry_out)
+    assert doc["state"].startswith("NOT_STARTED_CONTROLS_MISMATCH") and "verdict" not in doc and not (dry_out / "units").exists()
+
+
+def test_prerun_checks_real_controls_and_hash_mismatch(dry_out):
+    """The real checks: frozen hashes and archive, PR #48 harness, QA-D1-READY controls in a child without the launch signal."""
+    plan, frozen = rd.row_plan(), c.frozen_manifest()
+    res = c.prerun_checks(plan, frozen, dry_out)
+    assert res["pr48_controls_all_match"] is True and res["ready_controls_all_match"] is True and res["control_v_fail"] is False, res
+    if pf._same_hash_platform(frozen["hash_platform"]):  # start sets depend on numpy.sin (OD-12): strict on the recorded platform
+        assert res["input_hash_mismatch"] == []
+        bad = json.loads(json.dumps(frozen))
+        bad["d057"]["input_hashes_s1"][0]["given_in_sha"] = "0" * 64
+        k = bad["d057"]["input_hashes_s1"][0]["key"]
+        assert k in c.prerun_checks(plan, bad, dry_out / "b")["input_hash_mismatch"]
+
+
+def test_dry_run_block_c_keeps_rac_apart(dry_out):
+    plan = [rd._row("C", "r=1", "1", 2, 10, 12, 1.0, 1.0, 1, s, kind) for s in (1, 2) for kind in ("row", "rac")]
+    plan += [rd._row("C", "r=1", "1", 2, 10, 12, 1.0, 1.0, 2, s, kind) for s in (1, 2) for kind in ("row", "rac")]
+    doc = c.run_campaign(dry_out, plan=plan, dry_run=True)
+    assert doc["accounting"]["classified_rows"] == 4 and doc["accounting"]["rac_half_steps_not_campaign_rows"] == 4
+    assert doc["accounting"]["n23_s2plus"] == {"classified_rows": 1, "rac_half_steps": 1, "total": 2}
+    st = {r["key"]: r["status"] for r in doc["rows"]}
+    assert not any("RAC" in k for k in st) and st["D1-C|r=1|10x12|N1|s1"] == st["D1-C|r=1|10x12|N1|s2"] == "PASS"
+    assert st["D1-C|r=1|10x12|N2|s1"] == "PASS" and st["D1-C|r=1|10x12|N2|s2"] == "UNRESOLVED"
+    rac = {x["key"]: x for x in doc["rac"]}
+    assert rac["D1-C-RAC|r=1|10x12|N1|s2"]["chain_record_status"] == "OK"
+    assert "STOPPED_RANK_GUARD_UNCERTIFIED" in rac["D1-C-RAC|r=1|10x12|N2|s2"]["trajectory_reason"]
