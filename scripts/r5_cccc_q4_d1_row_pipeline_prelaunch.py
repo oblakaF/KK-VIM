@@ -76,6 +76,15 @@ are refused, before any binding, loading of arrays, re-run of an OP-8 half-step 
 ``bind_journal``, ``compute_row``, ``run_trajectory_journal``, the internal ``_row`` entry). Data of this tool:
 PRELAUNCH research observation, NOT D1 data, never D1_RESULT.
 
+D-059 (C1): a D1 grid passes ``guard_config`` only through ``campaign_gate`` - the launch signal KKVIM_D1_CAMPAIGN_AUTH
+("D-059:<git blob of the addendum>") is necessary, never sufficient: the gate validates, in every process that calls it (the
+``_row`` replay children included), a clean tracked tree, HEAD integrated into origin/main, the owner's re-freeze act in
+docs/DECISIONS.md naming the git blob of the addendum, the D-058 frozen manifest blob and every tool blob the addendum records.
+Without all of them (today: no re-freeze act, PENDING_REFREEZE) the D1 grids stay refused. N in 1..3, rows N >= 2 at s >= 2 and
+output under docs/ are refused whatever the gate says. ``assemble`` / ``not_executed`` return the exact classifier input
+(``input``); every child job reports the BLAS threads read from the libraries of NumPy and SciPy (``blas_threads_both``), and a
+replay process without 1 / 1 makes П-а not established (D-058.3).
+
 Usage (repository root; small non-D1 configurations only):
     uv run python scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py run --lx 1 --nx 8 --ly 1.25 --ny 10 --s-max 3 --out scratch/pl
 """
@@ -192,11 +201,162 @@ def git_blob_id(path: Path) -> str:
 # guard and encodings
 # ---------------------------------------------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------------------------------------------
+# D-059 (C1): the campaign gate. The launch signal is necessary, never sufficient; the identity of the addendum is established by the
+# owner's re-freeze act (a line of docs/DECISIONS.md naming its git blob), not by a field of the addendum itself (F3).
+# ---------------------------------------------------------------------------------------------------------------------------------
+
+CAMPAIGN_AUTH_ENV = "KKVIM_D1_CAMPAIGN_AUTH"
+CAMPAIGN_DECISION = "D-059"
+CAMPAIGN_ADDENDUM = "docs/results/r5_cccc_q4_d1_campaign/campaign_manifest.json"
+CAMPAIGN_TOOLS = ("scripts/r5_cccc_q4_d1_campaign.py", "scripts/r5_cccc_q4_d1_bc_reference_adapter.py")
+DECISIONS_DOC = "docs/DECISIONS.md"
+FROZEN_MANIFEST = "docs/results/r5_cccc_q4_d1_prelaunch/manifest.json"
+FROZEN_MANIFEST_BLOB = "b3b9e9382a2413af3c90f9ae390af0e10b548a5c"  # D-058 (F1); the candidate before the freeze act: 5a794e6
+INTEGRATION_REF = "refs/remotes/origin/main"
+REFREEZE_ACT = re.compile(r"^D1_CAMPAIGN_REFREEZE_ACT: decision=(D-\d{3}); authorizes=D-059; "
+                          r"addendum=docs/results/r5_cccc_q4_d1_campaign/campaign_manifest\.json; addendum_blob=([0-9a-f]{40}); "
+                          r"state=ACCEPTED\s*$", re.M)
+PENDING_REFREEZE = "PENDING_REFREEZE"
+_GATE_CACHE: dict = {}
+
+
+def _git_out(root: Path, *args: str) -> tuple[int, str]:
+    try:
+        p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return 1, str(exc)
+    return p.returncode, p.stdout
+
+
+def _git_blob(root: Path, path: str) -> str | None:
+    rc, out = _git_out(root, "rev-parse", "--verify", "--quiet", f"HEAD:{path}")
+    return out.strip() if rc == 0 and re.fullmatch(r"[0-9a-f]{40}", out.strip()) else None
+
+
+def _git_bytes(root: Path, spec: str) -> bytes | None:
+    try:
+        p = subprocess.run(["git", "cat-file", "blob", spec], cwd=root, capture_output=True)
+    except OSError:
+        return None
+    return p.stdout if p.returncode == 0 else None
+
+
+def campaign_gate(root: Path | None = None, environ=None) -> dict:
+    """D-059 / F3: is a D1 campaign row authorised in THIS process? Validated from git, never from the signal alone; every failed
+    condition is listed. ``authorized`` is True only when the launch signal names D-059 and the git blob of the addendum, and:
+    the tracked tree is clean; HEAD is contained in origin/main (integration); docs/DECISIONS.md at HEAD has the heading of D-059 and
+    exactly one re-freeze act line (REFREEZE_ACT) of an owner decision whose heading exists, naming the same addendum blob; the
+    addendum at HEAD has that blob, records D-059 and the D-058 frozen manifest blob; the frozen manifest at HEAD has that blob; every
+    tool blob the addendum records (changed, new and unchanged) is the blob at HEAD, and every tool of the D-058 manifest is covered.
+    Cached per process and signal (a replay child validates again in its own process)."""
+    root = Path(root or ROOT)
+    environ = os.environ if environ is None else environ
+    signal = environ.get(CAMPAIGN_AUTH_ENV)
+    key = (str(root.resolve()), signal)
+    if key in _GATE_CACHE:
+        return _GATE_CACHE[key]
+    out = {"authorized": False, "state": "NOT_REQUESTED", "signal": signal, "reasons": []}
+    _GATE_CACHE[key] = out
+    if not signal:
+        out["reasons"].append(f"no launch signal {CAMPAIGN_AUTH_ENV}")
+        return out
+    m = re.fullmatch(r"(D-\d{3}):([0-9a-f]{40})", signal.strip())
+    if m is None or m.group(1) != CAMPAIGN_DECISION:
+        out.update(state="MALFORMED_SIGNAL", reasons=[f"{CAMPAIGN_AUTH_ENV} must be '{CAMPAIGN_DECISION}:<git blob of the addendum>'"])
+        return out
+    want_blob = m.group(2)
+    bad = []
+    rc, st = _git_out(root, "status", "--porcelain", "--untracked-files=no")
+    if rc != 0:
+        out.update(state="NO_GIT", reasons=["git is not available or the root is not a git work tree"])
+        return out
+    if st.strip():
+        bad.append("tracked files differ from HEAD (the tree is not clean)")
+    rc, head = _git_out(root, "rev-parse", "HEAD")
+    head = head.strip()
+    out["head"] = head
+    rc2, _ = _git_out(root, "merge-base", "--is-ancestor", "HEAD", INTEGRATION_REF)
+    if rc != 0 or rc2 != 0:
+        bad.append(f"HEAD {head or '?'} is not contained in {INTEGRATION_REF} (not integrated)")
+    dec = (_git_bytes(root, f"HEAD:{DECISIONS_DOC}") or b"").decode("utf-8", "replace").replace("\r\n", "\n")
+    if f"\n### {CAMPAIGN_DECISION}." not in dec:
+        bad.append(f"{DECISIONS_DOC} at HEAD has no decision {CAMPAIGN_DECISION}")
+    acts = REFREEZE_ACT.findall(dec)
+    state = "INVALID"
+    if not acts:
+        state = PENDING_REFREEZE
+        bad.append(f"no owner re-freeze act ({PENDING_REFREEZE}): {DECISIONS_DOC} has no D1_CAMPAIGN_REFREEZE_ACT line")
+    elif len(acts) != 1:
+        bad.append(f"{len(acts)} re-freeze act lines: exactly one is required")
+    else:
+        act_dec, act_blob = acts[0]
+        out["refreeze_act"] = {"decision": act_dec, "addendum_blob": act_blob}
+        if act_dec == CAMPAIGN_DECISION or f"\n### {act_dec}." not in dec:
+            bad.append(f"the re-freeze act names {act_dec}: a separate recorded owner decision is required")
+        if act_blob != want_blob:
+            bad.append("the launch signal and the re-freeze act name different addendum blobs")
+    add_blob = _git_blob(root, CAMPAIGN_ADDENDUM)
+    if add_blob != want_blob:
+        bad.append(f"the addendum at HEAD is blob {add_blob or 'ABSENT'}, not the approved {want_blob}")
+    man_blob = _git_blob(root, FROZEN_MANIFEST)
+    if man_blob != FROZEN_MANIFEST_BLOB:
+        bad.append(f"the D-058 frozen manifest is blob {man_blob or 'ABSENT'}, not {FROZEN_MANIFEST_BLOB}")
+    try:
+        add = json.loads(_git_bytes(root, f"HEAD:{CAMPAIGN_ADDENDUM}") or b"null")
+        frozen = json.loads(_git_bytes(root, f"HEAD:{FROZEN_MANIFEST}") or b"null")
+        bad += addendum_defects(add, frozen, lambda p: _git_blob(root, p))
+    except (ValueError, TypeError, AttributeError, KeyError) as exc:
+        bad.append(f"the addendum or the frozen manifest is not readable: {type(exc).__name__}: {exc}")
+    if not bad:
+        state = "AUTHORIZED"
+    out.update(authorized=not bad, state=state, reasons=bad)
+    return out
+
+
+def addendum_defects(add: dict, frozen: dict, blob_at_head) -> list[str]:
+    """Consistency of the re-freeze addendum (C4) with the D-058 frozen manifest and the files at HEAD (``blob_at_head(path)``)."""
+    bad = []
+    if not isinstance(add, dict):
+        return ["the addendum is not a JSON object"]
+    if add.get("decision") != CAMPAIGN_DECISION:
+        bad.append(f"the addendum does not record {CAMPAIGN_DECISION}")
+    fb = (add.get("frozen_baseline") or {}).get("d058_frozen_manifest") or {}
+    if fb.get("path") != FROZEN_MANIFEST or fb.get("blob") != FROZEN_MANIFEST_BLOB:
+        bad.append("the addendum does not record the D-058 frozen manifest blob")
+    tools = add.get("tools") or {}
+    recorded = {}
+    for group in ("changed", "new", "unchanged"):
+        for path, e in (tools.get(group) or {}).items():
+            recorded[path] = e["blob"]
+            if blob_at_head(path) != e["blob"]:
+                bad.append(f"tool {path}: blob at HEAD differs from the addendum ({group})")
+    d058 = (frozen.get("d057") or {}).get("tool_blobs") or {}
+    for path, b in d058.items():
+        if path not in recorded:
+            bad.append(f"tool of the D-058 manifest not covered by the addendum: {path}")
+        elif path in (tools.get("changed") or {}):
+            if tools["changed"][path].get("d058_blob") != b:
+                bad.append(f"changed tool {path}: the D-058 blob is not the one of the frozen manifest")
+        elif recorded[path] != b:
+            bad.append(f"unchanged tool {path}: blob differs from the D-058 frozen manifest")
+    if SELF not in tools.get("changed", {}):
+        bad.append(f"the addendum does not record this tool ({SELF})")
+    for path in CAMPAIGN_TOOLS:  # outside the D-058 manifest: the runner (new) and the reference adapter (added unchanged)
+        if path not in recorded:
+            bad.append(f"the addendum does not record the campaign tool {path}")
+    return bad
+
+
 def guard_config(cfg) -> None:
-    """Configuration guard (before any loading or computation): the D1 grids are refused (D1_START = BLOCKED), N must be 1, 2 or 3.
-    Rows of N >= 2 exist only at s = 1 (D-057.1; ``guard_row``)."""
+    """Configuration guard (before any loading or computation): the D1 grids are refused unless ``campaign_gate`` authorises them in
+    this process (D-059; D1_START = BLOCKED until the re-freeze act), N must be 1, 2 or 3 (always). Rows of N >= 2 exist only at
+    s = 1 (D-057.1; ``guard_row``)."""
     if (cfg.nx, cfg.ny) in op8().D1_GRIDS:
-        raise D1Refused(f"({cfg.nx}, {cfg.ny}) is a grid of the D1 sample (protocol 2.2, 2.3, 3); D1_START = BLOCKED")
+        gate = campaign_gate()
+        if not gate["authorized"]:
+            raise D1Refused(f"({cfg.nx}, {cfg.ny}) is a grid of the D1 sample (protocol 2.2, 2.3, 3); D1_START = BLOCKED "
+                            f"(D-059 gate {gate['state']}: {'; '.join(gate['reasons'])})")
     if isinstance(cfg.N, bool) or cfg.N not in (1, 2, 3):
         raise D1Refused(f"N = {cfg.N!r}: N must be 1, 2 or 3")
 
@@ -354,6 +514,7 @@ def assemble(components: dict, premises: dict, recorded: dict | None = None, fau
             inp[k] = c[k]
     res = pf().classify_row(inp)
     res = dict(res)
+    res["input"] = inp  # D-059 (C1): the exact classifier input (``ready.verdict`` / ``campaign_verdict`` classify it again)
     faults = list(faults or [])
     if rejections:
         res["reasons"] = list(res["reasons"]) + [f"REJECTED at the pipeline boundary: {x}" for x in rejections]
@@ -1241,7 +1402,48 @@ def _row_job(spec: dict) -> dict:
                       sp_gamma=spec.get("sp_gamma"), sp_be=bool(spec.get("sp_be", False)))
     rec = rerun.pop("op8_record", None) if isinstance(rerun, dict) else None  # the full OP-8 record of a paired row: not a
     # reproduced value (its float diagnostics are observations); its C-3+ fields are compared through c3plus_record
-    return {"row": row, "input_binding_reasons": reasons, "op8_rerun": rerun, "op8_record": rec, "mode": mode, "pid": os.getpid()}
+    return {"row": row, "input_binding_reasons": reasons, "op8_rerun": rerun, "op8_record": rec, "mode": mode, "pid": os.getpid(),
+            "blas_threads": blas_threads_both()}
+
+
+_OPENBLAS = {"numpy": ("numpy", ("numpy.libs", "numpy/.dylibs"), ("scipy_openblas_get_num_threads64_", "openblas_get_num_threads64_",
+                                                                     "openblas_get_num_threads")),
+             "scipy": ("scipy", ("scipy.libs", "scipy/.dylibs"), ("scipy_openblas_get_num_threads", "openblas_get_num_threads"))}
+
+
+def blas_threads_both() -> dict:
+    """D-059 (C1), D-058.5: the effective thread count read in THIS process from the OpenBLAS library of NumPy and from the separate
+    one of SciPy (wheel layout: <site-packages>/numpy.libs, scipy.libs). None: the library or its function was not found (then the
+    count is not verified, D-058.3)."""
+    out = {}
+    for name, (pkg, dirs, symbols) in _OPENBLAS.items():
+        out[name] = None
+        try:
+            site = Path(importlib.util.find_spec(pkg).origin).resolve().parent.parent
+        except (ImportError, AttributeError, TypeError, ValueError):
+            continue
+        libs = [lib for d in dirs if (site / d).is_dir() for lib in sorted((site / d).glob("*openblas*"))]
+        for lib in libs:
+            try:
+                h = ctypes.CDLL(str(lib))
+            except OSError:
+                continue
+            f = next((getattr(h, s) for s in symbols if hasattr(h, s)), None)
+            if f is not None:
+                f.restype = ctypes.c_int
+                out[name] = int(f())
+                break
+    return out
+
+
+def replay_blas_defects(job: dict, label: str) -> list[str]:
+    """D-058.3 for a child process of the row: the BLAS threads read from both libraries must be 1; missing or unreadable is not
+    verified. Each item is a binding defect of П-а (UNRESOLVED_CERTIFICATE by the unchanged tree of protocol 4.2)."""
+    bt = job.get("blas_threads") if isinstance(job, dict) else None
+    if isinstance(bt, dict) and bt.get("numpy") == 1 and bt.get("scipy") == 1:
+        return []
+    return [f"OD-6 (D-058.3): BLAS threads of the {label} (pid {job.get('pid') if isinstance(job, dict) else None}) read from the "
+            f"libraries: {bt!r}; not 1 or not verified"]
 
 
 def _json_default(o):
@@ -1351,8 +1553,8 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
     except D1Refused:
         raise
     except Exception as exc:  # recorded, never hidden: the row is not executed (protocol 4.2), never PASS
-        res = pf().classify_row({"executed": False, "not_executed": {"reason": f"pipeline exception {type(exc).__name__}: "
-                                                                               f"{str(exc)[-500:]}"}})
+        inp = {"executed": False, "not_executed": {"reason": f"pipeline exception {type(exc).__name__}: {str(exc)[-500:]}"}}
+        res = {**pf().classify_row(inp), "input": inp}  # D-059 (C1): the exact classifier input
         return {"data_status": DATA_STATUS, "spec": {k: v for k, v in spec.items() if k != "arrays_sha256"}, "row": None,
                 "reproduction": None, "premises": {}, "classification": res, "status": res["status"], "contradictions": [],
                 "faults": [], "op8_rerun": None, "c3plus": None, "scope": SCOPE, "exception": f"{type(exc).__name__}: {exc}"}
@@ -1380,10 +1582,13 @@ def analyse(spec: dict, reproduce: bool = True, bound_values: dict | None = None
                       f"({rr.get('status')}; differing: {', '.join(diff) or 'V'})")
     c3, c3_bad = c3plus_status(rec, primary.get("op8_rerun"))
     pa += c3_bad
+    if spec.get("mode") is not None:  # the primary ran in a child process
+        pa += replay_blas_defects(primary, "child process of the row")
     repro = None
     if reproduce:
         try:
             second = run_child(spec)
+            pa += replay_blas_defects(second, "replay process")
             a, b = _comparable(primary), _comparable(second)
             repro = {"bitwise_equal": a == b, "differences": sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k)),
                      "child_pid": second["pid"]}
@@ -1448,7 +1653,8 @@ def not_executed(rec: dict | None, s: int, reason: str | None = None) -> dict:
     if reason is None:
         reason = f"OP-8 half-step s = {s}: absent" if rec is None else f"OP-8 half-step s = {s}: {rec.get('status')}"
     note = " (status of C-3+ premises in the row: owner decision OD-8)" if "C3PLUS" in reason else ""
-    res = pf().classify_row({"executed": False, "not_executed": {"reason": f"{reason}{note}"}})
+    inp = {"executed": False, "not_executed": {"reason": f"{reason}{note}"}}
+    res = {**pf().classify_row(inp), "input": inp}  # D-059 (C1): the exact classifier input
     c3 = None
     if rec is not None:
         prem = rec.get("c3plus_premises")

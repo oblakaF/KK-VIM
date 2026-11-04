@@ -1535,7 +1535,11 @@ def inproc_child(monkeypatch):
     reproduction stays a real recomputation; used where the subject is the journal, not the process boundary (speed)."""
     def child(spec, timeout=1800):
         pl.guard_config(pl.spec_config(spec))
-        return json.loads(json.dumps(pl._row_job(spec), default=pl._json_default))
+        job = json.loads(json.dumps(pl._row_job(spec), default=pl._json_default))
+        # D-059 (C1): a real replay process reports its BLAS threads (1 / 1: it sets them before NumPy is imported); this stand-in
+        # runs in the test process, so it declares them. The D-058.3 rule itself: test_r5_cccc_q4_d1_campaign.py (real child).
+        job["blas_threads"] = {"numpy": 1, "scipy": 1}
+        return job
 
     monkeypatch.setattr(pl, "run_child", child)
 

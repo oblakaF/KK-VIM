@@ -138,6 +138,10 @@ def test_input_hashes_reproducible(manifest, committed):
 PLATFORM_DEPENDENT = "<platform-dependent: start set T_N via numpy.sin (OD-12)>"
 MANIFEST_COMMIT = "711a1c1c44b15c562142d3d6497c0578b47bfa4e"  # the tool version that wrote manifest.json (QA-D1-READY; PR #48: 30463a4)
 _SHA = re.compile(r"[0-9a-f]{64}")
+# D-059 (C1, C2): the two frozen tools changed by the execution gate; in the frozen manifest they keep their D-058 blobs, their new
+# blobs are recorded in docs/results/r5_cccc_q4_d1_campaign/campaign_manifest.json (checked by test_r5_cccc_q4_d1_campaign.py)
+D059_CHANGED = ("scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py", "scripts/r5_cccc_q4_d1_ready.py")
+D059_CHANGED_BLOB = "<changed by D-059: blob in the re-freeze addendum>"
 
 
 def _self_entry(m: dict) -> dict:
@@ -155,6 +159,12 @@ def _strip_platform(m: dict, same_platform: bool) -> dict:
     _self_entry(m)["blob"] = None
     d = m.get("d057") or {}
     d["platform"] = d["freeze"] = None  # the record of the generating process (OD-6), compared in the QA-D1-READY results
+    for c in m["sha_inventory"]["components"]:  # D-059 (C1, C2): blobs of the re-freeze addendum (test_r5_cccc_q4_d1_campaign.py)
+        if c["path"] in D059_CHANGED:
+            c["blob"] = D059_CHANGED_BLOB
+    for t in D059_CHANGED:
+        if t in d.get("tool_blobs", {}):
+            d["tool_blobs"][t] = D059_CHANGED_BLOB
     if not same_platform:
         for x in [r["inputs"] for r in m["mandatory_rows"] if r["s"] == 1] + m["blocked_probes_N23"]["probes"] +                 d.get("input_hashes_s1", []):
             assert _SHA.fullmatch(x["given_in_sha"]), x["given_in_sha"]

@@ -1,6 +1,7 @@
 """R5-V Q4 QA-D1-READY (D-057.1...D-057.6): the integrated PRELAUNCH layer of the D1 campaign (protocol
 docs/R5_CCCC_Q4_D1_PROTOCOL.md 3-6, 8, 9, 12, 13). QA research tool. THIS IS NOT THE D1 CAMPAIGN: D1_START = BLOCKED; the D1 grids are
-refused before any computation of a row (``campaign`` refuses always); no candidate verdict is issued for D1. No import of the
+refused before any computation of a row (``campaign`` refuses unless the gate of D-059 authorises it, below); no candidate verdict is
+issued by this layer alone. No import of the
 working ``kkvim``; no new formula, threshold, tolerance or row status; the classifier of PR #48 (``classify_row``,
 ``campaign_verdict``) and its exact arithmetic are used unchanged.
 
@@ -41,6 +42,11 @@ What this layer adds (D-057.3):
    surrogate inputs fixed before the run, N = 3 at s = 1 (OD-9); no value of a row is recorded.
 
 Data: PRELAUNCH research observation, NOT D1 data, never D1_RESULT.
+
+D-059 (C2): ``campaign`` and its command line start the campaign runner (scripts/r5_cccc_q4_d1_campaign.py) only when the gate of
+the row pipeline (``pl().campaign_gate``: launch signal, re-freeze act, addendum, frozen manifest, tool blobs) authorises it in this
+process; otherwise they refuse as before (D1_START = BLOCKED). ``verdict`` passes the campaign-blocking conditions of protocol 4.4
+(``input_hash_mismatch``, ``control_v_fail``) to the unchanged ``campaign_verdict`` of PR #48 (F4); its precedence is unchanged.
 """
 
 import argparse
@@ -117,9 +123,18 @@ def git_blob_id(path: Path) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
-def campaign(*_a, **_k):
-    """The D1 campaign is not run by this tool (D1_START = BLOCKED; protocol 12, item 6: no owner permission)."""
-    raise D1Blocked("refused: D1_START = BLOCKED (protocol 12; no owner permission for the campaign)")
+CAMPAIGN_TOOL = "scripts/r5_cccc_q4_d1_campaign.py"
+
+
+def campaign(out=None, **kw):
+    """The D1 campaign (D-059): only through the validated gate of the row pipeline; refused before anything is loaded or computed
+    while the gate does not authorise it (D1_START = BLOCKED until the owner's re-freeze act, D-059.1, D-059.4)."""
+    gate = pl().campaign_gate()
+    if not gate["authorized"]:
+        raise D1Blocked(f"refused: D1_START = BLOCKED (protocol 12; D-059 gate {gate['state']}: {'; '.join(gate['reasons'])})")
+    if out is None:
+        raise ValueError("the output directory of the campaign is required")
+    return _load(CAMPAIGN_TOOL, "_d1_campaign").run_campaign(Path(out), **kw)
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -477,7 +492,7 @@ def z4_confirm(spec: dict, first: dict, reproduce: bool = True, recorded: dict |
                     "the candidate verdict is not issued until the cause is removed"}
 
 
-def verdict(rows: list[dict], mandatory: dict) -> dict:
+def verdict(rows: list[dict], mandatory: dict, input_hash_mismatch=(), control_v_fail: bool = False) -> dict:
     """Candidate / campaign verdict after Z-4 (module docstring 5). ``rows``: dicts of PR #48 ``campaign_verdict`` (key, block, N, s,
     mutated, input) plus optional ``z4`` (outcome dict or None), ``tool_defects`` (list) and ``mandatory`` (bool). The classifier
     verdict is computed unchanged; it is NOT issued while a required Z-4 is missing or a defect of a tool was found."""
@@ -499,7 +514,7 @@ def verdict(rows: list[dict], mandatory: dict) -> dict:
             defects.append(f"{r['key']}: Z-4 {z4['outcome']}")
         defects += [f"{r['key']}: {d}" for d in r.get("tool_defects") or []]
         rows2.append({k: v for k, v in r2.items() if k not in ("z4", "tool_defects", "mandatory")})
-    cv = f.campaign_verdict(rows2, mandatory)
+    cv = f.campaign_verdict(rows2, mandatory, input_hash_mismatch=input_hash_mismatch, control_v_fail=control_v_fail)  # F4
     if pending or defects:
         return {"verdict": VERDICT_NOT_ISSUED, "classifier": cv, "z4_pending": sorted(pending), "defects": sorted(set(defects)),
                 "rule": "D-057.3 item 4: the candidate verdict is not issued until Z-4 is done and the cause of a defect is removed"}
@@ -787,14 +802,20 @@ def main(argv=None) -> int:
     r.add_argument("names", nargs="*")
     r.add_argument("--out", type=Path, required=True)
     r.add_argument("--workers", type=int, default=1)
-    sub.add_parser("campaign")
+    cp = sub.add_parser("campaign")
+    cp.add_argument("--out", type=Path, default=None)
     a = ap.parse_args(argv)
     if a.cmd == "_probe_child":
         print(json.dumps(_probe_child(a.name, a.limit, a.flag), default=str))
         return 0
     if a.cmd == "campaign":
-        print("refused: D1_START = BLOCKED (protocol 12)", file=sys.stderr)
-        return 2
+        try:
+            res = campaign(a.out)
+        except D1Blocked as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps({"state": res.get("state"), "verdict": (res.get("verdict") or {}).get("verdict")}, default=str))
+        return 0
     pl().guard_out(a.out)
     doc = run_probes(a.names or list(PROBES), a.out, a.workers)
     with open(Path(a.out) / "resource_probes.json", "w", encoding="utf-8") as f:
