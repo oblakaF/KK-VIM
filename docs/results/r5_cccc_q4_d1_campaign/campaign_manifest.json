@@ -32,7 +32,7 @@
   "changed": {
    "scripts/r5_cccc_q4_d1_row_pipeline_prelaunch.py": {
     "d058_blob": "ee9a36d293882453d7d2909cfc101ba7f468e418",
-    "blob": "12d917de9d329c51a91fe594f47f8da79d645b60"
+    "blob": "545fc28c7468364809c5edf13051459480a19e0d"
    },
    "scripts/r5_cccc_q4_d1_ready.py": {
     "d058_blob": "3dcdce54e582de36fc3cf60c97609bb9026d1c7b",
@@ -41,7 +41,7 @@
   },
   "new": {
    "scripts/r5_cccc_q4_d1_campaign.py": {
-    "blob": "b1f2a407fb1ee8e0154ca4eef6feb764c68e7f2f"
+    "blob": "66abf4aefe35c2cd5647cfb9bb25c4b416df86a0"
    }
   },
   "unchanged": {
@@ -123,6 +123,80 @@
    "scripts/r5_cccc_q4_d1_bc_reference_adapter.py": {
     "blob": "051903de37eeda063c31ed530f278829659644ec",
     "note": "added to the frozen set unchanged (D-059, C3)"
+   }
+  },
+  "reference_package": {
+   "src/kkvim_reference/__init__.py": {
+    "blob": "661a7c6e7771cca2d95485b2a7e3c1affa8e7f1b"
+   },
+   "src/kkvim_reference/_r3_range.py": {
+    "blob": "4d750423825a5ba64068dc80ca7299367fa12bae"
+   },
+   "src/kkvim_reference/levy.py": {
+    "blob": "67aed7f1961b0d6c3fdf6cdcaf11621538b850e9"
+   },
+   "src/kkvim_reference/navier.py": {
+    "blob": "22ad1fdc8e175ce861e4bebd45a51db512e577fb"
+   },
+   "src/kkvim_reference/parseval_recursion.py": {
+    "blob": "4797135bc6c43184f4e4c953a4cd3f0bede53ce6"
+   },
+   "src/kkvim_reference/r4_continuous_sequence.py": {
+    "blob": "14214e74cc3450d26152b7b7b16ff95c0938a8f8"
+   },
+   "src/kkvim_reference/r4_dst_check.py": {
+    "blob": "7b9e85c73fd87b2a21dd4845ce09e86df6c50b0b"
+   },
+   "src/kkvim_reference/r4_energy_reference.py": {
+    "blob": "49bae555131e396aa8d9992056796c3f8e13753d"
+   },
+   "src/kkvim_reference/r4_levy_partial.py": {
+    "blob": "c7f1b58947031b81160303aed857ec474402398d"
+   },
+   "src/kkvim_reference/r4_rank_diagnostics.py": {
+    "blob": "222cecf2f96302a7e03d7f516fd3cf09ef27b1b7"
+   },
+   "src/kkvim_reference/r4_spectral_control.py": {
+    "blob": "35c74de0a9928d687b8598ac2d905fe511c477ff"
+   },
+   "src/kkvim_reference/r5_cccc_bc.py": {
+    "blob": "1303c7d301cd8e5f799813795eb8fe1c5f5ed10c"
+   },
+   "src/kkvim_reference/r5_cccc_d2.py": {
+    "blob": "a910fd291fdafdb1b8a6d568dd7b4bf589409758"
+   },
+   "src/kkvim_reference/r5_cccc_d2_poly.py": {
+    "blob": "d7b229367c68b4e19e1331e3b8564f769623811a"
+   },
+   "src/kkvim_reference/r5_cccc_dst_cert.py": {
+    "blob": "0169b8f43a0efdd1ae949c371301ef1d8087e744"
+   },
+   "src/kkvim_reference/r5_cccc_e2.py": {
+    "blob": "1a51a71cd139306273d2e259acfef4d20cb59752"
+   },
+   "src/kkvim_reference/r5_cccc_energy.py": {
+    "blob": "a2085bebf3d3879d3ccae26118c78f26c5e5a21c"
+   },
+   "src/kkvim_reference/r5_cccc_halfstep.py": {
+    "blob": "619e63926015e6214ee923b27424fca977519113"
+   },
+   "src/kkvim_reference/r5_cccc_hencky.py": {
+    "blob": "f1823ba2bf16633fe9f6c6192f1d80b8753673fa"
+   },
+   "src/kkvim_reference/r5_cccc_q3_e4e6.py": {
+    "blob": "1282a02cf7433ec7fb8d9db6673e1ee944ef345a"
+   },
+   "src/kkvim_reference/r5_cccc_ritz.py": {
+    "blob": "cd746562a8e58f9b34678a084f583aff4133c5f4"
+   },
+   "src/kkvim_reference/r5_cccc_sequence.py": {
+    "blob": "a175b5071bfa376042b62815781adba3701a902b"
+   },
+   "src/kkvim_reference/r5_cccc_tables.py": {
+    "blob": "190b00856d4440aae8fc97efaa71ccf10af8ced4"
+   },
+   "src/kkvim_reference/sine_halfstep.py": {
+    "blob": "258611fdb00363b7dad0172c5111e414ab8f251f"
    }
   }
  },
@@ -219,8 +293,41 @@
    "scipy": 1
   }
  },
+ "environment": {
+  "sys_platform": "win32",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "python": "3.13.15",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "numpy_blas": {
+   "name": "scipy-openblas",
+   "version": "0.3.34.106.0",
+   "openblas configuration": "OpenBLAS 0.3.34.106.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=24"
+  },
+  "scipy_blas": {
+   "name": "scipy-openblas",
+   "version": "0.3.31.dev",
+   "openblas configuration": "OpenBLAS 0.3.31.dev DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=24"
+  },
+  "numpy_blas_library_sha256": "ed4f167a5330424524f45258e7ca2c8d7f03c0cba1f30ee4985553ac1f88ecf8",
+  "scipy_blas_library_sha256": "197ee2fc9b4d071f7e048078cac741151a6585d871061cf5f88c0c73e31963a5",
+  "total_ram_bytes": 34033348608,
+  "node_sha256": "ef54c24e82938385a1909c9fa75989267032144ef1a4859ebc5acf7709ec603b",
+  "blas_threads": {
+   "numpy": 1,
+   "scipy": 1
+  },
+  "thread_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  }
+ },
+ "trust_assumptions": "The gate and the runtime checks read the local repository and the running interpreter. They detect accidents, substitutions (PYTHONPATH, wrong package path, assume-unchanged, skip-worktree, replaced files) and stale state; they are not a security boundary against someone who can rewrite the repository, its refs or the interpreter. A pyc file next to approved source is trusted through Python's own source check.",
  "controls": {
-  "results_sha256": "b1359319e66a16cca371e950757a0c43609c0f3904094906ceb9e7b4168c2da8",
+  "results_sha256": "a5f5d84ec2bf694e67fe14ee2186eacf5ce6c2b72a91916e8aa568b9dc3238f1",
   "all_match": true,
   "summary": {
    "rank_guard": {
@@ -329,11 +436,26 @@
     {
      "row": "D1-A|r=4|321x1279|N1|s2",
      "status": "PASS",
-     "row_job_seconds": 221.0,
-     "row_job_peak_bytes": 547459072,
-     "checks_job_seconds": 23.79,
-     "checks_job_peak_bytes": 931250176,
-     "longest_factorization_s": 0.045,
+     "row_job_seconds": 213.44,
+     "row_job_peak_bytes": 551514112,
+     "checks_job_seconds": 22.58,
+     "checks_job_peak_bytes": 931209216,
+     "row_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "checks_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "row_job_os_high_water": {
+      "total_processes": 4,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 570523648,
+      "peak_job_commit_bytes": 678752256
+     },
+     "checks_job_os_high_water": {
+      "total_processes": 2,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 951132160,
+      "peak_job_commit_bytes": 952041472
+     },
+     "row_job_max_concurrent_ws_bytes": 645947392,
+     "longest_factorization_s": 0.032,
      "checks": {
       "SP-LARGE": "PASS",
       "SP-C": "PASS",
@@ -345,11 +467,26 @@
     {
      "row": "D1-A|r=4|321x1279|N1|s3",
      "status": "PASS",
-     "row_job_seconds": 216.07,
-     "row_job_peak_bytes": 559030272,
-     "checks_job_seconds": 25.48,
-     "checks_job_peak_bytes": 929484800,
-     "longest_factorization_s": 0.153,
+     "row_job_seconds": 216.96,
+     "row_job_peak_bytes": 561086464,
+     "checks_job_seconds": 22.65,
+     "checks_job_peak_bytes": 931352576,
+     "row_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "checks_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "row_job_os_high_water": {
+      "total_processes": 4,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 579825664,
+      "peak_job_commit_bytes": 690892800
+     },
+     "checks_job_os_high_water": {
+      "total_processes": 2,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 951001088,
+      "peak_job_commit_bytes": 951914496
+     },
+     "row_job_max_concurrent_ws_bytes": 623792128,
+     "longest_factorization_s": 0.129,
      "checks": {
       "SP-LARGE": "PASS",
       "SP-C": "PASS",
@@ -361,11 +498,26 @@
     {
      "row": "D1-A|r=5/2|101x40|N1|s2",
      "status": "PASS",
-     "row_job_seconds": 3.96,
-     "row_job_peak_bytes": 72138752,
-     "checks_job_seconds": 1.34,
-     "checks_job_peak_bytes": 190906368,
-     "longest_factorization_s": 0.139,
+     "row_job_seconds": 3.53,
+     "row_job_peak_bytes": 90927104,
+     "checks_job_seconds": 1.35,
+     "checks_job_peak_bytes": 194187264,
+     "row_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "checks_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "row_job_os_high_water": {
+      "total_processes": 4,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 108662784,
+      "peak_job_commit_bytes": 198037504
+     },
+     "checks_job_os_high_water": {
+      "total_processes": 2,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 244985856,
+      "peak_job_commit_bytes": 245899264
+     },
+     "row_job_max_concurrent_ws_bytes": 150204416,
+     "longest_factorization_s": 0.142,
      "checks": {
       "SP-RH": "PASS",
       "SP-C": "PASS",
@@ -376,11 +528,26 @@
     {
      "row": "D1-A|r=5/2|101x40|N1|s3",
      "status": "PASS",
-     "row_job_seconds": 3.76,
-     "row_job_peak_bytes": 72155136,
-     "checks_job_seconds": 1.34,
-     "checks_job_peak_bytes": 182059008,
-     "longest_factorization_s": 0.091,
+     "row_job_seconds": 3.51,
+     "row_job_peak_bytes": 92168192,
+     "checks_job_seconds": 1.13,
+     "checks_job_peak_bytes": 191361024,
+     "row_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "checks_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "row_job_os_high_water": {
+      "total_processes": 4,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 109764608,
+      "peak_job_commit_bytes": 199241728
+     },
+     "checks_job_os_high_water": {
+      "total_processes": 2,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 242728960,
+      "peak_job_commit_bytes": 243646464
+     },
+     "row_job_max_concurrent_ws_bytes": 151805952,
+     "longest_factorization_s": 0.086,
      "checks": {
       "SP-RH": "PASS",
       "SP-C": "PASS",
@@ -391,11 +558,26 @@
     {
      "row": "D1-B|r=4|161x639|N3|s1",
      "status": "PASS",
-     "row_job_seconds": 51.1,
-     "row_job_peak_bytes": 182337536,
-     "checks_job_seconds": 4.39,
-     "checks_job_peak_bytes": 159825920,
-     "longest_factorization_s": 0.791,
+     "row_job_seconds": 47.68,
+     "row_job_peak_bytes": 183013376,
+     "checks_job_seconds": 4.85,
+     "checks_job_peak_bytes": 161591296,
+     "row_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "checks_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "row_job_os_high_water": {
+      "total_processes": 4,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 200544256,
+      "peak_job_commit_bytes": 302514176
+     },
+     "checks_job_os_high_water": {
+      "total_processes": 2,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 180105216,
+      "peak_job_commit_bytes": 181022720
+     },
+     "row_job_max_concurrent_ws_bytes": 245149696,
+     "longest_factorization_s": 0.891,
      "checks": {
       "BC-1/TS-1": "RESOLVED"
      }
@@ -403,11 +585,26 @@
     {
      "row": "D1-S|r=4|401x1601|N1|s3",
      "status": "PASS",
-     "row_job_seconds": 353.22,
-     "row_job_peak_bytes": 832565248,
-     "checks_job_seconds": 3.85,
-     "checks_job_peak_bytes": 149934080,
-     "longest_factorization_s": 0.178,
+     "row_job_seconds": 340.7,
+     "row_job_peak_bytes": 834289664,
+     "checks_job_seconds": 2.43,
+     "checks_job_peak_bytes": 151646208,
+     "row_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "checks_job_memory_evidence": "SAMPLED_AND_OS_BOUNDED",
+     "row_job_os_high_water": {
+      "total_processes": 4,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 854237184,
+      "peak_job_commit_bytes": 963674112
+     },
+     "checks_job_os_high_water": {
+      "total_processes": 2,
+      "active_processes": 0,
+      "peak_process_commit_bytes": 167751680,
+      "peak_job_commit_bytes": 168660992
+     },
+     "row_job_max_concurrent_ws_bytes": 878706688,
+     "longest_factorization_s": 0.2,
      "checks": {
       "BC-1/TS-1": "RESOLVED"
      }
@@ -419,6 +616,7 @@
      "pass": 2,
      "not_established": [],
      "contradictions": [],
+     "selected_without_a_row": [],
      "complete": true
     },
     "SP-LARGE": {
@@ -426,6 +624,7 @@
      "pass": 2,
      "not_established": [],
      "contradictions": [],
+     "selected_without_a_row": [],
      "complete": true
     },
     "SP-C": {
@@ -433,6 +632,7 @@
      "pass": 4,
      "not_established": [],
      "contradictions": [],
+     "selected_without_a_row": [],
      "complete": true
     },
     "SP-BR": {
@@ -440,6 +640,7 @@
      "pass": 4,
      "not_established": [],
      "contradictions": [],
+     "selected_without_a_row": [],
      "complete": true
     },
     "SP-OP": {
@@ -447,6 +648,23 @@
      "pass": 2,
      "not_established": [],
      "contradictions": [],
+     "selected_without_a_row": [],
+     "complete": true
+    },
+    "SP-GAMMA": {
+     "selected": 0,
+     "pass": 0,
+     "not_established": [],
+     "contradictions": [],
+     "selected_without_a_row": [],
+     "complete": true
+    },
+    "SP-BE": {
+     "selected": 0,
+     "pass": 0,
+     "not_established": [],
+     "contradictions": [],
+     "selected_without_a_row": [],
      "complete": true
     },
     "BC-1/TS-1": {
@@ -457,7 +675,8 @@
     }
    }
   },
-  "runtime_enforcement": "monitor_job: peak of every process of the job tree against 50 % RAM, every factorization stage against 30 min, from the parent; limits unchanged (D-057.4)"
+  "runtime_enforcement": "monitor_job: peak of every process of the job tree against 50 % RAM, every factorization stage against 30 min, from the parent; limits unchanged (D-057.4)",
+  "memory_evidence": "working sets sampled while a process lives; OS commit high-water marks of the job object beside them; compliance not claimed beyond this (memory_evidence, resource_evidence); the sum over the tree recorded, not limited"
  },
  "second_paths": {
   "SP-RH": "hs.solve_hessian, hs.error_bound, hs.certify_lambda_min",
@@ -476,6 +695,8 @@
   "BC-1 / TS-1 outside SP-BR: reading of protocol 5.1 and D-057.3 item 1, to be confirmed by the Reviewer",
   "SP-RH on (14, 6), N = 3, s = 1: the protocol names the grid, the frozen rule predates D-057.1",
   "D-058.5 retained: B_E coverage partial (N-4, N-6); SP-OP measured on one probe; limited reviewer independence",
-  "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary"
+  "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary",
+  "memory limit per process (D-057.4); protocol 8 says RAM of the machine: tree sum recorded only (owner decision I3)",
+  "a real run needs the remote at start and before the verdict (git ls-remote); unreachable refuses or withholds the verdict"
  ]
 }
