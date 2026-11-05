@@ -105,6 +105,88 @@ def test_n1_keeps_the_stopping_options_and_statuses_of_r3(tmp_path):
     assert document(out)["status"] == MAX_HALF_STEPS and document(out)["execution"] == "STOPPED"
 
 
+GRID_WARNING = "не удовлетворяет необходимым условиям квалификационной сетки"
+
+
+def grid_warnings(text):
+    return [line for line in text.splitlines() if GRID_WARNING in line]
+
+
+def both_commands(tmp_path, capsys, extra=(), **changes):
+    """The run command and run-ssss --N 1 on one plate: exit code and printed lines of each."""
+    old, new = tmp_path / "run", tmp_path / "ssss"
+    code_run = cli.main(["run", *plate(**changes), "--out", str(old), *extra])
+    printed_run = capsys.readouterr().out
+    code_ssss = cli.main(command(new, 1, *extra, **changes))
+    printed_ssss = capsys.readouterr().out
+    return old, new, (code_run, printed_run), (code_ssss, printed_ssss)
+
+
+@pytest.mark.parametrize("nx, ny, status, extra", [(30, 30, CONVERGED, ()), (16, 16, CONVERGED, ()), (24, 30, CONVERGED, ()),
+                                                   (30, 30, MAX_HALF_STEPS, ("--s-max", "3"))])
+def test_n1_prints_the_grid_warning_of_the_run_command(tmp_path, capsys, nx, ny, status, extra):
+    old, new, (code_run, printed_run), (code_ssss, printed_ssss) = both_commands(tmp_path, capsys, extra, nx=nx, ny=ny)
+    assert code_ssss == code_run
+    assert grid_warnings(printed_ssss) == grid_warnings(printed_run)
+    assert grid_warnings(printed_ssss) == [
+        f"Сетка {nx}×{ny} не удовлетворяет необходимым условиям квалификационной сетки "
+        "R3_NUMERICAL_SPEC.md 6.1 (min ≥ 20, max ≤ 640, кратность 4): расчёт диагностический."]
+    assert document(new)["status"] == document(old)["status"] == status  # the warning does not change the status
+    assert f"Статус: {status}" in printed_ssss
+
+
+def test_n1_prints_the_grid_warning_of_the_run_command_after_an_input_error(tmp_path, capsys):
+    _, new, (code_run, printed_run), (code_ssss, printed_ssss) = both_commands(tmp_path, capsys, nu=1.5, nx=30, ny=30)
+    assert code_ssss == code_run == cli.EXIT_SOLVER_ERROR
+    assert document(new)["status"] == ERROR_INPUT
+    assert grid_warnings(printed_ssss) == grid_warnings(printed_run) != []
+
+
+def test_n1_on_a_grid_with_the_necessary_conditions_prints_no_grid_warning(tmp_path, capsys):
+    _, new, (code_run, printed_run), (code_ssss, printed_ssss) = both_commands(tmp_path, capsys, nx=24, ny=24)
+    assert code_ssss == code_run == cli.EXIT_CONVERGED
+    assert grid_warnings(printed_run) == grid_warnings(printed_ssss) == []
+    assert not [value for key, value in document(new)["applicability"]["necessary_grid_conditions_6_1"].items()
+                if key != "note" and value is not True]
+
+
+@pytest.mark.parametrize("nx, ny", [(30, 30), (24, 24)])
+def test_the_grid_warning_changes_no_saved_value(tmp_path, capsys, nx, ny):
+    old, new, *_ = both_commands(tmp_path, capsys, nx=nx, ny=ny)
+    assert names(new) == ["field.csv", "history.csv", "result.json"]
+    assert (new / "field.csv").read_bytes() == (old / "field.csv").read_bytes()
+    assert (new / "history.csv").read_bytes() == (old / "history.csv").read_bytes()
+    r3 = document(old)
+    result = document(new)
+    for key in set(r3) - {"schema", "program"}:
+        assert result[key] == r3[key]
+    assert result["status"] == CONVERGED and result["converged"] is True
+    assert result["applicability"]["necessary_grid_conditions_6_1"] == cli.grid_conditions(nx, ny)
+
+
+def test_summary_writes_nothing_and_reads_the_grid_conditions_from_the_document(tmp_path, capsys):
+    out = tmp_path / "out"
+    assert cli.main(command(out, 1, nx=30, ny=30)) == cli.EXIT_CONVERGED
+    capsys.readouterr()
+    before = {path.name: path.read_bytes() for path in out.iterdir()}
+    args = cli.build_parser().parse_args(command(out, 1, "--overwrite", nx=30, ny=30))
+    texts = {cli.RESULT: before[cli.RESULT].decode("utf-8")}
+    cli_ssss.summary(args, CONVERGED, texts, sorted(before))
+    assert grid_warnings(capsys.readouterr().out) != []
+    conditions = json.loads(texts[cli.RESULT])["applicability"]["necessary_grid_conditions_6_1"]
+    texts[cli.RESULT] = json.dumps({**json.loads(texts[cli.RESULT]), "applicability": {
+        "necessary_grid_conditions_6_1": {**{key: True for key in conditions}, "note": conditions["note"]}}})
+    cli_ssss.summary(args, CONVERGED, texts, sorted(before))
+    assert grid_warnings(capsys.readouterr().out) == []
+    assert {path.name: path.read_bytes() for path in out.iterdir()} == before
+
+
+@pytest.mark.parametrize("N, half_steps, nx", [(2, 2, 30), (3, 2, 30), (4, 2, 40), (6, 2, 40)])
+def test_n2_to_n6_have_no_grid_warning_of_r3(tmp_path, capsys, N, half_steps, nx):
+    assert cli.main(command(tmp_path / "out", N, half_steps=half_steps, nx=nx, ny=nx)) == cli.EXIT_CONVERGED
+    assert grid_warnings(capsys.readouterr().out) == []
+
+
 # --- N = 2-3: run_coupled -------------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("N, changes", [(2, {}), (3, {}), (2, {"b": 2.0, "nx": 40, "ny": 80}),

@@ -810,3 +810,8 @@ def summary(args, status, texts, paths) -> None:
     cli._say(stream, f"Результаты: {args.out.resolve()}")
     for name in paths:
         cli._say(stream, f"  {name}")
+    if args.N == 1:  # the line of the run command; the status stays that of the solver
+        conditions = document["applicability"]["necessary_grid_conditions_6_1"]
+        if not all(value for key, value in conditions.items() if key != "note"):
+            cli._say(stream, f"Сетка {args.nx}×{args.ny} не удовлетворяет необходимым условиям квалификационной сетки "
+                             "R3_NUMERICAL_SPEC.md 6.1 (min ≥ 20, max ≤ 640, кратность 4): расчёт диагностический.")
