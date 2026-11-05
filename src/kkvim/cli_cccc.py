@@ -8,9 +8,10 @@ RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED: "completed" means only that the giv
 Files: result.json; history.csv; factors.csv (all factors of every half-step, for the QA checks of Policy 10.2); field_research.csv after the
 requested half-steps, field_diagnostic.csv (the field of the last completed half-step) after a stop; no field without a half-step.
 
-Saving is ``kkvim.cli.write_results`` (Policy 11), so a failure or a killed process while the files are moved in place may leave files of two
-runs. A refused input, an ERROR_* run or a run without a half-step does not touch earlier results: the status and the reason go to stderr. If
-the folder has no earlier results, such a run writes its result.json. factors.csv counts as a result file of this command.
+Saving is ``kkvim.cli_ssss.replace_results`` (D-062, in place of ``cli.write_results`` of Policy 11), with its guarantees and its limits: a failure
+or Ctrl+C restores the earlier files; after a killed process the next run refuses until the folder is dealt with; two runs saving into one folder
+at the same moment are not guarded against each other. A refused input, an ERROR_* run or a run without a half-step does not touch earlier
+results: the status and the reason go to stderr. If the folder has no earlier results, such a run writes its result.json.
 
 Exit codes (Policy 6): 0 - the requested half-steps were done (not convergence); 2 - outside the domain or a refused command line, nothing
 computed; 3 - ERROR_*; 4, 5 - as in ``kkvim.cli``; 6 - a guard or a protective stop; 130 - interrupted by the user.
@@ -24,10 +25,9 @@ import numpy as np
 
 import kkvim.cccc_n1 as cn
 import kkvim.cli as cli
-from kkvim.cli_ssss import EXIT_INTERRUPTED, software_provenance
+from kkvim.cli_ssss import _interrupted, _kept, _say_kept, check_no_interrupted_save, replace_results, software_provenance
 
 SCHEMA = "kkvim.cli.cccc_n1/1"
-FACTORS = "factors.csv"
 EXIT_PROTECTIVE_STOP = 6
 EXIT_CODES = {
     cn.COMPLETED_FIXED_HALF_STEPS: cli.EXIT_CONVERGED, cn.NOT_EXECUTED_OUTSIDE_DOMAIN: cli.EXIT_USAGE, cn.ERROR_INPUT: cli.EXIT_SOLVER_ERROR,
@@ -166,7 +166,7 @@ def result_texts(args, argv, result: cn.CCCCN1Result) -> dict:
         field_name = cli.FIELD_RESEARCH if result.status == cn.COMPLETED_FIXED_HALF_STEPS else cli.FIELD_DIAGNOSTIC
         texts[field_name] = _field_csv(result, field_name == cli.FIELD_DIAGNOSTIC)
     if result.steps:
-        texts[FACTORS] = _factors_csv(result)
+        texts[cli.FACTORS] = _factors_csv(result)
         texts[cli.HISTORY] = _history_csv(result)
     document = {
         "schema": SCHEMA,
@@ -200,7 +200,7 @@ def result_texts(args, argv, result: cn.CCCCN1Result) -> dict:
             "columns": [{"name": name, "unit": unit, "meaning": meaning} for name, unit, meaning in HISTORY_COLUMNS],
             "units_note": "* — единицы зависят от нормировки множителей (И-4); значения пишутся без пересчёта.",
         },
-        "factors": None if not result.steps else {"file": FACTORS, "note": "все множители каждого полушага; значения через repr"},
+        "factors": None if not result.steps else {"file": cli.FACTORS, "note": "все множители каждого полушага; значения через repr"},
     }
     texts[cli.RESULT] = json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     return texts
@@ -208,25 +208,10 @@ def result_texts(args, argv, result: cn.CCCCN1Result) -> dict:
 
 # --- the command -------------------------------------------------------------------------------------------------------------------
 
-def _kept(out: Path) -> list:
-    return [name for name in (*cli.OUTPUTS, FACTORS) if (out / name).exists()]
-
-
-def _check_folder(out: Path, overwrite: bool) -> None:
-    cli.check_output_folder(out, overwrite)
-    if (out / FACTORS).exists() and not overwrite:
-        raise cli.OutputExistsError(f"в {out} уже есть файл результатов {FACTORS}. Укажите другую папку или --overwrite")
-
-
-def _say_kept(out: Path) -> None:
-    kept = _kept(out)
-    if kept:
-        cli._say(sys.stderr, f"Прежние файлы результатов в {out} не изменены: {', '.join(kept)}.")
-
-
 def main(args, argv) -> int:
     try:
-        _check_folder(args.out, args.overwrite)
+        check_no_interrupted_save(args.out)
+        cli.check_output_folder(args.out, args.overwrite)
     except cli.OutputExistsError as exc:
         cli._say(sys.stderr, f"Расчёт не выполнен: {exc}")
         return cli.EXIT_USAGE
@@ -239,9 +224,7 @@ def main(args, argv) -> int:
         result = cn.run_cccc_n1_physical(args.a, args.b, args.t, args.E, args.nu, args.q, args.nx, args.ny, args.half_steps)
         texts = result_texts(args, argv, result)
     except KeyboardInterrupt:
-        cli._say(sys.stderr, "Расчёт прерван пользователем; результаты этого расчёта не сохранены.")
-        _say_kept(args.out)
-        return EXIT_INTERRUPTED
+        return _interrupted(args.out)
     except Exception:  # noqa: BLE001 - reported as an internal error, never as a status of the solver
         code = cli._internal_error("расчёт или подготовка результатов")
         _say_kept(args.out)
@@ -254,8 +237,12 @@ def main(args, argv) -> int:
         _say_kept(args.out)
         return code
     try:
-        _check_folder(args.out, args.overwrite)  # another run may have written here during this one
-        paths = cli.write_results(args.out, texts, args.overwrite)
+        if not args.overwrite:  # another run may have written here during this one
+            cli.check_output_folder(args.out, False)
+        check_no_interrupted_save(args.out)  # a save may have been killed here during this run
+        paths = replace_results(args.out, texts)
+    except KeyboardInterrupt:
+        return _interrupted(args.out)
     except cli.OutputExistsError as exc:
         cli._say(sys.stderr, f"Результаты не сохранены: {exc}")
         return cli.EXIT_USAGE
@@ -264,7 +251,9 @@ def main(args, argv) -> int:
             cli._say(sys.stderr, line)
         return cli.EXIT_OUTPUT_ERROR
     except Exception:  # noqa: BLE001
-        return cli._internal_error("запись результатов")
+        code = cli._internal_error("запись результатов")
+        _say_kept(args.out)
+        return code
     _summary(args, result, texts, paths)
     return code
 

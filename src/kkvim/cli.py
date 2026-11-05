@@ -43,7 +43,8 @@ from kkvim.rectangle_run import CENTRE, halfstep_report, run_rectangle_physical
 SCHEMA = "kkvim.cli.r3/1"
 RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC = "result.json", "history.csv", "field.csv", "field_diagnostic.csv"
 FIELD_RESEARCH = "field_research.csv"  # run-ssss, N >= 2: a research field, never an accepted solution
-OUTPUTS = (RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC, FIELD_RESEARCH)
+FACTORS = "factors.csv"  # run-cccc-n1: the factors of every half-step
+OUTPUTS = (RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC, FIELD_RESEARCH, FACTORS)
 CALLS = ("kkvim.rectangle_run.run_rectangle_physical", "kkvim.rectangle_run.halfstep_report")
 
 # exit codes

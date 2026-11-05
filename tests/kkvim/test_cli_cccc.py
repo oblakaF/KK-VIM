@@ -4,6 +4,7 @@ import csv
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -11,7 +12,7 @@ import numpy as np
 import pytest
 
 import kkvim.cccc_n1 as cn
-from kkvim import cli, cli_cccc
+from kkvim import cli, cli_cccc, cli_ssss
 
 PLATE = {"a": 1.0, "b": 1.25, "t": 0.01, "E": 2.1e11, "nu": 0.3, "q": 1000.0, "nx": 16, "ny": 20}
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -294,6 +295,142 @@ def test_an_interrupt_keeps_earlier_results(earlier, monkeypatch, capsys):
     capsys.readouterr()
     assert cli.main(command(earlier, "--overwrite")) == 130
     assert snapshot(earlier) == before and "прерван" in capsys.readouterr().err
+
+
+# --- saving through the transaction of run-ssss (D-062) ---------------------------------------------------------------------------
+
+STAGE = cli_ssss.STAGE_PREFIX + "*"
+SSSS_COMMANDS = [["run"], ["run-ssss", "--N", "1"], ["run-ssss", "--N", "3", "--half-steps", "2"]]
+KILLED_AT = """
+import os, sys, time
+from kkvim import cli
+real, count = os.replace, [0]
+def replace(*args, **kwargs):
+    count[0] += 1
+    if count[0] == int(sys.argv[1]):
+        print("STOPPED", flush=True)
+        time.sleep(3600)
+    return real(*args, **kwargs)
+os.replace = replace
+sys.exit(cli.main(sys.argv[2:]))
+"""
+
+
+def plate_args(**changes):
+    args = []
+    for name, value in {**PLATE, **changes}.items():
+        args += [f"--{name}", repr(value) if isinstance(value, float) else str(value)]
+    return args
+
+
+def failing_at(call, error):
+    """os.replace raising ``error`` at its ``call``-th use; the real one otherwise."""
+    real, count = os.replace, [0]
+
+    def replace(*args, **kwargs):
+        count[0] += 1
+        if count[0] == call:
+            raise error
+        return real(*args, **kwargs)
+
+    return replace
+
+
+def test_a_save_replaces_the_whole_set_through_the_transaction(earlier, monkeypatch):
+    monkeypatch.setattr(cli, "write_results", lambda *a: pytest.fail("the non-atomic save was used"))
+    assert cli.main(command(earlier, "--overwrite", half_steps=3)) == cli.EXIT_CONVERGED
+    assert names(earlier) == ["factors.csv", "field_research.csv", "history.csv", "other.txt", "result.json"]
+    assert document(earlier)["half_steps_completed"] == 3 and len(table(earlier / "history.csv")) == 3
+    assert (earlier / "other.txt").read_text(encoding="utf-8") == "kept"
+
+
+@pytest.mark.parametrize("call", [1, 2, 3, 4])
+@pytest.mark.parametrize("error, code, said", [(PermissionError("locked"), cli.EXIT_OUTPUT_ERROR, "locked"), (KeyboardInterrupt(), 130, "прерван")])
+def test_an_interrupted_replacement_restores_the_earlier_set(earlier, monkeypatch, capsys, call, error, code, said):
+    before = snapshot(earlier)
+    with monkeypatch.context() as patched:
+        patched.setattr(os, "replace", failing_at(call, error))
+        capsys.readouterr()
+        assert cli.main(command(earlier, "--overwrite", half_steps=3)) == code
+    err = capsys.readouterr().err
+    assert snapshot(earlier) == before and said in err and "не изменены" in err and "Traceback" not in err
+    assert cli.main(command(earlier, "--overwrite", half_steps=3)) == cli.EXIT_CONVERGED
+
+
+def test_ctrl_c_while_the_new_files_are_written_is_exit_130(earlier, monkeypatch, capsys):
+    def interrupt(*args):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli_ssss, "_write_file", interrupt)
+    before = snapshot(earlier)
+    assert cli.main(command(earlier, "--overwrite", half_steps=3)) == 130
+    assert snapshot(earlier) == before and "прерван" in capsys.readouterr().err
+
+
+def test_a_killed_replacement_is_refused_until_dealt_with_and_the_earlier_set_comes_back(earlier, monkeypatch, capsys):
+    before = snapshot(earlier)
+    process = subprocess.Popen([sys.executable, "-c", KILLED_AT, "2", *command(earlier, "--overwrite", half_steps=3)],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    line = process.stdout.readline()
+    process.kill()
+    process.communicate()
+    assert line.strip() == "STOPPED", line
+    assert not (earlier / "result.json").exists()  # a mixed set never looks like a result
+    stage = next(earlier.glob(STAGE))
+    assert (stage / cli_ssss.REPLACING_MARK).exists() and (stage / "old" / "factors.csv").read_bytes() == before["factors.csv"]
+    monkeypatch.setattr(cn, "run_cccc_n1_physical", lambda *a: pytest.fail("computed"))
+    for extra in (("--overwrite",), ()):
+        capsys.readouterr()
+        assert cli.main(command(earlier, *extra, half_steps=2)) == cli.EXIT_USAGE
+        err = capsys.readouterr().err
+        assert stage.name in err and "незавершённая замена" in err and "factors.csv" in err
+    for name in cli.OUTPUTS:  # the instruction printed
+        (earlier / name).unlink(missing_ok=True)
+    for path in (stage / "old").iterdir():
+        os.replace(path, earlier / path.name)
+    shutil.rmtree(stage)
+    assert snapshot(earlier) == before
+
+
+@pytest.mark.parametrize("new", SSSS_COMMANDS)
+def test_stale_factors_do_not_stay_next_to_new_ssss_results(earlier, new):
+    assert cli.main([*new, *plate_args(), "--out", str(earlier), "--overwrite"]) == cli.EXIT_CONVERGED
+    assert not (earlier / "factors.csv").exists() and (earlier / "other.txt").exists()
+    assert document(earlier).get("schema") != cli_cccc.SCHEMA
+
+
+@pytest.mark.parametrize("new", SSSS_COMMANDS)
+def test_an_existing_factors_file_protects_the_folder_from_every_command(tmp_path, capsys, new):
+    (tmp_path / "factors.csv").write_text("x", encoding="utf-8")
+    assert cli.main([*new, *plate_args(), "--out", str(tmp_path)]) == cli.EXIT_USAGE
+    assert snapshot(tmp_path) == {"factors.csv": b"x"} and "factors.csv" in capsys.readouterr().err
+
+
+def test_a_failed_ssss_replacement_gives_the_factors_back(earlier, monkeypatch):
+    before = snapshot(earlier)
+    monkeypatch.setattr(os, "replace", failing_at(1, KeyboardInterrupt()))
+    assert cli.main(["run-ssss", "--N", "1", *plate_args(), "--out", str(earlier), "--overwrite"]) == 130
+    assert snapshot(earlier) == before
+
+
+def test_new_results_replace_the_field_of_an_ssss_run(tmp_path):
+    assert cli.main(["run-ssss", "--N", "1", *plate_args(), "--out", str(tmp_path)]) == cli.EXIT_CONVERGED
+    assert cli.main(command(tmp_path, "--overwrite")) == cli.EXIT_CONVERGED
+    assert names(tmp_path) == ["factors.csv", "field_research.csv", "history.csv", "result.json"]
+
+
+def test_the_numbers_and_statuses_of_the_first_implementation_are_kept(tmp_path):
+    """The run reported at d68cb8d. The tolerance only absorbs the summation order of another BLAS (D-025); it is no criterion of the method."""
+    assert cli.main(command(tmp_path, half_steps=8, b=1.0, nx=32, ny=32)) == cli.EXIT_CONVERGED
+    d = document(tmp_path)
+    assert d["status"] == cn.COMPLETED_FIXED_HALF_STEPS and d["mode"] == "FIXED_HALF_STEPS_RESEARCH"
+    assert d["application_status"] == "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    assert d["premises_c3plus"]["status_by_half_steps"] == [cn.PREMISES_ESTABLISHED]
+    assert d["numerical_policy"]["eta_max_C"]["value"] == 100 * 2.0**-53
+    assert d["field"]["alpha_centre"] == pytest.approx(0.0012741269462195456, rel=1e-12)
+    w = direct(half_steps=8, b=1.0, nx=32, ny=32).field()
+    assert w[16, 16] == float(next(row for row in table(tmp_path / "field_research.csv") if (row["i"], row["j"]) == ("16", "16"))["w [m]"])
+    assert abs(w[16, 16]) == np.abs(w).max() and abs(w[16, 16]) == pytest.approx(6.625460120341636e-05, rel=1e-12)
 
 
 # --- routing -----------------------------------------------------------------------------------------------------------------------
