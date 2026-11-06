@@ -22,6 +22,7 @@ Values are written with ``repr`` and read back bit for bit; non-finite values ar
 Units are SI: lengths in m, E and q in Pa, D in N·m, w in m.
 
 ``python -m kkvim run-ssss`` (explicit N = 1..6, ``kkvim.cli_ssss``) has its own all-or-nothing saving; ``run`` stays as it is.
+``python -m kkvim run-cccc-n1`` (D-061, ``kkvim.cli_cccc``) is the limited research mode of CCCC, N = 1.
 """
 
 import argparse
@@ -42,7 +43,8 @@ from kkvim.rectangle_run import CENTRE, halfstep_report, run_rectangle_physical
 SCHEMA = "kkvim.cli.r3/1"
 RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC = "result.json", "history.csv", "field.csv", "field_diagnostic.csv"
 FIELD_RESEARCH = "field_research.csv"  # run-ssss, N >= 2: a research field, never an accepted solution
-OUTPUTS = (RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC, FIELD_RESEARCH)
+FACTORS = "factors.csv"  # run-cccc-n1: the factors of every half-step
+OUTPUTS = (RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC, FIELD_RESEARCH, FACTORS)
 CALLS = ("kkvim.rectangle_run.run_rectangle_physical", "kkvim.rectangle_run.halfstep_report")
 
 # exit codes
@@ -130,7 +132,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m kkvim",
         description="KK-VIM: run — расчёт принятым решателем R3 (D-043): пластина a × b, SSSS, q = const, N = 1; "
-                    "run-ssss — SSSS при явно выбранном N = 1…6 с указанием научного статуса.",
+                    "run-ssss — SSSS при явно выбранном N = 1…6 с указанием научного статуса; "
+                    "run-cccc-n1 — CCCC, N = 1, только исследование (D-061).",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser(
@@ -156,6 +159,8 @@ def build_parser() -> argparse.ArgumentParser:
     stopping.add_argument("--s-max", type=int, metavar="N", help=f"s_max (по умолчанию {S_MAX})")
     from kkvim import cli_ssss  # imports this module
     cli_ssss.add_parser(commands)
+    from kkvim import cli_cccc  # imports this module
+    cli_cccc.add_parser(commands)
     return parser
 
 
@@ -459,6 +464,9 @@ def main(argv=None) -> int:
     if args.command == "run-ssss":
         from kkvim import cli_ssss
         return cli_ssss.main(args, argv)
+    if args.command == "run-cccc-n1":
+        from kkvim import cli_cccc
+        return cli_cccc.main(args, argv)
     try:
         check_output_folder(args.out, args.overwrite)
     except OutputExistsError as exc:
