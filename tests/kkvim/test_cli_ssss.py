@@ -390,7 +390,7 @@ def test_other_supports_are_refused_and_nothing_is_created(tmp_path, monkeypatch
     out = tmp_path / "out"
     assert cli.main(command(out, 3, "--bc", bc, half_steps=2)) == cli.EXIT_USAGE
     err = capsys.readouterr().err
-    assert not out.exists() and "run-cccc-n1" in err and "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED" in err and "N ≥ 2" in err
+    assert not out.exists() and "run-cccc-n1" in err and "run-cccc-n23" in err and "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED" in err and "N ≥ 4" in err
 
 
 @pytest.mark.parametrize("N, extra, half_steps, fragment", [

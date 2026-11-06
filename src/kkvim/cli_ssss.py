@@ -170,9 +170,9 @@ def add_parser(commands) -> None:
 def check_options(args) -> None:
     """Refuse what this command does not offer, before anything is computed or created."""
     if args.bc != BOUNDARY:
-        raise OptionError(f"закрепление {args.bc!r} недоступно: команда считает только {BOUNDARY}. CCCC при N = 1 доступен только "
-                          "как RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED через команду run-cccc-n1 (D-061); CCCC при N ≥ 2 пока "
-                          "недоступен как рабочий решатель. Другие закрепления вне принятых областей.")
+        raise OptionError(f"закрепление {args.bc!r} недоступно: команда считает только {BOUNDARY}. CCCC доступен только как "
+                          "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED: при N = 1 — команда run-cccc-n1 (D-061), при N = 2, 3 — команда "
+                          "run-cccc-n23, только полушаг s = 1 (D-063); CCCC при N ≥ 4 недоступен. Другие закрепления вне принятых областей.")
     tolerances = [name for name, value in (("--tol-inf", args.tol_inf), ("--tol-E", args.tol_E), ("--s-min", args.s_min),
                                            ("--s-max", args.s_max)) if value is not None]
     if args.N == 1:
