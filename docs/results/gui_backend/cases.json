@@ -1,0 +1,1106 @@
+{
+ "schema": "kkvim-gui-backend-case/1/golden",
+ "source": {
+  "python": "3.13.15",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "kkvim": "0.0.0",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "git_commit": "79b6d82bc524ca818a31a1bfb492059be1668ab7",
+  "git_dirty": false
+ },
+ "comparison": {
+  "same_environment": "a GUI adapter calling the library must reproduce the direct API call of the same environment bitwise (status, D, history, field)",
+  "other_platform_R4": "field within the doubled first-order field model _model of tests/cross/test_r4_controller_comparison.py (as K-1 of D-048)",
+  "other_platform_R3": "status, half-step count, D and shape exactly; field values informative only (no accepted cross-platform tolerance for R3 fields)"
+ },
+ "cases": {
+  "r3_square": {
+   "spec": {
+    "model": "R3",
+    "N": 1,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 24
+    },
+    "purpose": "square SSSS, steel, n = 24"
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 24
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+   "expected_status": "CONVERGED",
+   "expected_status_class": "COMPLETED",
+   "is_error": false,
+   "scientific_status": "R3 ACCEPTED (D-043) within its scope; this run: CONVERGED by the stopping rule of NUMERICAL_SPEC 11",
+   "D": 19230.769230769234,
+   "half_steps_done": 7,
+   "field_available": true,
+   "field": {
+    "shape": [
+     25,
+     25
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.00021098466410855946,
+    "w_at_max_abs": 0.00021098466410855946,
+    "argmax_abs": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5
+    },
+    "max_abs_w_bar": 0.004057397386703067,
+    "centre": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5,
+     "w": 0.00021098466410855946,
+     "w_bar": 0.004057397386703067
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r3_square.json",
+    "history_csv": "cases/r3_square_history.csv",
+    "w_csv": "cases/r3_square_w.csv",
+    "w_bar_csv": "cases/r3_square_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r3_rect_b2a": {
+   "spec": {
+    "model": "R3",
+    "N": 1,
+    "inputs": {
+     "a": 1.0,
+     "b": 2.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 48
+    },
+    "purpose": "rectangle b = 2a, h_x = h_y"
+   },
+   "input": {
+    "a": 1.0,
+    "b": 2.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 48
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+   "expected_status": "CONVERGED",
+   "expected_status_class": "COMPLETED",
+   "is_error": false,
+   "scientific_status": "R3 ACCEPTED (D-043) within its scope; this run: CONVERGED by the stopping rule of NUMERICAL_SPEC 11",
+   "D": 19230.769230769234,
+   "half_steps_done": 7,
+   "field_available": true,
+   "field": {
+    "shape": [
+     25,
+     49
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.0005265152990765994,
+    "w_at_max_abs": 0.0005265152990765994,
+    "argmax_abs": {
+     "i": 12,
+     "j": 24,
+     "x": 0.5,
+     "y": 1.0
+    },
+    "max_abs_w_bar": 0.010125294213011529,
+    "centre": {
+     "i": 12,
+     "j": 24,
+     "x": 0.5,
+     "y": 1.0,
+     "w": 0.0005265152990765994,
+     "w_bar": 0.010125294213011529
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r3_rect_b2a.json",
+    "history_csv": "cases/r3_rect_b2a_history.csv",
+    "w_csv": "cases/r3_rect_b2a_w.csv",
+    "w_bar_csv": "cases/r3_rect_b2a_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r3_rect_a2b": {
+   "spec": {
+    "model": "R3",
+    "N": 1,
+    "inputs": {
+     "a": 2.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 48,
+     "n_y": 24
+    },
+    "purpose": "rectangle a = 2b (sides swapped)"
+   },
+   "input": {
+    "a": 2.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 48,
+    "n_y": 24
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+   "expected_status": "CONVERGED",
+   "expected_status_class": "COMPLETED",
+   "is_error": false,
+   "scientific_status": "R3 ACCEPTED (D-043) within its scope; this run: CONVERGED by the stopping rule of NUMERICAL_SPEC 11",
+   "D": 19230.769230769234,
+   "half_steps_done": 8,
+   "field_available": true,
+   "field": {
+    "shape": [
+     49,
+     25
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.0005265152990765983,
+    "w_at_max_abs": 0.0005265152990765983,
+    "argmax_abs": {
+     "i": 24,
+     "j": 12,
+     "x": 1.0,
+     "y": 0.5
+    },
+    "max_abs_w_bar": 0.0006328308883132192,
+    "centre": {
+     "i": 24,
+     "j": 12,
+     "x": 1.0,
+     "y": 0.5,
+     "w": 0.0005265152990765983,
+     "w_bar": 0.0006328308883132192
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r3_rect_a2b.json",
+    "history_csv": "cases/r3_rect_a2b_history.csv",
+    "w_csv": "cases/r3_rect_a2b_w.csv",
+    "w_bar_csv": "cases/r3_rect_a2b_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r3_rect_r5_unequal": {
+   "spec": {
+    "model": "R3",
+    "N": 1,
+    "inputs": {
+     "a": 0.5,
+     "b": 2.5,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 16,
+     "n_y": 40
+    },
+    "purpose": "b/a = 5 (range limit), h_x != h_y"
+   },
+   "input": {
+    "a": 0.5,
+    "b": 2.5,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 16,
+    "n_y": 40
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+   "expected_status": "CONVERGED",
+   "expected_status_class": "COMPLETED",
+   "is_error": false,
+   "scientific_status": "R3 ACCEPTED (D-043) within its scope; this run: CONVERGED by the stopping rule of NUMERICAL_SPEC 11",
+   "D": 19230.769230769234,
+   "half_steps_done": 7,
+   "field_available": true,
+   "field": {
+    "shape": [
+     17,
+     41
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 4.225615406802371e-05,
+    "w_at_max_abs": 4.225615406802371e-05,
+    "argmax_abs": {
+     "i": 8,
+     "j": 20,
+     "x": 0.25,
+     "y": 1.25
+    },
+    "max_abs_w_bar": 0.013001893559391913,
+    "centre": {
+     "i": 8,
+     "j": 20,
+     "x": 0.25,
+     "y": 1.25,
+     "w": 4.225615406802371e-05,
+     "w_bar": 0.013001893559391913
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r3_rect_r5_unequal.json",
+    "history_csv": "cases/r3_rect_r5_unequal_history.csv",
+    "w_csv": "cases/r3_rect_r5_unequal_w.csv",
+    "w_bar_csv": "cases/r3_rect_r5_unequal_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r3_negative_q": {
+   "spec": {
+    "model": "R3",
+    "N": 1,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.5,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": -500.0,
+     "n_x": 24,
+     "n_y": 36
+    },
+    "purpose": "load q < 0: the field changes sign"
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.5,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": -500.0,
+    "n_x": 24,
+    "n_y": 36
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+   "expected_status": "CONVERGED",
+   "expected_status_class": "COMPLETED",
+   "is_error": false,
+   "scientific_status": "R3 ACCEPTED (D-043) within its scope; this run: CONVERGED by the stopping rule of NUMERICAL_SPEC 11",
+   "D": 19230.769230769234,
+   "half_steps_done": 7,
+   "field_available": true,
+   "field": {
+    "shape": [
+     25,
+     37
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.0002006642136328296,
+    "w_at_max_abs": -0.0002006642136328296,
+    "argmax_abs": {
+     "i": 12,
+     "j": 18,
+     "x": 0.5,
+     "y": 0.75
+    },
+    "max_abs_w_bar": 0.007717854370493447,
+    "centre": {
+     "i": 12,
+     "j": 18,
+     "x": 0.5,
+     "y": 0.75,
+     "w": -0.0002006642136328296,
+     "w_bar": 0.007717854370493447
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r3_negative_q.json",
+    "history_csv": "cases/r3_negative_q_history.csv",
+    "w_csv": "cases/r3_negative_q_w.csv",
+    "w_bar_csv": "cases/r3_negative_q_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r3_error_nu": {
+   "spec": {
+    "model": "R3",
+    "N": 1,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 1.0,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 24
+    },
+    "purpose": "|nu| >= 1: ERROR_INPUT without a field"
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 1.0,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 24
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+   "expected_status": "ERROR_INPUT",
+   "expected_status_class": "ERROR",
+   "is_error": true,
+   "scientific_status": "R3 run not completed (ERROR_INPUT); no result is claimed",
+   "D": null,
+   "half_steps_done": 0,
+   "field_available": false,
+   "field": null,
+   "limitations": [
+    "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r3_error_nu.json"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r3_error_ratio": {
+   "spec": {
+    "model": "R3",
+    "N": 1,
+    "inputs": {
+     "a": 1.0,
+     "b": 6.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 24
+    },
+    "purpose": "b/a = 6 outside D-038: ERROR_INPUT"
+   },
+   "input": {
+    "a": 1.0,
+    "b": 6.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 24
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+   "expected_status": "ERROR_INPUT",
+   "expected_status_class": "ERROR",
+   "is_error": true,
+   "scientific_status": "R3 run not completed (ERROR_INPUT); no result is claimed",
+   "D": null,
+   "half_steps_done": 0,
+   "field_available": false,
+   "field": null,
+   "limitations": [
+    "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r3_error_ratio.json"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r3_error_grid": {
+   "spec": {
+    "model": "R3",
+    "N": 1,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 3,
+     "n_y": 24
+    },
+    "purpose": "n_x = 3 < N_MIN: ERROR_INPUT"
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 3,
+    "n_y": 24
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle_run.run_rectangle_physical(a, b, t, E, nu, q, n_x, n_y); kkvim.rectangle_run.halfstep_report(result)",
+   "expected_status": "ERROR_INPUT",
+   "expected_status_class": "ERROR",
+   "is_error": true,
+   "scientific_status": "R3 run not completed (ERROR_INPUT); no result is claimed",
+   "D": null,
+   "half_steps_done": 0,
+   "field_available": false,
+   "field": null,
+   "limitations": [
+    "R3 is ACCEPTED (D-043) for the rectangle SSSS, N = 1, q = const, 0.2 <= b/a <= 5; qualification only on the checked grids; convergence in s and moments are not claimed",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r3_error_grid.json"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r4_n2_normative": {
+   "spec": {
+    "model": "R4",
+    "N": 2,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 24
+    },
+    "purpose": "normative mode (default): NOT_QUALIFIED after s = 1",
+    "mode": "normative",
+    "transform": "fft",
+    "half_steps": 5
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 24,
+    "mode": "normative",
+    "transform": "fft",
+    "half_steps": 5
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='fft', half_steps=5)",
+   "expected_status": "NOT_QUALIFIED",
+   "expected_status_class": "NOT_QUALIFIED",
+   "is_error": false,
+   "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+   "D": 19230.769230769234,
+   "half_steps_done": 1,
+   "field_available": true,
+   "field": {
+    "shape": [
+     25,
+     25
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.00021101021204331677,
+    "w_at_max_abs": 0.00021101021204331677,
+    "argmax_abs": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5
+    },
+    "max_abs_w_bar": 0.004057888693140708,
+    "centre": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5,
+     "w": 0.00021101021204331677,
+     "w_bar": 0.004057888693140708
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r4_n2_normative.json",
+    "history_csv": "cases/r4_n2_normative_history.csv",
+    "w_csv": "cases/r4_n2_normative_w.csv",
+    "w_bar_csv": "cases/r4_n2_normative_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r4_n2_normative_one": {
+   "spec": {
+    "model": "R4",
+    "N": 2,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 24
+    },
+    "purpose": "normative mode, half_steps = 1",
+    "mode": "normative",
+    "transform": "fft",
+    "half_steps": 1
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 24,
+    "mode": "normative",
+    "transform": "fft",
+    "half_steps": 1
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='fft', half_steps=1)",
+   "expected_status": "HALF_STEP_LIMIT_REACHED",
+   "expected_status_class": "NOT_QUALIFIED",
+   "is_error": false,
+   "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+   "D": 19230.769230769234,
+   "half_steps_done": 1,
+   "field_available": true,
+   "field": {
+    "shape": [
+     25,
+     25
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.00021101021204331677,
+    "w_at_max_abs": 0.00021101021204331677,
+    "argmax_abs": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5
+    },
+    "max_abs_w_bar": 0.004057888693140708,
+    "centre": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5,
+     "w": 0.00021101021204331677,
+     "w_bar": 0.004057888693140708
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r4_n2_normative_one.json",
+    "history_csv": "cases/r4_n2_normative_one_history.csv",
+    "w_csv": "cases/r4_n2_normative_one_w.csv",
+    "w_bar_csv": "cases/r4_n2_normative_one_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r4_n2_research": {
+   "spec": {
+    "model": "R4",
+    "N": 2,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 24
+    },
+    "purpose": "research mode, D-048 stop",
+    "mode": "research",
+    "transform": "fft",
+    "half_steps": 100
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 24,
+    "mode": "research",
+    "transform": "fft",
+    "half_steps": 100
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='fft', half_steps=100, research_mode=True)",
+   "expected_status": "PROVISIONAL_FIELD_STABILIZED",
+   "expected_status_class": "PROVISIONAL",
+   "is_error": false,
+   "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+   "D": 19230.769230769234,
+   "half_steps_done": 10,
+   "field_available": true,
+   "field": {
+    "shape": [
+     25,
+     25
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.00021119311307262273,
+    "w_at_max_abs": 0.00021119311307262273,
+    "argmax_abs": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5
+    },
+    "max_abs_w_bar": 0.004061406020627361,
+    "centre": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5,
+     "w": 0.00021119311307262273,
+     "w_bar": 0.004061406020627361
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r4_n2_research.json",
+    "history_csv": "cases/r4_n2_research_history.csv",
+    "w_csv": "cases/r4_n2_research_w.csv",
+    "w_bar_csv": "cases/r4_n2_research_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r4_n3_research_rect": {
+   "spec": {
+    "model": "R4",
+    "N": 3,
+    "inputs": {
+     "a": 1.0,
+     "b": 2.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 48
+    },
+    "purpose": "research mode, N = 3, b = 2a",
+    "mode": "research",
+    "transform": "fft",
+    "half_steps": 100
+   },
+   "input": {
+    "a": 1.0,
+    "b": 2.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 48,
+    "mode": "research",
+    "transform": "fft",
+    "half_steps": 100
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='fft', half_steps=100, research_mode=True)",
+   "expected_status": "PROVISIONAL_FIELD_STABILIZED",
+   "expected_status_class": "PROVISIONAL",
+   "is_error": false,
+   "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+   "D": 19230.769230769234,
+   "half_steps_done": 11,
+   "field_available": true,
+   "field": {
+    "shape": [
+     25,
+     49
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.0005270077580765796,
+    "w_at_max_abs": 0.0005270077580765796,
+    "argmax_abs": {
+     "i": 12,
+     "j": 24,
+     "x": 0.5,
+     "y": 1.0
+    },
+    "max_abs_w_bar": 0.010134764578395765,
+    "centre": {
+     "i": 12,
+     "j": 24,
+     "x": 0.5,
+     "y": 1.0,
+     "w": 0.0005270077580765796,
+     "w_bar": 0.010134764578395765
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r4_n3_research_rect.json",
+    "history_csv": "cases/r4_n3_research_rect_history.csv",
+    "w_csv": "cases/r4_n3_research_rect_w.csv",
+    "w_bar_csv": "cases/r4_n3_research_rect_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r4_n3_research_fixed": {
+   "spec": {
+    "model": "R4",
+    "N": 3,
+    "inputs": {
+     "a": 2.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 40,
+     "n_y": 20
+    },
+    "purpose": "research mode, 12 fixed half-steps, a = 2b",
+    "mode": "research_fixed",
+    "transform": "fft",
+    "half_steps": 12
+   },
+   "input": {
+    "a": 2.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 40,
+    "n_y": 20,
+    "mode": "research_fixed",
+    "transform": "fft",
+    "half_steps": 12
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='fft', half_steps=12, research_mode=True, stop_on_stabilization=False)",
+   "expected_status": "RESEARCH_LIMIT_REACHED",
+   "expected_status_class": "PROVISIONAL",
+   "is_error": false,
+   "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+   "D": 19230.769230769234,
+   "half_steps_done": 12,
+   "field_available": true,
+   "field": {
+    "shape": [
+     41,
+     21
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.0005271476423097297,
+    "w_at_max_abs": 0.0005271476423097297,
+    "argmax_abs": {
+     "i": 20,
+     "j": 10,
+     "x": 1.0,
+     "y": 0.5
+    },
+    "max_abs_w_bar": 0.0006335909162376559,
+    "centre": {
+     "i": 20,
+     "j": 10,
+     "x": 1.0,
+     "y": 0.5,
+     "w": 0.0005271476423097297,
+     "w_bar": 0.0006335909162376559
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r4_n3_research_fixed.json",
+    "history_csv": "cases/r4_n3_research_fixed_history.csv",
+    "w_csv": "cases/r4_n3_research_fixed_w.csv",
+    "w_bar_csv": "cases/r4_n3_research_fixed_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r4_n2_dense": {
+   "spec": {
+    "model": "R4",
+    "N": 2,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 24
+    },
+    "purpose": "research mode, dense DST (D-048.6: n <= 40)",
+    "mode": "research",
+    "transform": "dense",
+    "half_steps": 100
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 24,
+    "mode": "research",
+    "transform": "dense",
+    "half_steps": 100
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='dense', half_steps=100, research_mode=True)",
+   "expected_status": "PROVISIONAL_FIELD_STABILIZED",
+   "expected_status_class": "PROVISIONAL",
+   "is_error": false,
+   "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+   "D": 19230.769230769234,
+   "half_steps_done": 10,
+   "field_available": true,
+   "field": {
+    "shape": [
+     25,
+     25
+    ],
+    "axes": "axis 0 = x: n_x + 1 nodes on [0, a]; axis 1 = y: n_y + 1 nodes on [0, b]; boundary nodes included",
+    "role": "field of the last completed half-step",
+    "max_abs_w": 0.00021119311307262278,
+    "w_at_max_abs": 0.00021119311307262278,
+    "argmax_abs": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5
+    },
+    "max_abs_w_bar": 0.004061406020627362,
+    "centre": {
+     "i": 12,
+     "j": 12,
+     "x": 0.5,
+     "y": 0.5,
+     "w": 0.00021119311307262278,
+     "w_bar": 0.004061406020627362
+    },
+    "boundary_max_abs": 0.0,
+    "w_bar_definition": "w D / (q a^4), a = length of the x side"
+   },
+   "limitations": [
+    "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r4_n2_dense.json",
+    "history_csv": "cases/r4_n2_dense_history.csv",
+    "w_csv": "cases/r4_n2_dense_w.csv",
+    "w_bar_csv": "cases/r4_n2_dense_w_bar.csv"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r4_n3_rank_loss": {
+   "spec": {
+    "model": "R4",
+    "N": 3,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": 0.01,
+     "E": 210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 4,
+     "n_y": 24
+    },
+    "purpose": "n_x = 4 < 2N = 6: STOPPED_RANK_LOSS_PROVEN without a field",
+    "mode": "research",
+    "transform": "fft",
+    "half_steps": 100
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": 0.01,
+    "E": 210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 4,
+    "n_y": 24,
+    "mode": "research",
+    "transform": "fft",
+    "half_steps": 100
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='fft', half_steps=100, research_mode=True)",
+   "expected_status": "STOPPED_RANK_LOSS_PROVEN",
+   "expected_status_class": "STOPPED_RANK_LOSS",
+   "is_error": false,
+   "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+   "D": 19230.769230769234,
+   "half_steps_done": 0,
+   "field_available": false,
+   "field": null,
+   "limitations": [
+    "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r4_n3_rank_loss.json"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  },
+  "r4_error_E": {
+   "spec": {
+    "model": "R4",
+    "N": 2,
+    "inputs": {
+     "a": 1.0,
+     "b": 1.0,
+     "t": -0.01,
+     "E": -210000000000.0,
+     "nu": 0.3,
+     "q": 1000.0,
+     "n_x": 24,
+     "n_y": 24
+    },
+    "purpose": "E < 0, t < 0 (D > 0): ERROR_INPUT",
+    "mode": "research",
+    "transform": "fft",
+    "half_steps": 100
+   },
+   "input": {
+    "a": 1.0,
+    "b": 1.0,
+    "t": -0.01,
+    "E": -210000000000.0,
+    "nu": 0.3,
+    "q": 1000.0,
+    "n_x": 24,
+    "n_y": 24,
+    "mode": "research",
+    "transform": "fft",
+    "half_steps": 100
+   },
+   "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+   "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='fft', half_steps=100, research_mode=True)",
+   "expected_status": "ERROR_INPUT",
+   "expected_status_class": "ERROR",
+   "is_error": true,
+   "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+   "D": null,
+   "half_steps_done": 0,
+   "field_available": false,
+   "field": null,
+   "limitations": [
+    "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+    "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+   ],
+   "files": {
+    "json": "cases/r4_error_E.json"
+   },
+   "provenance": "kkvim library at source.git_commit, this script; not an independent reference"
+  }
+ }
+}

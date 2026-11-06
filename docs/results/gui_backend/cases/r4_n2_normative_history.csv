@@ -1,0 +1,2 @@
+s,k,direction,eta_N,eta_initial,refined,rho_N,kappa_rep,cond_U,cond_V,set_sigma_min,cond_A_given,cond_M_max,P,delta_P,Q,tau,e1,e2,energy_status,m_s,w_max,eps_inf,eps_E,stabilization_ok,guards_passed,qr_done,qr_field_error,stop_reason,mark,energy_s2_mandatory_unresolved,energy_s2_reason
+1,0,Y,1.1485151799051894e-16,,False,0.0012109862432433747,1.0,1.0000000000000002,825.7732121891888,0.063387050355961,1.0,24.490775338387312,-0.04412426189093139,,,,,,NOT_APPLICABLE,,0.00021101021204331677,,,,,False,,NOT_QUALIFIED,PROVISIONAL / NOT_QUALIFIED,,
