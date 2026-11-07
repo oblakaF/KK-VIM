@@ -338,20 +338,13 @@ def test_a_negative_load_gives_the_negative_field():
 SCALED = [(1.0, 0.6, 10, 9), (1.0, 1.0, 32, 32), (1.0, 2.0, 32, 64)]
 
 
-@pytest.mark.xfail(strict=True, reason="Q-111: B-6 as written (factor 2) contradicts the normative QR of sqrt(h_x) T (Policy 3, step 2)")
-@pytest.mark.parametrize("N", [2, 3])
-@pytest.mark.parametrize("a, b, n_x, n_y", SCALED)
-def test_scaling_keeps_w_bar_bit_for_bit(a, b, n_x, n_y, N):
-    """B-6 of Policy 9.1 exactly as written; it fails, see Q-111. Not adapted: the order of operations of step 2 is normative."""
-    one = cn.run_cccc_n23(a, b, 1.0, 1.0, n_x, n_y, N, 1)
-    scaled = cn.run_cccc_n23(2 * a, 2 * b, 4.0, 8.0, n_x, n_y, N, 1)
-    assert np.array_equal(one.dimensionless_field(), scaled.dimensionless_field())
-
-
 @pytest.mark.parametrize("N", [2, 3])
 @pytest.mark.parametrize("a, b, n_x, n_y", SCALED)
 def test_scaling_by_four_keeps_w_bar_bit_for_bit(a, b, n_x, n_y, N):
-    """The cause of Q-111, not a replacement of B-6: with sqrt(4) = 2 every input of QR scales exactly, and w_bar is equal bit for bit."""
+    """B-6 as amended by D-064 (Q-111): with sqrt(4) = 2 every input of QR scales exactly, and w_bar is equal bit for bit.
+
+    A regression on these cases under the order of operations of Policy 3, step 2; not a theorem and not a cross-platform requirement.
+    """
     one = cn.run_cccc_n23(a, b, 1.0, 1.0, n_x, n_y, N, 1)
     scaled = cn.run_cccc_n23(4 * a, 4 * b, 16.0, 64.0, n_x, n_y, N, 1)
     assert np.array_equal(one.dimensionless_field(), scaled.dimensionless_field())
