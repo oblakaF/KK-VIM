@@ -25,8 +25,8 @@ No rank cutoff, no convergence tolerance, no regularization, no lower N, no eta 
 transferred, D-065). No RN-5 / RT-7 at s >= 3: the rank and the accuracy of the exact discrete sequence are UNRESOLVED (O4-h for s >= 2);
 the exact rank of the stored binary64 factors is an algebraic diagnostic only. No CONVERGED status exists.
 
-Iteration controller (task R5-CCCC-N23-ITERATION-CONTROLLER; s = 1..8 under D-066, s = 9..32 a research-only continuation by the owner's
-instruction of that task, without a new decision). ``--half-steps`` is the budget K <= 32. The only stops:
+Iteration controller (task R5-CCCC-N23-ITERATION-CONTROLLER). s = 1, 2: D-063 and D-065, with the RN-5 / RT-7 protections; s = 3..32:
+D-066, a research-only exception to D-057.1 and D-065.6-7 for this script only. ``--half-steps`` is the budget K <= 32. The only stops:
 
     RESEARCH_LIMIT_REACHED          the budget K is reached
     STOPPED_BITWISE_REPEATED_STATE  the stored (G, V) of a done half-step equal bitwise those of an earlier done half-step of the same phase
@@ -62,8 +62,8 @@ RESEARCH_LIMIT_REACHED = "RESEARCH_LIMIT_REACHED"
 STOPPED_BITWISE_REPEATED_STATE = "STOPPED_BITWISE_REPEATED_STATE"
 PILOT_STOPPED = "PILOT_STOPPED"
 BUDGET_MAX = 32  # the owner's bound of the research continuation; not a tolerance
-AUTHORIZATION = ("s = 1, 2: D-063, D-065; s = 3..8: D-066; s = 9..32: owner instruction R5-CCCC-N23-ITERATION-CONTROLLER "
-                 "(research-only continuation, no new decision)")
+AUTHORIZATION = ("s = 1, 2: D-063, D-065 (RN-5 / RT-7 protections); s = 3..32: D-066, research-only exception to D-057.1 and "
+                 "D-065.6-7 for this script only")
 HISTORY_COLUMNS = ("s", "direction", "status", "reason", "N", "n_s", "h_s", "given_exact_rank", "exact_rank_G", "R_diag_min_abs",
                    "cond_A_before_QR", "cond_A_after_QR", "premises_status", "cond_S", "min_eig_DM", "eta", "V_exact_rank", "sigma",
                    "rho_N", "kappa_rep", "field_preservation", "P_hat_previous_QR", "P_hat", "w_centre", "alpha_centre", "max_abs_w",
