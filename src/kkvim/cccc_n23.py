@@ -1,11 +1,22 @@
-"""CCCC, N = 2 or 3: the half-step s = 1 of the coupled KK-MVI, the limited research mode of D-063. Never a converged or qualified solution.
+"""CCCC, N = 2 or 3: the half-steps s = 1 and s = 2 of the coupled KK-MVI, the limited research modes of D-063 and D-065. Never a converged or
+qualified solution.
 
     run_cccc_n23(a, b, D, q, n_x, n_y, N, half_steps)
     run_cccc_n23_physical(a, b, t, E, nu, q, n_x, n_y, N, half_steps)
 
 "Policy" is docs/R5_CCCC_N23_LIMITED_POLICY.proposal.md, whose sections 2-5, 7 and 10 are the specification by D-063.1; "Policy-1" is
-docs/R5_CCCC_N1_LIMITED_POLICY.proposal.md. Only s = 1 is executed (D-057.1 item 2). With half_steps >= 2 the half-step s = 2 stops before the
-QR of the solved set, without assembly or solve: STOPPED_RANK_GUARD_UNCERTIFIED, or STOP_BEFORE_QR_S1 for a proven dependence (Policy 4).
+docs/R5_CCCC_N1_LIMITED_POLICY.proposal.md. The half-step s = 1 is that of D-063 and is not changed. With half_steps >= 2 the half-step s = 2
+follows D-065, 7 (C-G), only for n_x, n_y <= 32 (D-065.5):
+
+    C  exact rank of V (STOP_BEFORE_QR_S1 if < N); the RN-5 certificate on the saved G, V of this run; not certified -> stop before QR
+    D  QR of V with the normalisation of Policy 3, step 2 over y (G2), the companion G R^T, so that w(1) = (G R^T) G2^T exactly
+    E  RT-7 (R7-1...R7-3) on the saved V and G2; failed -> stop after QR, G2 not used
+    F  the X-half-step on G2 (roles of x and y exchanged, ВБC-13 p. 1 "symmetrically"): C-3+ with its premises, B-C, the field X G2^T
+    G  half_steps >= 3: stop before the QR that would open s = 3
+
+Every stop before s = 2 is STOPPED_RANK_GUARD_UNCERTIFIED (exit 6) with the field of s = 1 as diagnostic, except a proven dependence
+(STOP_BEFORE_QR_S1); it never proves a loss of rank. At s = 2 eta, cond(S), the singular values and the energy are only written: the thresholds
+of s = 1 (100u, 16u, c_f = 10) are not transferred (D-065).
 
 | Component                                      | Specification          | Level        | Decision           | Check        |
 | w = sum X_i(x) Y_i(y), half-steps              | MATH_SPEC C.3-C.4      | A (authors)  | D-024, D-050       | QA K-3       |
@@ -16,12 +27,18 @@ QR of the solved set, without assembly or solve: STOPPED_RANK_GUARD_UNCERTIFIED,
 | half-step solve B-C (DST-I + rank-2N SMW)      | Policy 3 step 5        | V (numerics) | D-049.2            | QA K-1, K-3  |
 | eta and its guard 100u                         | Policy 3 step 6        | V (numerics) | D-063.3 (variant A)| B-5          |
 | rank diagnostic, the guard of s >= 2           | Policy 3 step 7, 4     | V (numerics) | D-049.5, D-057.1   | B-5          |
+| RN-5 before the QR of V, RT-7 after it         | study 4.6; D-065, 6    | B (project)  | D-065.2, D-065.3   | QA (D-065)   |
+| QR of V, companion G R^T                       | R4 NS 5.4, 5.4.1       | V (numerics) | D-065.4            | QA (D-065)   |
+| X-half-step s = 2 (C-3+, B-C over x)           | ВБC-13 p. 1; Policy 3  | B / V        | D-065.1            | QA (D-065)   |
+| guard of s >= 3                                | D-065, 7 G             | V (numerics) | D-065              | tests        |
 | P_hat (Pi_h^C at w = G V^T)                    | Policy 5               | B (project)  | D-049.1            | B-1          |
 | mode, statuses                                 | Policy 5, 7            | V (numerics) | D-063.2, D-063.4   | B-5          |
 
 Limits: P-4 is assumed (classical dot products in BLAS); B-C is not qualified on working grids; the field belongs to span(G), the start set
 after the rounding of QR; one half-step does not approximate the discrete or the continuous solution (NS 9, O-8); the full rank of w(1) is
-UNRESOLVED (N = 3 continuously, any N >= 2 discretely). The guards have no fallback: no refinement, no other assembly, no A-C, no lower N, no
+UNRESOLVED (N = 3 continuously, any N >= 2 discretely); RN-5 certifies rank w_h(1) = N of one run and RT-7 only the transversality of span G2
+to the exact y-subspace, neither the accuracy, the conditioning nor the rank of w(2), nor anything of s >= 3. The guards have no fallback:
+no refinement, no other assembly, no A-C, no lower N, no
 regularization, no rank tolerance. cond(A), cond(S), the singular values and their ratios are only written. |eta - eta_QA| <= 16u and TS-1
 (c_f = 10) are criteria of the QA acceptance of the first version (D-063.3); the solver does not apply them. No kkvim module of the SSSS
 scheme is used; the stencils, the rounding probes and the input checks are those of ``kkvim.cccc_n1``, which is not changed.
@@ -38,12 +55,14 @@ import scipy.fft
 import scipy.linalg
 
 import kkvim.cccc_n1 as n1
+import kkvim.cccc_n23_certificate as certificate
 from kkvim.physical import PhysicalInputError
 from kkvim.rectangle import validated_rectangle_input
 
 MODE = n1.MODE
 APPLICATION_STATUS = n1.APPLICATION_STATUS
-RANK_GUARD_RULE = "D-057.1 (вариант В): N = 2, 3 — только s = 1"
+RANK_GUARD_RULE = ("D-057.1 (вариант В) с исключением D-065: N = 2, 3 — s = 1; s = 2 только при n_x, n_y ≤ 32 после RN-5 до QR и RT-7 после QR; "
+                   "s ≥ 3 — остановка до QR")
 RANK_DECISION = "UNRESOLVED (no approved numerical rank criterion; D-049.5, D-049.6)"
 ORIENTATION = "start T_N in x: U_i = sin^2(i pi x / a), i = 1..N (basis A, D-049.3), companion 0 (w(0) = 0); the first half-step solves Y"
 
@@ -67,7 +86,8 @@ U = n1.U
 ETA_MAX_C = 100.0 * U  # D-063.3, variant A: the guard of this mode only, not a qualified value
 N_VALUES = (2, 3)  # D-063.2
 N_MIN, N_MAX = n1.N_MIN, n1.N_MAX  # D-063.2: 7 <= n_x, n_y <= 1280, bounds of the domain, not tolerances
-S_MIN, S_MAX = n1.S_MIN, n1.S_MAX  # D-063.2: the number of half-steps asked for; only s = 1 is executed
+S_MIN, S_MAX = n1.S_MIN, n1.S_MAX  # D-063.2: the number of half-steps asked for; at most s = 2 is executed (D-065)
+S2_GRID_MAX = 32  # D-065.5: s = 2 only for n_x, n_y <= 32; a bound of the development, not a certification of these grids
 K_EXTRA = n1.K_EXTRA  # k = m + 13 of the bound of C-3+
 SMALLEST_NORMAL = n1.SMALLEST_NORMAL
 DBL_MAX = n1.DBL_MAX
@@ -75,22 +95,26 @@ DBL_MAX = n1.DBL_MAX
 
 @dataclass
 class HalfStep:
-    """The row s = 1 (executed) or s = 2 (the guard only); what it did not reach stays None."""
+    """The row s = 1, s = 2 (D-065) or s = 3 (the guard only); what it did not reach stays None.
+
+    At s = 1 G is the start set after QR (x) and V the solved Y factors; at s = 2 G is G2, the solved V of s = 1 after QR (y), and V the
+    solved X factors. The field of a done row is ``field_factors()``: (G, V) at s = 1, (V, G) at s = 2 (axis 0 = x).
+    """
 
     s: int
     k: int
-    direction: str  # the solved factors: Y at s = 1, X at s = 2
+    direction: str  # the solved factors: Y at s = 1, X at s = 2, Y at s = 3
     n_s: int
     h_s: float
     N: int
     status: str = HALF_STEP_DONE
     reason: str | None = None
     done: bool = False  # s = 1 solved and its guards passed
-    conditions: dict | None = None  # Policy 1: N <= floor(n_x/2), 2N < n_x, N <= floor(n_y/2); at s = 2 the configuration S-1 of RN-3
+    conditions: dict | None = None  # Policy 1: N <= floor(n_x/2), 2N < n_x, N <= floor(n_y/2); at s >= 2 S-1 of RN-3 and the grid of D-065.5
     T: np.ndarray | None = None  # s = 1: the start set
     exact_rank_T: int | None = None
     R: np.ndarray | None = None
-    G: np.ndarray | None = None  # s = 1: the solved given set after QR
+    G: np.ndarray | None = None  # the given set after QR
     exact_rank_G: int | None = None
     R_diag_min_abs: float | None = None
     cond_A_before_QR: float | None = None
@@ -106,7 +130,7 @@ class HalfStep:
     cond_S: float | None = None
     min_eig_DM: float | None = None
     eta: float | None = None
-    V: np.ndarray | None = None  # s = 1: the solved Y factors, (n_y - 1, N); s = 2: the given set
+    V: np.ndarray | None = None  # the solved factors: Y (n_y - 1, N) at s = 1, X (n_x - 1, N) at s = 2
     V_exact_rank: int | None = None
     sigma: tuple | None = None
     rho_N: float | None = None
@@ -115,6 +139,16 @@ class HalfStep:
     qr_executed: bool | None = None
     P_hat: float | None = None
     alpha_centre: float | None = None
+    given: np.ndarray | None = None  # s >= 2: the solved set of the previous half-step before QR
+    companion: np.ndarray | None = None  # s = 2: G(s = 1) R^T, the x-factor of w(1) in the basis G2
+    rn5: dict | None = None  # s = 2: ``cccc_n23_certificate.rn5_certificate``
+    rt7: dict | None = None  # s = 2: ``cccc_n23_certificate.rt7_conditions``
+    P_hat_previous_QR: float | None = None  # s = 2: Pi_h^C of w(1) from the transformed arrays (companion, G2); OBSERVATION
+    field_preservation: float | None = None  # s = 2: max|companion G2^T - G V^T| / max|G V^T| of s = 1; OBSERVATION
+
+    def field_factors(self):
+        """(x factor, y factor) of the field of this row."""
+        return (self.G, self.V) if self.s == 1 else (self.V, self.G)
 
 
 @dataclass(frozen=True)
@@ -146,14 +180,13 @@ class CCCCN23Result:
         return len(self.completed)
 
     def factors(self):
-        """(G, V) of s = 1 on the inner nodes, or None; w = G V^T."""
+        """(x factor, y factor) of the last completed half-step on the inner nodes, or None: (G, V) at s = 1, (X, G2) at s = 2."""
         if not self.completed:
             return None
-        step = self.completed[-1]
-        return step.G, step.V
+        return self.completed[-1].field_factors()
 
     def field(self):
-        """w(1) with the boundary nodes (axis 0 = x, axis 1 = y), or None."""
+        """w of the last completed half-step with the boundary nodes (axis 0 = x, axis 1 = y), or None."""
         factors = self.factors()
         return None if factors is None else _field(*factors)
 
@@ -430,19 +463,29 @@ def _half_step_1(step: HalfStep, a: float, b: float, D: float, q: float, n_x: in
     step.exact_rank_G = exact_rank(step.G)
     if not np.all(np.diag(step.R) != 0.0) or step.exact_rank_G < N:
         raise _Stop(PROTECTIVE_STOP_FACTORIZATION, f"после QR: min|diag R| = {step.R_diag_min_abs!r}, точный ранг G = {step.exact_rank_G}")
+    _solve_given(step, a, n_x, b, n_y, D, q, eta_guard=True)
+
+
+def _solve_given(step: HalfStep, l_g: float, n_g: int, l_s: float, n_s: int, D: float, q: float, eta_guard: bool) -> None:
+    """Policy 3, steps 4-8 on the given set step.G (direction of l_g, n_g), solving the other direction (l_s, n_s).
+
+    At s = 1 (x given, y solved) this is the half-step of D-063 operation by operation; at s = 2 the roles of x and y are exchanged
+    (ВБC-13 p. 1) and the guard of eta is not applied (D-065: the thresholds of s = 1 are not transferred).
+    """
+    hf = l_g / n_g
     failures = n1.rounding_probe_failures()
-    parts = assemble(step.G, a, n_x, q)
+    parts = assemble(step.G, l_g, n_g, q)
     step.A, step.B, step.C, step.F, step.C_L, step.E = (parts[name] for name in ("A", "B", "C", "F", "C_L", "E"))
     if not all(np.all(np.isfinite(value)) for value in (step.A, step.B, step.F)):
         raise _Stop(ERROR_NONFINITE, "A, B или F не конечно")
     eigenvalues = np.linalg.eigvalsh(step.A)
     step.cond_A_after_QR = float(eigenvalues[-1] / eigenvalues[0]) if eigenvalues[0] > 0 else math.inf
-    failures += premise_failures(parts, n_x)
+    failures += premise_failures(parts, n_g)
     step.premises_status = PREMISES_UNRESOLVED if failures else PREMISES_ESTABLISHED
     step.premises_reasons = tuple(failures)
     if failures:
         raise _Stop(UNRESOLVED_C3PLUS_PREMISE, "; ".join(failures))
-    V = solve_bc(step, step.A, step.B, step.C, step.F, D, b, n_y)
+    V = solve_bc(step, step.A, step.B, step.C, step.F, D, l_s, n_s)
     failures = n1.rounding_probe_failures()
     if failures:
         step.premises_status, step.premises_reasons = PREMISES_UNRESOLVED, tuple(failures)
@@ -455,28 +498,63 @@ def _half_step_1(step: HalfStep, a: float, b: float, D: float, q: float, n_x: in
     step.eta = residual_eta(V, step.A, step.B, step.C, step.F, D, step.h_s)
     if not math.isfinite(step.eta):
         raise _Stop(ERROR_NONFINITE, f"η = {step.eta!r}")
-    if not step.eta <= ETA_MAX_C:
+    if eta_guard and not step.eta <= ETA_MAX_C:
         raise _Stop(STOPPED_ETA_GUARD, f"η = {step.eta!r} > η_max^C = 100u (D-063.3)")
     step.V_exact_rank = exact_rank(V)
-    step.sigma, step.rho_N, step.kappa_rep = rank_diagnostic(step.G, hf, V, b / n_y)
+    step.sigma, step.rho_N, step.kappa_rep = rank_diagnostic(step.G, hf, V, l_s / n_s)
     step.rank_decision = RANK_DECISION
-    step.P_hat = discrete_energy(step.G, V, a, b, D, q, n_x, n_y)
+    x, y = step.field_factors()
+    a, b, n_x, n_y = (l_g, l_s, n_g, n_s) if step.s == 1 else (l_s, l_g, n_s, n_g)
+    step.P_hat = discrete_energy(x, y, a, b, D, q, n_x, n_y)
     if n_x % 2 == 0 and n_y % 2 == 0:
-        step.alpha_centre = float(_field(step.G, V)[n_x // 2, n_y // 2]) * D / (q * min(a, b) ** 4)
+        step.alpha_centre = float(_field(x, y)[n_x // 2, n_y // 2]) * D / (q * min(a, b) ** 4)
     step.done = True
 
 
-def _guard_2(first: HalfStep, a: float, n_x: int) -> HalfStep:
-    """The half-step s = 2 up to the guard of Policy 4: no QR, no assembly, no solve."""
-    N = first.N
-    step = HalfStep(s=2, k=1, direction="X", n_s=n_x, h_s=a / n_x, N=N, V=first.V, V_exact_rank=first.V_exact_rank, qr_executed=False)
-    step.conditions = {"S-1 (RN-3): N > floor(n_x/2)": N > n_x // 2}  # impossible in the domain; written only
+def _half_step_2(first: HalfStep, step: HalfStep, a: float, b: float, D: float, q: float, n_x: int, n_y: int) -> None:
+    """D-065, 7 C-F after a done s = 1; a stop raises ``_Stop``. Nothing of s = 1 is changed."""
+    N = step.N
+    step.given = first.V
+    step.conditions = {"S-1 (RN-3): N > floor(n_x/2)": N > n_x // 2, f"n_x, n_y <= {S2_GRID_MAX} (D-065.5)": max(n_x, n_y) <= S2_GRID_MAX}
+    step.rank_decision = RANK_DECISION
     if first.V_exact_rank < N:
-        step.status, step.reason = STOP_BEFORE_QR_S1, f"точный ранг решённого набора V {first.V_exact_rank} < N = {N} (D-049.5, п. 2)"
+        raise _Stop(STOP_BEFORE_QR_S1, f"точный ранг решённого набора V {first.V_exact_rank} < N = {N} (D-049.5, п. 2)")
+    if max(n_x, n_y) > S2_GRID_MAX:
+        raise _Stop(STOPPED_RANK_GUARD_UNCERTIFIED, f"N = {N}, s = 2: сетка {n_x} × {n_y} вне области D-065.5 (n_x, n_y ≤ {S2_GRID_MAX}); "
+                    "сертификат не строится, QR не выполняется (D-057.1, п. 2)")
+    step.rn5 = certificate.rn5_certificate(a, b, n_x, n_y, N, first.G, first.V, D, q)
+    if not step.rn5["certified"]:
+        raise _Stop(STOPPED_RANK_GUARD_UNCERTIFIED, f"RN-5 не выполнен ({step.rn5['verdict']}: {step.rn5['reason']}); QR решённого набора не "
+                    "выполняется. N не понижается, регуляризации нет (D-065, 7 C)")
+    step.G, step.R = orthonormalise(first.V, b / n_y)
+    step.qr_executed = True
+    step.R_diag_min_abs = float(np.min(np.abs(np.diag(step.R))))
+    singular = np.linalg.svd(step.R, compute_uv=False)
+    step.cond_A_before_QR = float((singular[0] / singular[-1]) ** 2) if singular[-1] > 0 else math.inf
+    step.companion = first.G @ step.R.T
+    step.rt7 = certificate.rt7_conditions(first.V, step.G, step.rn5)
+    if step.rt7["ranks"] is not None:
+        step.exact_rank_G = min(step.rt7["ranks"]["G2"])
+    if not step.rt7["passed"]:
+        raise _Stop(STOPPED_RANK_GUARD_UNCERTIFIED, f"RT-7 не выполнен после QR ({step.rt7['reason']}); G2 не используется (D-065, 7 E)")
+    with np.errstate(all="ignore"):
+        w1 = first.G @ first.V.T
+        step.field_preservation = float(np.max(np.abs(step.companion @ step.G.T - w1)) / np.max(np.abs(w1)))
+    step.P_hat_previous_QR = discrete_energy(step.companion, step.G, a, b, D, q, n_x, n_y)
+    _solve_given(step, b, n_y, a, n_x, D, q, eta_guard=False)
+
+
+def _guard_3(second: HalfStep, b: float, n_y: int) -> HalfStep:
+    """The half-step s = 3 up to its guard (D-065, 7 G): no QR of X, no assembly, no solve."""
+    N = second.N
+    step = HalfStep(s=3, k=1, direction="Y", n_s=n_y, h_s=b / n_y, N=N, given=second.V, qr_executed=False)
+    step.conditions = {"S-1 (RN-3): N > floor(n_y/2)": N > n_y // 2}  # impossible in the domain; written only
+    if second.V_exact_rank < N:
+        step.status, step.reason = STOP_BEFORE_QR_S1, f"точный ранг решённого набора X {second.V_exact_rank} < N = {N} (D-049.5, п. 2)"
     else:
         step.status = STOPPED_RANK_GUARD_UNCERTIFIED
-        step.reason = (f"N = {N}, s = 2: защитная остановка до QR решённого набора; утверждённой ранговой процедуры нет (D-057.1, пп. 2, 4; "
-                       "D-063.2). N не понижается, регуляризации и рангового допуска нет.")
+        step.reason = (f"N = {N}, s = 3: защитная остановка до QR решённого набора X; полушаги s ≥ 3 не разрешены (D-065). N не понижается, "
+                       "регуляризации и рангового допуска нет.")
     step.rank_decision = RANK_DECISION
     return step
 
@@ -492,9 +570,19 @@ def _execute(a: float, b: float, D: float, q: float, n_x: int, n_y: int, N: int,
     if half_steps == 1:
         first.status = COMPLETED_FIXED_HALF_STEPS
         return CCCCN23Result(COMPLETED_FIXED_HALF_STEPS, None, a, b, D, q, n_x, n_y, N, half_steps, tuple(steps), physical)
-    second = _guard_2(first, a, n_x)
+    second = HalfStep(s=2, k=1, direction="X", n_s=n_x, h_s=a / n_x, N=N, qr_executed=False)
     steps.append(second)
-    return CCCCN23Result(second.status, second.reason, a, b, D, q, n_x, n_y, N, half_steps, tuple(steps), physical)
+    try:
+        _half_step_2(first, second, a, b, D, q, n_x, n_y)
+    except _Stop as stop:
+        second.status, second.reason = stop.status, stop.reason
+        return CCCCN23Result(stop.status, stop.reason, a, b, D, q, n_x, n_y, N, half_steps, tuple(steps), physical)
+    if half_steps == 2:
+        second.status = COMPLETED_FIXED_HALF_STEPS
+        return CCCCN23Result(COMPLETED_FIXED_HALF_STEPS, None, a, b, D, q, n_x, n_y, N, half_steps, tuple(steps), physical)
+    third = _guard_3(second, b, n_y)
+    steps.append(third)
+    return CCCCN23Result(third.status, third.reason, a, b, D, q, n_x, n_y, N, half_steps, tuple(steps), physical)
 
 
 # --- refusals and the two entries ------------------------------------------------------------------------------------------------
@@ -511,7 +599,7 @@ def _not_run(status, reason, a, b, D, q, n_x, n_y, N, half_steps, physical=None)
 
 
 def run_cccc_n23(a, b, D, q, n_x, n_y, N, half_steps) -> CCCCN23Result:
-    """Plate a x b, stiffness D, load q != 0, clamped on all sides, N = 2 or 3: the half-step s = 1; s = 2 only up to its guard."""
+    """Plate a x b, stiffness D, load q != 0, clamped on all sides, N = 2 or 3: s = 1; s = 2 under D-065; s >= 3 only up to its guard."""
     reason = domain_refusal(a, b, n_x, n_y, N, half_steps)
     if reason is not None:
         return _not_run(NOT_EXECUTED_OUTSIDE_DOMAIN, reason, a, b, D, q, n_x, n_y, N, half_steps)
