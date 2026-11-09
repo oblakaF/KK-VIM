@@ -24,6 +24,7 @@ Units are SI: lengths in m, E and q in Pa, D in N·m, w in m.
 ``python -m kkvim run-ssss`` (explicit N = 1..6, ``kkvim.cli_ssss``) has its own all-or-nothing saving; ``run`` stays as it is.
 ``python -m kkvim run-cccc-n1`` (D-061, ``kkvim.cli_cccc``) is the limited research mode of CCCC, N = 1.
 ``python -m kkvim run-cccc-n23`` (D-063, ``kkvim.cli_cccc_n23``) is the limited research mode of CCCC, N = 2-3, half-step s = 1 and, under D-065, s = 2.
+``python -m kkvim run-cccc-n46`` (D-067, ``kkvim.cli_cccc_n46``) is the limited research mode of CCCC, N = 4-6, half-step s = 1 only.
 """
 
 import argparse
@@ -135,7 +136,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="KK-VIM: run — расчёт принятым решателем R3 (D-043): пластина a × b, SSSS, q = const, N = 1; "
                     "run-ssss — SSSS при явно выбранном N = 1…6 с указанием научного статуса; "
                     "run-cccc-n1 — CCCC, N = 1, только исследование (D-061); "
-                    "run-cccc-n23 — CCCC, N = 2–3, полушаги s = 1 и s = 2, только исследование (D-063, D-065).",
+                    "run-cccc-n23 — CCCC, N = 2–3, полушаги s = 1 и s = 2, только исследование (D-063, D-065); "
+                    "run-cccc-n46 — CCCC, N = 4–6, только полушаг s = 1, только исследование (D-067).",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser(
@@ -165,6 +167,8 @@ def build_parser() -> argparse.ArgumentParser:
     cli_cccc.add_parser(commands)
     from kkvim import cli_cccc_n23  # imports this module
     cli_cccc_n23.add_parser(commands)
+    from kkvim import cli_cccc_n46  # imports this module
+    cli_cccc_n46.add_parser(commands)
     return parser
 
 
@@ -474,6 +478,9 @@ def main(argv=None) -> int:
     if args.command == "run-cccc-n23":
         from kkvim import cli_cccc_n23
         return cli_cccc_n23.main(args, argv)
+    if args.command == "run-cccc-n46":
+        from kkvim import cli_cccc_n46
+        return cli_cccc_n46.main(args, argv)
     try:
         check_output_folder(args.out, args.overwrite)
     except OutputExistsError as exc:
