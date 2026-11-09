@@ -371,7 +371,16 @@ def test_run_ssss_points_to_the_cccc_commands(tmp_path, capsys):
     plate = [f"--{name}={value!r}" if isinstance(value, float) else f"--{name}={value}" for name, value in PLATE.items()]
     assert cli.main(["run-ssss", "--N", "2", "--bc", "CCCC", *plate, "--half-steps", "2", "--out", str(tmp_path / "x")]) == cli.EXIT_USAGE
     err = capsys.readouterr().err
-    assert "run-cccc-n1" in err and "run-cccc-n23" in err and "N ≥ 4" in err and not (tmp_path / "x").exists()
+    assert "run-cccc-n1" in err and "run-cccc-n23" in err and "run-cccc-n46" in err and not (tmp_path / "x").exists()
+    assert "N ≥ 4 недоступен" not in err
+
+
+def test_n4_is_refused_by_this_command_and_pointed_to_run_cccc_n46(tmp_path, capsys):
+    out = tmp_path / "x"
+    assert cli.main(command(out, N=4)) == 2
+    err = capsys.readouterr().err
+    assert "run-cccc-n46" in err and "D-067" in err and "только N = 2, 3" in err and "N ≥ 4 не разрешено" not in err
+    assert names(out) == ["result.json"] and document(out)["status"] == cn.NOT_EXECUTED_OUTSIDE_DOMAIN and document(out)["field"] is None
 
 
 def test_the_n1_modules_and_the_reference_are_untouched_by_this_mode():

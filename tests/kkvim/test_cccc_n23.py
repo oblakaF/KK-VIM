@@ -335,6 +335,17 @@ def test_outside_the_domain_nothing_is_computed(monkeypatch, changes, N, half_st
     assert result.status == cn.NOT_EXECUTED_OUTSIDE_DOMAIN and result.steps == () and result.reason
 
 
+@pytest.mark.parametrize("N", [1, 4, 5, 6, 7])
+def test_the_n_refusal_points_to_the_other_cccc_commands(monkeypatch, N):
+    """The refusal of N outside {2, 3} names run-cccc-n1 (D-061) and run-cccc-n46 (D-067, s = 1) and does not suggest N >= 4 here."""
+    monkeypatch.setattr(cn, "start_set", lambda *a: pytest.fail("computed"))
+    result = run(N, 1)
+    assert result.status == cn.NOT_EXECUTED_OUTSIDE_DOMAIN and result.steps == ()
+    reason = result.reason
+    assert "только N = 2, 3" in reason and "run-cccc-n1 (D-061)" in reason and "run-cccc-n46" in reason and "D-067" in reason
+    assert "N = 4, 5, 6" in reason and "s = 1" in reason and "N ≥ 4 не разрешено" not in reason
+
+
 @pytest.mark.parametrize("changes", [{"q": 0.0}, {"q": math.nan}, {"D": -1.0}, {"a": math.inf}, {"n_x": 10.0}])
 def test_invalid_input_is_error_input(monkeypatch, changes):
     monkeypatch.setattr(cn, "start_set", lambda *a: pytest.fail("computed"))
