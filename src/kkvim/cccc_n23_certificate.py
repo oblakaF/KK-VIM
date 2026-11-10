@@ -354,7 +354,7 @@ def _closed_forms_consistent(Tc, rho, mu_c, mu_r, la, hx, m, N, q, A_T, F_T, Bc,
                 pert = hx * (rho * sum(abs(v) for v in Mv[j]) + rho * sum(abs(v) for v in Mv[i]) + rho * rho * m * rowsum[name])
                 if abs(computed[i][j] - closed[i][j]) > pert + radius(i, j):
                     return False
-    return all(abs(F_c[i] - F_T[i]) <= q * hx * m * rho for i in range(N))
+    return all(abs(F_c[i] - F_T[i]) <= abs(q) * hx * m * rho for i in range(N))
 
 
 def rn5_certificate(a: float, b: float, n_x: int, n_y: int, N: int, G, V, D: float, q: float) -> dict:

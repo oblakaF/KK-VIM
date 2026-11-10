@@ -570,3 +570,71 @@ def test_two_half_steps_repeat_bit_for_bit(N):
             assert (x is None and y is None) or np.array_equal(x, y), name
         assert (one.eta, one.P_hat, one.sigma, one.status) == (two.eta, two.P_hat, two.sigma, two.status)
     assert first.steps[1].rn5["eps"] == second.steps[1].rn5["eps"] and first.steps[1].rt7["tau"] == second.steps[1].rt7["tau"]
+
+
+# --- P0-A: the half-step s = 2 for both signs of the load -------------------------------------------------------------------------
+
+SIGN_CASES = SMALL[:2]  # C-1, C-2 of Policy 8
+
+
+@pytest.mark.parametrize("q", [1.0, 1000.0])
+@pytest.mark.parametrize("N", [2, 3])
+@pytest.mark.parametrize("a, b, n_x, n_y", SIGN_CASES)
+def test_two_half_steps_complete_for_both_signs_of_the_load(a, b, n_x, n_y, N, q):
+    """RN-5 on the actual G and V, QR, RT-7 and the X-half-step for q and -q; the field is odd in q bit for bit, the certificates even."""
+    up, down = (cn.run_cccc_n23(a, b, 1.0, sign * q, n_x, n_y, N, 2) for sign in (1.0, -1.0))
+    for result in (up, down):
+        assert result.status == cn.COMPLETED_FIXED_HALF_STEPS and result.half_steps_completed == 2 and len(result.steps) == 2
+        first, second = result.steps
+        assert first.status == cn.HALF_STEP_DONE and second.status == cn.COMPLETED_FIXED_HALF_STEPS and second.done
+        assert second.rn5["certified"] and second.rn5["verdict"] == "RN5_CERTIFIED" and all(second.rn5["hypotheses"].values())
+        assert second.qr_executed is True and second.given is first.V and second.direction == "X"
+        assert second.rt7["passed"] and second.rt7["R7-1"] and second.rt7["R7-2"] and second.rt7["R7-3"]
+    (u1, u2), (d1, d2) = up.steps, down.steps
+    assert np.array_equal(down.field(), -up.field())
+    assert np.array_equal(d1.G, u1.G) and np.array_equal(d1.V, -u1.V) and np.array_equal(d1.F, -u1.F)
+    assert np.array_equal(d2.G, u2.G) and np.array_equal(d2.R, -u2.R) and np.array_equal(d2.V, -u2.V) and np.array_equal(d2.F, -u2.F)
+    assert (d1.eta, d1.P_hat, d2.eta, d2.P_hat) == (u1.eta, u1.P_hat, u2.eta, u2.P_hat)
+    assert (d2.rn5["eps"], d2.rn5["sigma_low"]) == (u2.rn5["eps"], u2.rn5["sigma_low"])
+    assert (d2.rt7["t"], d2.rt7["tau"]) == (u2.rt7["t"], u2.rt7["tau"])
+
+
+def test_for_a_negative_load_qr_of_v_follows_rn5_and_rt7_precedes_the_x_solve(monkeypatch):
+    calls = []
+    for module, name in ((cn.certificate, "rn5_certificate"), (cn.certificate, "rt7_conditions"), (cn, "orthonormalise"), (cn, "solve_bc")):
+        real = getattr(module, name)
+        monkeypatch.setattr(module, name, lambda *a, _real=real, _name=name, **k: calls.append(_name) or _real(*a, **k))
+    result = cn.run_cccc_n23(1.0, 0.6, 1.0, -1000.0, 10, 9, 3, 2)
+    assert result.status == cn.COMPLETED_FIXED_HALF_STEPS and result.half_steps_completed == 2
+    assert calls == ["orthonormalise", "solve_bc", "rn5_certificate", "orthonormalise", "rt7_conditions", "solve_bc"]
+
+
+_RT7_FAILED = {"passed": False, "R7-1": True, "R7-2": True, "R7-3": False, "reason": "injected", "ranks": None, "t": None, "tau": None,
+               "sin_theta_upper": None}
+
+
+@pytest.mark.parametrize("guard", ["proven dependence of V", "RN-5 not certified", "RT-7 failed", "grid outside D-065.5"])
+def test_the_guards_of_s2_stop_a_negative_load_as_a_positive_one(monkeypatch, guard):
+    changes = {"n_x": 33} if guard == "grid outside D-065.5" else {}
+    if guard == "proven dependence of V":
+        real_rank = cn.exact_rank
+        monkeypatch.setattr(cn, "exact_rank", lambda M: real_rank(M) - 1 if np.shape(M) == (8, 2) else real_rank(M))
+        monkeypatch.setattr(cn.certificate, "rn5_certificate", lambda *a: pytest.fail("a certificate of a dependent set"))
+    elif guard == "RN-5 not certified":
+        monkeypatch.setattr(cn.certificate, "rn5_certificate", _uncertified)
+    elif guard == "RT-7 failed":
+        monkeypatch.setattr(cn.certificate, "rt7_conditions", lambda *a: dict(_RT7_FAILED))
+    else:
+        monkeypatch.setattr(cn.certificate, "rn5_certificate", lambda *a: pytest.fail("RN-5 outside the grid of D-065.5"))
+    status = cn.STOP_BEFORE_QR_S1 if guard == "proven dependence of V" else cn.STOPPED_RANK_GUARD_UNCERTIFIED
+    counts, _ = _counting(monkeypatch, names=("orthonormalise", "solve_bc"))
+    results = {}
+    for q in (-1000.0, 1000.0):
+        counts.clear()
+        result = results[q] = run(2, 2, q=q, **changes)
+        second = result.steps[1]
+        assert result.status == status and result.half_steps_completed == 1 and len(result.steps) == 2 and second.status == status
+        assert second.qr_executed is (guard == "RT-7 failed") and second.V is None and second.A is None and second.eta is None
+        assert counts == {"orthonormalise": 1 + (guard == "RT-7 failed"), "solve_bc": 1}  # no X-solve; QR of V only after RN-5
+        assert np.array_equal(result.field()[1:-1, 1:-1], result.steps[0].G @ result.steps[0].V.T)  # the field of s = 1 is kept
+    assert np.array_equal(results[-1000.0].field(), -results[1000.0].field())  # the diagnostic field of s = 1, odd in q
