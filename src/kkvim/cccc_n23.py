@@ -591,7 +591,8 @@ def domain_refusal(a, b, n_x, n_y, N, half_steps) -> str | None:
     """Why the input is outside the domain of D-063.2, or None. Values that are not valid numbers are left to the input checks."""
     if not n1._is_integer(N) or N not in N_VALUES:
         return (f"N должно быть 2 или 3, получено {N!r}: эта команда принимает только N = 2, 3; N = 1 — команда run-cccc-n1 (D-061); "
-                "N = 4, 5, 6 — отдельная исследовательская команда run-cccc-n46, только полушаг s = 1 (D-067)")
+                "N = 4, 5, 6 — отдельная исследовательская команда run-cccc-n46: полушаг s = 1 (D-067), s = 2 только при n_x, n_y ≤ 32 после "
+                "RN-5 и RT-7 (D-068)")
     return n1.domain_refusal(a, b, n_x, n_y, half_steps)
 
 

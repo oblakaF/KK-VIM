@@ -344,6 +344,7 @@ def test_the_n_refusal_points_to_the_other_cccc_commands(monkeypatch, N):
     reason = result.reason
     assert "только N = 2, 3" in reason and "run-cccc-n1 (D-061)" in reason and "run-cccc-n46" in reason and "D-067" in reason
     assert "N = 4, 5, 6" in reason and "s = 1" in reason and "N ≥ 4 не разрешено" not in reason
+    assert "s = 2 только при n_x, n_y ≤ 32 после RN-5 и RT-7 (D-068)" in reason and "только полушаг s = 1" not in reason
 
 
 @pytest.mark.parametrize("changes", [{"q": 0.0}, {"q": math.nan}, {"D": -1.0}, {"a": math.inf}, {"n_x": 10.0}])

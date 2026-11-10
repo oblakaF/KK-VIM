@@ -24,7 +24,8 @@ Units are SI: lengths in m, E and q in Pa, D in N·m, w in m.
 ``python -m kkvim run-ssss`` (explicit N = 1..6, ``kkvim.cli_ssss``) has its own all-or-nothing saving; ``run`` stays as it is.
 ``python -m kkvim run-cccc-n1`` (D-061, ``kkvim.cli_cccc``) is the limited research mode of CCCC, N = 1.
 ``python -m kkvim run-cccc-n23`` (D-063, ``kkvim.cli_cccc_n23``) is the limited research mode of CCCC, N = 2-3, half-step s = 1 and, under D-065, s = 2.
-``python -m kkvim run-cccc-n46`` (D-067, ``kkvim.cli_cccc_n46``) is the limited research mode of CCCC, N = 4-6, half-step s = 1 only.
+``python -m kkvim run-cccc-n46`` (D-067, ``kkvim.cli_cccc_n46``) is the limited research mode of CCCC, N = 4-6, half-step s = 1 and, under D-068,
+s = 2 (n_x, n_y <= 32, after RN-5 and RT-7).
 """
 
 import argparse
@@ -137,7 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "run-ssss — SSSS при явно выбранном N = 1…6 с указанием научного статуса; "
                     "run-cccc-n1 — CCCC, N = 1, только исследование (D-061); "
                     "run-cccc-n23 — CCCC, N = 2–3, полушаги s = 1 и s = 2, только исследование (D-063, D-065); "
-                    "run-cccc-n46 — CCCC, N = 4–6, только полушаг s = 1, только исследование (D-067).",
+                    "run-cccc-n46 — CCCC, N = 4–6, полушаг s = 1 и s = 2 при n_x, n_y ≤ 32 после RN-5 и RT-7, только исследование (D-067, D-068).",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser(
