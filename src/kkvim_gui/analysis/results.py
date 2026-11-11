@@ -159,10 +159,10 @@ class Figure(QFrame):
         lang = self.session.figure_language
         self.title.setText(fig_text(lang, self._title_key, **self._title_values))
         marks = []
-        if self.outcome.is_error:
+        if self.outcome.is_error or self.outcome.diagnostic_only:
             marks.append(fig_text(lang, "mark.diagnostic"))
         if self.outcome.mark:
-            marks.append(fig_text(lang, "mark.provisional"))
+            marks.append(fig_text(lang, "mark.research" if self.outcome.mark.startswith("RESEARCH_ONLY") else "mark.provisional"))
         self.mark.setText(" · ".join(marks))
         self.mark.setVisible(bool(marks))
         for side, key in self._axes.items():
@@ -309,16 +309,29 @@ def padded(layout):
     return w
 
 
+FIELD_ROLE_TEXT = {
+    "accepted": "результат принятого решателя R3 (field.csv)",
+    "research": "исследовательское поле, не квалифицированный результат (field_research.csv)",
+    "diagnostic": "только диагностика: поле последнего выполненного полушага (field_diagnostic.csv)",
+}
+
+
 def statuses(outcome, run):
     """(kind, text) of execution, stop and scientific status of the result."""
-    execution = (("error", f"Расчёт не завершён: ошибка решателя {outcome.status}; поле — только диагностика")
-                 if outcome.is_error else ("success", "Расчёт выполнен"))
+    if outcome.is_error:
+        execution = ("error", f"Расчёт не завершён: ошибка решателя {outcome.status}; поле — только диагностика")
+    elif not outcome.requested_completed:
+        execution = ("warning", (f"Запрошенный расчёт не выполнен: {outcome.status}; поле последнего выполненного "
+                                 "полушага — только диагностика"))
+    else:
+        execution = ("success", "Запрошенный расчёт выполнен")
     kind = STOP_STATUS[outcome.stop_kind]
     if outcome.mark and kind == "success":
         kind = "warning"  # an R4 stabilization is PROVISIONAL, not a success of the method
     stop = (kind, f"{outcome.stop_text} (s = {outcome.s}, k = {outcome.k})")
+    decisions = f" ({', '.join(outcome.decisions)})" if outcome.mark and outcome.decisions else ""
     science = (outcome.science_kind if outcome.mark else "neutral",
-               f"Научный статус: {outcome.mark}" if outcome.mark else
+               f"Научный статус: {outcome.mark}{decisions}" if outcome.mark else
                "Научный статус: решатель R3 ACCEPTED (D-043); расчёт — не научная приёмка")
     return execution, stop, science
 
@@ -345,8 +358,10 @@ def key_values(outcome, elapsed_text):
         ]
     rows += [
         ("Статус решателя", outcome.status),
-        ("Полушаги", f"s = {outcome.s}, k = {outcome.k} (D-030)"),
-        ("Сетка, N", f"n_x = {r.n_x}, n_y = {r.n_y} · N = {r.N}"),
+        ("Полушаги", f"s = {outcome.s}" + (f" из запрошенных {outcome.s_requested}" if outcome.s_requested else "")
+                     + f", k = {outcome.k} (D-030)"),
+        ("Роль поля", FIELD_ROLE_TEXT.get(outcome.field_role, "поле не получено")),
+        ("Закрепление, сетка, N", f"{r.supports} · n_x = {r.n_x}, n_y = {r.n_y} · N = {r.N}"),
         ("Решатель", f"{outcome.solver}: {outcome.call}"),
         ("Время расчёта", elapsed_text),
     ]
@@ -367,6 +382,9 @@ class OverviewTab(QWidget):
             status_card.body.addWidget(s)
         for note in outcome.notes:
             status_card.body.addWidget(Note(note, "testdata" if outcome.mark else "info"))
+        if outcome.mark and outcome.limitations:  # the full list scrolls in "Энергия и диагностика"
+            status_card.body.addWidget(Note(f"Ограничения маршрута ({len(outcome.limitations)}): вкладка «Энергия и "
+                                            "диагностика» и report.html", "testdata"))
         status_card.body.addStretch(1)
         key = Card("Ключевые значения", right=label(outcome.mark or "", "tag"))
         key.body.addLayout(key_value(key_values(outcome, elapsed_text)))
@@ -594,10 +612,12 @@ class EnergyTab(QWidget):
 
     def __init__(self, session, outcome, trailing=(), parent=None):
         super().__init__(parent)
+        energy = next((c for c in outcome.columns if c.key in ("P", "P_hat")), None)  # R3/R4: P; CCCC: P_hat
         self.figure = Figure(session, outcome, "energy.title")
-        self.figure.set_axes("axis.halfstep", "axis.energy")
+        self.figure.set_axes("axis.halfstep", "axis.energy_cell" if energy is not None and energy.unit == "q²a⁶/D"
+                             else "axis.energy")
         s = outcome.history_values("s")
-        P = outcome.history_values("P")
+        P = outcome.history_values(energy.key if energy is not None else "P")
         pairs = [(a, b) for a, b in zip(s, P, strict=True) if b is not None]
         colour = session.tokens["accent"]
         self.curve = self.figure.plot.plot([p[0] for p in pairs], [p[1] for p in pairs],
@@ -621,6 +641,9 @@ class EnergyTab(QWidget):
         box.addLayout(key_value(rows))
         for note in outcome.notes:
             box.addWidget(Note(note, "testdata" if outcome.mark else "info"))
+        if outcome.limitations:
+            box.addWidget(Note("Ограничения маршрута:\n" + "\n".join(f"• {t}" for t in outcome.limitations),
+                               "testdata" if outcome.mark else "info"))
         box.addStretch(1)
         scroll = QScrollArea()  # long texts keep their wrapped height; the list scrolls instead
         scroll.setWidgetResizable(True)

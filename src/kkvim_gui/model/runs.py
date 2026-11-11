@@ -23,9 +23,21 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from kkvim_gui import placeholders
 from kkvim_gui.backend import export
-from kkvim_gui.backend.kkvim_adapter import AdapterInputError, check_request
-from kkvim_gui.backend.outcome import ORIGIN_DEMO, ORIGIN_SOLVER
+from kkvim_gui.backend.kkvim_adapter import (
+    RESEARCH_MARK,
+    ROUTES,
+    AdapterInputError,
+    check_request,
+)
+from kkvim_gui.backend.outcome import (
+    ORIGIN_DEMO,
+    ORIGIN_SOLVER,
+    ROLE_ACCEPTED,
+    ROLE_DIAGNOSTIC,
+    ROLE_RESEARCH,
+)
 from kkvim_gui.backend.process import CRASH, INPUT, OK, SolverProcess
+from kkvim_gui.backend.request import ROUTE_R3, ROUTE_R4
 from kkvim_gui.backend.units import base_unit
 
 STATUS_TEXT = {
@@ -95,15 +107,17 @@ class RunRecord:
 
     @property
     def has_results(self):
-        """Analysis: finished runs with a field (demo: finished runs); never stopped or failed runs."""
+        """Analysis: finished runs whose field is a result of its route (accepted or research; demo: finished runs).
+
+        Never stopped or failed runs, and never a diagnostic field (``RunOutcome.field_role``)."""
         if self.status != "finished":
             return False
-        return self.is_demo or (self.outcome is not None and self.outcome.has_field)
+        return self.is_demo or (self.outcome is not None and self.outcome.field_role in (ROLE_ACCEPTED, ROLE_RESEARCH))
 
     @property
     def has_diagnostic_field(self):
-        """A solver error that kept the field of its last half-step: may be opened only as diagnostics."""
-        return self.status == "error" and self.outcome is not None and self.outcome.diagnostic_only
+        """A run that did not end as requested and kept the field of its last half-step: diagnostics only."""
+        return self.status in ("finished", "error") and self.outcome is not None and self.outcome.field_role == ROLE_DIAGNOSTIC
 
     def elapsed(self, now):
         return self._elapsed_final if self._elapsed_final is not None else max(0.0, now - self._t0)
@@ -113,9 +127,14 @@ class RunRecord:
         grid = f"сетка {st.texts['n_x'].strip()}×{st.texts['n_y'].strip()}"
         if self.is_demo:
             return f"N = {st.N} · {grid} · демонстрация"
-        if st.N == 1:
+        route = st.route
+        if route == ROUTE_R3:
             return f"N = 1 · R3 · {grid}" + (" · строгий режим" if st.strict else "")
-        return f"N = {st.N} · R4 {st.r4_mode}, {st.transform} · {grid}"
+        if route == ROUTE_R4:
+            return f"N = {st.N} · R4 {st.r4_mode}, {st.transform} · {grid}"
+        if st.supports == "CCCC":
+            return f"CCCC · N = {st.N} · s = {st.cccc_half_steps} · исследование · {grid}"
+        return f"SSSS · N = {st.N} · исследование, s = {st.texts['half_steps'].strip()} · {grid}"
 
     def log(self, level, text, important=False):
         entry = (datetime.now().strftime("%H:%M:%S"), level, text)
@@ -182,16 +201,19 @@ class RunManager(QObject):
         if problems:
             raise AdapterInputError("; ".join(problems))
         run = self._new_run(snapshot, "КК-ВИМ", ORIGIN_SOLVER, "Расчёт в отдельном процессе", request=request)
-        solver = "R3 (run_rectangle_physical)" if request.N == 1 else "R4 (run_coupled)"
+        route = ROUTES[request.route]
+        solver = f"{route['solver']} ({route['call']}; {', '.join(route['decisions'])})"
         run.log("ИНФО", "Формальная проверка ввода и проверка ввода решателем выполнены")
         for key, text, unit in request.entered:
             if unit:
                 value = getattr(request, "t" if key == "h" else key)
                 run.log("ИНФО", f"{key} = {text} {unit} → {value!r} {base_unit(unit)} (СИ для решателя)")
-        run.log("ИНФО", f"Расчёт запущен: KK-VIM {solver}, N = {request.N}, сетка {request.n_x}×{request.n_y}",
-                important=True)
-        if request.N != 1:
+        run.log("ИНФО", f"Расчёт запущен: {route['title']}; KK-VIM {solver}, {request.supports}, N = {request.N}, "
+                        f"сетка {request.n_x}×{request.n_y}", important=True)
+        if request.route == ROUTE_R4:
             run.log("ПРЕДУПРЕЖДЕНИЕ", "R4: все результаты PROVISIONAL / NOT_QUALIFIED (D-047, D-048)", important=True)
+        elif request.route != ROUTE_R3:
+            run.log("ПРЕДУПРЕЖДЕНИЕ", f"Только исследование: все результаты {RESEARCH_MARK}", important=True)
         run.log("ЭТАП", run.stage)
         run._process = self.process_factory(request)
         return self._register(run)
@@ -229,6 +251,9 @@ class RunManager(QObject):
             run.log("ПРЕДУПРЕЖДЕНИЕ", note, important=True)
         if not outcome.has_field:
             run.log("ПРЕДУПРЕЖДЕНИЕ", "Поле прогиба не получено: анализ поля недоступен", important=True)
+        elif outcome.field_role == ROLE_DIAGNOSTIC:
+            run.log("ПРЕДУПРЕЖДЕНИЕ", f"Запрошенный расчёт не выполнен ({outcome.status}): поле последнего выполненного полушага "
+                                      f"s = {outcome.s} — только диагностика, не результат", important=True)
         self._save_protocol(run)
 
     def _save_protocol(self, run):

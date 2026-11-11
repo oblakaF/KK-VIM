@@ -215,14 +215,16 @@ class AnalysisWindow(QMainWindow):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
         self.header = AppHeader(self.session, "КК-ВИМ: анализ результатов",
-                                show_badge=bool(outcome.mark) or outcome.is_error)
-        if outcome.is_error:
+                                show_badge=bool(outcome.mark) or outcome.is_error or outcome.diagnostic_only)
+        if outcome.is_error or outcome.diagnostic_only:
+            cause = f"Решатель завершился ошибкой {outcome.status}" if outcome.is_error else                 f"Запрошенный расчёт не выполнен ({outcome.status})"
             self.header.set_badge("ДИАГНОСТИКА · расчёт не завершён", "ДИАГНОСТИКА",
-                                  f"Решатель завершился ошибкой {outcome.status}: поле последнего выполненного "
-                                  "полушага показано только для диагностики, это не результат")
+                                  f"{cause}: поле последнего выполненного полушага показано только для диагностики, "
+                                  "это не результат")
         elif outcome.mark:
-            self.header.set_badge(outcome.mark, "PROVISIONAL", "Исследовательский решатель R4 (D-047, D-048): "
-                                  "результаты не квалифицированы, не научная приёмка")
+            decisions = ", ".join(outcome.decisions)
+            self.header.set_badge(outcome.mark, "RESEARCH" if outcome.mark.startswith("RESEARCH_ONLY") else "PROVISIONAL",
+                                  f"Решатель {outcome.solver} ({decisions}): результаты не квалифицированы, не научная приёмка")
         self.header.set_project(title)
         self.header.settingsClicked.connect(self.settingsRequested)
         self.header.helpClicked.connect(self.helpRequested)
@@ -279,8 +281,9 @@ class AnalysisWindow(QMainWindow):
         lay.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
         mark = f" · {outcome.mark}" if outcome.mark else ""
-        if outcome.is_error:
-            self.statusBar().addWidget(label(f"●  ДИАГНОСТИКА: расчёт завершился ошибкой {outcome.status}; "
+        if outcome.is_error or outcome.diagnostic_only:
+            cause = "расчёт завершился ошибкой" if outcome.is_error else "запрошенный расчёт не выполнен,"
+            self.statusBar().addWidget(label(f"●  ДИАГНОСТИКА: {cause} {outcome.status}; "
                                              f"поле — последнего выполненного полушага, не результат{mark}"), 1)
         else:
             self.statusBar().addWidget(label(f"●  Результаты решателя KK-VIM загружены{mark}"), 1)
@@ -333,7 +336,11 @@ class AnalysisWindow(QMainWindow):
     def _export_all_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Папка для результатов")
         if folder:
-            paths = self.export_all(folder)
+            try:
+                paths = self.export_all(folder)
+            except OSError as exc:  # an existing package is never overwritten (export.new_folder)
+                QMessageBox.warning(self, "Сохранение не выполнено", f"Результаты не сохранены: {exc}")
+                return
             self.statusBar().showMessage(f"Сохранено: {paths['manifest'].parent}", 8000)
 
     def _export_history_dialog(self):
@@ -344,7 +351,8 @@ class AnalysisWindow(QMainWindow):
             self.statusBar().showMessage(f"Сохранено: {path}", 8000)
 
     def _export_field_dialog(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Поле прогиба", f"{self._base_name()}_field.csv", "CSV (*.csv)")
+        name = export.field_file_name(self.outcome)  # the name of its role: field / field_research / field_diagnostic
+        path, _ = QFileDialog.getSaveFileName(self, "Поле прогиба", f"{self._base_name()}_{name}", "CSV (*.csv)")
         if path:
             export.write_field_csv(self.outcome, path)
             self.statusBar().showMessage(f"Сохранено: {path}", 8000)

@@ -222,7 +222,8 @@ def test_r4_from_the_form_to_figures_history_and_export(qtbot, gui, tmp_path):
     paths = a.export_all(tmp_path / "export")
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))
     assert data["statuses"]["solver_status"] == o.status and data["marks"] == [MARK]
-    assert sorted(p.name for p in paths["manifest"].parent.iterdir()) == ["field.csv", "history.csv", "manifest.json"]
+    assert sorted(p.name for p in paths["manifest"].parent.iterdir()) == ["field_research.csv", "history.csv", "manifest.json"]
+    assert data["statuses"]["field_role"] == "research" and data["statuses"]["field_file"] == "field_research.csv"
     for theme in ("dark", "light"):
         gui.session.set_theme(theme, persist=False)
         assert not a.grab().isNull()
@@ -256,14 +257,21 @@ def test_input_rejected_by_kkvim_is_not_computed(qtbot, gui):
     assert w.runs.runs == [] and "D-048.6" in w.setup_view.errors_transform.text()
 
 
-def test_cccc_and_n_4_6_are_shown_as_not_implemented(qtbot, gui):
+def test_cccc_and_n_4_6_are_routed_only_as_research(qtbot, gui):
+    """P1: CCCC and N = 4-6 have routes; each is research only and needs no implicit choice (GUI-CORE-N16-P1)."""
     sv = gui.main_window.setup_view
-    assert "не реализовано" in sv.supports.buttons["CCCC"].text()
+    assert "не реализовано" not in sv.supports.buttons["CCCC"].text() and sv.supports.buttons["CCCC"].isEnabled()
     model = sv.N.model()
-    assert [model.item(i).isEnabled() for i in range(len(N_VALUES))] == [n <= 3 for n in N_VALUES]
+    assert all(model.item(i).isEnabled() for i in range(len(N_VALUES)))
     sv.supports.set_current("CCCC")
-    assert sv.try_run() is False and gui.main_window.runs.runs == []
-    assert sv.errors_supports.isVisibleTo(sv) and "CCCC" in sv.errors_supports.text()
+    assert sv.cccc_half_steps.isVisibleTo(sv) and sv.cccc_half_steps.currentData() == 1   # s = 1 by default
+    assert not sv.half_steps.isVisibleTo(sv) and not sv.research.isVisibleTo(sv)
+    assert all("исследование" in sv.N.itemText(i) for i in range(len(N_VALUES)))
+    sv.supports.set_current("SSSS")
+    sv.N.setCurrentIndex(N_VALUES.index(4))
+    assert sv.ssss_research.isVisibleTo(sv) and not sv.ssss_research.isChecked()
+    assert sv.try_run() is False and gui.main_window.runs.runs == []                  # N = 4-6 only on explicit choice
+    assert sv.errors_research.isVisibleTo(sv) and "D-056.7" in sv.errors_research.text()
 
 
 def test_r4_parameters_are_shown_only_for_n_2_3(qtbot, gui):

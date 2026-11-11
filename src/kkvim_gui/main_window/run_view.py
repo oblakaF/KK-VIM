@@ -9,7 +9,10 @@
   (in the details), and there are no per-iteration lines.
 No convergence plot here: scientific figures live in the analysis window. No remaining-time
 estimate. The demonstration backend is marked TEST DATA everywhere; every R4 result carries
-PROVISIONAL / NOT_QUALIFIED. The scientific status comes from the solver outcome, never from the GUI.
+PROVISIONAL / NOT_QUALIFIED and every research route (SSSS N = 4-6, CCCC) RESEARCH_ONLY / PROVISIONAL /
+NOT_QUALIFIED, with the limits of its route. The scientific status comes from the solver outcome (or, while
+the run is active, from the route of its request), never from N alone; a diagnostic field is never shown
+as a result.
 """
 
 from PySide6.QtCore import Qt, Signal
@@ -28,6 +31,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from kkvim_gui.backend.kkvim_adapter import LIMITATIONS, MARK, RESEARCH_MARK
+from kkvim_gui.backend.request import ROUTE_R3, ROUTE_R4
 from kkvim_gui.model.runs import STATUS_TEXT, format_duration
 from kkvim_gui.model.setup_state import summary_rows
 from kkvim_gui.widgets.common import Card, Note, StatusLabel, label, set_help_context
@@ -44,6 +49,10 @@ RESULTS_SOLVER = (
     "полушагов, энергия и диагностика — по массивам решателя KK-VIM."
 )
 RESULTS_R4 = RESULTS_SOLVER + " Все величины R4 — PROVISIONAL / NOT_QUALIFIED."
+RESULTS_RESEARCH = RESULTS_SOLVER + f" Исследовательский расчёт: {RESEARCH_MARK}; не квалифицированный результат."
+DIAGNOSTIC_FIELD = ("Запрошенный расчёт не выполнен: поле последнего выполненного полушага доступно только как диагностика "
+                    "(field_diagnostic.csv), не как результат.")
+LIMITS_SHOWN = 3  # the first limits of the route in the run summary; all of them in the analysis and the report
 NO_FIELD = "Поле прогиба не получено. Протокол и диагностика доступны через «Сохранить результаты…»."
 
 
@@ -132,6 +141,9 @@ class RunView(QWidget):
         card.body.addWidget(self.summary_text)
         self.results_note = Note(RESULTS_TEXT, "testdata")
         card.body.addWidget(self.results_note)
+        self.limits_note = Note("", "testdata")  # the limits of a non-accepted route (the same texts as the report)
+        self.limits_note.setVisible(False)
+        card.body.addWidget(self.limits_note)
         return card
 
     def _details_card(self):
@@ -252,7 +264,7 @@ class RunView(QWidget):
         diagnostic = has and run.has_diagnostic_field
         self.analysis_button.setVisible(has and (run.status == "finished" or diagnostic))
         self.analysis_button.setEnabled(has and (run.has_results or diagnostic))
-        self.analysis_button.setText("Открыть диагностику (расчёт не завершён)" if diagnostic
+        self.analysis_button.setText("Открыть диагностику (запрошенный расчёт не выполнен)" if diagnostic
                                      else "Открыть анализ результатов")
         self.export_button.setVisible(has and run.outcome is not None)
         outcome = run.outcome if has else None
@@ -260,9 +272,17 @@ class RunView(QWidget):
             self.results_note.text.setText(RESULTS_TEXT)
         elif outcome is not None:
             self.results_note.text.setText(
-                NO_FIELD if not outcome.has_field else RESULTS_R4 if outcome.mark else RESULTS_SOLVER)
-        self.results_note.setVisible(has and (run.has_results or (outcome is not None and not outcome.has_field)))
+                NO_FIELD if not outcome.has_field else DIAGNOSTIC_FIELD if outcome.diagnostic_only else
+                RESULTS_R4 if outcome.mark == MARK else RESULTS_RESEARCH if outcome.mark else RESULTS_SOLVER)
+        self.results_note.setVisible(has and (run.has_results or (outcome is not None and (not outcome.has_field
+                                                                                          or outcome.diagnostic_only))))
         self.details_tag.setText(self._tag(run) if has else "")
+        limits = self._limitations(run) if has else ()
+        shown = [f"• {t}" for t in limits[:LIMITS_SHOWN]]
+        if len(limits) > LIMITS_SHOWN:
+            shown.append(f"… ещё {len(limits) - LIMITS_SHOWN}: полный перечень — в окне анализа и в report.html")
+        self.limits_note.text.setText("Ограничения маршрута:\n" + "\n".join(shown))
+        self.limits_note.setVisible(bool(limits))
         if not has:
             self.summary_title.setText("Расчёты ещё не запускались")
             for v in self.details.values():
@@ -276,7 +296,8 @@ class RunView(QWidget):
         self.status_stop.set_status(*self._criterion(run))
         self.status_accept.set_status(*self._science(run))
         rows = dict(summary_rows(run.snapshot))
-        tail = " · TEST DATA" if run.is_demo else (" · PROVISIONAL / NOT_QUALIFIED" if run.snapshot.N != 1 else "")
+        mark = self._mark(run)
+        tail = " · TEST DATA" if run.is_demo else (f" · {mark}" if mark else "")
         self.summary_text.setText(f"{run.method} · {run.params_text()} · {rows['Закрепление']} · "
                                   f"{rows['Геометрия']}{tail}")
         d = self.details
@@ -309,13 +330,32 @@ class RunView(QWidget):
         self.important.setText("<br>".join(lines))
         self._fill_journal(run.detailed)
 
+    @classmethod
+    def _limitations(cls, run):
+        """Limits of a research or PROVISIONAL route (none for R3 and the demonstration)."""
+        if run.is_demo or cls._mark(run) is None:
+            return ()
+        if run.outcome is not None:
+            return run.outcome.limitations
+        route = run.request.route if run.request is not None else run.snapshot.route
+        return LIMITATIONS.get(route, ())
+
     @staticmethod
-    def _tag(run):
+    def _mark(run):
+        """The status mark of the run: from its outcome, or from the route of its request while it runs."""
+        if run.outcome is not None:
+            return run.outcome.mark
+        route = run.request.route if run.request is not None else run.snapshot.route
+        return None if route == ROUTE_R3 else MARK if route == ROUTE_R4 else RESEARCH_MARK
+
+    @classmethod
+    def _tag(cls, run):
         if run.is_demo:
             return "TEST DATA"
-        if run.snapshot.N != 1:
-            return "PROVISIONAL / NOT_QUALIFIED"
-        return "KK-VIM"
+        mark = cls._mark(run)
+        if run.outcome is not None and run.outcome.diagnostic_only:
+            return f"ДИАГНОСТИКА · {mark}" if mark else "ДИАГНОСТИКА"
+        return mark or "KK-VIM"
 
     @staticmethod
     def _criterion(run):
@@ -335,12 +375,16 @@ class RunView(QWidget):
             kind = "warning"  # an R4 stabilization is PROVISIONAL, not a success of the method
         return kind, f"{outcome.stop_text} (s = {outcome.s}, k = {outcome.k})"
 
-    @staticmethod
-    def _science(run):
+    @classmethod
+    def _science(cls, run):
         if run.is_demo:
             return "neutral", "Научная приёмка: не проводилась"
-        if run.snapshot.N != 1:
+        mark = cls._mark(run)
+        if mark == MARK:
             return "warning", "Научный статус: PROVISIONAL / NOT_QUALIFIED (R4, D-047, D-048)"
+        if mark:
+            decisions = ", ".join(run.outcome.decisions) if run.outcome is not None else ""
+            return "warning", f"Научный статус: {mark}" + (f" ({decisions})" if decisions else "")
         return "neutral", "Научный статус: решатель R3 ACCEPTED (D-043); расчёт — не научная приёмка"
 
     def _fill_journal(self, rows):

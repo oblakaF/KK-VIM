@@ -198,8 +198,9 @@ class MainWindow(QMainWindow):
             return run
         request = to_request(snapshot)
         problems = check_request(request)
-        if self.preview and request.N not in PREVIEW_N:
-            problems.append(f"N = {request.N}: недоступно в функциональной предварительной версии; доступно N = 1 (R3)")
+        if self.preview and (request.N not in PREVIEW_N or request.supports != "SSSS"):
+            problems.append(f"{request.supports}, N = {request.N}: недоступно в функциональной предварительной версии; "
+                            "доступно SSSS, N = 1 (R3)")
         if problems:
             self.setup_view.show_solver_problems(problems)
             return None
@@ -237,7 +238,9 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"●  Расчёт и отчёт сохранены: {paths['report'].parent}")
 
     def save_package(self, run_id, folder):
-        """Export files, PNG figures (if the run has a field) and report.html of a run in a new subfolder."""
+        """Export files, PNG figures (if the run has a field) and report.html of a run in a new subfolder.
+
+        An existing package is never overwritten: a subfolder that already holds files is refused (FileExistsError)."""
         from kkvim_gui.backend import report
 
         run = self.runs.get(run_id)
@@ -253,7 +256,7 @@ class MainWindow(QMainWindow):
         return paths
 
     def export_run(self, run_id, folder):
-        """Write manifest.json, history.csv and field.csv of a run into a new subfolder of ``folder``."""
+        """Write manifest.json, history.csv and the field file of its role into a new subfolder of ``folder``."""
         run = self.runs.get(run_id)
         target = Path(folder) / f"kkvim_{run.started:%Y%m%d-%H%M%S}_run{run.run_id:03d}"
         paths = export.write_result(run.outcome, target, run.meta(self.runs.clock()), run.detailed)

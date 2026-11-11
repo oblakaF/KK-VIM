@@ -2,7 +2,8 @@
 
 ``write_package`` writes into one folder:
 
-- ``manifest.json``, ``history.csv``, ``field.csv`` — the existing export of ``backend.export``, unchanged;
+- ``manifest.json``, ``history.csv`` and the field file of its role (``field.csv``, ``field_research.csv`` or
+  ``field_diagnostic.csv``) — the export of ``backend.export``;
 - the figures rendered by the interface (PNG; the caller passes a function that writes them);
 - ``report.html`` — a readable report built from the same ``RunOutcome`` as the export files.
 
@@ -23,18 +24,17 @@ from kkvim_gui import program_version
 from kkvim_gui.backend import export
 from kkvim_gui.backend.outcome import RunOutcome
 
-PREVIEW_TITLE = "KK-VIM — функциональная предварительная версия GUI (SSSS, N = 1)"
+PREVIEW_TITLE = "KK-VIM — отчёт расчёта"
 PREVIEW_NOTICE = (
     "Функциональная предварительная версия интерфейса. Не официальный выпуск R7 и не научная приёмка "
     "отдельного расчёта.")
-LIMITATIONS = (
-    "Модель: линейная теория пластин Кирхгофа–Лява; статика; постоянная толщина; однородный изотропный упругий "
-    "материал; равномерная нагрузка q.",
-    "Закрепление: только SSSS (шарнирное опирание всех краёв). CCCC не реализовано.",
-    "Метод: КК-ВИМ, N = 1 — принятый решатель R3 (D-043); область решателя 0,2 ≤ b/a ≤ 5. "
-    "N ≥ 2, теории Тимошенко и Редди в этой версии недоступны.",
-    "Статус CONVERGED означает выполнение критерия остановки решателя (NUMERICAL_SPEC.md 11.2), а не оценку "
-    "погрешности дискретизации или метода для данного расчёта.",
+ROLE_TITLE = {
+    "accepted": "результат принятого решателя R3 (CONVERGED)",
+    "research": "исследовательское поле (запрошенный расчёт выполнен); не квалифицированный результат",
+    "diagnostic": "только диагностика: поле последнего выполненного полушага; не результат",
+}
+LIMITATIONS = (  # common to every route; the limits of the route itself come from the outcome (``RunOutcome.limitations``)
+    "Теории Тимошенко и Редди в этой версии недоступны.",
     "Результат — значения в узлах сетки n_x × n_y; максимальный |w| найден по узлам, а не между ними.",
     "Моменты, напряжения и сравнение с эталонами в этой версии не выводятся.",
     "Масштаб прогиба на 3D-виде увеличен только для изображения; все числа отчёта и файлов — без увеличения.",
@@ -95,9 +95,11 @@ def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None) -> s
     e, c = s["w_max_abs_node"], s["w_centre_node"]
     created = datetime.now().isoformat(timespec="seconds")
     banner = [PREVIEW_NOTICE]
-    if outcome.is_error:
-        banner.insert(0, f"ДИАГНОСТИКА: решатель завершился ошибкой {outcome.status}; поле последнего выполненного "
-                         "полушага — не результат.")
+    if outcome.diagnostic_only:
+        banner.insert(0, f"ДИАГНОСТИКА: расчёт не выполнен как запрошено ({outcome.status}); поле последнего выполненного "
+                         "полушага — только диагностика, не результат.")
+    elif outcome.is_error:
+        banner.insert(0, f"ДИАГНОСТИКА: решатель завершился ошибкой {outcome.status}; поле не получено.")
     if outcome.mark:
         banner.insert(0, outcome.mark)
     if outcome.is_demo:
@@ -107,6 +109,7 @@ def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None) -> s
           ("E", f"{_exact(r.E)} Pa"), ("ν", _exact(r.nu)), ("q", f"{_exact(r.q)} Pa"),
           ("b/a", _num(r.b / r.a, 6)), ("D = Et³/(12(1−ν²)) (kkvim)", f"{_num(outcome.D)} N·m ({_exact(outcome.D)})")]
     model = [("Теория", "Кирхгоф–Ляв (линейная)"), ("Закрепление", _e(r.supports)), ("Нагрузка", "равномерная q"),
+             ("Маршрут", _e(outcome.route)),
              ("Метод", f"КК-ВИМ, N = {r.N}"), ("Решатель", f"{_e(outcome.solver)}: <code>{_e(outcome.call)}</code>"),
              ("Сетка", f"n_x = {r.n_x}, n_y = {r.n_y} ({len(outcome.x) if outcome.x is not None else '—'} × "
                        f"{len(outcome.y) if outcome.y is not None else '—'} узлов)")]
@@ -129,9 +132,14 @@ def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None) -> s
         results.append(("Поле прогиба", "не получено"))
     statuses = [
         ("Статус решателя", f"<b>{_e(outcome.status)}</b>"),
+        ("Запрошенный расчёт выполнен", "да" if outcome.requested_completed else "нет"),
         ("Остановка", _e(outcome.stop_text)),
         ("Научный статус", _e(outcome.science_text)),
-        ("Полушаги, циклы", f"s = {outcome.s}, k = {outcome.k} (D-030)"),
+        ("Полушаги, циклы", f"s = {outcome.s}" + (f" из запрошенных {outcome.s_requested}" if outcome.s_requested else "")
+                            + f", k = {outcome.k} (D-030)"),
+        ("Роль поля", _e(ROLE_TITLE.get(outcome.field_role, "поле не получено"))),
+        ("Файл поля", f"<code>{_e(files.get('field', '—'))}</code>"),
+        ("Решения владельца", _e(", ".join(outcome.decisions) or "—")),
     ]
     if outcome.reason:
         statuses.append(("Причина (решатель)", _e(outcome.reason)))
@@ -143,8 +151,8 @@ def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None) -> s
         + (f". {_e(view['exaggeration_text'])}" if key == "surface_png" and view.get("exaggeration_text") else "")
         + "</figcaption></figure>"
         for key, title in IMAGE_TITLES.items() if key in files)
-    history_cols = [c for c in outcome.columns if c.key in ("s", "k", "direction", "eps_inf", "eps_E", "P",
-                                                            "energy_status", "w_bar_centre")]
+    history_cols = [c for c in outcome.columns if c.key in ("s", "k", "direction", "status", "eps_inf", "eps_E", "P", "P_hat",
+                                                            "energy_status", "w_bar_centre", "rn5_verdict", "rt7_passed")]
     head = "".join(f"<th>{_e(col.title)}{', ' + _e(col.unit) if col.unit else ''}</th>" for col in history_cols)
     body = "\n".join("<tr>" + "".join(
         f"<td>{_num(row.get(col.key)) if col.kind == 'number' else _e(row.get(col.key) or '—')}</td>"
@@ -164,7 +172,7 @@ table.h th{{width:auto}} .banner{{background:#FFF4E0;border:1px solid #E3AE52;pa
 .x{{color:#5F6E7C;font-family:Consolas,monospace;font-size:12px}} figure{{margin:12px 0}}
 img{{max-width:100%;border:1px solid #DCE3EA}} figcaption{{font-size:13px;color:#5F6E7C}}
 </style></head><body>
-<h1>{_e(PREVIEW_TITLE)}</h1>
+<h1>{_e(PREVIEW_TITLE)} ({_e(r.supports)}, N = {r.N})</h1>
 <div class="banner">{"<br>".join(_e(b) for b in banner)}</div>
 <p>Отчёт создан {_e(created)} · запуск {_e(meta.get('run_id', '—'))} · kkvim-gui {_e(program_version())} ·
 {_e(versions)}</p>
@@ -177,7 +185,7 @@ img{{max-width:100%;border:1px solid #DCE3EA}} figcaption{{font-size:13px;color:
 <h2>5. Статус расчёта</h2><table>{_rows(statuses)}</table>
 <h2>6. История полушагов</h2><table class="h"><tr>{head}</tr>
 {body}</table>
-<h2>7. Ограничения применимости</h2><ul>{"".join(f"<li>{_e(t)}</li>" for t in LIMITATIONS)}</ul>
+<h2>7. Ограничения применимости</h2><ul>{"".join(f"<li>{_e(t)}</li>" for t in (*outcome.limitations, *LIMITATIONS))}</ul>
 <h2>8. Файлы расчёта</h2><ul>{file_list}</ul>
 </body></html>
 """
