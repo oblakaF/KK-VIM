@@ -1,8 +1,9 @@
-"""``kkvim.cccc_n46`` (D-067): CCCC, N = 4, 5, 6, the first half-step s = 1 only. Builder tests, not the independent QA of D-067.
+"""``kkvim.cccc_n46`` (D-067, D-068): CCCC, N = 4, 5, 6, the half-step s = 1 and the guarded s = 2. Builder tests, not the independent QA.
 
 Exact checks in Fraction where the operation is exact in binary64 (integer sets, h = 1/8); otherwise the dense system of (ЧФ-C1) is solved
 separately and compared with a sanity tolerance of the test, which is not a criterion of the method. No threshold of eta is applied by the
-solver for N >= 4 (D-067); the tests check that none exists.
+solver for N >= 4 (D-067) or at s = 2 (D-068); the tests check that none exists. The s = 2 path runs RN-5 and RT-7 of
+``kkvim.cccc_n23_certificate`` in exact arithmetic; the cases with the whole path use the smallest grids (2N + 1) to stay short.
 """
 
 import math
@@ -121,7 +122,7 @@ def test_the_task_case_completes_one_y_half_step_with_fixed_n(N):
     assert np.array_equal(w[1:-1, 1:-1], step.G @ step.V.T) and np.max(np.abs(w)) > 0
     assert result.D == 2.1e11 * 0.01**3 / (12 * (1 - 0.3**2)) and result.physical == {"t": 0.01, "E": 2.1e11, "nu": 0.3}
     assert result.mode == "FIXED_HALF_STEPS_RESEARCH" and result.application_status == "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
-    assert result.rank_guard_rule == cn.RANK_GUARD_RULE and "D-067" in result.rank_guard_rule
+    assert result.rank_guard_rule == cn.RANK_GUARD_RULE and "D-067" in result.rank_guard_rule and "D-068" in result.rank_guard_rule
 
 
 @pytest.mark.parametrize("N, a, b, n_x, n_y", CASES)
@@ -349,9 +350,16 @@ def test_physical_input_is_checked_like_the_other_commands():
     assert result.status == cn.ERROR_INPUT and result.D is None and result.steps == ()
 
 
-# --- 7. s >= 2 stops before the QR of the solved set ---------------------------------------------------------------------------
+# --- 7. s = 2 under RN-5 and RT-7 (D-068); s >= 3 stops before the QR of X ---------------------------------------------------
 
-def _counting(monkeypatch, names=("orthonormalise", "assemble", "solve_bc", "residual_eta", "rank_diagnostic", "start_set")):
+def run2(N=4, half_steps=2, **changes):
+    """The smallest square grid 2N + 1 of N, where the whole s = 2 path is short."""
+    low = cn.grid_min(N)
+    plate = {"a": 1.0, "b": 1.0, "D": 1.0, "q": 1.0, "n_x": low, "n_y": low, **changes}
+    return cn.run_cccc_n46(plate["a"], plate["b"], plate["D"], plate["q"], plate["n_x"], plate["n_y"], N, half_steps)
+
+
+def _counting(monkeypatch, names=("orthonormalise", "_solve_given", "solve_bc", "residual_eta", "rank_diagnostic", "start_set")):
     counts = {}
     for name in names:
         real = getattr(n23, name)
@@ -361,38 +369,204 @@ def _counting(monkeypatch, names=("orthonormalise", "assemble", "solve_bc", "res
             return _real(*args, **kwargs)
 
         monkeypatch.setattr(n23, name, counted)
-    qr_calls = []
-    real_qr = np.linalg.qr
-    monkeypatch.setattr(np.linalg, "qr", lambda *a, **k: qr_calls.append(1) or real_qr(*a, **k))
-    return counts, qr_calls
+    return counts
+
+
+def _log_calls(monkeypatch, log):
+    """The order of RN-5, QR, RT-7 and the half-step (assembly C-3+ and B-C in _solve_given); the real functions are called."""
+    for module, name in ((n23.certificate, "rn5_certificate"), (n23.certificate, "rt7_conditions"), (n23, "orthonormalise"),
+                         (n23, "_solve_given"), (n23, "solve_bc")):
+        real = getattr(module, name)
+        monkeypatch.setattr(module, name, lambda *a, _real=real, _name=name, **k: log.append(_name) or _real(*a, **k))
 
 
 @pytest.mark.parametrize("N", cn.N_VALUES)
-@pytest.mark.parametrize("half_steps", range(2, 9))
-def test_s2_stops_before_qr_without_assembly_or_solve(monkeypatch, N, half_steps):
-    monkeypatch.setattr(n23.certificate, "rn5_certificate", lambda *a: pytest.fail("RN-5 is not extended to N >= 4"))
-    monkeypatch.setattr(n23.certificate, "rt7_conditions", lambda *a: pytest.fail("RT-7 is not extended to N >= 4"))
-    counts, qr_calls = _counting(monkeypatch)
-    one = run(N, 1)
-    once, qr_once = dict(counts), len(qr_calls)
-    counts.clear()
-    qr_calls.clear()
-    result = run(N, half_steps)
-    assert counts == once and len(qr_calls) == qr_once  # nothing of s = 2 is computed, no QR of V
-    assert once["orthonormalise"] == 1 and once["solve_bc"] == 1
-    assert result.status == cn.STOPPED_RANK_GUARD_UNCERTIFIED and result.half_steps_completed == 1 and len(result.steps) == 2
+def test_s2_completes_with_rn5_qr_rt7_and_the_x_half_step(monkeypatch, N):
+    log = []
+    _log_calls(monkeypatch, log)
+    result = run2(N)
+    assert result.status == cn.COMPLETED_FIXED_HALF_STEPS and result.reason is None and result.half_steps_completed == 2, result.reason
+    assert log == ["orthonormalise", "_solve_given", "solve_bc", "rn5_certificate", "orthonormalise", "rt7_conditions", "_solve_given", "solve_bc"]
+    first, second = result.steps
+    low = cn.grid_min(N)
+    assert first.status == cn.HALF_STEP_DONE and second.status == cn.COMPLETED_FIXED_HALF_STEPS and first.done and second.done
+    assert (second.s, second.k, second.direction, second.n_s, second.N, second.qr_executed) == (2, 1, "X", low, N, True)
+    assert second.rn5["certified"] and second.rn5["verdict"] == "RN5_CERTIFIED" and all(second.rn5["hypotheses"].values())
+    assert second.rt7["passed"] and second.rt7["R7-1"] and second.rt7["R7-2"] and second.rt7["R7-3"]
+    assert second.rt7["tau"] < (1 - second.rt7["t"]) ** 2 and 0 <= second.rt7["t"] < 1  # the strict conditions, exact
+    assert np.array_equal(second.given, first.V) and second.G.shape == (low - 1, N) and second.V.shape == (low - 1, N)
+    G2, R = n23.orthonormalise(first.V, 1.0 / low)  # G2 is the QR of the saved V with the normalisation over y
+    assert np.array_equal(second.G, G2) and np.array_equal(second.R, R) and np.array_equal(second.companion, first.G @ R.T)
+    x, y = result.factors()
+    assert x is second.V and y is second.G  # axis 0 = x: X solved at s = 2, G2 over y
+    w = result.field()
+    assert np.array_equal(w[1:-1, 1:-1], second.V @ second.G.T) and not np.any(w[0]) and not np.any(w[:, -1])
+    assert second.V_exact_rank == N and second.premises_status == cn.PREMISES_ESTABLISHED and math.isfinite(second.eta)
+    assert second.P_hat < 0 and second.P_hat <= first.P_hat * (1 - 1e-12)  # an observation of the minimisation (not a criterion)
+    assert second.conditions == {"S-1 (RN-3): N > floor(n_x/2)": False, cn.GRID_KEY: True}
+
+
+def test_s1_is_unchanged_when_s2_is_asked_for():
+    one, two = run2(4, 1), run2(4, 2)
+    a, b = one.steps[0], two.steps[0]
+    for name in ("T", "G", "R", "A", "B", "C", "F", "V"):
+        assert np.array_equal(getattr(a, name), getattr(b, name)), name
+    assert (a.eta, a.P_hat, a.V_exact_rank, a.status) == (b.eta, b.P_hat, b.V_exact_rank, cn.COMPLETED_FIXED_HALF_STEPS)
+
+
+def test_the_x_half_step_solves_the_exchanged_dense_system():
+    result = run2(4)
     second = result.steps[1]
-    assert (second.s, second.direction, second.qr_executed, second.status) == (2, "X", False, result.status)
-    assert second.G is None and second.R is None and second.A is None and second.V is None and second.eta is None and second.rn5 is None
-    assert second.conditions == {"S-1 (RN-3): N > floor(n_x/2)": False} and "D-067" in second.reason
-    assert np.array_equal(result.field(), one.field()) and np.array_equal(second.given, result.steps[0].V)
+    low = cn.grid_min(4)
+    A, B, C, F = coefficients(second.G, 1.0, low)  # the given set G2 over y (b = 1, n_y = low), the solved direction x
+    m, h = low - 1, Fraction(1, low)
+    K = np.kron(np.array(A, dtype=float), np.array(d4_matrix(m, h), dtype=float)) - 2 * np.kron(
+        np.array(B, dtype=float), np.array(l_matrix(m, h), dtype=float)) + np.kron(np.array(C, dtype=float), np.eye(m))
+    x = np.linalg.solve(K, np.kron(np.array(F, dtype=float), np.ones(m)))
+    dense = x.reshape(4, m).T
+    assert np.max(np.abs(second.V - dense)) <= 1e-8 * np.max(np.abs(dense))  # sanity of the test (two solvers), not a criterion
+
+
+def test_no_eta_guard_at_s2(monkeypatch):
+    real = n23.residual_eta
+    monkeypatch.setattr(n23, "residual_eta", lambda V, *a: 1e-3 if V.shape == (8, 4) and len(calls) else calls.append(1) or real(V, *a))
+    calls = []
+    result = run2(4)
+    assert result.status == cn.COMPLETED_FIXED_HALF_STEPS and result.steps[1].eta == 1e-3
+
+
+def test_rn5_not_certified_stops_before_qr(monkeypatch):
+    counts = _counting(monkeypatch)
+    monkeypatch.setattr(n23.certificate, "rn5_certificate", lambda *a: {"certified": False, "verdict": "RN5_UNRESOLVED", "reason": "injected",
+                                                                         "hypotheses": {}, "values": {}, "eps": None, "sigma_low": None})
+    monkeypatch.setattr(n23.certificate, "rt7_conditions", lambda *a: pytest.fail("RT-7 without RN-5"))
+    result = run2(4, 3)
+    assert result.status == cn.STOPPED_RANK_GUARD_UNCERTIFIED and result.half_steps_completed == 1 and len(result.steps) == 2
+    assert counts["orthonormalise"] == 1 and counts["_solve_given"] == 1 and counts["solve_bc"] == 1  # no QR of V, nothing of s = 2
+    second = result.steps[1]
+    assert second.qr_executed is False and second.G is None and second.R is None and second.A is None and second.V is None
+    assert second.rn5["verdict"] == "RN5_UNRESOLVED" and second.rt7 is None and "RN-5" in result.reason and "D-068" in result.reason
+    assert np.array_equal(result.field(), run2(4, 1).field())  # the field of s = 1, diagnostic
+
+
+@pytest.mark.parametrize("N, n_x, n_y", [(4, 33, 9), (5, 11, 33), (6, 40, 1280)])
+@pytest.mark.parametrize("half_steps", [2, 8])
+def test_a_grid_beyond_32_keeps_s1_and_stops_before_rn5_and_qr(monkeypatch, N, n_x, n_y, half_steps):
+    monkeypatch.setattr(n23.certificate, "rn5_certificate", lambda *a: pytest.fail("RN-5 beyond 32"))
+    monkeypatch.setattr(n23.certificate, "rt7_conditions", lambda *a: pytest.fail("RT-7 beyond 32"))
+    counts = _counting(monkeypatch)
+    result = cn.run_cccc_n46(1.0, 1.0, 1.0, 1.0, n_x, n_y, N, half_steps)
+    assert result.status == cn.STOPPED_RANK_GUARD_UNCERTIFIED and result.half_steps_completed == 1 and len(result.steps) == 2
+    assert counts["orthonormalise"] == 1 and counts["solve_bc"] == 1
+    second = result.steps[1]
+    assert second.qr_executed is False and second.rn5 is None and second.G is None and second.V is None
+    assert second.conditions[cn.GRID_KEY] is False and "D-068" in result.reason
+    assert result.factors()[1] is result.steps[0].V  # s = 1 is the last completed half-step
 
 
 def test_a_proven_dependence_of_v_stops_s2_before_qr(monkeypatch):
     real = n23.exact_rank
     monkeypatch.setattr(n23, "exact_rank", lambda M: real(M) - 1 if np.shape(M) == (13, 4) else real(M))  # only V of 9 x 14
+    monkeypatch.setattr(n23.certificate, "rn5_certificate", lambda *a: pytest.fail("RN-5 at a proven dependence"))
+    counts = _counting(monkeypatch)
     result = run(4, 2)
     assert result.status == cn.STOP_BEFORE_QR_S1 and result.half_steps_completed == 1 and result.steps[1].status == cn.STOP_BEFORE_QR_S1
+    assert result.steps[1].qr_executed is False and counts["orthonormalise"] == 1
+
+
+@pytest.mark.parametrize("rt7", [
+    {"passed": False, "R7-1": True, "R7-2": True, "R7-3": False, "reason": "R7-3: injected", "ranks": None, "t": None, "tau": None,
+     "sin_theta_upper": None},
+    {"passed": False, "R7-1": False, "R7-2": False, "R7-3": False, "reason": "R7-1: injected", "ranks": None, "t": None, "tau": None,
+     "sin_theta_upper": None},
+])
+def test_rt7_failure_prevents_assembly_and_solve(monkeypatch, rt7):
+    monkeypatch.setattr(n23.certificate, "rt7_conditions", lambda *a: rt7)
+    counts = _counting(monkeypatch)
+    result = run2(4, 2)
+    assert result.status == cn.STOPPED_RANK_GUARD_UNCERTIFIED and result.half_steps_completed == 1
+    assert counts["orthonormalise"] == 2 and counts["_solve_given"] == 1 and counts["solve_bc"] == 1  # QR of V done; G2 never assembled
+    second = result.steps[1]
+    assert second.qr_executed is True and second.rn5["certified"] and second.rt7 is rt7
+    assert second.A is None and second.V is None and second.eta is None and "RT-7" in result.reason and "G2" in result.reason
+    assert np.array_equal(result.field(), run2(4, 1).field())
+
+
+@pytest.mark.parametrize("fake", [
+    {"certified": True, "verdict": "RN5_CERTIFIED", "eps": None, "sigma_low": None},  # missing quantities
+    {"certified": True, "verdict": "RN5_CERTIFIED", "eps": Fraction(1), "sigma_low": Fraction(1, 2)},  # t = 2: not this run's certificate
+    {"certified": True, "verdict": "RN5_CERTIFIED", "eps": 1e-20, "sigma_low": 1.0},  # floats, not exact certificate values
+])
+def test_missing_or_mismatched_certificate_data_cannot_authorize_s2(monkeypatch, fake):
+    monkeypatch.setattr(n23.certificate, "rn5_certificate", lambda *a: {"reason": "injected", "hypotheses": {}, "values": {}, **fake})
+    counts = _counting(monkeypatch)
+    result = run2(4, 2)
+    second = result.steps[1]
+    assert result.status == cn.STOPPED_RANK_GUARD_UNCERTIFIED and result.half_steps_completed == 1
+    assert second.rt7["passed"] is False and second.rt7["R7-2"] is False and counts["_solve_given"] == 1 and second.V is None
+
+
+def test_an_unestablished_premise_at_s2_stops_safely(monkeypatch):
+    real = n23.premise_failures
+    monkeypatch.setattr(n23, "premise_failures", lambda parts, n: ["P-2: injected at s = 2"] if calls.append(1) or len(calls) > 1 else real(parts, n))
+    calls = []
+    result = run2(4)
+    assert result.status == cn.UNRESOLVED_C3PLUS_PREMISE and result.half_steps_completed == 1 and result.steps[1].qr_executed is True
+    assert result.steps[1].premises_status == cn.PREMISES_UNRESOLVED and result.steps[1].V is None
+
+
+@pytest.mark.parametrize("replacement, status", [
+    (lambda step, *a: np.full((8, 4), np.nan), cn.ERROR_NONFINITE), (lambda step, *a: np.zeros((8, 4)), cn.STOP_ZERO_FIELD),
+])
+def test_nonfinite_and_zero_at_s2_are_protected(monkeypatch, replacement, status):
+    real = n23.solve_bc
+    monkeypatch.setattr(n23, "solve_bc", lambda step, *a: replacement(step, *a) if step.s == 2 else real(step, *a))
+    result = run2(4)
+    assert result.status == status and result.half_steps_completed == 1 and result.steps[1].status == status
+
+
+def test_a_failed_factorization_at_s2_is_a_protective_stop(monkeypatch):
+    real = n23.assemble
+
+    def negated(G, length, n, q):
+        parts = real(G, length, n, q)
+        if q == 2.0:  # the half-step assemblies (the energy assembles with q = 1)
+            calls.append(1)
+            if len(calls) == 2:  # the given set G2 of s = 2 only
+                parts["A"] = -parts["A"]
+        return parts
+
+    calls = []
+    monkeypatch.setattr(n23, "assemble", negated)
+    result = run2(4, q=2.0)
+    assert result.status == cn.PROTECTIVE_STOP_FACTORIZATION and result.half_steps_completed == 1 and result.steps[1].V is None
+
+
+@pytest.mark.parametrize("half_steps", [3, 8])
+def test_s3_stops_before_qr_assembly_and_solve(monkeypatch, half_steps):
+    counts = _counting(monkeypatch)
+    result = run2(4, half_steps)
+    assert result.status == cn.STOPPED_RANK_GUARD_UNCERTIFIED and result.half_steps_completed == 2 and len(result.steps) == 3
+    assert counts["orthonormalise"] == 2 and counts["_solve_given"] == 2 and counts["solve_bc"] == 2  # nothing of s = 3
+    third = result.steps[2]
+    assert (third.s, third.direction, third.qr_executed, third.status) == (3, "Y", False, result.status)
+    assert third.G is None and third.A is None and third.V is None and "s = 3" in third.reason and "D-068" in third.reason
+    assert np.array_equal(result.field(), run2(4, 2).field())  # the field of s = 2, diagnostic
+
+
+def test_a_changed_grid_bound_of_cccc_n23_does_not_authorize_s2(monkeypatch):
+    monkeypatch.setattr(n23, "S2_GRID_MAX", 40)
+    monkeypatch.setattr(n23.certificate, "rn5_certificate", lambda *a: pytest.fail("RN-5"))
+    result = run2(4)
+    assert result.status == cn.STOPPED_RANK_GUARD_UNCERTIFIED and result.steps[1].qr_executed is False and "D-068" in result.reason
+
+
+def test_no_rank_reduction_regularization_or_replacement_of_directions():
+    result = run2(5, 2)
+    assert all(step.N == 5 for step in result.steps) and result.steps[1].V.shape[1] == 5 and result.steps[1].G.shape[1] == 5
+    text = Path(cn.__file__).read_text(encoding="utf-8")
+    for forbidden in ("lstsq", "pinv", "regulari", "truncat", "svd(first", "rank_tol"):
+        assert forbidden not in text, forbidden
 
 
 # --- 8. no convergence, no accepted field ----------------------------------------------------------------------------------------
@@ -419,5 +593,7 @@ def test_the_other_cccc_modules_keep_their_domains():
 def test_the_module_imports_no_reference_and_no_ssss_scheme():
     text = Path(cn.__file__).read_text(encoding="utf-8")
     assert "kkvim_reference" not in text and "import scripts" not in text
-    for forbidden in ("kkvim.coefficients", "kkvim.linear_solver", "kkvim.coupled", "kkvim.controller", "cccc_n23_certificate"):
+    for forbidden in ("kkvim.coefficients", "kkvim.linear_solver", "kkvim.coupled", "kkvim.controller", "import kkvim.cccc_n23_certificate"):
         assert forbidden not in text, forbidden
+    for own in ("def rn5", "def rt7", "def solve_bc", "def assemble", "def orthonormalise", "Fraction("):  # RN-5, RT-7, B-C, C-3+ not duplicated
+        assert own not in text, own

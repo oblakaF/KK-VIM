@@ -1,0 +1,779 @@
+{
+ "task": "R5-CCCC-N46-S2-D068-FINAL",
+ "script_sha256": "d2b54ac454fd6e844070c1b137645cc0cec3e70335b88a83b85f564cbd37a254",
+ "reused": {
+  "d068_s2\\s2_independent_check.py": "60948d8becd31f9472b4b3ee04287e6b88f4480a3b293a0725567f26d8ada5f1",
+  "rn5_negq\\negq_independent.py": "215edcbb224572f7d58fdbcc7b5110168720467648ddc32f1dcfa153443c3872"
+ },
+ "kkvim_reference_file": "<QA_WORKTREE>\\src\\kkvim_reference\\r5_cccc_d2.py",
+ "kkvim_reference_sha256": "1ac9613054a3334841f849b2bbd1fc90ca8a730f7c4a164cbe99f75f95df578c",
+ "python": "3.14.8 (main, Oct  9 2026, 15:21:39) [MSC v.1944 64 bit (AMD64)]",
+ "numpy": "2.5.4",
+ "criteria": "Criteria (fixed BEFORE any comparison; the same as the D-068 QA, whose task fixed \"the error bound before comparison\"):\n  X1  certified forward bound  ||X_hat - X*||_F <= ||rho||_2 / lambda_low(K), rho = K x_hat - f EXACT (fractions),\n      lambda_low(K) >= (mu_x^2 + mu_y^2) * Gershgorin_low(G2^T G2) (proved), kappa_up = Gershgorin_up(K) / lambda_low(K) (proved upper bound).\n      PASS iff B_rel = bound/||X_hat|| <= 2 kappa_up n u (classical normwise forward bound of a backward-stable solve; a CERTIFIED\n      kappa_up, not an estimate). Heuristic kappa (float eigvalsh) is reported separately and decides nothing.\n  REF reference X_ref = X_hat - K_float^-1 rho (one refinement step with the EXACT residual); its certified uncertainty\n      ||X_ref - X*||_F <= ||rho_ref|| / lambda_low. delta_abs = max|w_prod - X_ref G2^T|, delta_rel = delta_abs / max|X_ref G2^T|;\n      certified field error of production: max|w_prod - w*| <= gamma_N-term + ||X_hat - X*||_F max_j ||G2_j||_2.\n  F1/E1/E2/R7 as in the D-068 QA (field = X G2^T within gamma_N; P_hat within the stated estimate; Pi(w2) <= Pi(companion G2^T) +\n      1/2 c ||rho||^2/lambda_low; RT-7 exact with t from MY RN-5).\n  D2  (investigation, observation) full 2-D D2 solution u (kkvim_reference.solve, refined): delta_rel(w_prod, u); the exact identity\n      Pi(w) - Pi(u) = 1/2 c (w-u)^T A (w-u) + c (w-u)^T r_u (r_u = A u - q/D 1 exact) splits the difference into the energy-norm\n      distance of the rank-N field from the full-space solution and the (tiny) residual term of u.\n  SIGN q -> -q on the CLI files: even factors equal, odd factors negated, field w negated, w_bar equal; differences of the sign bit only at\n      exact zeros (IEEE-754 +0.0/-0.0) are counted, never a discrepancy.\n  STOP refusal cases: exit 6, status, no QR of V, no s = 2 factors other than allowed, field_diagnostic.csv only, = G1 V1^T.\n",
+ "reruns": {
+  "R_C1": {
+   "files_bitwise": {
+    "history.csv": true,
+    "factors.csv": true,
+    "field_research.csv": true
+   },
+   "result_json_diff_paths": [
+    "/program/argv[22]",
+    "/program/command",
+    "/provenance/git_commit",
+    "/provenance/git_diagnostic",
+    "/provenance/git_worktree_modified"
+   ]
+  },
+  "R_C2": {
+   "files_bitwise": {
+    "history.csv": true,
+    "factors.csv": true,
+    "field_research.csv": true
+   },
+   "result_json_diff_paths": [
+    "/program/argv[22]",
+    "/program/command",
+    "/provenance/git_commit",
+    "/provenance/git_diagnostic",
+    "/provenance/git_worktree_modified"
+   ]
+  },
+  "R_C3": {
+   "files_bitwise": {
+    "history.csv": true,
+    "factors.csv": true,
+    "field_research.csv": true
+   },
+   "result_json_diff_paths": [
+    "/program/argv[22]",
+    "/program/command",
+    "/provenance/git_commit",
+    "/provenance/git_diagnostic",
+    "/provenance/git_worktree_modified"
+   ]
+  },
+  "R_C4": {
+   "files_bitwise": {
+    "history.csv": true,
+    "factors.csv": true,
+    "field_research.csv": true
+   },
+   "result_json_diff_paths": [
+    "/program/argv[22]",
+    "/program/command",
+    "/provenance/git_commit",
+    "/provenance/git_diagnostic",
+    "/provenance/git_worktree_modified"
+   ]
+  },
+  "R_C5": {
+   "files_bitwise": {
+    "history.csv": true,
+    "factors.csv": true,
+    "field_research.csv": true
+   },
+   "result_json_diff_paths": [
+    "/program/argv[22]",
+    "/program/command",
+    "/provenance/git_commit",
+    "/provenance/git_diagnostic",
+    "/provenance/git_worktree_modified"
+   ]
+  },
+  "R_C6": {
+   "files_bitwise": {
+    "history.csv": true,
+    "factors.csv": true,
+    "field_research.csv": true
+   },
+   "result_json_diff_paths": [
+    "/program/argv[22]",
+    "/program/command",
+    "/provenance/git_commit",
+    "/provenance/git_diagnostic",
+    "/provenance/git_worktree_modified"
+   ]
+  },
+  "R_C7": {
+   "files_bitwise": {
+    "history.csv": true,
+    "factors.csv": true,
+    "field_research.csv": true
+   },
+   "result_json_diff_paths": [
+    "/program/argv[22]",
+    "/program/command",
+    "/provenance/git_commit",
+    "/provenance/git_diagnostic",
+    "/provenance/git_worktree_modified"
+   ]
+  }
+ },
+ "s2": {
+  "B_pos": {
+   "tag": "B_pos",
+   "N": 6,
+   "a": 1.0,
+   "b": 5.0,
+   "nx": 24,
+   "ny": 32,
+   "q": 1000.0,
+   "checks": {
+    "input": true,
+    "schema": true,
+    "status_completed_2": true,
+    "research_file_only": true,
+    "not_qualified_label": true,
+    "no_forbidden_status": true,
+    "run_rn5_rt7_qr": true,
+    "shapes": true,
+    "R_upper": true,
+    "independent_rn5_certified": true,
+    "RT7_independent": true,
+    "companion": true,
+    "operator_kron_exact": true,
+    "lambda_low_positive": true,
+    "X1_certified_bound_within_criterion": true,
+    "field_grid": true,
+    "F1_field_eq_X_G2T": true,
+    "field_boundary_zero": true,
+    "field_axis0_x": true,
+    "field_w_bar": true,
+    "E2_monotone_proven": true,
+    "D2_identity_exact": true
+   },
+   "values": {
+    "D": 19230.769230769234,
+    "qr_relation_max_rel": 3.8677513872679825e-16,
+    "rn5_mine": {
+     "certified": true,
+     "first_failed": null,
+     "seconds": 11.996727199759334,
+     "eps": 1.6341833240044e-16,
+     "sigma_low": 2.83082235106277e-14,
+     "margin": 173.22550716807757,
+     "lambda_low": 9660017.327128857,
+     "norm_dK": 8.907153149723946e-06
+    },
+    "rn5_run": {
+     "lambda_low": 9719996.989268309,
+     "norm_dK": 1.0649006395151604e-05,
+     "eps": 1.9320755384418993e-16,
+     "sigma_low": 2.8237028826964408e-14,
+     "margin_sigma_over_eps": 146.14867930958766
+    },
+    "rt7": {
+     "tau": 2.235108094523255e-19,
+     "t_qa": 0.0057728218918113375,
+     "t_run": 0.006842347154446012,
+     "tau_run": 2.235108094523255e-19
+    },
+    "X": {
+     "n": 138,
+     "rho_prod": 1.549411415081114e-11,
+     "rho_ref": 5.353666657030975e-13,
+     "lambda_low_K_certified": 622.6356057075573,
+     "lambda_up_K_certified": 38977499.299840026,
+     "kappa_up_certified": 62600.81971307497,
+     "kappa_heuristic_eigvalsh": 11668.25104513145,
+     "lambda_min_heuristic": 3249.4536321102914,
+     "abs_bound_X_prod": 2.4884722313950827e-14,
+     "B_rel": 2.8825602288782038e-11,
+     "criterion_2kappa_n_u": 1.9182240508018524e-09,
+     "abs_bound_X_ref": 8.59839464360076e-16,
+     "rel_bound_X_ref": 9.960083186440778e-13,
+     "float_solve_rel_diff": 1.5292661302546182e-12,
+     "delta_abs_field": 6.2341624917916505e-19,
+     "delta_rel_field": 4.531294254298009e-15,
+     "w_ref_max": 0.00013758017338817585,
+     "certified_field_err_prod_vs_exact": 4.4387962367193675e-14,
+     "certified_field_err_ref_vs_exact": 1.533729912765811e-15
+    },
+    "energy": {
+     "Pi1": -0.15759077221416787,
+     "Pi2": -0.1579515163558667,
+     "Pic": -0.15759077221416787,
+     "P_hat1": -0.15759077221416795,
+     "P_hat2": -0.15795151635586674,
+     "rel_P_hat2": 1.757221219269289e-16,
+     "rel_P_hat1": 5.283731126954959e-16,
+     "Pi2_minus_Pi1": -0.00036074414169885385,
+     "solve_gap": 2.4136538971328582e-23
+    },
+    "D2": {
+     "delta_abs_prod_vs_D2": 4.0869010511424865e-10,
+     "delta_rel_prod_vs_D2": 2.97055719530495e-06,
+     "delta_rel_s1_vs_D2": 0.0019325454284306075,
+     "D2_own_error_estimate_e_D2": 1.2966084041857301e-20,
+     "D2_residual_max": 4.267468477792136e-14,
+     "Pi_w2_minus_Pi_u": 1.2147795359394644e-11,
+     "half_energy_norm_sq": 1.2147795359399793e-11,
+     "residual_term": -5.1490020798040566e-24,
+     "identity_exact": true,
+     "energy_rel_gap": 7.690838074065237e-11
+    }
+   },
+   "seconds": 13.243999242782593,
+   "all_checks": true
+  },
+  "B_neg": {
+   "tag": "B_neg",
+   "N": 6,
+   "a": 1.0,
+   "b": 5.0,
+   "nx": 24,
+   "ny": 32,
+   "q": -1000.0,
+   "checks": {
+    "input": true,
+    "schema": true,
+    "status_completed_2": true,
+    "research_file_only": true,
+    "not_qualified_label": true,
+    "no_forbidden_status": true,
+    "run_rn5_rt7_qr": true,
+    "shapes": true,
+    "R_upper": true,
+    "independent_rn5_certified": true,
+    "RT7_independent": true,
+    "companion": true,
+    "operator_kron_exact": true,
+    "lambda_low_positive": true,
+    "X1_certified_bound_within_criterion": true,
+    "field_grid": true,
+    "F1_field_eq_X_G2T": true,
+    "field_boundary_zero": true,
+    "field_axis0_x": true,
+    "field_w_bar": true,
+    "E2_monotone_proven": true,
+    "D2_identity_exact": true
+   },
+   "values": {
+    "D": 19230.769230769234,
+    "qr_relation_max_rel": 3.8677513872679825e-16,
+    "rn5_mine": {
+     "certified": true,
+     "first_failed": null,
+     "seconds": 12.52303529996425,
+     "eps": 1.6341833240044e-16,
+     "sigma_low": 2.83082235106277e-14,
+     "margin": 173.22550716807757,
+     "lambda_low": 9660017.327128857,
+     "norm_dK": 8.907153149723946e-06
+    },
+    "rn5_run": {
+     "lambda_low": 9719996.989268309,
+     "norm_dK": 1.0649006395151604e-05,
+     "eps": 1.9320755384418993e-16,
+     "sigma_low": 2.8237028826964408e-14,
+     "margin_sigma_over_eps": 146.14867930958766
+    },
+    "rt7": {
+     "tau": 2.235108094523255e-19,
+     "t_qa": 0.0057728218918113375,
+     "t_run": 0.006842347154446012,
+     "tau_run": 2.235108094523255e-19
+    },
+    "X": {
+     "n": 138,
+     "rho_prod": 1.549411415081114e-11,
+     "rho_ref": 5.353666657030975e-13,
+     "lambda_low_K_certified": 622.6356057075573,
+     "lambda_up_K_certified": 38977499.299840026,
+     "kappa_up_certified": 62600.81971307497,
+     "kappa_heuristic_eigvalsh": 11668.25104513145,
+     "lambda_min_heuristic": 3249.4536321102914,
+     "abs_bound_X_prod": 2.4884722313950827e-14,
+     "B_rel": 2.8825602288782038e-11,
+     "criterion_2kappa_n_u": 1.9182240508018524e-09,
+     "abs_bound_X_ref": 8.59839464360076e-16,
+     "rel_bound_X_ref": 9.960083186440778e-13,
+     "float_solve_rel_diff": 1.5292661302546182e-12,
+     "delta_abs_field": 6.2341624917916505e-19,
+     "delta_rel_field": 4.531294254298009e-15,
+     "w_ref_max": 0.00013758017338817585,
+     "certified_field_err_prod_vs_exact": 4.4387962367193675e-14,
+     "certified_field_err_ref_vs_exact": 1.533729912765811e-15
+    },
+    "energy": {
+     "Pi1": -0.15759077221416787,
+     "Pi2": -0.1579515163558667,
+     "Pic": -0.15759077221416787,
+     "P_hat1": -0.15759077221416795,
+     "P_hat2": -0.15795151635586674,
+     "rel_P_hat2": 1.757221219269289e-16,
+     "rel_P_hat1": 5.283731126954959e-16,
+     "Pi2_minus_Pi1": -0.00036074414169885385,
+     "solve_gap": 2.4136538971328582e-23
+    },
+    "D2": {
+     "delta_abs_prod_vs_D2": 4.0869010511424865e-10,
+     "delta_rel_prod_vs_D2": 2.97055719530495e-06,
+     "delta_rel_s1_vs_D2": 0.0019325454284306075,
+     "D2_own_error_estimate_e_D2": 1.2966084041857301e-20,
+     "D2_residual_max": 4.267468477792136e-14,
+     "Pi_w2_minus_Pi_u": 1.2147795359394644e-11,
+     "half_energy_norm_sq": 1.2147795359399793e-11,
+     "residual_term": -5.1490020798040566e-24,
+     "identity_exact": true,
+     "energy_rel_gap": 7.690838074065237e-11
+    }
+   },
+   "seconds": 13.093891859054565,
+   "all_checks": true
+  },
+  "D_N4_neg": {
+   "tag": "D_N4_neg",
+   "N": 4,
+   "a": 1.0,
+   "b": 1.0,
+   "nx": 32,
+   "ny": 32,
+   "q": -1000.0,
+   "checks": {
+    "input": true,
+    "schema": true,
+    "status_completed_2": true,
+    "research_file_only": true,
+    "not_qualified_label": true,
+    "no_forbidden_status": true,
+    "run_rn5_rt7_qr": true,
+    "shapes": true,
+    "R_upper": true,
+    "independent_rn5_certified": true,
+    "RT7_independent": true,
+    "companion": true,
+    "operator_kron_exact": true,
+    "lambda_low_positive": true,
+    "X1_certified_bound_within_criterion": true,
+    "field_grid": true,
+    "F1_field_eq_X_G2T": true,
+    "field_boundary_zero": true,
+    "field_axis0_x": true,
+    "field_w_bar": true,
+    "E2_monotone_proven": true,
+    "D2_identity_exact": true
+   },
+   "values": {
+    "D": 19230.769230769234,
+    "qr_relation_max_rel": 1.5726634768907042e-16,
+    "rn5_mine": {
+     "certified": true,
+     "first_failed": null,
+     "seconds": 5.3806238998658955,
+     "eps": 1.141787467476645e-16,
+     "sigma_low": 1.739873041483646e-10,
+     "margin": 1523815.150405156,
+     "lambda_low": 15515555.221456038,
+     "norm_dK": 2.188303288066378e-05
+    },
+    "rn5_run": {
+     "lambda_low": 24725321.724794615,
+     "norm_dK": 2.214912348786434e-05,
+     "eps": 2.541904985695131e-17,
+     "sigma_low": 1.7398730405078566e-10,
+     "margin_sigma_over_eps": 6844760.328569307
+    },
+    "rt7": {
+     "tau": 2.0576225304577002e-25,
+     "t_qa": 6.562475768364144e-07,
+     "t_run": 1.4609715344248148e-07,
+     "tau_run": 2.0576225304577002e-25
+    },
+    "X": {
+     "n": 124,
+     "rho_prod": 9.978669245568866e-12,
+     "rho_ref": 2.543170788715761e-12,
+     "lambda_low_K_certified": 6224.173386440338,
+     "lambda_up_K_certified": 2147483648.0000005,
+     "kappa_up_certified": 345023.10823769745,
+     "kappa_heuristic_eigvalsh": 18741.299953555226,
+     "lambda_min_heuristic": 41052.43495333119,
+     "abs_bound_X_prod": 1.603211965031032e-15,
+     "B_rel": 9.972858489988277e-12,
+     "criterion_2kappa_n_u": 9.499704450072085e-09,
+     "abs_bound_X_ref": 4.0859574931768146e-16,
+     "rel_bound_X_ref": 2.541689855387954e-12,
+     "float_solve_rel_diff": 3.8009446233783277e-13,
+     "delta_abs_field": 5.421010862427522e-20,
+     "delta_rel_field": 8.170210339393432e-16,
+     "w_ref_max": 6.635093390790213e-05,
+     "certified_field_err_prod_vs_exact": 4.2849127477297135e-15,
+     "certified_field_err_ref_vs_exact": 1.0920484208696678e-15
+    },
+    "energy": {
+     "Pi1": -0.010201765631131558,
+     "Pi2": -0.010260330710104834,
+     "Pic": -0.010201765631131558,
+     "P_hat1": -0.010201765631131565,
+     "P_hat2": -0.010260330710104829,
+     "rel_P_hat2": 5.072127375782459e-16,
+     "rel_P_hat1": 6.801659785961561e-16,
+     "Pi2_minus_Pi1": -5.856507897327699e-05,
+     "solve_gap": 1.5022087148421715e-25
+    },
+    "D2": {
+     "delta_abs_prod_vs_D2": 4.786868594196623e-10,
+     "delta_rel_prod_vs_D2": 7.214475055955634e-06,
+     "delta_rel_s1_vs_D2": 0.006351712687156079,
+     "D2_own_error_estimate_e_D2": 6.213046039172302e-21,
+     "D2_residual_max": 2.6328963576816024e-13,
+     "Pi_w2_minus_Pi_u": 5.806400820909028e-10,
+     "half_energy_norm_sq": 5.806400820909156e-10,
+     "residual_term": -1.2854758976151021e-23,
+     "identity_exact": true,
+     "energy_rel_gap": 5.6590773303261185e-08
+    }
+   },
+   "seconds": 5.987974405288696,
+   "all_checks": true
+  },
+  "D_N5_neg": {
+   "tag": "D_N5_neg",
+   "N": 5,
+   "a": 1.0,
+   "b": 0.6,
+   "nx": 20,
+   "ny": 13,
+   "q": -1000.0,
+   "checks": {
+    "input": true,
+    "schema": true,
+    "status_completed_2": true,
+    "research_file_only": true,
+    "not_qualified_label": true,
+    "no_forbidden_status": true,
+    "run_rn5_rt7_qr": true,
+    "shapes": true,
+    "R_upper": true,
+    "independent_rn5_certified": true,
+    "RT7_independent": true,
+    "companion": true,
+    "operator_kron_exact": true,
+    "lambda_low_positive": true,
+    "X1_certified_bound_within_criterion": true,
+    "field_grid": true,
+    "F1_field_eq_X_G2T": true,
+    "field_boundary_zero": true,
+    "field_axis0_x": true,
+    "field_w_bar": true,
+    "E2_monotone_proven": true,
+    "D2_identity_exact": true
+   },
+   "values": {
+    "D": 19230.769230769234,
+    "qr_relation_max_rel": 1.5026003231657625e-16,
+    "rn5_mine": {
+     "certified": true,
+     "first_failed": null,
+     "seconds": 7.2181935999542475,
+     "eps": 5.0347122743977765e-18,
+     "sigma_low": 9.815463429108892e-13,
+     "margin": 194955.7967596661,
+     "lambda_low": 34681356.776517674,
+     "norm_dK": 1.2546031069228282e-05
+    },
+    "rn5_run": {
+     "lambda_low": 95051346.96940243,
+     "norm_dK": 1.2802116956289128e-05,
+     "eps": 7.91579641240042e-19,
+     "sigma_low": 9.810569540054623e-13,
+     "margin_sigma_over_eps": 1239366.076253043
+    },
+    "rt7": {
+     "tau": 1.4294934041016157e-22,
+     "t_qa": 5.129367870157567e-06,
+     "t_run": 8.068641050941825e-07,
+     "tau_run": 1.4294934041016157e-22
+    },
+    "X": {
+     "n": 95,
+     "rho_prod": 1.1955379988297187e-13,
+     "rho_ref": 2.4690085043558372e-14,
+     "lambda_low_K_certified": 18228.89117217554,
+     "lambda_up_K_certified": 262056995.88477394,
+     "kappa_up_certified": 14375.915320882272,
+     "kappa_heuristic_eigvalsh": 2030.1598232046315,
+     "lambda_min_heuristic": 106958.21665984513,
+     "abs_bound_X_prod": 6.558478996542477e-18,
+     "B_rel": 2.5295263660086584e-13,
+     "criterion_2kappa_n_u": 3.0324897159679584e-10,
+     "abs_bound_X_ref": 1.3544479919461671e-18,
+     "rel_bound_X_ref": 5.223942790426717e-14,
+     "float_solve_rel_diff": 5.341499026053809e-15,
+     "delta_abs_field": 1.0164395367051604e-20,
+     "delta_rel_field": 6.199910367768536e-16,
+     "w_ref_max": 1.6394423086974335e-05,
+     "certified_field_err_prod_vs_exact": 2.1584466525420183e-17,
+     "certified_field_err_ref_vs_exact": 4.4557146384013995e-18
+    },
+    "energy": {
+     "Pi1": -0.0016554681269231935,
+     "Pi2": -0.0016661747964124265,
+     "Pic": -0.0016554681269231937,
+     "P_hat1": -0.0016554681269231929,
+     "P_hat2": -0.0016661747964124265,
+     "rel_P_hat2": 0.0,
+     "rel_P_hat1": 3.92953082521947e-16,
+     "Pi2_minus_Pi1": -1.0706669489232846e-05,
+     "solve_gap": 1.7398470831863467e-29
+    },
+    "D2": {
+     "delta_abs_prod_vs_D2": 3.929042607621813e-13,
+     "delta_rel_prod_vs_D2": 2.3965726582083625e-08,
+     "delta_rel_s1_vs_D2": 0.013576700507189251,
+     "D2_own_error_estimate_e_D2": 1.4149355018350935e-21,
+     "D2_residual_max": 4.976442934142411e-15,
+     "Pi_w2_minus_Pi_u": 2.980321630213272e-16,
+     "half_energy_norm_sq": 2.9803216300288398e-16,
+     "residual_term": 1.8443220044178413e-26,
+     "identity_exact": true,
+     "energy_rel_gap": 1.788720869280886e-13
+    }
+   },
+   "seconds": 7.36791205406189,
+   "all_checks": true
+  }
+ },
+ "stops": {
+  "C_pos": {
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "completed": 1,
+   "reason": "RN-5 не выполнен (RN5_UNRESOLVED: σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано); QR решённого набора не выполняется. N не понижается, регуляризации нет (D-065, 7 C) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]",
+   "rn5_run": {
+    "certified": false,
+    "verdict": "RN5_UNRESOLVED",
+    "reason": "σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано"
+   },
+   "rn5_hypotheses": {
+    "2N < n_x (ВБC-13 p. 3)": true,
+    "N <= floor(n_x/2) (ВБC-13 p. 4)": true,
+    "N <= floor(n_y/2) (RN-3)": true,
+    "closed forms consistent with the enclosure": true,
+    "lambda_low(K(U~)) > ||dK||_2": true,
+    "sigma_N(w_hat_w)^2 > eps^2 (Weyl)": false
+   },
+   "rn5_values": {
+    "lambda_low": 9392406.971917948,
+    "norm_dK": 4.3293121671700255e-07,
+    "eps": 8.93483016824665e-18,
+    "sigma_low": 0.0
+   },
+   "qr_executed": false,
+   "rt7": null,
+   "s2_factor_roles": [],
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "history_rows": [
+    [
+     "1",
+     "HALF_STEP_DONE"
+    ],
+    [
+     "2",
+     "STOPPED_RANK_GUARD_UNCERTIFIED"
+    ]
+   ],
+   "diagnostic_eq_G1V1T": true,
+   "diag_header": true,
+   "exit_in_log": false,
+   "rn5_mine": {
+    "certified": true,
+    "first_failed": null,
+    "values": {
+     "rho_T": 3.0532503680369423e-78,
+     "closed_form_max_abs_dev_at_centres": 2.7321000088544844e-74,
+     "norm_dA": 1.8507883495127457e-30,
+     "norm_dB": 1.596856155089259e-14,
+     "norm_dC": 8.339022497458625e-13,
+     "norm_dF_x1": 1.0692951399144785e-12,
+     "norm_D4y_bound": 456976.0,
+     "norm_Ly_bound": 676.0,
+     "norm_dK": 4.312191820491056e-07,
+     "norm_E_F": 5.322407087986909e-15,
+     "lamA_lo": 0.9999999999999994,
+     "lamB_lo": 0.41648281427375705,
+     "lamC_lo": 0.7952087176894099,
+     "l0": 9.821665709994415,
+     "lambda_low": 2027719.9228476642,
+     "norm_residual": 1.4445620628643088e-09,
+     "norm_x_hat": 0.0006546352337336616,
+     "dx_hat_bound": 7.124070965558264e-16,
+     "norm_x_star_bound": 0.000654635233734374,
+     "dx_prime": 1.3974344384479596e-16,
+     "norm_Uw": 1.0,
+     "eps1": 3.9139842414748015e-17,
+     "eps2": 1.9758617812588135e-16,
+     "eps": 2.367260205406294e-16,
+     "sigma2_low": 5.926436949671607e-32,
+     "sigma2_high": 5.926436949671607e-32,
+     "sigma_low": 2.434427437750324e-16,
+     "sigma_high": 2.434427437750324e-16,
+     "margin_sigma_over_eps_low": 1.0283734049136786,
+     "margin_lambda_over_dK": 4702295276411.788
+    }
+   },
+   "ok": true
+  },
+  "C_neg": {
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "completed": 1,
+   "reason": "RN-5 не выполнен (RN5_UNRESOLVED: σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано); QR решённого набора не выполняется. N не понижается, регуляризации нет (D-065, 7 C) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]",
+   "rn5_run": {
+    "certified": false,
+    "verdict": "RN5_UNRESOLVED",
+    "reason": "σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано"
+   },
+   "rn5_hypotheses": {
+    "2N < n_x (ВБC-13 p. 3)": true,
+    "N <= floor(n_x/2) (ВБC-13 p. 4)": true,
+    "N <= floor(n_y/2) (RN-3)": true,
+    "closed forms consistent with the enclosure": true,
+    "lambda_low(K(U~)) > ||dK||_2": true,
+    "sigma_N(w_hat_w)^2 > eps^2 (Weyl)": false
+   },
+   "rn5_values": {
+    "lambda_low": 9392406.971917948,
+    "norm_dK": 4.3293121671700255e-07,
+    "eps": 8.93483016824665e-18,
+    "sigma_low": 0.0
+   },
+   "qr_executed": false,
+   "rt7": null,
+   "s2_factor_roles": [],
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "history_rows": [
+    [
+     "1",
+     "HALF_STEP_DONE"
+    ],
+    [
+     "2",
+     "STOPPED_RANK_GUARD_UNCERTIFIED"
+    ]
+   ],
+   "diagnostic_eq_G1V1T": true,
+   "diag_header": true,
+   "exit_in_log": false,
+   "rn5_mine": {
+    "certified": true,
+    "first_failed": null,
+    "values": {
+     "rho_T": 3.0532503680369423e-78,
+     "closed_form_max_abs_dev_at_centres": 2.7321000088544844e-74,
+     "norm_dA": 1.8507883495127457e-30,
+     "norm_dB": 1.596856155089259e-14,
+     "norm_dC": 8.339022497458625e-13,
+     "norm_dF_x1": 1.0692951399144785e-12,
+     "norm_D4y_bound": 456976.0,
+     "norm_Ly_bound": 676.0,
+     "norm_dK": 4.312191820491056e-07,
+     "norm_E_F": 5.322407087986909e-15,
+     "lamA_lo": 0.9999999999999994,
+     "lamB_lo": 0.41648281427375705,
+     "lamC_lo": 0.7952087176894099,
+     "l0": 9.821665709994415,
+     "lambda_low": 2027719.9228476642,
+     "norm_residual": 1.4445620628643088e-09,
+     "norm_x_hat": 0.0006546352337336616,
+     "dx_hat_bound": 7.124070965558264e-16,
+     "norm_x_star_bound": 0.000654635233734374,
+     "dx_prime": 1.3974344384479596e-16,
+     "norm_Uw": 1.0,
+     "eps1": 3.9139842414748015e-17,
+     "eps2": 1.9758617812588135e-16,
+     "eps": 2.367260205406294e-16,
+     "sigma2_low": 5.926436949671607e-32,
+     "sigma2_high": 5.926436949671607e-32,
+     "sigma_low": 2.434427437750324e-16,
+     "sigma_high": 2.434427437750324e-16,
+     "margin_sigma_over_eps_low": 1.0283734049136786,
+     "margin_lambda_over_dK": 4702295276411.788
+    }
+   },
+   "ok": true
+  }
+ },
+ "sign": {
+  "B_neg": {
+   "factors_ok": true,
+   "factor_bad": [],
+   "factor_signed_zeros": 15,
+   "field_file": "field_research.csv",
+   "field_bad": 0,
+   "field_signed_zeros": 224,
+   "history_diff_cols": [
+    "F"
+   ],
+   "result_json_diff_paths": [
+    "/input/q/value",
+    "/program/argv[14]",
+    "/program/argv[22]",
+    "/program/command"
+   ]
+  },
+  "D_N4_neg": {
+   "factors_ok": true,
+   "factor_bad": [],
+   "factor_signed_zeros": 6,
+   "field_file": "field_research.csv",
+   "field_bad": 0,
+   "field_signed_zeros": 256,
+   "history_diff_cols": [
+    "F"
+   ],
+   "result_json_diff_paths": [
+    "/input/q/value",
+    "/program/argv[14]",
+    "/program/argv[22]",
+    "/program/command"
+   ]
+  },
+  "D_N5_neg": {
+   "factors_ok": true,
+   "factor_bad": [],
+   "factor_signed_zeros": 10,
+   "field_file": "field_research.csv",
+   "field_bad": 0,
+   "field_signed_zeros": 132,
+   "history_diff_cols": [
+    "F"
+   ],
+   "result_json_diff_paths": [
+    "/input/q/value",
+    "/program/argv[14]",
+    "/program/argv[22]",
+    "/program/command"
+   ]
+  },
+  "C_neg": {
+   "factors_ok": true,
+   "factor_bad": [],
+   "factor_signed_zeros": 0,
+   "field_file": "field_diagnostic.csv",
+   "field_bad": 0,
+   "field_signed_zeros": 180,
+   "history_diff_cols": [
+    "F"
+   ],
+   "result_json_diff_paths": [
+    "/input/q/value",
+    "/program/argv[14]",
+    "/program/argv[22]",
+    "/program/command"
+   ]
+  }
+ },
+ "kkvim_imported_end": false,
+ "seconds": 67.58248090744019
+}
