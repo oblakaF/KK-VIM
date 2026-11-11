@@ -1,0 +1,480 @@
+{
+  "schema": "kkvim.cli.cccc_n46/2",
+  "program": {
+    "command": "python -m kkvim run-cccc-n46 --N 4 --a 1 --b 1 --t 0.01 --E 2.1e11 --nu 0.3 --q 1000 --nx 33 --ny 9 --half-steps 2 --out scratch/d068_final/guards/G33_q1000",
+    "argv": [
+      "run-cccc-n46",
+      "--N",
+      "4",
+      "--a",
+      "1",
+      "--b",
+      "1",
+      "--t",
+      "0.01",
+      "--E",
+      "2.1e11",
+      "--nu",
+      "0.3",
+      "--q",
+      "1000",
+      "--nx",
+      "33",
+      "--ny",
+      "9",
+      "--half-steps",
+      "2",
+      "--out",
+      "scratch/d068_final/guards/G33_q1000"
+    ],
+    "calls": [
+      "kkvim.cccc_n46.run_cccc_n46_physical"
+    ]
+  },
+  "provenance": {
+    "versions": {
+      "python": "3.14.8",
+      "kkvim": "0.0.0",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+    },
+    "git_commit": null,
+    "git_worktree_modified": null,
+    "git_diagnostic": "коммит неизвестен: пакет запущен не из рабочей копии исходного кода",
+    "module": "kkvim.cli_cccc_n46"
+  },
+  "model": {
+    "boundary": "CCCC",
+    "N": 4,
+    "theory": "Kirchhoff-Love, linear; homogeneous isotropic plate; uniform q = const",
+    "representation": "w = sum_i X_i(x) Y_i(y), N fixed, no rank reduction",
+    "orientation": "start T_N in x: U_i = sin^2(i pi x / a), i = 1..N (basis A, D-049.3), companion 0 (w(0) = 0); the first half-step solves Y",
+    "qr": "QR of the start set (D-057.1 item 2, D-067); QR of the solved V before s = 2 only after RN-5, then RT-7 (D-068)",
+    "half_step_2": "X-half-step on G2, roles of x and y exchanged (ВБC-13 p. 1); companion G R^T (D-068)",
+    "assembly": "C-3+ (D-054.3)",
+    "half_step_solver": "B-C, rank-2N correction (D-049.2)",
+    "discretization": "проект, уровень Б (D-049.1, D-050; операции полушага s = 1 ПОЛИТИКИ-23, разд. 2–3, распространены на N = 4–6 решением D-067; полушаг s = 2 по D-065, 7 C–F распространён на N = 4–6 решением D-068); авторам КК-МВИ не приписывается",
+    "decision": "D-067, D-068"
+  },
+  "input": {
+    "a": {
+      "value": 1.0,
+      "unit": "m"
+    },
+    "b": {
+      "value": 1.0,
+      "unit": "m"
+    },
+    "t": {
+      "value": 0.01,
+      "unit": "m"
+    },
+    "E": {
+      "value": 210000000000.0,
+      "unit": "Pa"
+    },
+    "nu": {
+      "value": 0.3,
+      "unit": "1"
+    },
+    "q": {
+      "value": 1000.0,
+      "unit": "Pa"
+    },
+    "N": 4,
+    "n_x": 33,
+    "n_y": 9,
+    "half_steps": 2
+  },
+  "D": {
+    "value": 19230.769230769234,
+    "unit": "N·m"
+  },
+  "mode": "FIXED_HALF_STEPS_RESEARCH",
+  "application_status": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+  "scientific_status": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED; полный ранг точной дискретной последовательности — UNRESOLVED; Q4 — IN_PROGRESS, R5 — IN_PROGRESS; D1_START = BLOCKED",
+  "rank_guard_rule": "D-057.1 (вариант В) с исключением D-068: N = 4–6 — s = 1 (D-067); s = 2 только при n_x, n_y ≤ 32 после RN-5 до QR и RT-7 после QR; s ≥ 3 — остановка до QR",
+  "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+  "status_note": "Защитная остановка до QR, открывающего следующий полушаг (s = 2: сетка больше 32 или RN-5 не выполнен; после QR — RT-7 не выполнен, G2 не используется; s = 3 не разрешён) (D-068). Поле последнего выполненного полушага — только диагностика. Невыполненный достаточный сертификат не доказывает потери ранга.",
+  "reason": "N = 4, s = 2: сетка 33 × 9 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]",
+  "half_steps_requested": 2,
+  "half_steps_completed": 1,
+  "half_steps_executable": "s = 1 (D-067, сетки до 1280); s = 2 при n_x, n_y ≤ 32 после RN-5 и RT-7 (D-068); s ≥ 3 — нет",
+  "fixed_half_steps_only": "выполнены только фиксированные исследовательские полушаги; это не сходимость",
+  "numerical_policy": {
+    "eta": {
+      "value": 2.811713161032811e-17,
+      "half_step": 1,
+      "by_half_step": {
+        "1": 2.811713161032811e-17
+      },
+      "role": "OBSERVATION; защитного порога η нет (D-067, D-068)"
+    },
+    "not_transferred": "η_max^C = 100u, |η − η_QA| ≤ 16u, c_f = 10 — критерии N = 2, 3 (D-063.3); для N = 4–6 и для s = 2 не применяются",
+    "recorded_only": "η, TS-1, cond(S), cond(A) до и после QR, σ_i, ρ̂_N, κ_rep, точный ранг сохранённых множителей; на s = 2 также энергия",
+    "certificates_s2": "RN-5 и RT-7 — строгие неравенства в точной арифметике без допусков (D-065, 5, 6; для N = 4–6 — D-068)",
+    "safeguards": "неконечные значения; доказанная зависимость; предпосылки C-3⁺; факторизация; сетка ≤ 32, RN-5 до QR и RT-7 после QR перед s = 2; остановка до QR s = 3 (D-067, D-068)"
+  },
+  "rank": {
+    "rule": "D-057.1 (вариант В) с исключением D-068: N = 4–6 — s = 1 (D-067); s = 2 только при n_x, n_y ≤ 32 после RN-5 до QR и RT-7 после QR; s ≥ 3 — остановка до QR",
+    "decision": "UNRESOLVED (no approved numerical rank criterion; D-049.5, D-049.6)",
+    "exact_rank_T": 4,
+    "exact_rank_G": 4,
+    "V_exact_rank": 4,
+    "sigma": [
+      2.999305618554881e-05,
+      9.079337606159139e-08,
+      2.3825483408469873e-09,
+      3.1383538982898564e-11
+    ],
+    "rho_N": 1.0463601571226248e-06,
+    "kappa_rep": 0.9999999999999998,
+    "cond_S": 2.4069902404693133,
+    "role": "OBSERVATION: значения статус расчёта не меняют; точный ранг сохранённых binary64-множителей — не сертификат ранга неокруглённого дискретного решения (D-067)",
+    "full_rank_of_exact_discrete_sequence": "UNRESOLVED",
+    "half_step_2": {
+      "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+      "done": false,
+      "qr_executed": false,
+      "conditions": {
+        "S-1 (RN-3): N > floor(n_x/2)": false,
+        "n_x, n_y <= 32 (D-068)": false
+      },
+      "reason": "N = 4, s = 2: сетка 33 × 9 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]",
+      "rn5": null,
+      "rt7": null,
+      "authorization": "D-068"
+    },
+    "half_step_3": null
+  },
+  "premises_c3plus": {
+    "status_by_half_steps": [
+      "ESTABLISHED_CONDITIONAL_ON_P4"
+    ],
+    "reasons": [],
+    "P-4": "ASSUMED: classical dot products in BLAS (D-055.1, D-057.3); cannot be checked"
+  },
+  "limits": [
+    "Линейная изотропная однородная пластина Кирхгофа–Лява, CCCC, q = const ≠ 0, N = 4, 5 или 6 фиксировано, 0,2 ≤ b/a ≤ 5, 2N + 1 ≤ n_x, n_y ≤ 1280; полушаг s = 1 (D-067); полушаг s = 2 только при n_x, n_y ≤ 32 после сертификатов RN-5 и RT-7 этого расчёта (D-068); s ≥ 3 не исполняется.",
+    "RN-5 доказывает только rank w_h⁽¹⁾ = N точной дискретной последовательности для этого расчёта; RT-7 — только евклидову трансверсальность span G2 к точному подпространству по y (sin θ_max ≤ √τ + t < 1). Ни точности поля s = 2, ни обусловленности, ни ранга w⁽²⁾, ни сходимости, ни свойств s ≥ 3 они не устанавливают. RN-5 и RT-7 — выводы проекта (уровень Б), не авторов КК-МВИ; для N = 4–6 разрешены D-068.",
+    "Граница сетки 2N + 1 — инженерный предел применимости, а не сертификат точности; нижняя граница по y не устанавливает полного ранга поля.",
+    "Полный ранг точной дискретной последовательности при N ≥ 4 — UNRESOLVED (MATH_SPEC C.1: N ≥ 4 не рассматривается). Точный ранг сохранённых binary64-множителей — не сертификат для неокруглённого дискретного решения.",
+    "η, TS-1, cond(S), σ_i, ρ̂_N, κ_rep и точный ранг V — только наблюдения. Пороги N = 2, 3 (η_max^C = 100u, |η − η_QA| ≤ 16u, c_f = 10) не переносятся (D-067); защиты по η нет.",
+    "Фиксированные полушаги не приближают решение дискретной задачи ω_h^C и непрерывной ω₀. Режим не утверждает сходимости, квалификации и приёмки R5, Q4, Q5.",
+    "Поле s = 1 относится к span(G), стартовому набору 𝒯_N после округления QR; поле s = 2 — к span(G2) после округления QR решённого набора.",
+    "Предпосылка П-4 (классическое скалярное произведение в BLAS) принята как допущение и не проверяется.",
+    "B-C не квалифицирован на рабочих сетках. Независимая QA пути s = 2 при N = 4–6 (D-068) ещё не выполнена; тесты Builder её не заменяют."
+  ],
+  "field": {
+    "file": "field_diagnostic.csv",
+    "role": "diagnostic",
+    "half_step": 1,
+    "shape": [
+      34,
+      10
+    ],
+    "axes": "axis 0 = x (i = 0..n_x), axis 1 = y (j = 0..n_y), boundary nodes included",
+    "definition": "w(1) = G V^T",
+    "units": {
+      "x": "m",
+      "y": "m",
+      "w": "m",
+      "w_bar": "1"
+    },
+    "w_bar_definition": "w_bar = w D / (q a^4)",
+    "w_max": {
+      "value": 6.754123560869981e-05,
+      "i": 16,
+      "j": 4,
+      "x": 0.48484848484848486,
+      "y": 0.4444444444444444
+    },
+    "alpha_centre": null,
+    "alpha_definition": "alpha_centre = w(a/2, b/2) D / (q l^4), l = min(a, b); only with even n_x and n_y",
+    "alpha_note": "центр не узел"
+  },
+  "history": {
+    "file": "history.csv",
+    "rows": 2,
+    "columns": [
+      {
+        "name": "s",
+        "unit": "",
+        "meaning": "номер полушага"
+      },
+      {
+        "name": "k",
+        "unit": "",
+        "meaning": "⌊s/2⌋"
+      },
+      {
+        "name": "direction",
+        "unit": "",
+        "meaning": "решаемые множители: Y при s = 1, X при s = 2, Y при s = 3 (только защита)"
+      },
+      {
+        "name": "status",
+        "unit": "",
+        "meaning": "HALF_STEP_DONE или, в последней строке, статус расчёта"
+      },
+      {
+        "name": "n_s",
+        "unit": "",
+        "meaning": "интервалов по решаемому направлению"
+      },
+      {
+        "name": "h_s",
+        "unit": "m",
+        "meaning": "шаг по решаемому направлению"
+      },
+      {
+        "name": "N",
+        "unit": "",
+        "meaning": "число членов, фиксировано"
+      },
+      {
+        "name": "orientation",
+        "unit": "",
+        "meaning": "start T_N in x: U_i = sin^2(i pi x / a), i = 1..N (basis A, D-049.3), companion 0 (w(0) = 0); the first half-step solves Y"
+      },
+      {
+        "name": "conditions",
+        "unit": "",
+        "meaning": "s = 1: N ≤ ⌊n_x/2⌋, 2N < n_x, N ≤ ⌊n_y/2⌋; s ≥ 2: конфигурационный S-1 (РН-3) и сетка D-068"
+      },
+      {
+        "name": "exact_rank_T",
+        "unit": "",
+        "meaning": "точный ранг стартового набора"
+      },
+      {
+        "name": "exact_rank_G",
+        "unit": "",
+        "meaning": "точный ранг G после QR"
+      },
+      {
+        "name": "qr_executed",
+        "unit": "",
+        "meaning": "s = 1: QR стартового набора; s = 2: QR решённого набора V только после RN-5; s = 3: QR не выполняется"
+      },
+      {
+        "name": "R_diag_min_abs",
+        "unit": "*",
+        "meaning": "min |diag R|"
+      },
+      {
+        "name": "cond_A_before_QR",
+        "unit": "",
+        "meaning": "cond(R)^2; только запись"
+      },
+      {
+        "name": "cond_A_after_QR",
+        "unit": "",
+        "meaning": "по собственным числам A(G); только запись"
+      },
+      {
+        "name": "A_diag",
+        "unit": "*",
+        "meaning": "диагональ A через ';'"
+      },
+      {
+        "name": "B_diag",
+        "unit": "*",
+        "meaning": "диагональ B"
+      },
+      {
+        "name": "C_diag",
+        "unit": "*",
+        "meaning": "диагональ C (C-3⁺)"
+      },
+      {
+        "name": "F",
+        "unit": "*",
+        "meaning": "правая часть"
+      },
+      {
+        "name": "A_norm_inf",
+        "unit": "*",
+        "meaning": "‖A‖∞"
+      },
+      {
+        "name": "B_norm_inf",
+        "unit": "*",
+        "meaning": "‖B‖∞"
+      },
+      {
+        "name": "C_norm_inf",
+        "unit": "*",
+        "meaning": "‖C‖∞"
+      },
+      {
+        "name": "C_L_norm_inf",
+        "unit": "*",
+        "meaning": "часть C"
+      },
+      {
+        "name": "E_norm_inf",
+        "unit": "*",
+        "meaning": "часть C"
+      },
+      {
+        "name": "premises_status",
+        "unit": "",
+        "meaning": "П-1…П-5; П-4 — допущение"
+      },
+      {
+        "name": "cond_S",
+        "unit": "",
+        "meaning": "только запись"
+      },
+      {
+        "name": "min_eig_DM",
+        "unit": "*",
+        "meaning": "min собственного числа DM/D"
+      },
+      {
+        "name": "eta",
+        "unit": "",
+        "meaning": "невязка исходной системы; OBSERVATION, порога нет (D-067, D-068)"
+      },
+      {
+        "name": "V_exact_rank",
+        "unit": "",
+        "meaning": "точный ранг сохранённого решённого набора; диагностика"
+      },
+      {
+        "name": "sigma_1",
+        "unit": "",
+        "meaning": "σ_1 матрицы R_G R_Vᵀ (до N)"
+      },
+      {
+        "name": "sigma_2",
+        "unit": "",
+        "meaning": "σ_2 матрицы R_G R_Vᵀ (до N)"
+      },
+      {
+        "name": "sigma_3",
+        "unit": "",
+        "meaning": "σ_3 матрицы R_G R_Vᵀ (до N)"
+      },
+      {
+        "name": "sigma_4",
+        "unit": "",
+        "meaning": "σ_4 матрицы R_G R_Vᵀ (до N)"
+      },
+      {
+        "name": "sigma_5",
+        "unit": "",
+        "meaning": "σ_5 матрицы R_G R_Vᵀ (до N)"
+      },
+      {
+        "name": "sigma_6",
+        "unit": "",
+        "meaning": "σ_6 матрицы R_G R_Vᵀ (до N)"
+      },
+      {
+        "name": "rho_N",
+        "unit": "",
+        "meaning": "σ_N/σ₁; только запись"
+      },
+      {
+        "name": "kappa_rep",
+        "unit": "",
+        "meaning": "‖R_G‖₂‖R_V‖₂/σ₁; только запись"
+      },
+      {
+        "name": "rank_decision",
+        "unit": "",
+        "meaning": "UNRESOLVED (no approved numerical rank criterion; D-049.5, D-049.6)"
+      },
+      {
+        "name": "P_hat",
+        "unit": "N·m",
+        "meaning": "Π_h^C поля полушага; наблюдение"
+      },
+      {
+        "name": "alpha_centre",
+        "unit": "",
+        "meaning": "alpha_centre = w(a/2, b/2) D / (q l^4), l = min(a, b); only with even n_x and n_y"
+      },
+      {
+        "name": "alpha_note",
+        "unit": "",
+        "meaning": "центр не узел"
+      },
+      {
+        "name": "rn5_verdict",
+        "unit": "",
+        "meaning": "s = 2: результат RN-5 до QR"
+      },
+      {
+        "name": "rn5_eps",
+        "unit": "",
+        "meaning": "s = 2: ε ≥ ‖(ŵ₁ − w_h⁽¹⁾)_w‖₂, округлено для записи"
+      },
+      {
+        "name": "rn5_sigma_low",
+        "unit": "",
+        "meaning": "s = 2: σ_N(ŵ₁,w) ≥ это значение, округлено для записи"
+      },
+      {
+        "name": "rn5_margin",
+        "unit": "",
+        "meaning": "s = 2: σ_low/ε, строго > 1 при RN5_CERTIFIED"
+      },
+      {
+        "name": "rt7_passed",
+        "unit": "",
+        "meaning": "s = 2: R7-1, R7-2 и R7-3 выполнены"
+      },
+      {
+        "name": "rt7_t",
+        "unit": "",
+        "meaning": "s = 2: t = ε/σ_low"
+      },
+      {
+        "name": "rt7_tau",
+        "unit": "",
+        "meaning": "s = 2: τ, точно; округлено для записи"
+      },
+      {
+        "name": "rt7_sin_theta_upper",
+        "unit": "",
+        "meaning": "s = 2: верхняя граница √τ + t"
+      },
+      {
+        "name": "P_hat_previous_QR",
+        "unit": "N·m",
+        "meaning": "s = 2: Π_h^C поля s = 1 по преобразованным массивам"
+      },
+      {
+        "name": "field_preservation",
+        "unit": "",
+        "meaning": "s = 2: max|G Rᵀ G2ᵀ − G Vᵀ| / max|G Vᵀ|; наблюдение"
+      },
+      {
+        "name": "reason",
+        "unit": "",
+        "meaning": "причина остановки"
+      }
+    ],
+    "units_note": "* — единицы зависят от базиса G после QR; значения пишутся без пересчёта."
+  },
+  "factors": {
+    "file": "factors.csv",
+    "roles": [
+      "T",
+      "R",
+      "G",
+      "A",
+      "B",
+      "C",
+      "C_L",
+      "E",
+      "F",
+      "V",
+      "companion"
+    ],
+    "note": "матрицы полушагов s = 1 и s = 2 поэлементно; значения через repr; при s = 2 G — это G2, V — это X"
+  }
+}

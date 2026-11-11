@@ -1,0 +1,6 @@
+python 3.14.8 (main, Oct  9 2026, 15:21:39) [MSC v.1944 64 bit (AMD64)]
+platform Windows-10-10.0.19045-SP0
+numpy 2.5.4
+scipy 1.18.1
+git version 2.55.0.windows.3
+QA worktree HEAD ab116b94b07420e3bc13c9211cf9292cd6bcbb36 (detached, tracked files clean: 0 changes)

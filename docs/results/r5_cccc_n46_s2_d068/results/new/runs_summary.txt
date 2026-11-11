@@ -1,0 +1,13 @@
+R_C4 N=4 a=1 b=1 9x9 q=1000 exit=0 seconds=24
+R_C5 N=5 a=1 b=1 11x11 q=1000 exit=0 seconds=15
+R_C6 N=6 a=1 b=1 13x13 q=1000 exit=0 seconds=16
+R_C7 N=5 a=1 b=0.6 20x13 q=1000 exit=0 seconds=18
+R_C1 N=4 a=1 b=1 32x32 q=1000 exit=0 seconds=19
+R_C2 N=5 a=1 b=1 32x32 q=1000 exit=0 seconds=51
+R_C3 N=6 a=1 b=1 32x32 q=1000 exit=0 seconds=123
+B_pos N=6 a=1 b=5 24x32 q=1000 exit=0 seconds=134
+B_neg N=6 a=1 b=5 24x32 q=-1000 exit=0 seconds=141
+C_pos N=6 a=5 b=1 32x13 q=1000 exit=6 seconds=18
+C_neg N=6 a=5 b=1 32x13 q=-1000 exit=6 seconds=19
+D_N4_neg N=4 a=1 b=1 32x32 q=-1000 exit=0 seconds=22
+D_N5_neg N=5 a=1 b=0.6 20x13 q=-1000 exit=0 seconds=20
