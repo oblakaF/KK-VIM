@@ -92,6 +92,52 @@ def test_rn5_with_the_physical_d_and_q_of_the_run_certifies():
     assert out["certified"]
 
 
+# --- P0-A: the sign of the load (the closed-form check of F is within |q| h m rho) ---------------------------------------------------
+
+@pytest.mark.parametrize("q", [1, -1, 1000, -1000])
+@pytest.mark.parametrize("N", [2, 3])
+@pytest.mark.parametrize("a, b, n_x, n_y", CASES)
+def test_the_closed_form_of_f_is_checked_within_the_magnitude_of_q(a, b, n_x, n_y, N, q):
+    """F_c - F* = q h sum_l (Tc - T*)_li with |Tc - T*| <= rho at the m nodes: the admissible radius |q| h m rho is >= 0 for either sign."""
+    la, q = Fraction(a), Fraction(q)
+    hx, m = la / n_x, n_x - 1
+    Tc, rho = cc.tstar(n_x, N)
+    F_c = cc.coefficients(Tc, la, n_x, q)[3]
+    assert all(abs(F_c[i] - q * la / 2) <= abs(q) * hx * m * rho for i in range(N)) and rho > 0
+    assert F_c == [-f for f in cc.coefficients(Tc, la, n_x, -q)[3]]  # the deviation of F_c from F* = q a / 2 is odd in q
+
+
+@pytest.mark.parametrize("q", [1.0, 1000.0])
+@pytest.mark.parametrize("N", [2, 3])
+@pytest.mark.parametrize("a, b, n_x, n_y", CASES)
+def test_rn5_is_the_same_for_opposite_loads(a, b, n_x, n_y, N, q):
+    """The field of s = 1 is odd in q, the certificate even: G is the start set, V(-q) = -V(q) bit for bit, every bound of RN-5 is equal."""
+    up = cn.run_cccc_n23(a, b, 1.0, q, n_x, n_y, N, 1).steps[0]
+    down = cn.run_cccc_n23(a, b, 1.0, -q, n_x, n_y, N, 1).steps[0]
+    assert np.array_equal(down.G, up.G) and np.array_equal(down.V, -up.V)
+    plus = cc.rn5_certificate(a, b, n_x, n_y, N, up.G, up.V, 1.0, q)
+    minus = cc.rn5_certificate(a, b, n_x, n_y, N, down.G, down.V, 1.0, -q)
+    assert plus["certified"] and minus["certified"] and minus["verdict"] == "RN5_CERTIFIED" and all(minus["hypotheses"].values())
+    assert minus["hypotheses"] == plus["hypotheses"] and minus["values"] == plus["values"]
+    assert (minus["eps"], minus["sigma_low"]) == (plus["eps"], plus["sigma_low"])
+
+
+def test_rn5_for_a_negative_load_does_not_certify_the_factors_of_the_opposite_load():
+    G, V = factors(1.0, 1.3, 8, 7, 2)  # q = +1
+    out = cc.rn5_certificate(1.0, 1.3, 8, 7, 2, G, V, 1.0, -1.0)
+    assert out["hypotheses"]["closed forms consistent with the enclosure"]
+    assert not out["certified"] and out["verdict"] == "RN5_UNRESOLVED" and out["eps"] is None and out["sigma_low"] is None
+
+
+def test_rn5_for_a_negative_load_does_not_certify_a_nearly_dependent_v():
+    step = cn.run_cccc_n23(1.0, 1.3, 1.0, -1.0, 8, 7, 2, 1).steps[0]
+    other = step.V[:, 0].copy()
+    other[2] = np.nextafter(other[2], -np.inf)
+    out = cc.rn5_certificate(1.0, 1.3, 8, 7, 2, step.G, np.column_stack([step.V[:, 0], other]), 1.0, -1.0)
+    assert not out["certified"] and out["verdict"] == "RN5_UNRESOLVED" and out["eps"] is None and out["sigma_low"] is None
+    assert out["hypotheses"]["closed forms consistent with the enclosure"] and not out["hypotheses"]["sigma_N(w_hat_w)^2 > eps^2 (Weyl)"]
+
+
 def test_rn5_does_not_certify_a_nearly_dependent_v():
     G, V = factors(1.0, 1.3, 8, 7, 2)
     other = V[:, 0].copy()
