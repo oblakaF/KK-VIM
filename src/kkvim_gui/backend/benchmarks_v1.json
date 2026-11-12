@@ -1,0 +1,358 @@
+{
+ "payload": {
+  "schema": "kkvim-gui-benchmarks/1",
+  "normalization": "beta = w(a/2, b/2) * D / (q * a**4); D = E t^3 / (12 (1 - nu^2)); a is the side along x",
+  "inputs": {
+   "a": 1.0,
+   "t": 0.01,
+   "E": 210000000000.0,
+   "nu": 0.3,
+   "q": 1000.0,
+   "D": 19230.769230769234
+  },
+  "match_rule": "exact equality of the SI values passed to the solver (a, b, t, E, nu, q); CCCC D2 and FEM also need n_x = n_y = n of a stored grid; no interpolation, extrapolation or rescaling",
+  "cccc": [
+   {
+    "b": 1.0,
+    "published": {
+     "beta": 0.001265319087,
+     "printed": "0.001265319087",
+     "table": "Table I (square), column w Center D/(qa^4) 10^3, M >= 800 and Hencky"
+    },
+    "grids": [
+     {
+      "n_x": 16,
+      "n_y": 16,
+      "D2": {
+       "beta": 0.0013073014529768486,
+       "w_centre_m": 6.797967555479611e-05,
+       "e_D2_m": 6.398443575350781e-21,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.0, 16, 16, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.0013747615249065552,
+       "w_centre_m": 7.148759929514086e-05,
+       "triangles": 512,
+       "dofs": 1089,
+       "constrained_w": 64,
+       "constrained_w_n": 64,
+       "solver_status": "SOLVED",
+       "rel_residual": 2.786454613804865e-13
+      }
+     },
+     {
+      "n_x": 32,
+      "n_y": 32,
+      "D2": {
+       "beta": 0.0012759787033572092,
+       "w_centre_m": 6.635089257457487e-05,
+       "e_D2_m": 6.213046039172302e-21,
+       "refinement_steps": 3,
+       "source": "REUSED committed docs/results/r5_cccc_references/d2_external.csv (QA 3e6fe2b), checked by recomputation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.0, 32, 32, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.0012930810216122098,
+       "w_centre_m": 6.724021312383489e-05,
+       "triangles": 2048,
+       "dofs": 4225,
+       "constrained_w": 128,
+       "constrained_w_n": 128,
+       "solver_status": "SOLVED",
+       "rel_residual": 4.157135065959977e-12
+      }
+     },
+     {
+      "n_x": 64,
+      "n_y": 64,
+      "D2": {
+       "beta": 0.0012679950248812037,
+       "w_centre_m": 6.593574129382259e-05,
+       "e_D2_m": 6.710733400088517e-21,
+       "refinement_steps": 3,
+       "source": "REUSED committed docs/results/r5_cccc_references/d2_external.csv (QA 3e6fe2b), checked by recomputation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.0, 64, 64, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.0012722872513910672,
+       "w_centre_m": 6.615893707233548e-05,
+       "triangles": 8192,
+       "dofs": 16641,
+       "constrained_w": 256,
+       "constrained_w_n": 256,
+       "solver_status": "SOLVED",
+       "rel_residual": 7.201712749392287e-11
+      }
+     }
+    ]
+   },
+   {
+    "b": 1.2,
+    "published": {
+     "beta": 0.001724870503,
+     "printed": "0.001724870503",
+     "table": "Table II, Double Cosine = Hencky"
+    },
+    "grids": [
+     {
+      "n_x": 16,
+      "n_y": 16,
+      "D2": {
+       "beta": 0.0017813996102319391,
+       "w_centre_m": 9.263277973206082e-05,
+       "e_D2_m": 6.43113962392358e-21,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.2, 16, 16, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.0018830104886211414,
+       "w_centre_m": 9.791654540829934e-05,
+       "triangles": 512,
+       "dofs": 1089,
+       "constrained_w": 64,
+       "constrained_w_n": 64,
+       "solver_status": "SOLVED",
+       "rel_residual": 2.5907688124530506e-13
+      }
+     },
+     {
+      "n_x": 32,
+      "n_y": 32,
+      "D2": {
+       "beta": 0.0017392172828545975,
+       "w_centre_m": 9.043929870843905e-05,
+       "e_D2_m": 6.4205687586013675e-21,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.2, 32, 32, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.001764946225247807,
+       "w_centre_m": 9.177720371288594e-05,
+       "triangles": 2048,
+       "dofs": 4225,
+       "constrained_w": 128,
+       "constrained_w_n": 128,
+       "solver_status": "SOLVED",
+       "rel_residual": 3.820814440156016e-12
+      }
+     },
+     {
+      "n_x": 64,
+      "n_y": 64,
+      "D2": {
+       "beta": 0.0017284717079120349,
+       "w_centre_m": 8.98805288114258e-05,
+       "e_D2_m": 6.774790410152902e-21,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.2, 64, 64, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.0017349265985733733,
+       "w_centre_m": 9.021618312581539e-05,
+       "triangles": 8192,
+       "dofs": 16641,
+       "constrained_w": 256,
+       "constrained_w_n": 256,
+       "solver_status": "SOLVED",
+       "rel_residual": 7.325994191383994e-11
+      }
+     }
+    ]
+   },
+   {
+    "b": 1.4,
+    "published": {
+     "beta": 0.002068143209,
+     "printed": "0.002068143209",
+     "table": "Table II, Double Cosine = Hencky"
+    },
+    "grids": [
+     {
+      "n_x": 16,
+      "n_y": 16,
+      "D2": {
+       "beta": 0.0021340919869749704,
+       "w_centre_m": 0.00011097278332269843,
+       "e_D2_m": 6.7111390251551055e-21,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.4, 16, 16, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.0022841653074434165,
+       "w_centre_m": 0.00011877659598705765,
+       "triangles": 512,
+       "dofs": 1089,
+       "constrained_w": 64,
+       "constrained_w_n": 64,
+       "solver_status": "SOLVED",
+       "rel_residual": 2.780439107422576e-13
+      }
+     },
+     {
+      "n_x": 32,
+      "n_y": 32,
+      "D2": {
+       "beta": 0.002084859282139107,
+       "w_centre_m": 0.00010841268267123354,
+       "e_D2_m": 6.746814819608702e-21,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.4, 32, 32, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.002122772721266153,
+       "w_centre_m": 0.00011038418150583993,
+       "triangles": 2048,
+       "dofs": 4225,
+       "constrained_w": 128,
+       "constrained_w_n": 128,
+       "solver_status": "SOLVED",
+       "rel_residual": 4.100465555000133e-12
+      }
+     },
+     {
+      "n_x": 64,
+      "n_y": 64,
+      "D2": {
+       "beta": 0.0020723379068286097,
+       "w_centre_m": 0.00010776157115508768,
+       "e_D2_m": 6.762727711598682e-21,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.4, 64, 64, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.002081843096379328,
+       "w_centre_m": 0.00010825584101172505,
+       "triangles": 8192,
+       "dofs": 16641,
+       "constrained_w": 256,
+       "constrained_w_n": 256,
+       "solver_status": "SOLVED",
+       "rel_residual": 4.380045429126258e-11
+      }
+     }
+    ]
+   },
+   {
+    "b": 2.0,
+    "published": {
+     "beta": 0.002532955769,
+     "printed": "0.002532955769",
+     "table": "Table II, Double Cosine = Hencky"
+    },
+    "grids": [
+     {
+      "n_x": 16,
+      "n_y": 16,
+      "D2": {
+       "beta": 0.002607550310105197,
+       "w_centre_m": 0.00013559261612547022,
+       "e_D2_m": 1.1803197821648635e-20,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 2.0, 16, 16, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.0029631286007723943,
+       "w_centre_m": 0.00015408268724016448,
+       "triangles": 512,
+       "dofs": 1089,
+       "constrained_w": 64,
+       "constrained_w_n": 64,
+       "solver_status": "SOLVED",
+       "rel_residual": 1.7371563902136495e-13
+      }
+     },
+     {
+      "n_x": 32,
+      "n_y": 32,
+      "D2": {
+       "beta": 0.00255169945426842,
+       "w_centre_m": 0.00013268837162195782,
+       "e_D2_m": 1.3043658946706834e-20,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 2.0, 32, 32, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.002641006465259061,
+       "w_centre_m": 0.00013733233619347114,
+       "triangles": 2048,
+       "dofs": 4225,
+       "constrained_w": 128,
+       "constrained_w_n": 128,
+       "solver_status": "SOLVED",
+       "rel_residual": 2.4982738879009805e-12
+      }
+     },
+     {
+      "n_x": 64,
+      "n_y": 64,
+      "D2": {
+       "beta": 0.0025376485180887615,
+       "w_centre_m": 0.00013195772294061559,
+       "e_D2_m": 1.3543632464325738e-20,
+       "refinement_steps": 3,
+       "source": "new D2 calculation",
+       "call": "r5_cccc_d2.solve(D2Problem(1.0, 2.0, 64, 64, D, 1000.0))"
+      },
+      "FEM": {
+       "beta": 0.0025600007085112677,
+       "w_centre_m": 0.0001331200368425859,
+       "triangles": 8192,
+       "dofs": 16641,
+       "constrained_w": 256,
+       "constrained_w_n": 256,
+       "solver_status": "SOLVED",
+       "rel_residual": 3.7604112201384894e-11
+      }
+     }
+    ]
+   }
+  ],
+  "ssss": [
+   {
+    "b": 1.0,
+    "navier": {
+     "beta": 0.0040623526606750485,
+     "w_centre_m": 0.00021124233835510248,
+     "M": 2559,
+     "error_bound_beta": 3.341384707131491e-10
+    }
+   }
+  ],
+  "references": {
+   "published": "Taylor R. L., Govindjee S., Solution of Clamped Rectangular Plate Problems, UCB/SEMM-2002/09 (2002), printed p. 6, Tables I-II; library L-120, PDF SHA256 149c733760ec20b7198cc9f39a86e21ed04e2867d09d3e938533f44ffa8d64b7; continuum Kirchhoff-Love solution (double cosine series / Hencky); printed to 10 significant digits",
+   "D2": "QA reference kkvim_reference.r5_cccc_d2 (13-point finite differences, even ghost nodes; D-049.8): an independent implementation of the SAME discrete problem as KK-VIM CCCC (D-049.1: D1 = D2); it does not check the grid error. Square n = 32, 64 equal the committed docs/results/r5_cccc_references/d2_external.csv (QA 3e6fe2b); other cases computed in scratch/published_plate_comparison_02",
+   "FEM": "scikit-fem 12.0.2, nonconforming Morley triangle (docs/examples/ex02.py adapted to CCCC: w = 0 at boundary vertices and dw/dn = 0 at boundary edge midpoints), structured mesh of n x n cells, 2 n^2 triangles; a DIFFERENT discretization of the SAME Kirchhoff-Love plate model; n x n FEM cells are not the n x n finite-difference grid (scratch/published_plate_fem_comparison_01)",
+   "navier": "Navier double sine series, kkvim_reference.navier.NavierRectangle, M = 2559 (D-037), qualified SSSS reference of R3 (D-043); value read as data, computed in scratch/published_plate_comparison_02",
+   "limits": "no approved agreement threshold: signed differences only; three mesh levels give neither an error bound nor a convergence order; comparison never changes the scientific status of a KK-VIM run"
+  },
+  "provenance": {
+   "built_by": "scratch/gui_benchmark_comparison_01/build_dataset.py (GUI-BENCHMARK-COMPARISON-01)",
+   "source_commit": "18ed8762d632c7773bc9a4f1457e1dd3cd6824f8",
+   "files_sha256": {
+    "scratch/published_plate_comparison_02/results.csv": "daaeca1e44a338d2e8b4c8132f6886133a46ef2b124b710ff0a8674bd4d039ec",
+    "scratch/published_plate_comparison_02/results.json": "373de12b05ee39ef9d371de7a385076924e59ec0afee58bc95db2b4eb4fce411",
+    "scratch/published_plate_comparison_02/MANIFEST.sha256": "c475313732ccb8a8ba2950055782787e04a672cb12ff1f1f8c2f223ed1806943",
+    "scratch/published_plate_fem_comparison_01/results.csv": "604186893e076bc9d82de731c1ff23969e1d5860fe452cd49d580d798c999b31",
+    "scratch/published_plate_fem_comparison_01/results.json": "9845d50b229116803b809c66c7a325624d1ac34830ce6f284be696d7df545e5a",
+    "scratch/published_plate_fem_comparison_01/MANIFEST.sha256": "8d0591932671d6fad7cce687006566ddf04da33e56284794c686d6e62d35119e",
+    "docs/results/r5_cccc_references/d2_external.csv": "111ab2724ba130be52226bffdcac8db30dae8287f76b61d0f9bcb1530fdb6609",
+    "L-120 PDF (local library, not in git)": "149c733760ec20b7198cc9f39a86e21ed04e2867d09d3e938533f44ffa8d64b7"
+   },
+   "manifests_checked": {
+    "published_plate_comparison_02": 79,
+    "published_plate_fem_comparison_01": 25
+   }
+  }
+ },
+ "payload_sha256": "4229dc714c19a6c10a56cc05abdaf48d43102db688be134fbc3b4ba71b6090bb"
+}

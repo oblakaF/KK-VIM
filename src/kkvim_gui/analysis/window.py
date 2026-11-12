@@ -7,6 +7,8 @@ figures carry the session-wide "Графики RU | EN" switch.
 - A solver run (``run`` with a ``RunOutcome``): every tab is drawn from the solver arrays and rows
   (``analysis.results``); «Экспорт ▾» writes JSON and CSV with units and statuses. The window keeps
   its run: later changes in the main window do not affect it.
+- "Сравнение" (``analysis.comparison``): the run next to saved independent references read as data
+  (``backend.benchmarks``); for a diagnostic field or inputs without a reference it states why, with no numbers.
 - Without a solver run (``--demo``): the layout with TEST DATA placeholders, never results.
 """
 
@@ -56,7 +58,9 @@ TAB_HELP = (
     "results.overview", "results.overview", "results.overview",
     "results.overview", "iterations.overview", "verification.overview",
 )
-COMPARISON_TOOLTIP = "Сравнение с эталонами — после появления независимых эталонов (G4)"
+COMPARISON_TOOLTIP = "Сравнение с эталонами — только для расчёта решателя, не для демонстрационных данных"
+COMPARISON_SOLVER_TOOLTIP = ("Текущий расчёт рядом с сохранёнными независимыми эталонами (опубликованное решение, D2, МКЭ, "
+                             "Навье): знаковые разности без порога согласия")
 REPORT_TOOLTIP = (
     "Конструктор отчёта: выбор рисунков, полей и таблиц, PDF/PNG/SVG, XLSX, язык рисунков, "
     "папка отчёта с manifest.json — после появления графиков и таблиц (GUI_DESIGN.md, 18)"
@@ -257,11 +261,13 @@ class AnalysisWindow(QMainWindow):
         self.values = results.ValuesTab(outcome, trailing=(self._export_button(),))
         self.history = results.HistoryTab(s, outcome, trailing=self._trailing())
         self.energy = results.EnergyTab(s, outcome, trailing=self._trailing())
+        from kkvim_gui.analysis.comparison import ComparisonTab
+
+        self.comparison = ComparisonTab(outcome, run)  # states itself when no reference applies
         for widget, name in zip((self.overview, self.fields, self.sections, self.values, self.history, self.energy,
-                                 QWidget()), SOLVER_TABS, strict=True):
+                                 self.comparison), SOLVER_TABS, strict=True):
             self.tabs.addTab(widget, name)
-        self.tabs.setTabEnabled(6, False)
-        self.tabs.setTabToolTip(6, COMPARISON_TOOLTIP)
+        self.tabs.setTabToolTip(6, COMPARISON_SOLVER_TOOLTIP)
         for i, topic in enumerate(SOLVER_TAB_HELP):
             set_help_context(self.tabs.widget(i), topic)
         self.report_button = QPushButton("Собрать отчёт…")

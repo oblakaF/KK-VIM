@@ -199,7 +199,8 @@ def test_r4_from_the_form_to_figures_history_and_export(qtbot, gui, tmp_path):
         rv.analysis_button.click()
     a = gui.analysis_windows[-1]
     assert a.outcome is o and [a.tabs.tabText(i) for i in range(a.tabs.count())] == list(SOLVER_TABS)
-    assert not a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение"))
+    assert a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение"))     # states itself: no reference for these inputs
+    assert a.comparison.comparison.state == "unavailable" and a.comparison.table is None
     assert a.header.badge.isVisibleTo(a.header) and "PROVISIONAL" in a.header.badge.text()
     assert MARK in a.status_accept.text() and MARK in a.fields.figure.mark.text()
     np.testing.assert_array_equal(a.fields.figure.image.image, o.w * 1000.0)   # the solver array, in mm

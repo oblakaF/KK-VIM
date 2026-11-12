@@ -9,9 +9,11 @@ Options:
   --demo               demonstration backend only (TEST DATA, the solver is not called)
   --protocol-dir DIR   folder for run protocols (default: application data folder)
   --smoke-test DIR     check of an installed application: run the default case through the windows, open the
-                       analysis, save the calculation package and screenshots to DIR, write DIR/smoke.json, exit
+                       analysis and its "Сравнение" tab, save the calculation package and screenshots to DIR, write
+                       DIR/smoke.json, exit
   --smoke-case FILE    with --smoke-test: the case to type into the form instead of the default (JSON: supports, N,
-                       a, b, h, E, nu, q in m and Pa, n_x, n_y, half_steps; optional expect_status, expect_field_role)
+                       a, b, h, E, nu, q in m and Pa, n_x, n_y, half_steps; optional expect_status, expect_field_role,
+                       expect_comparison)
 Options for design review (do not change saved settings):
   --theme light|dark   start with this theme
   --state start|setup|running|finished
@@ -171,6 +173,7 @@ class SmokeTest:
         window.fields.set_view("map")
         QApplication.processEvents()
         window.grab().save(str(self.folder / "screen_analysis_map.png"))
+        comparison = self._comparison(window)
         paths = window.save_package(self.folder)
         e = o.extremum()
         manifest = json.loads(Path(paths["manifest"]).read_text(encoding="utf-8"))
@@ -180,15 +183,32 @@ class SmokeTest:
                            w_bar_at_max=e["w_bar"], x=e["x"], y=e["y"], analysis_badge=window.header.badge.text(),
                            analysis_badge_visible=not window.header.badge.isHidden(),
                            package={k: str(v) for k, v in paths.items()},
-                           manifest_statuses=manifest["statuses"], manifest_marks=manifest["marks"])
+                           manifest_statuses=manifest["statuses"], manifest_marks=manifest["marks"],
+                           comparison=comparison)
         if self.case is None:
             ok = o.status == "CONVERGED"
         else:
             ok = (self.case.get("expect_status", o.status) == o.status
                   and self.case.get("expect_field_role", o.field_role) == o.field_role
+                  and self.case.get("expect_comparison", comparison["state"]) == comparison["state"]
                   and manifest["statuses"]["solver_status"] == o.status
                   and manifest["statuses"]["field_role"] == o.field_role)
         self._finish(0 if ok else 1, "ok" if ok else "unexpected status or field role")
+
+    def _comparison(self, window):
+        """Open "Сравнение" as a user would: screenshot, the comparison record and the texts shown in its table."""
+        from kkvim_gui.backend import benchmarks
+
+        tab = window.comparison
+        window.tabs.setCurrentWidget(tab)
+        QApplication.processEvents()
+        window.grab().save(str(self.folder / "screen_analysis_comparison.png"))
+        shown = []
+        if tab.table is not None:
+            model = tab.table.model()
+            shown = [[model.data(model.index(i, j)) for j in range(model.columnCount())] for i in range(model.rowCount())]
+        return {**benchmarks.as_record(tab.comparison), "tab_enabled": window.tabs.isTabEnabled(window.tabs.indexOf(tab)),
+                "state_text": tab.state_label.text(), "table_shown": shown}
 
     def _finish(self, code, text):
         self.report.update(exit_code=code, result=text, seconds=round(time.monotonic() - self.t0, 2))
