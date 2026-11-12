@@ -3,15 +3,11 @@
 Ветка `gui/ssss-n1-functional-preview`. Цели G3.1, G3.2; подготовка G5. Это **не** официальный выпуск R7.
 Научные решения, спецификации, допуски и код `kkvim` / `kkvim_reference` не меняются.
 
+> **Историческая запись.** С GUI-CORE-N16-P1 `kkvim-gui` открывает полный интерфейс (SSSS и CCCC, N = 1–6), а превью N = 1 осталось только как `MainWindow(preview=True)`. Запуск на Windows, сборка и обновление — [WINDOWS_LAUNCH.md](WINDOWS_LAUNCH.md).
+
 ## 1. Запуск без команд Python
 
-| Способ | Что делает |
-|---|---|
-| Двойной щелчок по `KK-VIM-GUI.cmd` в корне репозитория | при первом запуске собирает приложение, далее открывает `dist\kkvim-gui-preview\Scripts\kkvim-gui.exe` |
-| `scripts\windows\build_gui_preview.ps1 [-Target <папка>]` | сборка: wheel проекта (hatchling, `[project.gui-scripts] kkvim-gui`) в отдельное окружение с версиями из `uv.lock` |
-| `kkvim-gui.exe` | оконное приложение без консоли |
-
-Требуется `uv` в PATH (только для сборки). `uv.lock` и `.venv` проекта сборка не изменяет.
+Двойной щелчок по `KK-VIM-GUI.cmd`; сборка — `scripts\windows\build_gui.ps1` (прежнее имя `build_gui_preview.ps1`), установка — `dist\kkvim-gui\`. Подробно: [WINDOWS_LAUNCH.md](WINDOWS_LAUNCH.md).
 
 ## 2. Объём
 

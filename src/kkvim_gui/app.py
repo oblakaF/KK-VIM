@@ -10,6 +10,8 @@ Options:
   --protocol-dir DIR   folder for run protocols (default: application data folder)
   --smoke-test DIR     check of an installed application: run the default case through the windows, open the
                        analysis, save the calculation package and screenshots to DIR, write DIR/smoke.json, exit
+  --smoke-case FILE    with --smoke-test: the case to type into the form instead of the default (JSON: supports, N,
+                       a, b, h, E, nu, q in m and Pa, n_x, n_y, half_steps; optional expect_status, expect_field_role)
 Options for design review (do not change saved settings):
   --theme light|dark   start with this theme
   --state start|setup|running|finished
@@ -99,6 +101,7 @@ def parse_args(argv):
     parser.add_argument("--demo", action="store_true", help="demonstration backend (TEST DATA, no solver)")
     parser.add_argument("--protocol-dir", help="folder for run protocols")
     parser.add_argument("--smoke-test", metavar="DIR", help="run, analyse and save the default case, then exit")
+    parser.add_argument("--smoke-case", metavar="FILE", help="with --smoke-test: JSON case typed into the form")
     return parser.parse_known_args(argv)
 
 
@@ -117,11 +120,12 @@ class SmokeTest:
 
     TIMEOUT = 600.0
 
-    def __init__(self, gui, app, folder):
+    def __init__(self, gui, app, folder, case=None):
         self.gui, self.app, self.folder = gui, app, Path(folder)
         self.folder.mkdir(parents=True, exist_ok=True)
         self.t0 = time.monotonic()
-        self.report = {"stage": "start"}
+        self.case = case
+        self.report = {"stage": "start", "case": case}
         self.timer = QTimer()
         self.timer.setInterval(250)
         self.timer.timeout.connect(self._poll)
@@ -129,10 +133,14 @@ class SmokeTest:
     def start(self):
         main = self.gui.main_window
         main.set_state("setup")
+        if self.case is not None:
+            type_case(main.setup_model, self.case)
+        self.report.update(installation=installation_record(), preview=main.preview, demo=main.demo,
+                           route=main.setup_model.state.route)
         main.setup_view.try_run()
         self.report["stage"] = "running"
         if main.runs.active is None:
-            return self._finish(1, "the run did not start")
+            return self._finish(1, "the run did not start: " + main.setup_view.check_text.text())
         self.timer.start()
 
     def _poll(self):
@@ -165,10 +173,22 @@ class SmokeTest:
         window.grab().save(str(self.folder / "screen_analysis_map.png"))
         paths = window.save_package(self.folder)
         e = o.extremum()
-        self.report.update(N=o.request.N, grid=[o.request.n_x, o.request.n_y], s=o.s, w_max=e["w"],
-                           w_bar_at_max=e["w_bar"], x=e["x"], y=e["y"],
-                           package={k: str(v) for k, v in paths.items()})
-        self._finish(0 if o.status == "CONVERGED" else 1, "ok")
+        manifest = json.loads(Path(paths["manifest"]).read_text(encoding="utf-8"))
+        self.report.update(N=o.request.N, supports=o.request.supports, grid=[o.request.n_x, o.request.n_y], s=o.s,
+                           s_requested=o.s_requested, route=o.route, solver=o.solver, call=o.call, mark=o.mark,
+                           field_role=o.field_role, requested_completed=o.requested_completed, w_max=e["w"],
+                           w_bar_at_max=e["w_bar"], x=e["x"], y=e["y"], analysis_badge=window.header.badge.text(),
+                           analysis_badge_visible=not window.header.badge.isHidden(),
+                           package={k: str(v) for k, v in paths.items()},
+                           manifest_statuses=manifest["statuses"], manifest_marks=manifest["marks"])
+        if self.case is None:
+            ok = o.status == "CONVERGED"
+        else:
+            ok = (self.case.get("expect_status", o.status) == o.status
+                  and self.case.get("expect_field_role", o.field_role) == o.field_role
+                  and manifest["statuses"]["solver_status"] == o.status
+                  and manifest["statuses"]["field_role"] == o.field_role)
+        self._finish(0 if ok else 1, "ok" if ok else "unexpected status or field role")
 
     def _finish(self, code, text):
         self.report.update(exit_code=code, result=text, seconds=round(time.monotonic() - self.t0, 2))
@@ -199,6 +219,33 @@ def default_protocol_dir():
     return Path(base) / "runs" if base else None
 
 
+def type_case(model, case):
+    """Type a smoke case into the setup form as a user would (values in m and Pa); research choices only if asked."""
+    model.set_choice(supports=case["supports"], N=int(case["N"]))
+    for key in ("a", "b", "h", "E", "nu", "q", "n_x", "n_y"):
+        model.set_text(key, str(case[key]))
+    for key, unit in (("a", "m"), ("b", "m"), ("h", "m"), ("E", "Pa"), ("q", "Pa")):
+        model.set_unit(key, unit)
+    if case["supports"] == "CCCC":
+        model.set_choice(cccc_half_steps=int(case["half_steps"]))
+    elif "half_steps" in case:
+        model.set_text("half_steps", str(case["half_steps"]))
+        if int(case["N"]) >= 4:
+            model.set_choice(ssss_research=bool(case.get("ssss_research", False)))
+
+
+def installation_record():
+    """Where the running program and its modules come from (the check of an installed application).
+
+    The location of kkvim is looked up without importing it: only the adapter imports kkvim (test_gui_independence)."""
+    import importlib.util
+
+    import kkvim_gui
+
+    return {"executable": sys.executable, "prefix": sys.prefix, "kkvim": importlib.util.find_spec("kkvim").origin,
+            "kkvim_gui": kkvim_gui.__file__}
+
+
 def main(argv=None):
     args, qt_args = parse_args(sys.argv[1:] if argv is None else argv)
     app = create_qapplication(qt_args)
@@ -215,6 +262,7 @@ def main(argv=None):
     if args.analysis:
         gui.open_analysis()
     if args.smoke_test:
-        smoke = SmokeTest(gui, app, args.smoke_test)
+        case = json.loads(Path(args.smoke_case).read_text(encoding="utf-8")) if args.smoke_case else None
+        smoke = SmokeTest(gui, app, args.smoke_test, case)
         QTimer.singleShot(500, smoke.start)
     return app.exec()
