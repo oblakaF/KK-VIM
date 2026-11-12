@@ -6,6 +6,14 @@ largest |w| (a search over the stored values, not a new quantity) and lookups of
 
 ``origin`` is the only source of the TEST DATA mark (GUI_DESIGN.md, 9): "solver" for a computation
 by kkvim, "demo" for the demonstration backend.
+
+``field_role`` is the single statement of what the field is (set by the adapter from the solver status,
+``kkvim_adapter.FIELD_ROLE_RULE``); every view, the export and the report read it:
+- "accepted" — the field of an accepted R3 run with CONVERGED (field.csv);
+- "research" — the field of a research or PROVISIONAL run that ended as requested (field_research.csv);
+- "diagnostic" — the field of the last completed half-step of a run that did not end as requested: a
+  protective stop, a stop of its stopping rule or a solver error (field_diagnostic.csv); never a result;
+- None — no field was computed (no field file).
 """
 
 from dataclasses import dataclass, field
@@ -16,6 +24,12 @@ from kkvim_gui.backend.request import RunRequest
 
 ORIGIN_SOLVER = "solver"
 ORIGIN_DEMO = "demo"
+
+ROLE_ACCEPTED = "accepted"
+ROLE_RESEARCH = "research"
+ROLE_DIAGNOSTIC = "diagnostic"
+FIELD_ROLES = (ROLE_ACCEPTED, ROLE_RESEARCH, ROLE_DIAGNOSTIC)
+FIELD_FILE = {ROLE_ACCEPTED: "field", ROLE_RESEARCH: "field_research", ROLE_DIAGNOSTIC: "field_diagnostic"}  # + .csv
 
 # stop: "met" — the stopping rule of the mode is satisfied; "not_met" — the run ended otherwise;
 # "error" — an error exit of the solver; "none" — no stopping rule applies (e.g. the normative mode).
@@ -42,7 +56,7 @@ class Column:
 class RunOutcome:
     origin: str
     request: RunRequest
-    solver: str  # "R3" (N = 1) or "R4" (N = 2-3)
+    solver: str  # "R3", "R4", "SSSS-RESEARCH", "CCCC-N1", "CCCC-N23", "CCCC-N46"
     call: str  # the kkvim function that produced the result
     status: str  # status code of the solver, unchanged
     reason: str  # reason text of the solver ("" if it gives none)
@@ -51,7 +65,7 @@ class RunOutcome:
     stop_text: str
     science_kind: str  # "success" | "warning" | "neutral"
     science_text: str
-    mark: str | None  # "PROVISIONAL / NOT_QUALIFIED" for every R4 result, None otherwise
+    mark: str | None  # status mark of every non-accepted route (PROVISIONAL / NOT_QUALIFIED, RESEARCH_ONLY / ...), None for R3
     D: float | None  # N·m
     x: np.ndarray | None  # node coordinates, m
     y: np.ndarray | None
@@ -64,6 +78,18 @@ class RunOutcome:
     diagnostics: tuple = ()  # (name, value) of the run-level diagnostics
     notes: tuple = ()  # warnings for the user
     versions: dict = field(default_factory=dict)
+    route: str = ""  # request.route_of(supports, N)
+    field_role: str | None = None  # see the module text; None without a field
+    requested_completed: bool = False  # the run ended as requested (R3: CONVERGED; others: the requested end of the mode)
+    s_requested: int | None = None  # the requested (fixed or limiting) number of half-steps; None for R3 (s_max is a parameter)
+    decisions: tuple = ()  # decisions that authorize the route
+    limitations: tuple = ()  # limits of the route, shown in the run screen, the analysis and the report
+
+    def __post_init__(self):
+        if self.field_role is not None and self.field_role not in FIELD_ROLES:
+            raise ValueError(f"unknown field role {self.field_role!r}")
+        if (self.field_role is None) != (self.w is None):
+            raise ValueError("a field needs a field role and a field role needs a field")
 
     @property
     def k(self) -> int:
@@ -79,8 +105,13 @@ class RunOutcome:
 
     @property
     def diagnostic_only(self) -> bool:
-        """An error exit that kept the field of its last completed half-step: diagnostics, never a result."""
-        return self.is_error and self.has_field
+        """The field of the last completed half-step of a run that did not end as requested: diagnostics, never a result."""
+        return self.field_role == ROLE_DIAGNOSTIC
+
+    @property
+    def field_file(self) -> str | None:
+        """Base name of the field file (without the TEST DATA suffix and .csv), or None without a field."""
+        return None if self.field_role is None else FIELD_FILE[self.field_role]
 
     @property
     def is_demo(self) -> bool:

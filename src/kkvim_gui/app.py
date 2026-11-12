@@ -1,8 +1,10 @@
 """Application entry point: `kkvim-gui` or `python -m kkvim_gui`.
 
 Calculations run the KK-VIM solver in a separate process; the protocol of every run is written to
-the application data folder (``runs/``). The application is the functional preview: only Kirchhoff–Love,
-SSSS, N = 1 (the accepted R3 solver, D-043) can be chosen; other methods, N and CCCC are shown as unavailable.
+the application data folder (``runs/``). Kirchhoff–Love, uniform load: SSSS N = 1 (the accepted R3 solver, D-043),
+SSSS N = 2–3 (R4, PROVISIONAL / NOT_QUALIFIED), SSSS N = 4–6 and CCCC N = 1–6 (research only, RESEARCH_ONLY /
+PROVISIONAL / NOT_QUALIFIED), each on the domain and with the guards of its own solver. ``MainWindow(preview=True)``
+remains the restricted functional preview (SSSS, N = 1).
 Options:
   --demo               demonstration backend only (TEST DATA, the solver is not called)
   --protocol-dir DIR   folder for run protocols (default: application data folder)
@@ -207,8 +209,7 @@ def main(argv=None):
         session.apply_theme()
     protocol_dir = args.protocol_dir or default_protocol_dir()
     sys.excepthook = show_unexpected_error
-    gui = GuiApplication(session, dev=args.dev, demo=args.demo, protocol_dir=None if args.demo else protocol_dir,
-                         preview=True)
+    gui = GuiApplication(session, dev=args.dev, demo=args.demo, protocol_dir=None if args.demo else protocol_dir)
     gui.main_window.set_state(args.state)
     gui.main_window.show()
     if args.analysis:

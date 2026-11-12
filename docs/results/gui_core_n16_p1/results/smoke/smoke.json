@@ -1,0 +1,26 @@
+{
+  "stage": "finished",
+  "run_status": "finished",
+  "solver_status": "CONVERGED",
+  "N": 1,
+  "grid": [
+    80,
+    40
+  ],
+  "s": 8,
+  "w_max": 0.0026315633022785515,
+  "w_bar_at_max": 0.0006325873322784981,
+  "x": 1.0,
+  "y": 0.5,
+  "package": {
+    "history": "scratch\\gui_n16\\smoke\\kkvim_20261112-050500_run001\\history.csv",
+    "field": "scratch\\gui_n16\\smoke\\kkvim_20261112-050500_run001\\field.csv",
+    "manifest": "scratch\\gui_n16\\smoke\\kkvim_20261112-050500_run001\\manifest.json",
+    "field_png": "scratch\\gui_n16\\smoke\\kkvim_20261112-050500_run001\\field.png",
+    "surface_png": "scratch\\gui_n16\\smoke\\kkvim_20261112-050500_run001\\surface.png",
+    "report": "scratch\\gui_n16\\smoke\\kkvim_20261112-050500_run001\\report.html"
+  },
+  "exit_code": 0,
+  "result": "ok",
+  "seconds": 3.04
+}

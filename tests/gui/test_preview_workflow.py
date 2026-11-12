@@ -161,13 +161,11 @@ def test_preview_offers_only_kirchhoff_love_ssss_and_n1(preview):
     model = view.N.model()
     enabled = [n for i, n in enumerate(N_VALUES) if model.item(i).isEnabled()]
     assert enabled == list(PREVIEW_N) == [1]
-    for n in (2, 3):
+    for n in (2, 3, 4, 5, 6):
         assert "недоступно" in view.N.itemText(N_VALUES.index(n))
-    for n in (4, 5, 6):
-        assert "не реализовано" in view.N.itemText(N_VALUES.index(n))
     theories = view.theory.model()
     assert theories.item(0).isEnabled() and not any(theories.item(i).isEnabled() for i in (1, 2))
-    assert "не реализовано" in view.supports.buttons["CCCC"].text()
+    assert "недоступно" in view.supports.buttons["CCCC"].text() and not view.supports.buttons["CCCC"].isEnabled()
     assert view.preview_note is not None
     assert any("N = 1" in t and "недоступные" in t for t in label_texts(view.preview_note))
     assert not preview.header.badge.isHidden() and "ПРЕДВАРИТЕЛЬНАЯ" in preview.header.badge.text()
@@ -179,11 +177,13 @@ def test_preview_refuses_n2_and_cccc_even_if_set_programmatically(preview):
     assert preview._start_run() is None and preview.runs.active is None and not preview.runs.runs
     assert any("недоступно" in t for t in label_texts(view))
     view.N.setCurrentIndex(0)
-    view.supports.set_current("CCCC")
-    assert not view.try_run() and not preview.runs.runs
+    view.supports.set_current("CCCC")  # not possible with the mouse: the button is disabled in the preview
+    view.try_run()
+    assert not preview.runs.runs and any("недоступно" in t for t in label_texts(view))
 
 
-def test_full_application_entry_is_the_preview():
+def test_the_preview_window_is_restricted_to_n1():
+    """``preview=True`` remains the restricted window (SSSS, N = 1); the application entry runs every route (P1)."""
     args, _ = parse_args(["--smoke-test", "x"])
     assert args.smoke_test == "x"
     gui = GuiApplication(Session(settings=None), preview=True)

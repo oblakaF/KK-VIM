@@ -56,7 +56,8 @@ class StartView(QWidget):
         if demo:
             rows = (("Решатель", "не вызывается"), ("Режим", "демонстрационный (TEST DATA)"))
         else:
-            rows = (("Решатель", "KK-VIM: N = 1 — R3 (ACCEPTED, D-043); N = 2–3 — R4 (PROVISIONAL / NOT_QUALIFIED)"),
+            rows = (("Решатель", ("KK-VIM: SSSS N = 1 — R3 (ACCEPTED, D-043); SSSS N = 2–3 — R4 (PROVISIONAL / NOT_QUALIFIED); "
+                                  "SSSS N = 4–6 и CCCC N = 1–6 — только исследование (RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED)")),
                     ("Режим", "расчёт в отдельном процессе"))
         rows = (*rows, ("Версия", f"KK-VIM {program_version()}"))
         for i, (k, v) in enumerate(rows):

@@ -1,0 +1,334 @@
+{
+  "schema_version": 2,
+  "data_origin": "solver",
+  "marks": [
+    "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+  ],
+  "created": "2026-11-12T05:00:56",
+  "program": {
+    "kkvim_gui": "0.0.0",
+    "versions": {
+      "python": "3.14.8",
+      "kkvim": "0.0.0",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+    }
+  },
+  "run": {},
+  "input": {
+    "entered": [],
+    "si": {
+      "a": {
+        "value": 1.0,
+        "unit": "m"
+      },
+      "b": {
+        "value": 1.0,
+        "unit": "m"
+      },
+      "t": {
+        "value": 0.01,
+        "unit": "m"
+      },
+      "E": {
+        "value": 210000000000.0,
+        "unit": "Pa"
+      },
+      "nu": {
+        "value": 0.3,
+        "unit": "1"
+      },
+      "q": {
+        "value": 1000.0,
+        "unit": "Pa"
+      }
+    },
+    "supports": "SSSS",
+    "load": "uniform",
+    "theory": "Kirchhoff-Love",
+    "N": 4,
+    "grid": {
+      "n_x": 40,
+      "n_y": 40
+    },
+    "method": {
+      "ssss_research": true,
+      "half_steps": 2
+    }
+  },
+  "model": {
+    "theory": "Kirchhoff-Love",
+    "supports": "SSSS",
+    "N": 4,
+    "route": "ssss_n46",
+    "decisions": [
+      "D-056.7",
+      "D-060"
+    ]
+  },
+  "solver": {
+    "stage": "SSSS-RESEARCH",
+    "call": "kkvim.research_ssss.run_research",
+    "parameters": {
+      "N": 4,
+      "transform": "fft",
+      "half_steps": 2,
+      "research_mode": true,
+      "stop_on_stabilization": false,
+      "K_research": 1000000,
+      "eps_floor": 3.599651550783913e-13,
+      "tol_inf": 1e-10,
+      "tol_E": 1e-08,
+      "s_min": 3,
+      "s_max": 100,
+      "eta_max": 1e-12,
+      "cell": "a = 1, b = r, q = D = 1 (ячейка исследования); w = w̄ · qa⁴/D",
+      "w_scale_q_a4_over_D": 0.05199999999999999
+    }
+  },
+  "statuses": {
+    "solver_status": "RESEARCH_LIMIT_REACHED",
+    "solver_reason": "2 half-steps done; this is not convergence",
+    "error": null,
+    "stop": {
+      "kind": "none",
+      "text": "Выполнено заданное число полушагов: RESEARCH_LIMIT_REACHED (стабилизация только регистрируется; не сходимость)"
+    },
+    "scientific": {
+      "kind": "warning",
+      "text": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED: исследовательский путь SSSS, N = 4–6 (D-056.7, D-060). Не рабочий и не квалифицированный решатель; не сходимость и не научная приёмка"
+    },
+    "scientific_status": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_run_completed": true,
+    "field_role": "research",
+    "field_file": "field_research.csv"
+  },
+  "results": {
+    "D": {
+      "value": 19230.769230769234,
+      "unit": "N·m"
+    },
+    "s": 2,
+    "k": 1,
+    "half_steps": {
+      "completed": 2,
+      "requested": 2
+    },
+    "field_available": true,
+    "field_role": "research field: the run ended as requested; RESEARCH / PROVISIONAL / NOT_QUALIFIED, never a qualified result",
+    "field_role_code": "research",
+    "field_file": "field_research.csv",
+    "requested_run_completed": true,
+    "completed_without_error": true,
+    "extremum_by_nodes": {
+      "i": 20,
+      "j": 20,
+      "x": {
+        "value": 0.5,
+        "unit": "m"
+      },
+      "y": {
+        "value": 0.5,
+        "unit": "m"
+      },
+      "w": {
+        "value": 0.00021122735341554515,
+        "unit": "m"
+      },
+      "w_bar": {
+        "value": 0.004062064488760484,
+        "unit": "1"
+      }
+    },
+    "w_bar_definition": "w_bar = w D / (q a^4), MATH_SPEC 2.5"
+  },
+  "history_columns": [
+    {
+      "key": "s",
+      "title": "s",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "k",
+      "title": "k",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "direction",
+      "title": "Множитель",
+      "kind": "text",
+      "unit": null
+    },
+    {
+      "key": "eps_inf",
+      "title": "ε^∞",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "eps_E",
+      "title": "ε^E",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "stabilization_ok",
+      "title": "ε ≤ tol",
+      "kind": "flag",
+      "unit": null
+    },
+    {
+      "key": "w_max",
+      "title": "max|w̄| (ячейка)",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "P",
+      "title": "Π_h",
+      "kind": "number",
+      "unit": "q²a⁶/D"
+    },
+    {
+      "key": "energy_status",
+      "title": "Энергетический тест",
+      "kind": "text",
+      "unit": null
+    },
+    {
+      "key": "delta_P",
+      "title": "ΔP",
+      "kind": "number",
+      "unit": "q²a⁶/D"
+    },
+    {
+      "key": "Q",
+      "title": "Q",
+      "kind": "number",
+      "unit": "q²a⁶/D"
+    },
+    {
+      "key": "tau",
+      "title": "τ",
+      "kind": "number",
+      "unit": "q²a⁶/D"
+    },
+    {
+      "key": "m_s",
+      "title": "m_s",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "eta",
+      "title": "η_N (невязка)",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "eta_initial",
+      "title": "η_N до уточнения",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "refined",
+      "title": "Уточнение",
+      "kind": "flag",
+      "unit": null
+    },
+    {
+      "key": "rho_N",
+      "title": "ρ_N",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "kappa_rep",
+      "title": "κ_rep",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "guards_passed",
+      "title": "Защиты D-048.5",
+      "kind": "flag",
+      "unit": null
+    },
+    {
+      "key": "qr_done",
+      "title": "QR",
+      "kind": "flag",
+      "unit": null
+    },
+    {
+      "key": "qr_field_error",
+      "title": "Ошибка поля QR",
+      "kind": "number",
+      "unit": "1"
+    },
+    {
+      "key": "stop_reason",
+      "title": "Причина остановки",
+      "kind": "text",
+      "unit": null
+    },
+    {
+      "key": "mark",
+      "title": "Статус",
+      "kind": "text",
+      "unit": null
+    }
+  ],
+  "diagnostics": {
+    "status": "RESEARCH_LIMIT_REACHED",
+    "reason": "2 half-steps done; this is not convergence",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "first_stabilization_s": null,
+    "energy_unit": "q²a⁶/D (ячейка)"
+  },
+  "notes": [
+    "SSSS, N = 4 — только исследование: RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED (D-056.7)",
+    "Энергии в истории — в единицах q²a⁶/D ячейки исследования; поле w — в метрах (w = w̄ · qa⁴/D)",
+    "Выполнено заданное число полушагов. Это не сходимость."
+  ],
+  "limitations": [
+    "N = 4–6 — только исследование (RESEARCH_ONLY, D-056.7): не рабочий и не квалифицированный решатель. Каждый результат — PROVISIONAL / NOT_QUALIFIED.",
+    "D-048 и K_RESEARCH на N = 4–6 не распространяются (D-056.7, п. 3): исследовательский контроллер применён без изменений как выбор исследования, числа полушагов фиксированы, стабилизация только регистрируется.",
+    "Остановка защитой (например, N = 6, r = 1/5, 1/3) — не потеря ранга; продолжать за защитой нельзя.",
+    "Считается ячейка исследования a = 1, b = r, q = D = 1; физические w получены точным множителем qa⁴/D (вывод проекта, kkvim.research_ssss). Энергии в history.csv — в единицах q²a⁶/D.",
+    "Сходимость при фиксированном N не доказана; при s ≥ 2 утверждения — не выше PROVISIONAL (Q-022).",
+    "Линейная прямоугольная пластина Кирхгофа–Лява, однородный изотропный материал, SSSS, q = const, 0,2 ≤ b/a ≤ 5.",
+    "CCCC, другие закрепления и нагрузки, моменты и напряжения здесь не считаются.",
+    "Успешный запуск, стабилизация итераций и научная приёмка — разные статусы (AGENTS.md, разд. 4)."
+  ],
+  "log": [],
+  "files": {
+    "history": "history.csv",
+    "field": "field_research.csv",
+    "report": "report.html"
+  },
+  "report_summary": {
+    "w_max_abs_node": {
+      "i": 20,
+      "j": 20,
+      "x": 0.5,
+      "y": 0.5,
+      "w": 0.00021122735341554515,
+      "w_bar": 0.004062064488760484
+    },
+    "w_centre_node": {
+      "i": 20,
+      "j": 20,
+      "x": 0.5,
+      "y": 0.5,
+      "w": 0.00021122735341554515,
+      "w_bar": 0.004062064488760484
+    },
+    "w_bar_max_abs": 0.004062064488760484
+  },
+  "visualization": {}
+}

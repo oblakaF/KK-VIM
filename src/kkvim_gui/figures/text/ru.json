@@ -18,6 +18,7 @@
   "axis.halfstep": "Полушаг s",
   "axis.change": "Изменение поля ε",
   "axis.energy": "Π_h, N·m",
+  "axis.energy_cell": "Π_h, q²a⁶/D (ячейка исследования)",
   "hist.title": "Изменение поля по полушагам",
   "energy.title": "Дискретная энергия Π_h по полушагам",
   "legend.eps_inf": "ε^∞",
@@ -25,6 +26,7 @@
   "legend.tol_inf": "tol_∞",
   "legend.tol_E": "tol_E",
   "mark.provisional": "PROVISIONAL / NOT_QUALIFIED",
+  "mark.research": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
   "mark.diagnostic": "ДИАГНОСТИКА · РАСЧЁТ НЕ ЗАВЕРШЁН",
   "surface.title": "Деформированная форма пластины (аксонометрия)"
 }

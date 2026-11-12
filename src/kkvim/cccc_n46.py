@@ -45,8 +45,9 @@ half-step does not approximate the discrete or the continuous solution; RN-5 cer
 transversality of span G2 to the exact y-subspace, neither the accuracy, the conditioning nor the rank of w(2), nor anything of s >= 3; the full rank of w(1) for N >= 4 is not considered by MATH_SPEC C.1 and
 is UNRESOLVED; the exact rank of the stored binary64 factors is not a certificate for the unrounded discrete solution. The grid bound
 2N + 1 <= n_x, n_y <= 1280 is an engineering applicability limit, not an accuracy certificate; the lower bound over y does not establish the
-full rank of the field. s = 2 needs n_x, n_y <= 32 (D-068). Independent QA of the s = 2 path is still to come; the tests of the module are not
-that QA.
+full rank of the field. s = 2 needs n_x, n_y <= 32 (D-068). The independent QA of the s = 2 path, R5-CCCC-N46-S2-D068-FINAL, gave
+QA_PASS_S2_N46_IMPLEMENTATION_LIMITED (docs/results/r5_cccc_n46_s2_d068): a limited check of the implementation, not a qualification; the
+tests of the module are not that QA.
 
 Statuses never raise: a refused input is a result with its status and reason, without a field.
 """
