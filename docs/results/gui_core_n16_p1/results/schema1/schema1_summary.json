@@ -1,0 +1,39 @@
+{
+ "r3_converged": {
+  "status": "CONVERGED",
+  "is_error": false,
+  "files": [
+   "field.csv",
+   "history.csv",
+   "manifest.json"
+  ]
+ },
+ "r3_max_half_steps": {
+  "status": "MAX_HALF_STEPS",
+  "is_error": false,
+  "files": [
+   "field.csv",
+   "history.csv",
+   "manifest.json"
+  ]
+ },
+ "r4_normative": {
+  "status": "NOT_QUALIFIED",
+  "is_error": false,
+  "files": [
+   "field.csv",
+   "history.csv",
+   "manifest.json"
+  ]
+ },
+ "r4_research": {
+  "status": "PROVISIONAL_FIELD_STABILIZED",
+  "is_error": false,
+  "files": [
+   "field.csv",
+   "history.csv",
+   "manifest.json"
+  ]
+ },
+ "_modules_from_base": true
+}

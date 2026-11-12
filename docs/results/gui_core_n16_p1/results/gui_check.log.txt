@@ -1,0 +1,28 @@
+{
+ "failures": [
+  "S3_R4_N2_research: field_csv_data_bitwise_vs_cli ",
+  "S4_R4_N3_fixed4: field_csv_data_bitwise_vs_cli ",
+  "S6_SSSS_N4_research: history_common_columns_text_equal {'columns': ['P', 'Q', 'delta_P', 'direction', 'energy_status', 'eps_E', 'eps_inf', 'eta_initial', 'k', 'kappa_rep', 'm_s', 'mark', 'qr_done', 'qr_field_error', 'refined', 'rho_N', 's', 'stabilization_ok', 'stop_reason', 'tau', 'w_max'], 'diffs': [('w_max', 0, '0.004061894554288518', '0.00021121851682300287'), ('w_max', 1, '0.004062064488760484', '0.00021122735341554515')]}"
+ ],
+ "cases": {
+  "S1_R3_converged": 25,
+  "S2_R3_max_half_steps": 28,
+  "S3_R4_N2_research": 22,
+  "S4_R4_N3_fixed4": 22,
+  "S5_R4_N2_normative": 22,
+  "S6_SSSS_N4_research": 24,
+  "C1_CCCC_N1_s3": 30,
+  "C2_CCCC_N2_s2": 30,
+  "C3_CCCC_N4_32_s2": 31,
+  "C4_CCCC_N5_b06_s2_pos": 31,
+  "C5_CCCC_N5_b06_s2_neg": 37,
+  "C6_CCCC_N6_a5_32x13_s2": 38,
+  "C7_CCCC_N4_33x9_s2": 35,
+  "C5_CCCC_N5_b06_s2_neg__vs_D068_D_N5_neg": 2,
+  "C4_CCCC_N5_b06_s2_pos__vs_D068_R_C7": 2,
+  "C3_CCCC_N4_32_s2__vs_D068_R_C1": 2,
+  "C6_CCCC_N6_a5_32x13_s2__vs_D068_C_pos": 2
+ }
+}
+VERDICT_CHECKS FAIL
+exit=0

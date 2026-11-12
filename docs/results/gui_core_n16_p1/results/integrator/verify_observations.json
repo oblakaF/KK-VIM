@@ -1,0 +1,219 @@
+{
+ "task": "GUI-CORE-N16-P1-INTEGRATION-PREP",
+ "verdict": "PASS",
+ "problems": [],
+ "checks": {
+  "manifest_sha256_all_match": {
+   "ok": true,
+   "detail": {
+    "entries": 36,
+    "mismatch": [],
+    "unlisted": []
+   }
+  },
+  "repackaging_consistent_with_qa_manifest": {
+   "ok": true,
+   "detail": {
+    "rows": 33,
+    "qa_original_entries": 200,
+    "problems": [],
+    "transformations": [
+     "eol",
+     "eol+name",
+     "eol+path+name",
+     "name",
+     "none",
+     "path"
+    ]
+   }
+  },
+  "all_json_parse": {
+   "ok": true,
+   "detail": []
+  },
+  "gui_check_verdict_checks_is_FAIL_as_published": {
+   "ok": true,
+   "detail": "FAIL"
+  },
+  "gui_check_not_true_checks_are_exactly_N1_N2": {
+   "ok": true,
+   "detail": {
+    "case_checks": 386,
+    "not_true": [
+     "S3_R4_N2_research:field_csv_data_bitwise_vs_cli",
+     "S4_R4_N3_fixed4:field_csv_data_bitwise_vs_cli",
+     "S6_SSSS_N4_research:history_common_columns_text_equal"
+    ],
+    "failures_entries": 3
+   }
+  },
+  "field_roles_accepted_only_for_R3_CONVERGED": {
+   "ok": true,
+   "detail": {
+    "S1_R3_converged": [
+     "CONVERGED",
+     "accepted"
+    ],
+    "S2_R3_max_half_steps": [
+     "MAX_HALF_STEPS",
+     "diagnostic"
+    ],
+    "S3_R4_N2_research": [
+     "PROVISIONAL_FIELD_STABILIZED",
+     "research"
+    ],
+    "S4_R4_N3_fixed4": [
+     "RESEARCH_LIMIT_REACHED",
+     "research"
+    ],
+    "S5_R4_N2_normative": [
+     "NOT_QUALIFIED",
+     "research"
+    ],
+    "S6_SSSS_N4_research": [
+     "RESEARCH_LIMIT_REACHED",
+     "research"
+    ],
+    "C1_CCCC_N1_s3": [
+     "COMPLETED_FIXED_HALF_STEPS",
+     "research"
+    ],
+    "C2_CCCC_N2_s2": [
+     "COMPLETED_FIXED_HALF_STEPS",
+     "research"
+    ],
+    "C3_CCCC_N4_32_s2": [
+     "COMPLETED_FIXED_HALF_STEPS",
+     "research"
+    ],
+    "C4_CCCC_N5_b06_s2_pos": [
+     "COMPLETED_FIXED_HALF_STEPS",
+     "research"
+    ],
+    "C5_CCCC_N5_b06_s2_neg": [
+     "COMPLETED_FIXED_HALF_STEPS",
+     "research"
+    ],
+    "C6_CCCC_N6_a5_32x13_s2": [
+     "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "diagnostic"
+    ],
+    "C7_CCCC_N4_33x9_s2": [
+     "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "diagnostic"
+    ]
+   }
+  },
+  "qt_smoke_verdict_PASS": {
+   "ok": true,
+   "detail": "PASS"
+  },
+  "N1_S3_R4_N2_research_only_w_bar_differs_by_at_most_1_ulp": {
+   "ok": true,
+   "detail": {
+    "nodes": 289,
+    "columns": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "differing_nodes": {
+     "i": 0,
+     "j": 0,
+     "x [m]": 0,
+     "y [m]": 0,
+     "w [m]": 0,
+     "w_bar [1]": 62
+    },
+    "max_ulp": {
+     "i": 0,
+     "j": 0,
+     "x [m]": 0,
+     "y [m]": 0,
+     "w [m]": 0,
+     "w_bar [1]": 1
+    }
+   }
+  },
+  "N1_S4_R4_N3_fixed4_only_w_bar_differs_by_at_most_1_ulp": {
+   "ok": true,
+   "detail": {
+    "nodes": 289,
+    "columns": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "differing_nodes": {
+     "i": 0,
+     "j": 0,
+     "x [m]": 0,
+     "y [m]": 0,
+     "w [m]": 0,
+     "w_bar [1]": 54
+    },
+    "max_ulp": {
+     "i": 0,
+     "j": 0,
+     "x [m]": 0,
+     "y [m]": 0,
+     "w [m]": 0,
+     "w_bar [1]": 1
+    }
+   }
+  },
+  "N2_gui_w_max_is_dimensionless_cell_value": {
+   "ok": true,
+   "detail": {
+    "w_scale_q_a4_over_D_m": 0.05199999999999999,
+    "gui_manifest_column": [
+     {
+      "key": "w_max",
+      "title": "max|w̄| (ячейка)",
+      "kind": "number",
+      "unit": "1"
+     }
+    ],
+    "rows": [
+     {
+      "s": "1",
+      "cli_w_max_m": "0.00021121851682300287",
+      "cli_w_bar_max": "0.004061894554288518",
+      "gui_w_max_[1]": "0.004061894554288518",
+      "gui_equals_cli_w_bar_max": true,
+      "ulp(gui*w_scale, cli_w_max)": 0
+     },
+     {
+      "s": "2",
+      "cli_w_max_m": "0.00021122735341554515",
+      "cli_w_bar_max": "0.004062064488760484",
+      "gui_w_max_[1]": "0.004062064488760484",
+      "gui_equals_cli_w_bar_max": true,
+      "ulp(gui*w_scale, cli_w_max)": 0
+     }
+    ]
+   }
+  },
+  "N3_normative_R4_budget_wording_as_reported": {
+   "ok": true,
+   "detail": {
+    "r4_mode": "normative",
+    "solver_status": "NOT_QUALIFIED",
+    "half_steps": {
+     "completed": 1,
+     "requested": 100
+    },
+    "requested_run_completed": true,
+    "field_role": "research",
+    "report_phrase_present": true
+   }
+  }
+ },
+ "note": "PASS means the package is intact and the QA FAIL entries are exactly the documented observations N1 and N2; it does not turn gui_check.json verdict_checks into PASS and is not a scientific acceptance."
+}

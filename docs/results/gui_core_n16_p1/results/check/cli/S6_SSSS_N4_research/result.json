@@ -1,0 +1,375 @@
+{
+  "schema": "kkvim.cli.ssss/1",
+  "N": 4,
+  "boundary_conditions": "SSSS",
+  "theory": "Kirchhoff-Love, linear; homogeneous isotropic plate; uniform q = const",
+  "method": "КК-МВИ: w = Σ_j X_j(x) Y_j(y), N фиксировано; полушаги чередуются Y → X → Y; при N ≥ 2 все N функций полушага находятся совместно из одной связанной системы (D-004, D-044, D-045)",
+  "solver_path": {
+    "mode": "RESEARCH_ONLY_N4_N6",
+    "route": "kkvim.research_ssss.run_research",
+    "decisions": [
+      "D-056.7",
+      "D-060"
+    ],
+    "research": true
+  },
+  "provenance": {
+    "versions": {
+      "python": "3.14.8",
+      "kkvim": "0.0.0",
+      "numpy": "2.5.4",
+      "scipy": "1.18.1"
+    },
+    "git_commit": "d48c10e713d4ec4700331782bd583bd63b6f75da",
+    "git_worktree_modified": false,
+    "git_diagnostic": null,
+    "module": "kkvim.cli_ssss"
+  },
+  "execution": "COMPLETED",
+  "status": "RESEARCH_LIMIT_REACHED",
+  "status_note": "Выполнено заданное число полушагов. Это не сходимость.",
+  "reason": "2 half-steps done; this is not convergence",
+  "half_steps_completed": 2,
+  "program": {
+    "command": "python -m kkvim run-ssss --a 1.0 --b 1.0 --t 0.01 --E 2.1e11 --nu 0.3 --q 1000.0 --nx 40 --ny 40 --N 4 --research-only --half-steps 2 --out <QA_WORKTREE>\\scratch\\gui_n16\\check\\cli\\S6_SSSS_N4_research",
+    "argv": [
+      "run-ssss",
+      "--a",
+      "1.0",
+      "--b",
+      "1.0",
+      "--t",
+      "0.01",
+      "--E",
+      "2.1e11",
+      "--nu",
+      "0.3",
+      "--q",
+      "1000.0",
+      "--nx",
+      "40",
+      "--ny",
+      "40",
+      "--N",
+      "4",
+      "--research-only",
+      "--half-steps",
+      "2",
+      "--out",
+      "<QA_WORKTREE>\\scratch\\gui_n16\\check\\cli\\S6_SSSS_N4_research"
+    ]
+  },
+  "input": {
+    "a": {
+      "value": 1.0,
+      "unit": "m"
+    },
+    "b": {
+      "value": 1.0,
+      "unit": "m"
+    },
+    "t": {
+      "value": 0.01,
+      "unit": "m"
+    },
+    "E": {
+      "value": 210000000000.0,
+      "unit": "Pa"
+    },
+    "nu": {
+      "value": 0.3,
+      "unit": "1"
+    },
+    "q": {
+      "value": 1000.0,
+      "unit": "Pa"
+    },
+    "n_x": 40,
+    "n_y": 40,
+    "half_steps_requested": 2,
+    "fixed_half_steps": true
+  },
+  "D": {
+    "value": 19230.769230769234,
+    "unit": "N·m"
+  },
+  "w_scale_q_a4_over_D": {
+    "value": 0.05199999999999999,
+    "unit": "m",
+    "use": "w = w_bar * value; поле считалось в ячейке"
+  },
+  "energy_scale_q2_a6_over_D": {
+    "value": 51.99999999999999,
+    "unit": "N·m",
+    "use": "energy [N·m] = energy of history.csv * value"
+  },
+  "cycles_k": 1,
+  "converged": false,
+  "first_stabilization_s": null,
+  "energy_s2": {
+    "checked": true,
+    "mandatory_d048": null,
+    "status": "E1_E2_HOLD_PROVISIONAL",
+    "m_2": 16002.86042416263,
+    "mandatory_unresolved": null,
+    "reason": null
+  },
+  "numerical_parameters": {
+    "a": 1.0,
+    "b": 1.0,
+    "D": 1.0,
+    "q": 1.0,
+    "n_x": 40,
+    "n_y": 40,
+    "N": 4,
+    "transform": "fft",
+    "half_steps": 2,
+    "research_mode": true,
+    "K_research": 1000000,
+    "eps_floor": 3.599651550783913e-13,
+    "tol_inf": 1e-10,
+    "tol_E": 1e-08,
+    "s_min": 3,
+    "s_max": 100,
+    "eta_max": 1e-12,
+    "stop_on_stabilization": false,
+    "cell": "a, b, D, q — значения ячейки исследования a = 1, b = r, q = D = 1"
+  },
+  "scientific_applicability": {
+    "accepted_solver": false,
+    "qualified": false,
+    "research_only": true,
+    "status": "RESEARCH_ONLY (D-056.7)",
+    "mark": "PROVISIONAL / NOT_QUALIFIED",
+    "domain": {
+      "control_r": "1",
+      "study_matrix": "десять r; n_x = n_y из (40, 80, 160, 320, 640, 1280); шесть сеток семейства II; s ≤ 40",
+      "note": "Вне этой матрицы команда отказывает: исследованная область не расширяется молча."
+    },
+    "limits": [
+      "N = 4–6 — только исследование (RESEARCH_ONLY, D-056.7): не рабочий и не квалифицированный решатель. Каждый результат — PROVISIONAL / NOT_QUALIFIED.",
+      "D-048 и K_RESEARCH на N = 4–6 не распространяются (D-056.7, п. 3): исследовательский контроллер применён без изменений как выбор исследования, числа полушагов фиксированы, стабилизация только регистрируется.",
+      "Остановка защитой (например, N = 6, r = 1/5, 1/3) — не потеря ранга; продолжать за защитой нельзя.",
+      "Считается ячейка исследования a = 1, b = r, q = D = 1; физические w получены точным множителем qa⁴/D (вывод проекта, kkvim.research_ssss). Энергии в history.csv — в единицах q²a⁶/D.",
+      "Сходимость при фиксированном N не доказана; при s ≥ 2 утверждения — не выше PROVISIONAL (Q-022).",
+      "Линейная прямоугольная пластина Кирхгофа–Лява, однородный изотропный материал, SSSS, q = const, 0,2 ≤ b/a ≤ 5.",
+      "CCCC, другие закрепления и нагрузки, моменты и напряжения здесь не считаются.",
+      "Успешный запуск, стабилизация итераций и научная приёмка — разные статусы (AGENTS.md, разд. 4)."
+    ]
+  },
+  "field": {
+    "file": "field_research.csv",
+    "role": "research",
+    "note": "Исследовательское поле полушага s = 2: PROVISIONAL / NOT_QUALIFIED.",
+    "half_step": 2,
+    "shape": [
+      41,
+      41
+    ],
+    "axes": "axis 0 = x (i = 0..n_x), axis 1 = y (j = 0..n_y), boundary nodes included",
+    "units": {
+      "x": "m",
+      "y": "m",
+      "w": "m",
+      "w_bar": "1"
+    },
+    "w_bar_definition": "w_bar = w*D/(q*a^4), a — сторона вдоль x (R3_NUMERICAL_SPEC.md 1.2; RectangleResult.dimensionless_field)",
+    "w_max": {
+      "value": 0.00021122735341554515,
+      "i": 20,
+      "j": 20,
+      "x": 0.5,
+      "y": 0.5,
+      "unit": "m"
+    },
+    "w_bar_centre": 0.004062064488760484
+  },
+  "history": {
+    "file": "history.csv",
+    "rows": 2,
+    "comments": [
+      "PROVISIONAL / NOT_QUALIFIED; N = 4; RESEARCH_ONLY_N4_N6; статус RESEARCH_LIMIT_REACHED.",
+      "Энергии P, delta_P, Q, gamma_s, tau, P_after_qr: НОРМИРОВАННЫЕ, в единицах q^2 a^6 / D (ячейка a = 1, b = r, q = D = 1); в N·m — умножить на energy_scale_q2_a6_over_D из result.json."
+    ],
+    "energy_kind": "normalized",
+    "energy_unit": "q^2 a^6 / D",
+    "energy_note": "Энергии P, delta_P, Q, gamma_s, tau, P_after_qr: НОРМИРОВАННЫЕ, в единицах q^2 a^6 / D (ячейка a = 1, b = r, q = D = 1); в N·m — умножить на energy_scale_q2_a6_over_D из result.json.",
+    "columns": [
+      {
+        "name": "s",
+        "unit": "",
+        "meaning": "half-step"
+      },
+      {
+        "name": "k",
+        "unit": "",
+        "meaning": "cycle s // 2"
+      },
+      {
+        "name": "direction",
+        "unit": "",
+        "meaning": "computed set: Y (odd s) or X (even s)"
+      },
+      {
+        "name": "eta_initial",
+        "unit": "",
+        "meaning": "eta_N before the refinement decision"
+      },
+      {
+        "name": "eta_N",
+        "unit": "",
+        "meaning": "eta_N of the accepted half-step"
+      },
+      {
+        "name": "refined",
+        "unit": "",
+        "meaning": "one refinement step done (D-048.2)"
+      },
+      {
+        "name": "rho_N",
+        "unit": "",
+        "meaning": "sigma_N / sigma_1 of the field"
+      },
+      {
+        "name": "kappa_rep",
+        "unit": "",
+        "meaning": "|U_w|_2 |V_w|_2 / |W_w|_2"
+      },
+      {
+        "name": "cond_U",
+        "unit": "",
+        "meaning": "cond_2(U_w)"
+      },
+      {
+        "name": "cond_V",
+        "unit": "",
+        "meaning": "cond_2(V_w)"
+      },
+      {
+        "name": "set_sigma_min",
+        "unit": "",
+        "meaning": "sigma_min(R_V D_c)"
+      },
+      {
+        "name": "cond_A_given",
+        "unit": "",
+        "meaning": "cond_2(A) of the given set"
+      },
+      {
+        "name": "cond_M_max",
+        "unit": "",
+        "meaning": "max_k cond_2(M_k)"
+      },
+      {
+        "name": "w_max",
+        "unit": "m",
+        "meaning": "max|w_s|"
+      },
+      {
+        "name": "w_bar_max",
+        "unit": "",
+        "meaning": "max|w_s| D / (|q| a^4)"
+      },
+      {
+        "name": "eps_inf",
+        "unit": "",
+        "meaning": "max|w_s - w_{s-1}| / max|w_s|"
+      },
+      {
+        "name": "eps_E",
+        "unit": "",
+        "meaning": "|w_s - w_{s-1}|_a / |w_s|_a"
+      },
+      {
+        "name": "stabilization_ok",
+        "unit": "",
+        "meaning": "eps_inf <= tol_inf and eps_E <= tol_E at this s"
+      },
+      {
+        "name": "energy_status",
+        "unit": "",
+        "meaning": "energy test: NOT_APPLICABLE, UNRESOLVED, E1_E2_HOLD_PROVISIONAL, ..."
+      },
+      {
+        "name": "P",
+        "unit": "q^2 a^6 / D",
+        "meaning": "Pi_h(w_s)"
+      },
+      {
+        "name": "delta_P",
+        "unit": "q^2 a^6 / D",
+        "meaning": "Delta P_s"
+      },
+      {
+        "name": "Q",
+        "unit": "q^2 a^6 / D",
+        "meaning": "Q_s"
+      },
+      {
+        "name": "gamma_s",
+        "unit": "q^2 a^6 / D",
+        "meaning": "gamma_s"
+      },
+      {
+        "name": "tau",
+        "unit": "q^2 a^6 / D",
+        "meaning": "tau_s^(N)"
+      },
+      {
+        "name": "m_s",
+        "unit": "",
+        "meaning": "Q_s / (10 tau_s)"
+      },
+      {
+        "name": "guard_applicable",
+        "unit": "",
+        "meaning": "K u kappa_rep < 1"
+      },
+      {
+        "name": "guard_rank_ok",
+        "unit": "",
+        "meaning": "rho_N > K u kappa_rep"
+      },
+      {
+        "name": "guard_set_ok",
+        "unit": "",
+        "meaning": "sigma_min(R_V D_c) > K u"
+      },
+      {
+        "name": "rank_threshold",
+        "unit": "",
+        "meaning": "K u kappa_rep"
+      },
+      {
+        "name": "set_threshold",
+        "unit": "",
+        "meaning": "K u"
+      },
+      {
+        "name": "qr_done",
+        "unit": "",
+        "meaning": "the QR was done after the guards"
+      },
+      {
+        "name": "qr_field_error",
+        "unit": "",
+        "meaning": "field change of the QR"
+      },
+      {
+        "name": "P_after_qr",
+        "unit": "q^2 a^6 / D",
+        "meaning": "Pi_h from the transformed sets"
+      },
+      {
+        "name": "stop_reason",
+        "unit": "",
+        "meaning": "status taken at this half-step"
+      },
+      {
+        "name": "mark",
+        "unit": "",
+        "meaning": "mark of the record"
+      }
+    ]
+  }
+}

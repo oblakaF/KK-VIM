@@ -1,0 +1,5 @@
+{
+ "failures": [],
+ "verdict": "PASS"
+}
+exit=0
