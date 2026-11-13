@@ -38,5 +38,9 @@
   "axis.w_maxabs": "w в узле max|w|, mm",
   "legend.series.kkvim": "КК-ВИМ (расчёт при каждом q)",
   "legend.series.navier": "Навье (эталон, M = {M})",
-  "legend.series.excluded": "не завершён / диагностика (нет точки)"
+  "legend.series.excluded": "не завершён / диагностика (нет точки)",
+  "d2.section.x.title": "КК-ВИМ и МКР D2: сечение при y = {y} m",
+  "d2.section.y.title": "КК-ВИМ и МКР D2: сечение при x = {x} m",
+  "legend.d2": "МКР D2 (рассчитан для этих данных)",
+  "legend.series.d2": "МКР D2 (расчёт при каждом q)"
 }

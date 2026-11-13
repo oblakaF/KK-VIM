@@ -2,7 +2,7 @@
 id: param.stop.s_min
 title: Минимум полушагов s_min
 category: iterations
-summary: Наименьшее число полушагов, после которого может сработать остановка CONVERGED. По умолчанию 3.
+summary: Наименьшее число полушагов, после которого может сработать остановка CONVERGED: нужны s ≥ s_min и оба допуска на двух полушагах подряд. По умолчанию 3.
 keywords: s_min, минимум полушагов, остановка
 related: param.stop.s_max, param.halfsteps
 sources: docs/NUMERICAL_SPEC.md, разд. 11.1–11.4; docs/DECISIONS.md, D-032, D-040, D-043

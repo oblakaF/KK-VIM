@@ -12,7 +12,14 @@ process running ``kkvim_reference.navier`` at the plate centre, M = 2559; the GU
 that point record (``navier=``) and lays it out with the same rows, cells and states as the saved references; it never
 derives a reference value from the KK-VIM field.
 
-A comparison is shown only when the inputs passed to the solver equal the reference inputs exactly (no interpolation,
+CCCC runs with «МКР — двумерный (D2)» chosen also get D2 computed for exactly their own inputs and grid
+(``backend.d2_job``: a separate process running ``kkvim_reference.r5_cccc_d2``). ``compare`` takes that record (``d2=``)
+and adds the row "D2_live" next to the saved CCCC references, which stay unchanged and keep their own row titles: a
+saved row is stored data, the D2_live row is a calculation executed for this run. The D2_live row uses the dimensional
+centre deflection of D2 and beta_a = w_c D/(q a^4) with the reference length a (never the shorter-side alpha of
+``D2Solution.alpha``). When the saved data do not cover the inputs, the comparison still shows the D2_live row.
+
+A saved comparison is shown only when the inputs passed to the solver equal the reference inputs exactly (no interpolation,
 extrapolation or rescaling), the run ended as requested (never a diagnostic field) and the plate centre is a node of the
 result grid. It gives signed differences, never a verdict: no agreement threshold is approved, and the comparison never
 changes the scientific status of the run.
@@ -37,9 +44,13 @@ DATA_ERROR = "data_error"  # the packaged data are missing or corrupted
 NO_RUN = "no_run"  # no solver result (demonstration or no field)
 PENDING = "pending"  # the Navier reference of these inputs is still being computed in its own process
 
-KIND_TITLE = {"published": "Опубликованное решение (Taylor, Govindjee 2002)", "D2": "D2 (та же дискретная задача)",
-              "FEM": "МКЭ, элемент Морли (другая дискретизация)", "navier": "Аналитическое решение Навье",
-              "navier_live": "Навье — рассчитан для этих входных данных"}
+KIND_TITLE = {"published": "Опубликованное решение (Taylor, Govindjee 2002)",
+              "D2": "D2, сохранённое значение (та же дискретная задача)",
+              "FEM": "МКЭ, элемент Морли, сохранённое значение (другая дискретизация)", "navier": "Аналитическое решение Навье",
+              "navier_live": "Навье — рассчитан для этих входных данных",
+              "D2_live": "МКР — двумерный (D2), рассчитан для этих входных данных",
+              "saved": "Сохранённые эталоны"}
+EXECUTED_KINDS = ("navier_live", "D2_live")  # rows computed for this run in a separate process (not stored data)
 STATE_TITLE = {
     AVAILABLE: "Сравнение с сохранёнными эталонами: знаковые разности, без порога согласия",
     UNAVAILABLE: "Эталонные данные для этого расчёта недоступны",
@@ -112,11 +123,22 @@ class Comparison:
     notes: tuple = ()
     data: dict | None = field(default=None, repr=False)
     navier: dict | None = field(default=None, repr=False)  # point record of the Navier reference computed for this run
+    d2: dict | None = field(default=None, repr=False)  # D2 record computed for this CCCC run (backend.d2_job), or None
 
     @property
     def live(self) -> bool:
-        """True if the reference was computed for this run (Navier worker), not read from the saved data."""
-        return self.navier is not None and self.navier.get("state") == "ok" and bool(self.rows)
+        """True if every reference row was computed for this run (a worker), none read from the saved data."""
+        return bool(self.rows) and all(r.reference.kind in EXECUTED_KINDS for r in self.rows)
+
+    @property
+    def executed(self) -> bool:
+        """True if at least one reference row was computed for this run in a separate process."""
+        return any(r.reference.kind in EXECUTED_KINDS for r in self.rows)
+
+    @property
+    def saved(self) -> bool:
+        """True if at least one reference row is stored data (benchmarks_v1.json)."""
+        return any(r.reference.kind not in EXECUTED_KINDS for r in self.rows)
 
     @property
     def has_numbers(self) -> bool:
@@ -207,11 +229,56 @@ def _compare_live(outcome, nav) -> Comparison:
                       navier=nav)
 
 
-def compare(outcome, text: str | None = None, navier: dict | None = None) -> Comparison:
+def _d2_row(outcome, d2, beta, w_c) -> Row:
+    """The row of D2 computed for this run: its own dimensional centre deflection and D, beta with the length a."""
+    ref = Reference("D2_live", KIND_TITLE["D2_live"], d2["beta_a"], d2["w_centre_m"], d2_detail(d2))
+    return Row(ref, beta, beta - ref.beta, (beta - ref.beta) / ref.beta * 100.0, w_c - ref.w_centre_m)
+
+
+def d2_detail(d2) -> str:
+    timing = d2.get("timing", {})
+    p = d2.get("problem") or {}
+    return (f"МКР, 13 точек, та же дискретная задача (D-049.1); сетка {p.get('nx')}×{p.get('ny')}, {p.get('unknowns')} "
+            f"неизвестных; e_D2 = {d2['e_D2_m']!r} m, уточнений {d2['refinement_steps']}; D эталона = {d2['D']!r} N·m; "
+            f"α по короткой стороне l = {d2['short_side_m']!r} m: {d2['alpha_short_side']!r}; рассчитан в отдельном процессе "
+            f"за {timing.get('solve_s', float('nan')):.4f} с (вызов solve) ({d2['method']})")
+
+
+def _d2_missing(d2):
+    """(kind, reason) of a D2 that was chosen but gave no centre value for this run, or None."""
+    if d2 is None:
+        return None
+    state = d2.get("state")
+    if state == "ok" and d2.get("w_centre_m") is None:
+        return ("D2_live", d2.get("centre_reason") or CENTRE_MISSING)
+    if state not in ("ok", "pending"):
+        return ("D2_live", d2.get("reason") or state)
+    return None
+
+
+def _d2_notes(d2):
+    if d2 is None:
+        return ()
+    if d2.get("state") == "pending":
+        return ("МКР D2 для этих входных данных ещё вычисляется в отдельном процессе: строка появится после его ответа.",)
+    if d2.get("state") != "ok":
+        return ()
+    return ("D2 рассчитан для точно тех же a, b, h, E, ν, q и той же сетки в отдельном процессе (kkvim_reference.r5_cccc_d2, "
+            "без КК-ВИМ и его поля). Это независимая реализация той же дискретной задачи (D-049.1, D-049.8): разность "
+            "КК-ВИМ − D2 показывает отличие приближения КК-ВИМ от полного дискретного решения на той же сетке; она не "
+            "является ошибкой континуальной модели пластины и не проверяет сеточную погрешность.",
+            "β для D2 вычислен по размерному прогибу в центре: β = w_c·D/(q·a⁴) (длина a, как у КК-ВИМ); α эталона по "
+            "короткой стороне min(a, b) показан в строке отдельно и с β напрямую не сравнивается.",
+            "Строки сохранённых эталонов — данные прежних проверок (не пересчитываются); строка D2 — расчёт, выполненный "
+            "для этого запуска.")
+
+
+def compare(outcome, text: str | None = None, navier: dict | None = None, d2: dict | None = None) -> Comparison:
     """Comparison of a solver run with the references.
 
     ``navier``: the point record of the Navier reference computed for this SSSS run (``backend.navier_job``); without it
-    the saved references are used. ``text``: data instead of the packaged file (tests).
+    the saved references are used. ``d2``: the D2 record computed for this CCCC run (``backend.d2_job``), added as the
+    row "D2_live" next to the saved references. ``text``: data instead of the packaged file (tests).
     """
     if outcome is None or outcome.is_demo or not outcome.has_field:
         return Comparison(NO_RUN, "Нет поля решателя КК-ВИМ: сравнивать нечего.")
@@ -221,25 +288,44 @@ def compare(outcome, text: str | None = None, navier: dict | None = None) -> Com
                                       "с эталонами не сравнивается.", supports)
     if supports == "SSSS" and navier is not None:
         return _compare_live(outcome, navier)
+    if supports != "CCCC":
+        d2 = None  # D2 is the clamped-plate scheme: never a reference of another supports
+    r = outcome.request
+    d2_ok = d2 is not None and d2.get("state") == "ok" and d2.get("w_centre_m") is not None and all(
+        d2["inputs"][key] == getattr(r, key) for key in ("a", "b", "t", "E", "nu", "q", "n_x", "n_y"))
+    d2_missing = _d2_missing(d2)
     try:
         data = load(text)
     except BenchmarkDataError as exc:
-        return Comparison(DATA_ERROR, f"Сравнение недоступно: {exc}.", supports)
-    r = outcome.request
-    key = "cccc" if supports == "CCCC" else "ssss" if supports == "SSSS" else None
-    cases = data.get(key, []) if key else []
-    wrong = _input_mismatches(r, data["inputs"], [c["b"] for c in cases])
-    if not cases or wrong:
-        return Comparison(UNAVAILABLE, "Эталонных данных для этих входных данных нет: " + "; ".join(wrong or
-                          [f"закрепление {supports}"]) + ". Значения не подставляются и не пересчитываются.",
-                          supports, data=data)
+        if not d2_ok:
+            return Comparison(DATA_ERROR, f"Сравнение недоступно: {exc}.", supports, d2=d2)
+        data, saved_problem = None, ("saved", f"данные эталонов не прочитаны: {exc}")
+    else:
+        key = "cccc" if supports == "CCCC" else "ssss" if supports == "SSSS" else None
+        cases = data.get(key, []) if key else []
+        wrong = _input_mismatches(r, data["inputs"], [c["b"] for c in cases])
+        saved_problem = None
+        if not cases or wrong:
+            text_ = ("Эталонных данных для этих входных данных нет: " + "; ".join(wrong or [f"закрепление {supports}"])
+                     + ". Значения не подставляются и не пересчитываются.")
+            if not d2_ok:
+                if d2 is not None and d2.get("state") == "pending":
+                    return Comparison(PENDING, "МКР D2 для этих входных данных ещё вычисляется в отдельном процессе.",
+                                      supports, data=data, d2=d2)
+                missing = (d2_missing,) if d2_missing else ()
+                return Comparison(UNAVAILABLE, text_, supports, missing=missing, data=data, d2=d2)
+            saved_problem = ("saved", "нет данных для этих входных данных (" + "; ".join(wrong or [supports]) + ")")
     centre = centre_node(outcome)
     if centre is None:
-        return Comparison(UNAVAILABLE, CENTRE_MISSING, supports, data=data)
-    case = next(c for c in cases if c["b"] == r.b)
+        return Comparison(UNAVAILABLE, CENTRE_MISSING, supports, data=data, d2=d2)
     w_c = float(outcome.w[centre["i"], centre["j"]])
     beta = w_c * outcome.D / (r.q * r.a ** 4)
     w_bar = None if outcome.w_bar is None else float(outcome.w_bar[centre["i"], centre["j"]])
+    if saved_problem is not None:  # only the D2 computed for this run
+        rows = (_d2_row(outcome, d2, beta, w_c),)
+        return Comparison(AVAILABLE, "", supports, centre, w_c, beta, w_bar, outcome.D, rows, (saved_problem,),
+                          _d2_notes(d2) + _common_notes(), data, d2=d2)
+    case = next(c for c in cases if c["b"] == r.b)
     refs, missing = [], []
     if supports == "CCCC":
         p = case["published"]
@@ -251,9 +337,10 @@ def compare(outcome, text: str | None = None, navier: dict | None = None) -> Com
             for kind in ("D2", "FEM"):
                 missing.append((kind, f"нет сохранённых данных для сетки {r.n_x}×{r.n_y} (есть {have})"))
         else:
-            d2, fem = grid["D2"], grid["FEM"]
-            refs.append(Reference("D2", KIND_TITLE["D2"], d2["beta"], d2["w_centre_m"],
-                                  f"МКР, 13 точек, сетка {r.n_x}×{r.n_y}; e_D2 = {d2['e_D2_m']!r} m; {d2['source']}"))
+            stored_d2, fem = grid["D2"], grid["FEM"]
+            refs.append(Reference("D2", KIND_TITLE["D2"], stored_d2["beta"], stored_d2["w_centre_m"],
+                                  f"МКР, 13 точек, сетка {r.n_x}×{r.n_y}; e_D2 = {stored_d2['e_D2_m']!r} m; "
+                                  f"{stored_d2['source']}"))
             refs.append(Reference("FEM", KIND_TITLE["FEM"], fem["beta"], fem["w_centre_m"],
                                   f"scikit-fem 12.0.2, Морли, {r.n_x}×{r.n_y} ячеек, {fem['triangles']} треугольников, "
                                   f"{fem['dofs']} степеней свободы; {fem['solver_status']}"))
@@ -263,8 +350,17 @@ def compare(outcome, text: str | None = None, navier: dict | None = None) -> Com
                               f"двойной ряд синусов, M = {nav['M']}, оценка остатка в β {nav['error_bound_beta']!r}"))
     rows = tuple(Row(ref, beta, beta - ref.beta, (beta - ref.beta) / ref.beta * 100.0,
                      None if ref.w_centre_m is None else w_c - ref.w_centre_m) for ref in refs)
+    if d2_ok:
+        rows = (_d2_row(outcome, d2, beta, w_c), *rows)
+    elif d2_missing:
+        missing.insert(0, d2_missing)
     return Comparison(AVAILABLE, "", supports, centre, w_c, beta, w_bar, outcome.D, rows, tuple(missing),
-                      _notes(supports), data)
+                      _d2_notes(d2) + _notes(supports), data, d2=d2)
+
+
+def _common_notes():
+    return ("Утверждённого порога согласия нет: показаны знаковые разности, без оценки «точно / неточно».",
+            "Сравнение не меняет научного статуса расчёта КК-ВИМ и не делает его принятым (ACCEPTED).")
 
 
 def full(value) -> str:
@@ -280,18 +376,42 @@ def cells(row: Row) -> tuple:
 
 
 LIVE_TITLE = "Сравнение с эталоном Навье, рассчитанным для этих входных данных: знаковые разности, без порога согласия"
+D2_LIVE_TITLE = "Сравнение с МКР D2, рассчитанным для этих входных данных: знаковые разности, без порога согласия"
+MIXED_TITLE = ("Сравнение с МКР D2, рассчитанным для этих входных данных, и с сохранёнными эталонами: знаковые разности, "
+               "без порога согласия")
 
 
 def state_title(c: Comparison) -> str:
-    """The title of the state of ``c`` (the live Navier reference is not a saved one)."""
-    return LIVE_TITLE if c.live else STATE_TITLE[c.state]
+    """The title of the state of ``c`` (a reference computed for this run is not a saved one)."""
+    if c.executed:
+        if c.saved:
+            return MIXED_TITLE
+        return LIVE_TITLE if c.navier is not None and c.rows[0].reference.kind == "navier_live" else D2_LIVE_TITLE
+    return STATE_TITLE[c.state]
+
+
+def row_source(c: Comparison, row: Row) -> str:
+    """Where the values of one row come from (comparison.csv: per row; stored data and executed calculations apart)."""
+    kind = row.reference.kind
+    if kind == "navier_live":
+        return f"рассчитан для этого расчёта в отдельном процессе: {c.navier['method']}; {c.navier['source']}"
+    if kind == "D2_live":
+        return f"рассчитан для этого расчёта в отдельном процессе: {c.d2['method']}; {c.d2['source']}"
+    return dataset_text()
 
 
 def source_text(c: Comparison) -> str:
-    """Where the reference values of ``c`` come from (the report and comparison.csv)."""
-    if c.live:
-        return f"рассчитан для этого расчёта в отдельном процессе: {c.navier['method']}; {c.navier['source']}"
-    return dataset_text()
+    """Where the reference values of ``c`` come from (the report)."""
+    if not c.executed:
+        return dataset_text()
+    texts = []
+    for kind, record in (("navier_live", c.navier), ("D2_live", c.d2)):
+        if any(r.reference.kind == kind for r in c.rows):
+            texts.append(f"{KIND_TITLE[kind]}: рассчитан для этого расчёта в отдельном процессе: {record['method']}; "
+                         f"{record['source']}")
+    if c.saved:
+        texts.append(f"сохранённые эталоны: {dataset_text()}")
+    return " | ".join(texts)
 
 
 def dataset_text() -> str:
@@ -308,4 +428,5 @@ def as_record(c: Comparison) -> dict:
                       "detail": x.reference.detail}
                      for x in c.rows],
             "live_reference": c.live,
+            "executed_reference_kinds": [x.reference.kind for x in c.rows if x.reference.kind in EXECUTED_KINDS],
             "missing": [list(m) for m in c.missing]}

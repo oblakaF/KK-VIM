@@ -2,7 +2,7 @@
 id: param.stop.tol_E
 title: Допуск tol_E
 category: iterations
-summary: Предел относительного изменения прогиба в дискретной энергетической норме: ε^E = ‖w⁽ˢ⁾ − w⁽ˢ⁻¹⁾‖ / ‖w⁽ˢ⁾‖. По умолчанию 10⁻⁸.
+summary: Предел изменения в энергетической норме ε^E = ‖w⁽ˢ⁾ − w⁽ˢ⁻¹⁾‖ / ‖w⁽ˢ⁾‖, по умолчанию 10⁻⁸. CONVERGED — при s ≥ s_min, если ε^∞ ≤ tol_∞ и ε^E ≤ tol_E на двух полушагах подряд.
 keywords: tol_E, допуск, энергетическая норма, остановка, сходимость
 related: param.stop.tol_inf, param.stop.strict
 sources: docs/NUMERICAL_SPEC.md, разд. 11.1–11.4; docs/DECISIONS.md, D-032, D-040, D-043

@@ -1,7 +1,8 @@
 """The «Сравнение с эталоном» tab of the analysis window: one solver run next to independent references (GUI_DESIGN.md, 6).
 
-All numbers come from ``backend.benchmarks.compare`` (the run arrays, the packaged reference data and, for SSSS, the
-Navier reference computed for the run's own inputs in a separate process); this module only lays them out. The tab
+All numbers come from ``backend.benchmarks.compare`` (the run arrays, the packaged reference data, for SSSS the Navier
+reference and for CCCC with «МКР — двумерный (D2)» the D2 solution computed for the run's own inputs in a separate
+process); this module only lays them out. A row computed for this run and a row of stored data are titled apart. The tab
 keeps four things apart: the solver route and its scientific status, the numerical stopping result, the independent
 reference, and the observed signed difference (which does not by itself establish the accuracy of the method).
 Values are shown at full precision (Python repr of the binary64 number): the comparison is a set of
@@ -30,12 +31,13 @@ full = benchmarks.full  # full-precision text of a number (shortest repr that ro
 
 
 class ComparisonTab(QWidget):
-    def __init__(self, outcome, run=None, text=None, navier=None, parent=None):
+    def __init__(self, outcome, run=None, text=None, navier=None, d2=None, parent=None):
         """text: benchmark data instead of the packaged file (tests of damaged data); navier: the point record of the
-        Navier reference computed for this SSSS run (``backend.navier_job``), "pending" while it is computed."""
+        Navier reference computed for this SSSS run (``backend.navier_job``), "pending" while it is computed; d2: the D2
+        record computed for this CCCC run (``backend.d2_job``)."""
         super().__init__(parent)
         self.outcome = outcome
-        self.comparison = benchmarks.compare(outcome, text, navier=navier)
+        self.comparison = benchmarks.compare(outcome, text, navier=navier, d2=d2)
         c = self.comparison
         body = QVBoxLayout()
         guide = Card("Что сравнивается")
@@ -66,7 +68,8 @@ class ComparisonTab(QWidget):
             self.table = results.table_view(model)
             self.table.setMinimumHeight(40 + 34 * len(rows))
             refs = Card("Независимый эталон, рассчитанный для этих входных данных" if c.live else
-                        "Эталоны (сохранённые данные, не пересчитываются)")
+                        "Рассчитанный для этих входных данных D2 и сохранённые эталоны (сохранённые не пересчитываются)"
+                        if c.executed else "Эталоны (сохранённые данные, не пересчитываются)")
             refs.body.addWidget(self.table)
             for kind_, reason in c.missing:
                 refs.body.addWidget(Note(f"{benchmarks.KIND_TITLE[kind_]}: {reason}.", "info"))
@@ -110,11 +113,16 @@ class ComparisonTab(QWidget):
         ]
         if c.state == benchmarks.AVAILABLE:
             ce = c.centre
-            if c.live:
+            if c.navier is not None and c.live:
                 nav = c.navier
                 rows += [("Эталон Навье — w в центре", f"{full(nav['w_m'])} m (M = {nav['M']}, отдельный процесс)"),
                          ("Разность Δw = w_КК-ВИМ − w_Навье", f"{full(c.rows[0].delta_w_m)} m"),
                          ("Относительная разность Δβ / β_Навье", f"{full(c.rows[0].rel_pct)} %")]
+            d2_row = next((x for x in c.rows if x.reference.kind == "D2_live"), None)
+            if d2_row is not None:
+                rows += [("МКР D2 — w в центре", f"{full(c.d2['w_centre_m'])} m (рассчитан в отдельном процессе)"),
+                         ("Разность Δw = w_КК-ВИМ − w_D2", f"{full(d2_row.delta_w_m)} m"),
+                         ("Относительная разность Δβ / β_D2", f"{full(d2_row.rel_pct)} %")]
             rows += [
                 ("Узел центра", f"i = {ce['i']}, j = {ce['j']}: x = {ce['x']!r} m, y = {ce['y']!r} m (точно a/2, b/2)"),
                 ("Прогиб в центре w_c", f"{full(c.w_centre_m)} m"),

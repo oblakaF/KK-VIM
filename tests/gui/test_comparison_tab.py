@@ -21,7 +21,8 @@ from kkvim_gui.app import GuiApplication, type_case  # noqa: E402
 from kkvim_gui.backend import benchmarks as bm  # noqa: E402
 from kkvim_gui.session import Session  # noqa: E402
 
-CASE = dict(supports="CCCC", N=1, a=1.0, b=1.0, h=0.01, E=2.1e11, nu=0.3, q=1000, n_x=16, n_y=16, half_steps=1)
+# the saved references alone: «МКР — двумерный (D2)» is switched off here (with D2: tests/gui/test_multimethod_d2.py)
+CASE = dict(supports="CCCC", N=1, a=1.0, b=1.0, h=0.01, E=2.1e11, nu=0.3, q=1000, n_x=16, n_y=16, half_steps=1, d2=False)
 VERDICTS = ("ACCURATE", "INACCURATE", "PASS", "FAIL", "ТОЧНО", "НЕТОЧНО", "ACCEPTED")
 
 

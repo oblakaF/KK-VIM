@@ -13,12 +13,21 @@
   a diagnostic field, demonstration data, damaged reference data) the report states the reason and no CSV is written;
   the reference data never prevent saving the calculation.
 
+D2 of a CCCC run (``d2``: the record of ``backend.d2_job``, computed for the run's own inputs in a separate process):
+``d2_field.csv`` (the D2 field on all nodes, metres, full precision) and ``d2_result.json`` (the record without the
+field: method, input echo, status, dimensional and dimensionless values, refinement, timings with their definitions,
+runtime) are written next to the KK-VIM files; the manifest gets ``independent_d2`` (the record and the SHA256 of both
+files) and ``timing`` (every timer of both methods with its definition); report.html gets the section «МКР — двумерный
+(D2)» and «Время вычислений». A D2 that did not run is stated with its reason and writes no file. D2 is a calculation
+executed for this run, never stored benchmark data; comparison.csv names the source of every row.
+
 Every number of the report is taken from the outcome; the report shows it in the interface form and, next to it,
 in Python's round-trip form (``repr``), so the report can be checked against ``manifest.json`` and ``field.csv``
 exactly. Nothing is computed here except unit scaling for display (m -> mm) and lookups of stored values. The
 visual exaggeration of the 3D view applies to the figure only and is recorded as such.
 """
 
+import hashlib
 import html
 import json
 from datetime import datetime
@@ -27,7 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from kkvim_gui import program_version
-from kkvim_gui.backend import benchmarks, export
+from kkvim_gui.backend import benchmarks, d2_job, export
 from kkvim_gui.backend.outcome import RunOutcome
 
 PREVIEW_TITLE = "KK-VIM — отчёт расчёта"
@@ -50,6 +59,9 @@ LIMITATIONS = (  # common to every route; the limits of the route itself come fr
 IMAGE_TITLES = {"field_png": "Поле прогиба w(x, y) с изолиниями", "surface_png": "Деформированная форма (3D-вид)"}
 COMPARISON_TITLE = "Сравнение с независимыми эталонами"
 COMPARISON_FILE = "comparison.csv"
+D2_FIELD_FILE = "d2_field.csv"
+D2_RESULT_FILE = "d2_result.json"
+D2_FIELD_COLUMNS = (("i", ""), ("j", ""), ("x", "m"), ("y", "m"), ("w_d2", "m"))
 COMPARISON_COLUMNS = (  # (name, unit): "1" dimensionless, "" text or count
     ("reference_kind", ""), ("reference_method", ""), ("reference_source_provenance", ""),
     ("beta_reference", "1"), ("w_centre_reference", "m"), ("beta_kkvim", "1"), ("w_centre_kkvim", "m"),
@@ -59,11 +71,15 @@ COMPARISON_COLUMNS = (  # (name, unit): "1" dimensionless, "" text or count
     ("D", "N·m"), ("w_bar_solver_centre", "1"), ("half_steps_completed", ""), ("half_steps_requested", ""),
     ("solver_status", ""), ("requested_run_completed", ""), ("field_role", ""), ("scientific_status", ""),
     ("mark", ""), ("reference_data", ""), ("reference_data_payload_sha256", ""), ("reference_level_M", ""),
+    ("reference_origin", ""),
 )
 COMPARISON_DEFINITIONS = (
     "# comparison with independent references: beta = w(a/2, b/2) * D / (q * a^4); "
     "delta_beta = beta_kkvim - beta_reference; delta_beta_relative = delta_beta / beta_reference * 100 %; "
     "delta_w_centre = w_centre_kkvim - w_centre_reference",
+    "# reference_origin: executed = computed for this run in a separate process (navier_live, D2_live); stored = saved "
+    "benchmark data (not recomputed); D2_live: beta_reference = w_centre_d2 * D_reference / (q * a^4), D2 is the same "
+    "discrete problem as KK-VIM CCCC (D-049.1): the difference is not an error of the continuous plate model",
     "# signed differences only: no agreement threshold is approved; the comparison is not a scientific acceptance "
     "and does not change the status of the run",
 )
@@ -130,11 +146,16 @@ def comparison_rows(outcome: RunOutcome, c: benchmarks.Comparison) -> list[tuple
     r = outcome.request
     run = (r.supports, r.N, r.a, r.b, r.t, r.E, r.nu, r.q, r.n_x, r.n_y, c.centre["i"], c.centre["j"], c.centre["x"],
            c.centre["y"], c.D, c.w_bar_solver, outcome.s, outcome.s_requested, outcome.status, outcome.requested_completed,
-           outcome.field_role, export.scientific_status(outcome), outcome.mark or "",
-           benchmarks.source_text(c) if c.live else f"{benchmarks.DATA_FILE} ({benchmarks.SCHEMA})",
-           "" if c.live else benchmarks.PAYLOAD_SHA256, c.navier["M"] if c.live else "")
+           outcome.field_role, export.scientific_status(outcome), outcome.mark or "")
+
+    def source(x):
+        executed = x.reference.kind in benchmarks.EXECUTED_KINDS
+        return (benchmarks.row_source(c, x) if executed else f"{benchmarks.DATA_FILE} ({benchmarks.SCHEMA})",
+                "" if executed else benchmarks.PAYLOAD_SHA256,
+                c.navier["M"] if x.reference.kind == "navier_live" else "", "executed" if executed else "stored")
+
     return [(x.reference.kind, x.reference.title, x.reference.detail, x.reference.beta, x.reference.w_centre_m,
-             x.beta_kkvim, c.w_centre_m, x.delta, x.rel_pct, x.delta_w_m, *run) for x in c.rows]
+             x.beta_kkvim, c.w_centre_m, x.delta, x.rel_pct, x.delta_w_m, *run, *source(x)) for x in c.rows]
 
 
 def write_comparison_csv(outcome: RunOutcome, c: benchmarks.Comparison, path) -> Path:
@@ -151,7 +172,7 @@ def _comparison_section(outcome: RunOutcome, c: benchmarks.Comparison, csv_name)
     reason = c.reason
     if outcome.is_demo:
         reason = "Демонстрационные данные (TEST DATA): решатель не вызывался, сравнение не выполняется."
-    if c.live:
+    if c.executed:
         data = benchmarks.source_text(c)
     elif c.state == benchmarks.DATA_ERROR:
         data = f"не прошли проверку; ожидались {benchmarks.dataset_text()}"
@@ -188,7 +209,73 @@ def _comparison_section(outcome: RunOutcome, c: benchmarks.Comparison, csv_name)
             + f"<p>Как читать сравнение:</p><ul>{notes}</ul>")
 
 
-def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None, comparison=None) -> str:
+def _sec(value) -> str:
+    return "—" if value is None else f"{float(value):.4f} с ({float(value)!r})"
+
+
+def timing_table(timing=None, d2=None) -> list[dict]:
+    """Every timer of the run: KK-VIM (``RunRecord.timing``) and D2 (``d2["timing"]``), with its definition."""
+    timing = timing or {}
+    t = (d2 or {}).get("timing") or {}
+    rows = [{"timer": key, "seconds": timing.get(key), "definition": d2_job.TIMER_TEXT[key]}
+            for key in ("kkvim_solver_s", "kkvim_import_s", "kkvim_wall_s")]
+    if d2 is not None:
+        rows += [{"timer": f"d2_{key}", "seconds": t.get(key), "definition": d2_job.TIMER_TEXT[f"d2_{key}"]}
+                 for key in ("solve_s", "import_s", "post_s", "worker_s", "wall_s", "parse_s")]
+    return rows
+
+
+def _d2_section(outcome: RunOutcome, d2, files) -> str:
+    """Section 6a: D2 computed for this run (CCCC), or the reason it is absent."""
+    title = f"<h2>6а. {_e(d2_job.TITLE)} — рассчитан для этих входных данных</h2>"
+    if d2 is None:
+        return ""
+    if d2.get("state") != d2_job.OK:
+        rows = [("Состояние", f"<b>{_e(d2_job.STATE_TEXT.get(d2.get('state'), d2.get('state')))}</b>"),
+                ("Причина", _e(d2.get("reason", ""))), ("Файлы D2", "не созданы: значения D2 нет и не подставляются")]
+        return f"{title}<table>{_rows(rows)}</table>"
+    inp, p = d2["inputs"], d2.get("problem") or {}
+    rows = [("Состояние", f"<b>{_e(d2_job.STATE_TEXT[d2_job.OK])}</b> "
+                          "(расчёт выполнен для этого запуска, не сохранённые данные)"),
+            ("Метод", f"<code>{_e(d2['method'])}</code>"), ("Источник", _e(d2["source"])),
+            ("Вход (СИ)", _e(f"a = {inp['a']!r} m, b = {inp['b']!r} m, h = {inp['t']!r} m, E = {inp['E']!r} Pa, "
+                             f"ν = {inp['nu']!r}, q = {inp['q']!r} Pa, {inp['supports']}")),
+            ("Сетка", _e(f"n_x = {inp['n_x']}, n_y = {inp['n_y']}; {p.get('unknowns')} неизвестных; упорядочение "
+                         f"{p.get('ordering')}; ненулевых в LU {d2['factor_nnz']}")),
+            ("Жёсткость D (эталон)", f"{_e(benchmarks.full(d2['D']))} N·m")]
+    if d2["w_centre_m"] is None:
+        rows.append(("w в центре", _e(d2.get("centre_reason", ""))))
+    else:
+        rows += [("w в центре (узел a/2, b/2)", f"<b>{_num(d2['w_centre_m'] * 1000.0, 10)} mm</b> "
+                                                 f"<span class=x>({_exact(d2['w_centre_m'])} m)</span>"),
+                 ("β_a = w_c·D/(q·a⁴) (длина a)", f"{_e(benchmarks.full(d2['beta_a']))}"),
+                 (f"α = w_c·D/(q·l⁴), l = min(a, b) = {d2['short_side_m']!r} m", _e(benchmarks.full(d2["alpha_short_side"])))]
+    diff = d2_job.field_difference(d2, outcome)
+    rows += [("max |w_КК-ВИМ − w_D2| по узлам", "не вычисляется: поле КК-ВИМ не является результатом" if diff is None else
+              _e(f"{diff['delta_w_m']!r} m (знаковое) в узле i = {diff['i']}, j = {diff['j']}")),
+             ("Собственная оценка ошибки e_D2", f"{_e(benchmarks.full(d2['e_D2_m']))} m (последняя поправка уточнения)"),
+             ("Уточнение", _e(f"{d2['refinement_steps']} шагов; поправки {d2['corrections_m']!r} m")),
+             ("Файлы D2", f"<code>{_e(files.get('d2_field', '—'))}</code>, <code>{_e(files.get('d2_result', '—'))}</code>"),
+             ("Ограничения", _e("D2 — независимая реализация той же дискретной задачи (D-049.1, D-049.8): разность КК-ВИМ − D2 "
+                                "не является ошибкой континуальной модели пластины и не проверяет сеточную погрешность; "
+                                "наблюдаемый второй порядок по сетке не доказан как глобальная оценка; порога согласия нет; "
+                                "научный статус КК-ВИМ не меняется."))]
+    return f"{title}<table>{_rows(rows)}</table>"
+
+
+def _timing_section(timing, d2) -> str:
+    if not timing and d2 is None:
+        return ""
+    rows = [(r["timer"], f"{_e(_sec(r['seconds']))} — {_e(r['definition'])}") for r in timing_table(timing, d2)]
+    rt = (d2 or {}).get("runtime") or {}
+    if rt:
+        rows.append(("Компьютер и среда", _e(f"{rt.get('platform')}; {rt.get('processor') or rt.get('machine')}; "
+                                             f"логических процессоров {rt.get('cpu_count')}; Python {rt.get('python')}")))
+    rows.append(("Роль измерений", _e(d2_job.TIMING_ROLE)))
+    return f"<h2>6б. Время вычислений</h2><table>{_rows(rows)}</table>"
+
+
+def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None, comparison=None, d2=None, timing=None) -> str:
     r = outcome.request
     view = view or {}
     comparison = comparison if comparison is not None else comparison_of(outcome)
@@ -287,6 +374,8 @@ img{{max-width:100%;border:1px solid #DCE3EA}} figcaption{{font-size:13px;color:
 {images}
 <h2>5. Статус расчёта</h2><table>{_rows(statuses)}</table>
 {_comparison_section(outcome, comparison, files.get("comparison"))}
+{_d2_section(outcome, d2, files)}
+{_timing_section(timing, d2)}
 <h2>7. История полушагов</h2><table class="h"><tr>{head}</tr>
 {body}</table>
 <h2>8. Ограничения применимости</h2><ul>{"".join(f"<li>{_e(t)}</li>" for t in (*outcome.limitations, *LIMITATIONS))}</ul>
@@ -295,12 +384,32 @@ img{{max-width:100%;border:1px solid #DCE3EA}} figcaption{{font-size:13px;color:
 """
 
 
-def write_package(outcome: RunOutcome, folder, run_meta=None, log=(), render=None, view=None, comparison=None) -> dict:
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def write_d2_field_csv(outcome: RunOutcome, d2, path) -> Path:
+    """The D2 field on all nodes (i h_x, j h_y), metres, full precision."""
+    r = outcome.request
+    field = d2["field"]
+    h_x, h_y = r.a / r.n_x, r.b / r.n_y
+    header = [f"{name} [{unit}]" if unit else name for name, unit in D2_FIELD_COLUMNS]
+    comments = [f"# {d2_job.TITLE}: computed for this run in a separate process ({d2['method']})",
+                "# QA reference D2: the same discrete problem as KK-VIM CCCC (D-049.1, D-049.8); not a qualified result "
+                "of the plate model; nodes x = i h_x, y = j h_y; w = 0 on the boundary"]
+    rows = ((i, j, i * h_x, j * h_y, float(field[i, j])) for i in range(field.shape[0]) for j in range(field.shape[1]))
+    export._write_csv(Path(path), comments, header, rows)
+    return Path(path)
+
+
+def write_package(outcome: RunOutcome, folder, run_meta=None, log=(), render=None, view=None, comparison=None,
+                  d2=None, timing=None) -> dict:
     """Write the calculation package into ``folder`` and return {name: path}.
 
     ``render(folder) -> {"field_png": path, "surface_png": path}`` draws the figures (Qt, by the caller); it is
     called only for a result with a field. ``view`` records how the figures were drawn (e.g. the exaggeration).
     ``comparison``: the ``benchmarks.Comparison`` shown in the "Сравнение" tab of this outcome (computed here if None).
+    ``d2``: the D2 record of the run (``backend.d2_job``), None without D2; ``timing``: ``RunRecord.timing`` of KK-VIM.
     """
     folder = Path(folder)
     paths = export.write_result(outcome, folder, run_meta, log)  # refuses an existing non-empty folder
@@ -309,12 +418,28 @@ def write_package(outcome: RunOutcome, folder, run_meta=None, log=(), render=Non
     comparison = comparison if comparison is not None else comparison_of(outcome)
     if comparison.has_numbers:
         paths["comparison"] = write_comparison_csv(outcome, comparison, folder / COMPARISON_FILE)
+    d2_ok = d2 is not None and d2.get("state") == d2_job.OK
+    if d2_ok:
+        paths["d2_field"] = write_d2_field_csv(outcome, d2, folder / D2_FIELD_FILE)
+        result = {**export._plain(d2_job.plain(d2)), "field_file": D2_FIELD_FILE,
+                  "timer_definitions": {k: v for k, v in d2_job.TIMER_TEXT.items() if k.startswith("d2_")},
+                  "role": "executed for this run in a separate process; the same discrete problem as KK-VIM CCCC "
+                          "(D-049.1, D-049.8); not stored benchmark data and not a qualified result"}
+        paths["d2_result"] = folder / D2_RESULT_FILE
+        paths["d2_result"].write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     suffix = "_TEST-DATA" if outcome.is_demo else ""
     paths["report"] = folder / f"report{suffix}.html"
     files = {name: path.name for name, path in paths.items() if name != "manifest"}
-    paths["report"].write_text(report_html(outcome, files, run_meta, view, comparison), encoding="utf-8")
+    paths["report"].write_text(report_html(outcome, files, run_meta, view, comparison, d2, timing), encoding="utf-8")
     data = export.manifest(outcome, run_meta, log, files)
     data["report_summary"] = export._plain(summary(outcome))
     data["visualization"] = export._plain(view or {})
+    if d2 is not None:
+        data["independent_d2"] = {
+            "state": d2.get("state"), "reason": d2.get("reason", ""), "title": d2_job.TITLE,
+            "record": export._plain(d2_job.plain(d2)) if d2_ok else None,
+            "files_sha256": {paths[k].name: _sha256(paths[k]) for k in ("d2_field", "d2_result") if k in paths},
+        }
+    data["timing"] = {"timers": export._plain(timing_table(timing, d2)), "role": d2_job.TIMING_ROLE}
     paths["manifest"].write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return paths

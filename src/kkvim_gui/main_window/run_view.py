@@ -16,7 +16,9 @@ as a result.
 
 Load series: the runs of a series are ordinary rows of the dispatcher («серия N, точка k из n»); «Нагрузка — прогиб…»
 opens the graph of the selected run's series once it is no longer running; «Стоп» stops the point and cancels the
-rest of the series. SSSS runs show the state of their independent Navier reference (computed in its own process).
+rest of the series. SSSS runs show the state of their independent Navier reference (computed in its own process);
+CCCC runs with «МКР — двумерный (D2)» show the state of D2 (computed in its own process after KK-VIM; «Стоп» while D2 runs
+stops D2 only and keeps the KK-VIM result).
 """
 
 from PySide6.QtCore import Qt, Signal
@@ -35,7 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from kkvim_gui.backend import navier_job
+from kkvim_gui.backend import d2_job, navier_job
 from kkvim_gui.backend.kkvim_adapter import LIMITATIONS, MARK, RESEARCH_MARK
 from kkvim_gui.backend.request import ROUTE_R3, ROUTE_R4
 from kkvim_gui.model.runs import SERIES_STATUS_TEXT, STATUS_TEXT, format_duration
@@ -165,7 +167,7 @@ class RunView(QWidget):
         grid.setVerticalSpacing(5)
         grid.setColumnStretch(1, 1)
         self.details = {}
-        rows = ("Метод", "Параметры", "Пластина", "Серия нагрузок", "Эталон Навье", "Этап", "Счётчики",
+        rows = ("Метод", "Параметры", "Пластина", "Серия нагрузок", "Эталон Навье", "МКР D2", "Этап", "Счётчики",
                 "Прошло времени", "Протокол")
         for i, name in enumerate(rows):
             grid.addWidget(label(name, "fieldLabel"), i, 0, Qt.AlignmentFlag.AlignTop)
@@ -176,6 +178,7 @@ class RunView(QWidget):
         self.counter_label = grid.itemAtPosition(rows.index("Счётчики"), 0).widget()
         self.series_label = grid.itemAtPosition(rows.index("Серия нагрузок"), 0).widget()
         self.navier_label = grid.itemAtPosition(rows.index("Эталон Навье"), 0).widget()
+        self.d2_label = grid.itemAtPosition(rows.index("МКР D2"), 0).widget()
         card.body.addLayout(grid)
         card.body.addWidget(label("Важные сообщения", "cardTitle"))
         self.important = label("", wrap=True)
@@ -287,6 +290,16 @@ class RunView(QWidget):
             return f"w в центре = {nav['w_m']!r} m (M = {nav['M']}, отдельный процесс)"
         return navier_job.STATE_TEXT.get(nav["state"], nav["state"]) if nav["state"] == navier_job.PENDING else nav["reason"]
 
+    @staticmethod
+    def d2_text(run):
+        d2 = run.d2
+        if d2 is None:
+            return "не выбран" if run.request is not None and run.request.supports == "CCCC" else "—"
+        if d2["state"] == d2_job.OK:
+            centre = "нет узла в центре" if d2["w_centre_m"] is None else f"w в центре = {d2['w_centre_m']!r} m"
+            return f"{centre}; вызов solve {d2['timing'].get('solve_s', 0.0):.3f} с (отдельный процесс)"
+        return d2_job.STATE_TEXT[d2_job.PENDING] if d2["state"] == d2_job.PENDING else d2["reason"]
+
     def _show_selected(self):
         run = self.selected()
         has = run is not None
@@ -350,6 +363,10 @@ class RunView(QWidget):
             d["Серия нагрузок"].setText(f"№ {series.series_id}: q = " + "; ".join(f"{q!r}" for q in series.loads)
                                         + f" Pa — {SERIES_STATUS_TEXT[series.status].lower()}")
         d["Эталон Навье"].setText(self.navier_text(run))
+        cccc = run.request is not None and run.request.supports == "CCCC"
+        self.d2_label.setVisible(cccc)
+        d["МКР D2"].setVisible(cccc)
+        d["МКР D2"].setText(self.d2_text(run))
         d["Этап"].setText(run.stage)
         self.counter_label.setVisible(run.iterative)
         d["Счётчики"].setVisible(run.iterative)

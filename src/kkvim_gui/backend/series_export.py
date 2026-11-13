@@ -6,6 +6,8 @@ A load series is several real runs, so it is saved as its own package, never dis
   statuses, field role, whether it is on the KK-VIM curve (and why not), the KK-VIM centre deflection, the signed w at
   the node of the largest |w|, the Navier reference and the signed differences (SSSS only), the plate, N and grid.
   Units in brackets; numbers in Python's round-trip form (``export._cell``), so the file holds the binary64 values;
+- with D2 (CCCC, «МКР — двумерный (D2)»): per row the state of the D2 run at that q, its centre deflection, beta_a,
+  e_D2, the signed difference KK-VIM − D2, and the timings of both methods (one execution each: observations);
 - ``series_manifest.json`` — kind "load_series", schema ``kkvim-gui-load-series/1``, the same rows, provenance of the
   reference and the SHA256 of every file of the package;
 - the graph (PNG), drawn by the interface (``render``).
@@ -31,6 +33,9 @@ COLUMNS = (  # (name, unit): "1" dimensionless, "" text, flag or count
     ("navier_state", ""), ("w_centre_navier", "m"), ("delta_w_centre", "m"), ("delta_w_centre_relative", "%"),
     ("supports", ""), ("N", ""), ("route", ""), ("a", "m"), ("b", "m"), ("h", "m"), ("E", "Pa"), ("nu", "1"),
     ("n_x", ""), ("n_y", ""),
+    ("d2_state", ""), ("d2_reason", ""), ("on_d2_curve", ""), ("w_centre_d2", "m"), ("beta_a_d2", "1"), ("e_D2", "m"),
+    ("delta_w_centre_kkvim_minus_d2", "m"), ("delta_w_centre_kkvim_minus_d2_relative", "%"),
+    ("kkvim_solver_time", "s"), ("kkvim_process_wall_time", "s"), ("d2_solve_time", "s"), ("d2_process_wall_time", "s"),
 )
 DEFINITIONS = (
     "# load series: every row is a separate KK-VIM run at its own uniform load q (no scaling, no interpolation)",
@@ -38,6 +43,12 @@ DEFINITIONS = (
     "w_at_max_abs_node_kkvim: signed w at the node of the largest |w|",
     "# w_centre_navier: kkvim_reference.navier at (a/2, b/2), M = 2559, computed in a separate process for every q (SSSS "
     "only); delta_w_centre = w_centre_kkvim - w_centre_navier; delta_w_centre_relative = delta / w_centre_navier * 100 %",
+    "# w_centre_d2: D2 (kkvim_reference.r5_cccc_d2, the same discrete problem as KK-VIM CCCC, D-049.1) computed in its own "
+    "process at every q for the same plate and grid (CCCC with D2 chosen only); beta_a_d2 = w_centre_d2 * D / (q * a^4); "
+    "delta_w_centre_kkvim_minus_d2 = w_centre_kkvim - w_centre_d2 (not an error of the continuous plate model)",
+    "# times, s: kkvim_solver_time = kkvim_adapter.execute in the computing process; kkvim_process_wall_time = process "
+    "start to the message read by the GUI (polling 0.2 s); d2_solve_time = r5_cccc_d2.solve in the D2 process; "
+    "d2_process_wall_time = D2 process start to its complete answer; one execution each: observations, not a ranking",
     "# signed differences only: no agreement threshold is approved; the series is not a scientific acceptance",
 )
 
@@ -52,7 +63,9 @@ def rows(data) -> list:
                     p.requested_completed, p.scientific_status, p.mark or "", p.included, p.reason,
                     p.w_centre_m, c.get("i"), c.get("j"), p.w_at_max_abs_m,
                     p.navier_state or "not applicable", p.navier_w_m, p.delta_w_m, p.rel_pct,
-                    data.supports, data.N, data.route, plate["a"], plate["b"], plate["t"], plate["E"], plate["nu"], n_x, n_y))
+                    data.supports, data.N, data.route, plate["a"], plate["b"], plate["t"], plate["E"], plate["nu"], n_x, n_y,
+                    p.d2_state or "not applicable", p.d2_reason, p.on_d2_curve, p.d2_w_m, p.d2_beta_a, p.d2_e_m,
+                    p.d2_delta_w_m, p.d2_rel_pct, p.kkvim_solver_s, p.kkvim_wall_s, p.d2_solve_s, p.d2_wall_s))
     return out
 
 
@@ -93,6 +106,11 @@ def write_series(data, folder, render=None) -> dict:
                                                "x": nav.get("x"), "y": nav.get("y"), "D": nav.get("D"),
                                                "versions": nav.get("versions")},
         "reference_state": None if data.navier is None else data.navier.get("state"),
+        "independent_d2": None if not data.d2 else {
+            "title": "МКР — двумерный (D2)", "method": data.d2_method,
+            "role": "executed in a separate process at every q for the same plate and grid; the same discrete problem as "
+                    "KK-VIM CCCC (D-049.1, D-049.8); not stored benchmark data; not an error estimate of the plate model",
+            "points_on_curve": len(data.d2_included)},
         "limits": ["signed differences only; no approved agreement threshold",
                    "every point is a separate KK-VIM run; runs that did not end as requested are kept in the table and are "
                    "not points of the curve", "the series is not a scientific acceptance and does not change any status"],

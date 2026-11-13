@@ -555,9 +555,14 @@ class OverviewTab(QWidget):
                 rows.append(("Другие эталоны", f"ещё {len(comparison.rows) - 1}: вкладка «Сравнение с эталоном»"))
             self.comparison_rows = rows
             self.comparison_body.addLayout(key_value(rows))
-            if self.outcome.mark and comparison.live:
+            if self.outcome.mark and comparison.navier is not None and comparison.live:
                 self.comparison_body.addWidget(Note(f"Для этого маршрута ({self.outcome.mark}) решение Навье — справочные "
                                                     "данные: статус расчёта не меняется.", "testdata"))
+            if ref.kind == "D2_live":
+                self.comparison_body.addWidget(Note("МКР D2 рассчитан для этих входных данных в отдельном процессе: та же "
+                                                    "дискретная задача (D-049.1); разность — отличие приближения КК-ВИМ от "
+                                                    "полного дискретного решения, не ошибка модели пластины. Статус "
+                                                    "расчёта не меняется.", "info"))
             self.comparison_body.addWidget(label("Знаковые разности без порога согласия; сравнение не меняет научный "
                                                  "статус и не является оценкой точности метода.", "secondary", wrap=True))
         else:
@@ -785,8 +790,9 @@ class HistoryTab(QWidget):
                     f"(k = {outcome.k}).")
         if outcome.route == "ssss_r3":
             rule = ("График: ε^∞ и ε^E — относительное изменение поля между соседними полушагами (по максимуму и в "
-                    "энергетической норме). Остановка CONVERGED — когда оба не больше допусков на двух полушагах подряд; "
-                    "это правило остановки, а не доказательство точности.")
+                    "энергетической норме). Остановка CONVERGED — при s ≥ s_min, когда на двух полушагах подряд (s − 1 "
+                    "и s) одновременно ε^∞ ≤ tol_∞ и ε^E ≤ tol_E (NUMERICAL_SPEC.md, разд. 11.3); это правило остановки, "
+                    "а не доказательство точности.")
         else:
             rule = (f"Как закончился расчёт: {outcome.stop_text}. Выполнение заданного числа полушагов — не сходимость. "
                     "График показывает изменение поля между полушагами, если оно вычислено.")

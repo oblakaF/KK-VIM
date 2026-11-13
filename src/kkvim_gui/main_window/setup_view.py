@@ -17,6 +17,10 @@ limits of the route are in the collapsed «Технические подробн
 model, the same validation and the same solver checks run. Load: «Одна нагрузка» or «Серия нагрузок» (several q, one
 run each); the loads of a series are shown before the run.
 
+«Независимый расчёт для сравнения» (in the supports card): for CCCC the switch «МКР — двумерный (D2)» (on by default) —
+D2 of the same plate and grid in its own process after KK-VIM; for SSSS the line that the Navier reference is computed
+automatically and that D2 is not applied to SSSS.
+
 All values live in one SetupModel shared with the main window, so they survive switching
 between sections (GUI_DESIGN.md, 5.2). Numeric fields keep exactly the text the user typed;
 it is parsed ("." or ",", sign, exponent) and formally checked when the value is committed
@@ -88,6 +92,13 @@ SERIES_HINT = "Несколько значений q через «;» или п�
 CCCC_TOOLTIP = ("CCCC — исследовательские режимы: N = 1 (D-061), N = 2–3 (D-063, D-065), N = 4–6 (D-067, D-068). "
                 "Результат никогда не квалифицирован")
 CCCC_PREVIEW_TEXT = "CCCC — недоступно в этой версии"
+D2_TEXT = "МКР — двумерный (D2): рассчитать для тех же входных данных"
+D2_TOOLTIP = ("Независимая реализация той же дискретной задачи CCCC (13-точечная схема, D-049.1, D-049.8) в отдельном "
+              "процессе после КК-ВИМ, для тех же a, b, h, E, ν, q и той же сетки; в серии — при каждом q. Совпадение с D2 "
+              "не проверяет сеточную погрешность и не повышает научный статус КК-ВИМ")
+INDEPENDENT_TITLE = "Независимый расчёт для сравнения"
+SSSS_INDEPENDENT = ("SSSS: эталон Навье рассчитывается автоматически для тех же входных данных. МКР D2 — схема "
+                    "жёсткой заделки; для SSSS не применяется.")
 N_TEXT = {n: str(n) for n in N_VALUES}  # the list shows N only; the status of the route is a separate line
 THEORIES = (
     ("Кирхгоф–Ляв", True),
@@ -241,6 +252,14 @@ class SetupView(QWidget):
         supports.body.addWidget(self.support_text)
         self.cccc_warning = Note(CCCC_WARNING, "testdata")
         supports.body.addWidget(self.cccc_warning)
+        supports.body.addWidget(label_with_info(INDEPENDENT_TITLE, "verification.d2"))
+        self.d2 = QCheckBox(D2_TEXT)
+        self.d2.setChecked(st.with_d2)
+        self.d2.setToolTip(D2_TOOLTIP)
+        set_help(self.d2, "verification.d2")
+        supports.body.addWidget(self.d2)
+        self.ssss_independent = label(SSSS_INDEPENDENT, "secondary", wrap=True)
+        supports.body.addWidget(self.ssss_independent)
         self.errors_supports = error_label()
         supports.body.addWidget(self.errors_supports)
         supports.body.addStretch(1)
@@ -483,6 +502,7 @@ class SetupView(QWidget):
         self.strict.toggled.connect(lambda on: self.model.set_choice(strict=on))
         self.research.toggled.connect(self._on_research)
         self.ssss_research.toggled.connect(lambda on: self.model.set_choice(ssss_research=on))
+        self.d2.toggled.connect(lambda on: self.model.set_choice(with_d2=on))
         self.cccc_half_steps.currentIndexChanged.connect(self._on_cccc_steps)
         self.research_rule.currentIndexChanged.connect(self._on_research_rule)
         self.transform.currentIndexChanged.connect(
@@ -569,6 +589,12 @@ class SetupView(QWidget):
             self.load_mode.set_current(st.load_mode)
         self.support_text.setText(SUPPORT_TEXT[st.supports])
         self.cccc_warning.setVisible(st.supports == "CCCC")
+        self.d2.setVisible(st.supports == "CCCC" and not self.preview)
+        self.ssss_independent.setVisible(st.supports == "SSSS" and not self.preview)
+        if self.d2.isChecked() != st.with_d2:
+            self.d2.blockSignals(True)
+            self.d2.setChecked(st.with_d2)
+            self.d2.blockSignals(False)
         self.route_status.set_status(*ROUTE_STATUS[st.scope])
         self._show_load(st)
         if self._n_supports != st.supports:  # the N items name the route of the selected supports
@@ -702,7 +728,7 @@ class SetupView(QWidget):
         for key, b in self.supports.buttons.items():
             b.setEnabled(not locked and not (self.preview and key == "CCCC"))
         for w in (self.theory, self.N, self.load_uniform, self.strict, self.research, self.transform, self.ssss_research,
-                  self.cccc_half_steps, self.load_mode):
+                  self.cccc_half_steps, self.load_mode, self.d2):
             w.setEnabled(not locked)
         self.research_rule.setEnabled(not locked and self.model.state.research)
         self._update_status()

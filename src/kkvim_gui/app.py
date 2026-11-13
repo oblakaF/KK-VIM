@@ -14,7 +14,12 @@ Options:
   --smoke-case FILE    with --smoke-test: the case to type into the form instead of the default (JSON: supports, N,
                        a, b, h, E, nu, q in m and Pa, n_x, n_y, half_steps; optional series (loads in Pa: a load series
                        instead of one run), expect_status, expect_field_role, expect_comparison, expect_navier,
-                       expect_series_points, screenshots (also the start, setup, help and every analysis tab))
+                       expect_series_points, screenshots (also the start, setup, help and every analysis tab);
+                       CCCC D2 (GUI-MULTIMETHOD-CCCC-D2-01): d2 (the setup switch), expect_d2 (state of D2),
+                       expect_series_status, expect_d2_points; failure checks of the check harness only:
+                       d2_command (argv of an unavailable D2 worker), kill_solver_point (k: kill the KK-VIM process of
+                       series point k, an abnormal termination), stop_d2_point (k: press «Стоп» while D2 of point k
+                       runs); every process started is checked to be gone at the end ("processes_left")
 Options for design review (do not change saved settings):
   --theme light|dark   start with this theme
   --state start|setup|running|finished
@@ -155,8 +160,19 @@ class SmokeTest:
         self.case = case
         self.report = {"stage": "start", "case": case}
         self.timer = QTimer()
-        self.timer.setInterval(250)
+        self.timer.setInterval(100)
         self.timer.timeout.connect(self._poll)
+        self.jobs, self.actions = [], []
+        manager = gui.main_window.runs
+        factory, command = manager.d2_factory, (case or {}).get("d2_command")
+        if factory is not None:
+            def recording(inputs):  # every D2 process is kept to check that none is left at the end
+                job = factory(inputs, command=[sys.executable if a == "{python}" else a for a in command]) if command \
+                    else factory(inputs)
+                self.jobs.append(job)
+                return job
+
+            manager.d2_factory = recording
 
     def _shot(self, widget, name):
         if self.case is not None and self.case.get("screenshots"):
@@ -191,8 +207,50 @@ class SmokeTest:
     def series(self):
         return self.case is not None and bool(self.case.get("series"))
 
+    def _act(self, main):
+        """Failure checks of a case: kill the KK-VIM process of a series point; «Стоп» while D2 of a point runs."""
+        run, case = main.runs.active, self.case or {}
+        if run is None or run.series_id is None:
+            return
+        series = main.runs.get_series(run.series_id)
+        point = series.run_ids.index(run.run_id) + 1
+        process = getattr(run._process, "_process", None)
+        if case.get("kill_solver_point") == point and run.outcome is None and process is not None and process.is_alive() \
+                and ("kill", point) not in self.actions:
+            process.kill()  # abnormal termination: the process ends without a message (O-1)
+            self.actions.append(("kill", point))
+        if case.get("stop_d2_point") == point and run._d2_job is not None and ("stop_d2", point) not in self.actions:
+            main.run_view.select(run.run_id)
+            QApplication.processEvents()
+            self._shot(main, "screen_main_d2_running.png")
+            self.actions.append(("stop_d2", point))
+            QTimer.singleShot(400, self._confirm)  # the user answers «Yes» in the confirmation
+            main.run_view.stop_button.click()  # the user's «Стоп» while D2 runs (a modal confirmation opens)
+
+    def _confirm(self):
+        from PySide6.QtWidgets import QMessageBox
+
+        box = QApplication.activeModalWidget()
+        if isinstance(box, QMessageBox):
+            self._shot(box, "screen_stop_confirmation.png")
+            self.actions.append(("confirmation", box.text()))
+            box.button(QMessageBox.StandardButton.Yes).click()
+        else:
+            self.actions.append(("confirmation", None))
+
+    def processes_left(self):
+        """pids of KK-VIM and D2 processes of this session that are still alive (should be none)."""
+        left = []
+        for run in self.gui.main_window.runs.runs:
+            process = getattr(run._process, "_process", None)
+            if process is not None and process.is_alive():
+                left.append(("kkvim", process.pid))
+        left += [("d2", job.pid) for job in self.jobs if job._process.poll() is None]
+        return left
+
     def _poll(self):
         main = self.gui.main_window
+        self._act(main)
         busy = main.runs.active is not None or main.runs.references_pending or (
             self.series and main.runs.series and main.runs.series[-1].active)
         if busy:
@@ -220,21 +278,32 @@ class SmokeTest:
         QApplication.processEvents()
         window.grab().save(str(self.folder / "screen_series.png"))
         kx, ky, nx, ny = window.tab.figure.curves()
+        dx, dy = window.tab.figure.d2_curve()
         paths = window.tab.save(self.folder)
         data = series_data(series, main.runs)
         manifest = json.loads(Path(paths["manifest"]).read_text(encoding="utf-8"))
         points = [{"q": p.q, "run_id": p.run_id, "run_status": p.run_status, "solver_status": p.solver_status,
                    "field_role": p.field_role, "included": p.included, "reason": p.reason, "w_centre_m": p.w_centre_m,
                    "w_at_max_abs_m": p.w_at_max_abs_m, "navier_state": p.navier_state, "navier_w_m": p.navier_w_m,
-                   "delta_w_m": p.delta_w_m, "rel_pct": p.rel_pct, "scientific_status": p.scientific_status}
+                   "delta_w_m": p.delta_w_m, "rel_pct": p.rel_pct, "scientific_status": p.scientific_status,
+                   "d2_state": p.d2_state, "d2_reason": p.d2_reason, "d2_w_m": p.d2_w_m, "d2_beta_a": p.d2_beta_a,
+                   "d2_e_m": p.d2_e_m, "d2_delta_w_m": p.d2_delta_w_m, "d2_rel_pct": p.d2_rel_pct,
+                   "kkvim_solver_s": p.kkvim_solver_s, "kkvim_wall_s": p.kkvim_wall_s, "d2_solve_s": p.d2_solve_s,
+                   "d2_wall_s": p.d2_wall_s}
                   for p in data.points]
+        logs = {run_id: [list(e) for e in main.runs.get(run_id).important] for run_id in series.run_ids}
         self.report.update(stage="finished", series_status=series.status, series_points=points,
-                           curves={"kkvim_q_kPa": kx, "kkvim_w_mm": ky, "navier_q_kPa": nx, "navier_w_mm": ny},
+                           curves={"kkvim_q_kPa": kx, "kkvim_w_mm": ky, "navier_q_kPa": nx, "navier_w_mm": ny,
+                                   "d2_q_kPa": dx, "d2_w_mm": dy},
                            navier_state=None if series.navier is None else series.navier.get("state"),
-                           package={k: str(v) for k, v in paths.items()}, manifest_files=manifest["files"])
+                           package={k: str(v) for k, v in paths.items()}, manifest_files=manifest["files"],
+                           manifest_independent_d2=manifest.get("independent_d2"), actions=self.actions,
+                           important_logs=logs, processes_left=self.processes_left())
         expected = self.case.get("expect_series_points", len(points))
-        ok = (series.status == "finished" and len(data.included) == expected
-              and self.case.get("expect_navier", self.report["navier_state"]) == self.report["navier_state"])
+        ok = (series.status == self.case.get("expect_series_status", "finished") and len(data.included) == expected
+              and self.case.get("expect_d2_points", len(data.d2_included)) == len(data.d2_included)
+              and self.case.get("expect_navier", self.report["navier_state"]) == self.report["navier_state"]
+              and not self.report["processes_left"])
         self._finish(0 if ok else 1, "ok" if ok else "unexpected series result")
 
     def _after_run(self):
@@ -261,6 +330,23 @@ class SmokeTest:
             self._shot(window, f"screen_analysis_{name}.png")
         comparison = self._comparison(window)
         self.report["overview_comparison"] = window.overview.comparison_rows
+        if window.d2_tab is not None:
+            window.tabs.setCurrentWidget(window.d2_tab)
+            QApplication.processEvents()
+            window.grab().save(str(self.folder / "screen_analysis_d2.png"))
+            self.report["d2_tab"] = {"title": window.tabs.tabText(window.tabs.indexOf(window.d2_tab)),
+                                     "state_text": window.d2_tab.state_label.text(),
+                                     "result_rows": window.d2_tab.result_rows,
+                                     "timing_rows": [list(r) for r in window.d2_tab.timing],
+                                     "difference": window.d2_tab.difference}
+        from kkvim_gui.backend import d2_job
+
+        self.report["d2"] = d2_job.plain(run.d2)
+        self.report["d2_requested"] = run.d2_requested
+        self.report["timing"] = run.timing
+        self.report["important_log"] = [list(e) for e in run.important]
+        self.report["setup_d2_visible"] = main.setup_view.d2.isVisibleTo(main.setup_view)
+        self.report["setup_d2_checked"] = main.setup_view.d2.isChecked()
         self.report["navier"] = run.navier
         self.report["tab_titles"] = [window.tabs.tabText(i) for i in range(window.tabs.count())]
         self.report["statuses"] = [window.status_run.text(), window.status_stop.text(), window.status_accept.text()]
@@ -269,9 +355,17 @@ class SmokeTest:
             self._shot(help_window, "screen_help_navier.png")
             help_window.show_search("Навье")
             self._shot(help_window, "screen_help_search.png")
+            self.report["help_search_navier"] = help_window.topics_in_index()
+            self.report["help_search_shown_highlighted"] = [help_window.current_topic, help_window.highlighted_topic()]
             help_window.show_topic("method.overview")
             self._shot(help_window, "screen_help_method.png")
-            self.report["help_search_navier"] = help_window.topics_in_index()
+            help_window.show_topic("param.stop.s_min")
+            self._shot(help_window, "screen_help_stop_s_min.png")
+            help_window.show_search("остановка")
+            self._shot(help_window, "screen_help_search_stop.png")
+            self.report["help_search_stop_shown_highlighted"] = [help_window.current_topic, help_window.highlighted_topic()]
+            help_window.show_topic("verification.d2")
+            self._shot(help_window, "screen_help_d2.png")
         paths = window.save_package(self.folder)
         e = o.extremum()
         manifest = json.loads(Path(paths["manifest"]).read_text(encoding="utf-8"))
@@ -282,7 +376,9 @@ class SmokeTest:
                            analysis_badge_visible=not window.header.badge.isHidden(),
                            package={k: str(v) for k, v in paths.items()},
                            manifest_statuses=manifest["statuses"], manifest_marks=manifest["marks"],
-                           manifest_files=manifest["files"], comparison=comparison)
+                           manifest_files=manifest["files"], comparison=comparison,
+                           manifest_independent_d2=manifest.get("independent_d2"), manifest_timing=manifest.get("timing"),
+                           actions=self.actions, processes_left=self.processes_left())
         if self.case is None:
             ok = o.status == "CONVERGED"
         else:
@@ -293,7 +389,9 @@ class SmokeTest:
                   and self.case.get("expect_navier", navier_state) == navier_state
                   and ("comparison" in manifest["files"]) == (comparison["state"] == "available")
                   and manifest["statuses"]["solver_status"] == o.status
-                  and manifest["statuses"]["field_role"] == o.field_role)
+                  and manifest["statuses"]["field_role"] == o.field_role
+                  and self.case.get("expect_d2", (run.d2 or {}).get("state")) == (run.d2 or {}).get("state")
+                  and not self.report["processes_left"])
         self._finish(0 if ok else 1, "ok" if ok else "unexpected status or field role")
 
     def _comparison(self, window):
@@ -354,6 +452,8 @@ def type_case(model, case):
         model.set_text("q_series", "; ".join(repr(float(q)) for q in case["series"]))
     if case["supports"] == "CCCC":
         model.set_choice(cccc_half_steps=int(case["half_steps"]))
+        if "d2" in case:
+            model.set_choice(with_d2=bool(case["d2"]))
     elif "half_steps" in case:
         model.set_text("half_steps", str(case["half_steps"]))
         if int(case["N"]) >= 4:
@@ -373,6 +473,9 @@ def installation_record():
     return {"executable": sys.executable, "prefix": sys.prefix, "kkvim": importlib.util.find_spec("kkvim").origin,
             "kkvim_gui": kkvim_gui.__file__,
             "kkvim_navier_worker": importlib.util.find_spec("kkvim_navier_worker").origin,
+            "kkvim_d2_worker": importlib.util.find_spec("kkvim_d2_worker").origin,
+            "kkvim_reference_r5_cccc_d2": str(Path(importlib.util.find_spec("kkvim_reference").origin)
+                                              .with_name("r5_cccc_d2.py")),
             "kkvim_reference": importlib.util.find_spec("kkvim_reference").origin,
             "help_articles": len(load_articles()), "benchmarks_payload_ok": bool(benchmarks.load())}
 

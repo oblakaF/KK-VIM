@@ -1,6 +1,12 @@
-"""Help centre window (GUI_DESIGN.md, 17.3): search on top, alphabetical index А–Я, article view."""
+"""Help centre window (GUI_DESIGN.md, 17.3): search on top, alphabetical index А–Я, article view.
 
-from PySide6.QtCore import Qt
+The highlighted index entry is always the article shown, or nothing when that article is not in the (filtered) index
+(GUI-MULTIMETHOD-CCCC-D2-01, O-4): a search that filters the article out clears the highlight instead of leaving the
+previous entry highlighted; ``show_search`` with a query shows the first result whose title contains every query word
+(else the first result) and highlights it.
+"""
+
+from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
@@ -15,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from kkvim_gui.help.articles import alphabetical_index, get, search
+from kkvim_gui.help.articles import alphabetical_index, get, normalize, search
 from kkvim_gui.help.render import article_markdown
 from kkvim_gui.widgets.common import fit_to_screen
 from kkvim_gui.widgets.header import AppHeader, app_icon
@@ -104,13 +110,22 @@ class HelpWindow(QMainWindow):
         self._select(self.current_topic)
 
     def _select(self, topic):
+        """Highlight the entry of ``topic``; no highlight if it is not in the index (never another article's entry)."""
         for i in range(self.index.topLevelItemCount()):
             head = self.index.topLevelItem(i)
             for j in range(head.childCount()):
                 item = head.child(j)
                 if item.data(0, TOPIC_ROLE) == topic:
                     self.index.setCurrentItem(item)
-                    return
+                    return True
+        self.index.setCurrentIndex(QModelIndex())
+        self.index.clearSelection()
+        return False
+
+    def highlighted_topic(self):
+        """The topic of the highlighted index entry, or None."""
+        items = self.index.selectedItems()
+        return items[0].data(0, TOPIC_ROLE) if items else None
 
     def topics_in_index(self):
         return [
@@ -140,7 +155,10 @@ class HelpWindow(QMainWindow):
 
     def show_search(self, query=""):
         self.search.setText(query)
-        self.show_topic(START_TOPIC)
+        found = self.topics_in_index() if query.strip() else []
+        words = normalize(query).split()
+        titled = [t for t in found if all(w in normalize(get(t).title) for w in words)]
+        self.show_topic((titled or found or [START_TOPIC])[0])  # the shown article is the highlighted one (O-4)
         self.mode = "search"
         self.search.setFocus()
         self.search.selectAll()

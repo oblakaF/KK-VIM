@@ -11,6 +11,9 @@ figures carry the session-wide "Графики RU | EN" switch.
   reference computed for its own inputs in a separate process (``RunRecord.navier``; while it is computed the tab says so
   and is rebuilt when it arrives), for CCCC the saved references read as data (``backend.benchmarks``); for a
   diagnostic field or inputs without a reference it states why, with no numbers.
+- «МКР D2» (``analysis.d2_tab``): only for a CCCC run with «МКР — двумерный (D2)» chosen: the D2 solution computed for
+  the run's own inputs in a separate process (``RunRecord.d2``), sections next to KK-VIM, node values and the timings of
+  both methods; when D2 did not run the tab states why. D2 is also a row of «Сравнение с эталоном».
 - «Нагрузка — прогиб» (``analysis.series``): only for a run of a finished load series.
 - Without a solver run (``--demo``): the layout with TEST DATA placeholders, never results.
 """
@@ -265,7 +268,8 @@ class AnalysisWindow(QMainWindow):
         from kkvim_gui.analysis.comparison import ComparisonTab
 
         self._navier = getattr(run, "navier", None)  # None: a run without a reference record
-        self.comparison = ComparisonTab(outcome, run, navier=self._navier)  # states itself when no reference applies
+        self._d2 = getattr(run, "d2", None)  # None: D2 not requested (SSSS, or CCCC without «МКР — двумерный (D2)»)
+        self.comparison = ComparisonTab(outcome, run, navier=self._navier, d2=self._d2)  # states itself when none applies
         self.overview = results.OverviewTab(s, outcome, run, self.model_rows, elapsed, comparison=self.comparison.comparison)
         self.fields = results.FieldsTab(s, outcome, self.model_rows, trailing=self._trailing())
         self.sections = results.SectionsTab(s, outcome, trailing=self._trailing())
@@ -280,6 +284,9 @@ class AnalysisWindow(QMainWindow):
         self.tabs.setTabToolTip(6, COMPARISON_SOLVER_TOOLTIP)
         for i, topic in enumerate(SOLVER_TAB_HELP):
             set_help_context(self.tabs.widget(i), topic)
+        self.d2_tab = None
+        if self._d2 is not None and self._d2.get("state") != "pending":
+            self._add_d2_tab()
         self.series_tab = None
         if self.series is not None:
             from kkvim_gui.analysis.series import SeriesTab
@@ -287,7 +294,7 @@ class AnalysisWindow(QMainWindow):
             self.series_tab = SeriesTab(s, self.series)
             self.tabs.addTab(self.series_tab, SERIES_TAB)
         self._navier_timer = None
-        if self._navier is not None and self._navier.get("state") == "pending":
+        if any(r is not None and r.get("state") == "pending" for r in (self._navier, self._d2)):
             self._navier_timer = QTimer(self)
             self._navier_timer.setInterval(300)
             self._navier_timer.timeout.connect(self._check_navier)
@@ -316,12 +323,27 @@ class AnalysisWindow(QMainWindow):
         fit_to_screen(self)
 
     def _check_navier(self):
-        """The Navier reference of an SSSS run arrived after the window opened: rebuild the comparison with it."""
-        navier = getattr(self.run, "navier", None)
-        if navier is None or navier is self._navier or navier.get("state") == "pending":
+        """A reference of the run (Navier for SSSS, D2 for CCCC) arrived after the window opened: rebuild the comparison."""
+        navier, d2 = getattr(self.run, "navier", None), getattr(self.run, "d2", None)
+        pending = [r for r in (navier, d2) if r is not None and r.get("state") == "pending"]
+        if navier is self._navier and d2 is self._d2:
+            return
+        if pending:
             return
         self._navier_timer.stop()
-        self.set_navier(self.run.navier)
+        if d2 is not self._d2:
+            self._d2 = d2
+            if self.d2_tab is None and d2 is not None:
+                self._add_d2_tab()
+        self.set_navier(navier)
+
+    def _add_d2_tab(self):
+        from kkvim_gui.analysis.d2_tab import TAB_TITLE, TAB_TOOLTIP, D2Tab
+
+        self.d2_tab = D2Tab(self.session, self.outcome, self.run, trailing=(FigureLanguageSwitch(self.session),))
+        index = self.tabs.indexOf(self.comparison) + 1
+        self.tabs.insertTab(index, self.d2_tab, TAB_TITLE)
+        self.tabs.setTabToolTip(index, TAB_TOOLTIP)
 
     def set_navier(self, navier):
         from kkvim_gui.analysis.comparison import ComparisonTab
@@ -330,7 +352,7 @@ class AnalysisWindow(QMainWindow):
         index = self.tabs.indexOf(self.comparison)
         current = self.tabs.currentIndex()
         old = self.comparison
-        self.comparison = ComparisonTab(self.outcome, self.run, navier=navier)
+        self.comparison = ComparisonTab(self.outcome, self.run, navier=navier, d2=self._d2)
         self.tabs.removeTab(index)
         self.tabs.insertTab(index, self.comparison, SOLVER_TABS[6])
         self.tabs.setTabToolTip(index, COMPARISON_SOLVER_TOOLTIP)
@@ -372,7 +394,8 @@ class AnalysisWindow(QMainWindow):
         return report.write_package(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed,
                                     render=snapshots.renderer(self.session, self.outcome, factor),
                                     view=snapshots.view_record(self.outcome, factor),
-                                    comparison=self.comparison.comparison)
+                                    comparison=self.comparison.comparison, d2=self._d2,
+                                    timing=getattr(self.run, "timing", None))
 
     def _save_package_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Папка для расчёта и отчёта")

@@ -26,6 +26,11 @@ Load: one uniform load q, or a load series (``load_mode == "series"``): the fiel
 in the unit chosen for q, separated by ";" or spaces ("," is the decimal comma). ``to_series_requests`` gives one
 RunRequest per value: the request of the same form with only the text of q replaced, so geometry, material, supports,
 N, grid and every method parameter are exactly those of a single run.
+
+Independent method for comparison (GUI-MULTIMETHOD-CCCC-D2-01): ``with_d2`` — for CCCC, also compute «МКР — двумерный
+(D2)» (the QA reference D2 of the same discrete problem, ``backend.d2_job``) for the same plate and grid, in its own
+process after the KK-VIM run (for a series: at every q). On by default; it applies to CCCC only: SSSS keeps the Navier
+reference and D2 (the clamped-plate scheme) is never offered for SSSS. It does not enter the RunRequest of the solver.
 """
 
 from dataclasses import dataclass, field, replace
@@ -174,6 +179,7 @@ class SetupState:
     ssss_research: bool = False  # SSSS N = 4-6: the explicit research choice (D-056.7)
     cccc_half_steps: int = 1  # CCCC: the exact number of half-steps; s = 1 by default (no continuation)
     load_mode: str = "single"  # "single": one load q; "series": the loads of "q_series", one run each
+    with_d2: bool = True  # CCCC: also «МКР — двумерный (D2)» for the same plate and grid (never for SSSS)
 
     def with_text(self, key, text):
         return replace(self, texts={**self.texts, key: text})
@@ -192,6 +198,8 @@ class SetupState:
             raise ValueError(f"unknown R4 mode {choices['r4_mode']!r}")
         if "transform" in choices and choices["transform"] not in TRANSFORMS:
             raise ValueError(f"unknown transform {choices['transform']!r}")
+        if "with_d2" in choices and not isinstance(choices["with_d2"], bool):
+            raise ValueError(f"with_d2 must be True or False, got {choices['with_d2']!r}")
         if "load_mode" in choices and choices["load_mode"] not in LOAD_MODES:
             raise ValueError(f"unknown load mode {choices['load_mode']!r}")
         changed = any(key in choices and choices[key] != getattr(self, key) for key in ("N", "supports"))
@@ -220,6 +228,11 @@ class SetupState:
     @property
     def series(self):
         return self.load_mode == "series"
+
+    @property
+    def d2(self):
+        """True if «МКР — двумерный (D2)» is computed with the run: CCCC and the choice is on."""
+        return self.supports == "CCCC" and self.with_d2
 
     def active_fields(self):
         """Fields that take part in a run of the current supports, N and load mode, in form order."""
@@ -272,6 +285,7 @@ def to_config(state):
         method.update(ssss_research=state.ssss_research, half_steps=quantity("half_steps"))
     else:
         method.update(half_steps=state.cccc_half_steps)
+        method["independent_d2"] = state.d2  # «МКР — двумерный (D2)» for the same plate and grid
     return {
         "geometry": {k: quantity(k) for k in ("a", "b", "h")},
         "material": {"E": quantity("E"), "nu": quantity("nu")},
@@ -320,8 +334,9 @@ def to_request(state):
 
 def method_text(state):
     if state.scope == "cccc":
+        d2 = " · + МКР — двумерный (D2) для сравнения" if state.d2 else ""
         return (f"КК-ВИМ, N = {state.N} · CCCC, исследование, s = {state.cccc_half_steps} · RESEARCH_ONLY / PROVISIONAL / "
-                f"NOT_QUALIFIED · {state.theory}")
+                f"NOT_QUALIFIED · {state.theory}{d2}")
     if state.scope == "r46":
         chosen = "выбрано" if state.ssss_research else "не выбрано"
         return f"КК-ВИМ, N = {state.N} · SSSS, исследование N = 4–6 ({chosen}) · RESEARCH_ONLY · {state.theory}"

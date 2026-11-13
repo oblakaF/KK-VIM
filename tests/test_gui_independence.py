@@ -3,7 +3,9 @@
 - kkvim and kkvim_reference never import kkvim_gui;
 - kkvim_gui never imports kkvim_reference;
 - the Navier worker (kkvim_navier_worker, started by the GUI as a separate process) imports kkvim_reference only: never
-  kkvim or kkvim_gui; kkvim_gui never imports the worker, and the scientific packages never import it.
+  kkvim or kkvim_gui; kkvim_gui never imports the worker, and the scientific packages never import it;
+- the D2 worker (kkvim_d2_worker, GUI-MULTIMETHOD-CCCC-D2-01) likewise: kkvim_reference only, never kkvim (the solver
+  whose result D2 is compared with) or kkvim_gui; neither the GUI nor the scientific packages nor the Navier worker import it.
 
 Static analysis with ast, like tests/test_package_independence.py; no Qt needed.
 """
@@ -24,6 +26,13 @@ FORBIDDEN = (
     ("kkvim_navier_worker", "kkvim_gui"),
     ("kkvim", "kkvim_navier_worker"),
     ("kkvim_reference", "kkvim_navier_worker"),
+    ("kkvim_gui", "kkvim_d2_worker"),
+    ("kkvim_d2_worker", "kkvim"),
+    ("kkvim_d2_worker", "kkvim_gui"),
+    ("kkvim_d2_worker", "kkvim_navier_worker"),
+    ("kkvim", "kkvim_d2_worker"),
+    ("kkvim_reference", "kkvim_d2_worker"),
+    ("kkvim_navier_worker", "kkvim_d2_worker"),
 )
 
 

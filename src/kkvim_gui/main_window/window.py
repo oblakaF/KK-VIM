@@ -317,10 +317,15 @@ class MainWindow(QMainWindow):
         return run if run is not None and (run.has_results or run.has_diagnostic_field) else None
 
     def _confirm_stop(self, run_id):
+        run = self.runs.get(run_id)
+        d2_running = run is not None and getattr(run, "_d2_job", None) is not None
         answer = QMessageBox.question(
             self,
             "Остановить расчёт",
-            "Остановить расчёт? Анализ прерванного расчёта недоступен.",
+            ("Остановить расчёт МКР D2? Результат КК-ВИМ этого запуска сохраняется; значение D2 не будет получено."
+             if d2_running else "Остановить расчёт? Анализ прерванного расчёта недоступен.")
+            + (" Следующие точки серии нагрузок не будут рассчитаны." if run is not None and run.series_id is not None
+               else ""),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )

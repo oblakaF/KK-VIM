@@ -3,7 +3,9 @@
 Drawn from ``model.series.SeriesData`` only: every KK-VIM point is a real run at its q (the stored field at the centre
 node, or the separately labelled signed w at the node of the largest |w|); runs that did not end as requested stay in
 the table with the reason and are not points of the curve. For SSSS the Navier reference computed in its own process at
-every q is a second curve (never for CCCC). q is shown in kPa and w in mm (SI multiples, stated on the axes); the saved
+every q is a second curve (never for CCCC). For a CCCC series with «МКР — двумерный (D2)», D2 computed in its own process
+at every q is the second curve: only the points where D2 answered with a centre value; the others stay in the table
+with the state and reason of their D2. q is shown in kPa and w in mm (SI multiples, stated on the axes); the saved
 file keeps Pa and m at full precision. The graph is an interactive pyqtgraph X–Y plot (pan, zoom, reset); its texts
 follow the figure language (GUI-D03).
 """
@@ -35,11 +37,20 @@ from kkvim_gui.widgets.header import AppHeader, app_icon
 KPA = 1e-3  # q in kPa for the axis (q in Pa · 1e-3)
 HEADERS = ("q, kPa", "Расчёт", "Статус решателя", "Роль поля", "На графике", "w в центре КК-ВИМ, mm",
            "w в узле max|w|, mm", "w в центре Навье, mm", "Δw = w_КК-ВИМ − w_Навье, mm", "Δw / w_Навье, %", "Причина исключения")
+D2_HEADERS = ("МКР D2", "w в центре D2, mm", "Δw = w_КК-ВИМ − w_D2, mm", "Δw / w_D2, %", "Время КК-ВИМ (решатель), s",
+              "Время D2 (solve), s")
 ROLE_SHORT = {"accepted": "результат R3", "research": "исследование", "diagnostic": "диагностика", None: "—"}
 QUANTITIES = {"centre": "Прогиб в центре", "maxabs": "w в узле max|w|"}
 
 
-def _row(p):
+def _row(p, d2=False):
+    extra = () if not d2 else (
+        p.d2_state if not p.d2_reason else f"{p.d2_state}: {p.d2_reason}", None if p.d2_w_m is None else p.d2_w_m * MM,
+        None if p.d2_delta_w_m is None else p.d2_delta_w_m * MM, p.d2_rel_pct, p.kkvim_solver_s, p.d2_solve_s)
+    return _base_row(p) + extra
+
+
+def _base_row(p):
     return (p.q * KPA, f"№ {p.run_id}" if p.run_id else "—", p.solver_status or RUN_STATUS_TEXT.get(p.run_status, p.run_status),
             ROLE_SHORT.get(p.field_role, p.field_role), "да" if p.included else "нет",
             None if p.w_centre_m is None else p.w_centre_m * MM, None if p.w_at_max_abs_m is None else p.w_at_max_abs_m * MM,
@@ -76,6 +87,8 @@ class SeriesFigure(QFrame):
         self.kkvim = self.plot.plot(pen=pg.mkPen(t["accent"], width=2), symbol="o", symbolSize=8, symbolBrush=t["accent"])
         self.navier = self.plot.plot(pen=pg.mkPen(t["status.warning"], width=2, style=Qt.PenStyle.DashLine), symbol="t",
                                      symbolSize=8, symbolBrush=t["status.warning"])
+        self.d2 = self.plot.plot(pen=pg.mkPen(t["status.warning"], width=2, style=Qt.PenStyle.DashLine), symbol="s",
+                                 symbolSize=8, symbolBrush=t["status.warning"])
         self.restyle()
         session.themeChanged.connect(self.restyle)
         session.figureLanguageChanged.connect(self.redraw)
@@ -92,6 +105,13 @@ class SeriesFigure(QFrame):
     def set_quantity(self, quantity):
         self.quantity = quantity
         self.redraw()
+
+    def d2_curve(self):
+        """(D2 xs, ys) in kPa and mm: the D2 points actually computed (centre only)."""
+        if self.quantity != "centre":
+            return [], []  # D2 is reported at the centre node only
+        pts = sorted(self.data.d2_included, key=lambda p: p.q)
+        return [p.q * KPA for p in pts], [p.d2_w_m * MM for p in pts]
 
     def curves(self):
         """(KK-VIM xs, ys, Navier xs, ys) in kPa and mm: the plotted coordinates."""
@@ -117,6 +137,11 @@ class SeriesFigure(QFrame):
         self.navier.setVisible(bool(nx))
         if nx:
             self.legend.addItem(self.navier, fig_text(lang, "legend.series.navier", M=self.data.navier.get("M")))
+        dx, dy = self.d2_curve()
+        self.d2.setData(dx, dy)
+        self.d2.setVisible(bool(dx))
+        if dx:
+            self.legend.addItem(self.d2, fig_text(lang, "legend.series.d2"))
         self.plot.autoRange()
 
 
@@ -130,11 +155,13 @@ class SeriesTab(QWidget):
         self.quantity.setToolTip("Прогиб в центре (a/2, b/2) или знаковый w в узле с наибольшим |w|: это разные величины")
         self.quantity.changed.connect(self.figure.set_quantity)
         self.save_button = QPushButton("Сохранить серию…")
-        self.save_button.setToolTip("Отдельная папка серии: load_series.csv, series_manifest.json и график PNG")
+        self.save_button.setToolTip("Отдельная папка серии: load_series.csv, series_manifest.json и график PNG"
+                                    + ("; для D2 — его значения и время каждого метода в load_series.csv" if data.d2 else ""))
         self.save_button.clicked.connect(self._save_dialog)
         self.save_button.setEnabled(data.complete)
         bar = toolbar(self.quantity, trailing=(*trailing, FigureLanguageSwitch(session), self.save_button))
-        self.model = RowsModel(HEADERS, len(data.points), lambda i: _row(data.points[i]), digits=10)
+        headers = HEADERS + D2_HEADERS if data.d2 else HEADERS
+        self.model = RowsModel(headers, len(data.points), lambda i: _row(data.points[i], data.d2), digits=10)
         table = Card(f"Расчёты серии: {len(data.points)} значений q, на графике — {len(data.included)}",
                      right=label(f"{data.supports} · N = {data.N} · сетка {data.grid[0]} × {data.grid[1]}", "tag"))
         excluded = [p for p in data.points if not p.included]
@@ -149,6 +176,13 @@ class SeriesTab(QWidget):
                          f"Эталон Навье недоступен: {data.navier.get('reason') or data.navier.get('state')}.")
         else:
             notes.append("Для CCCC кривой Навье нет: решение Навье относится только к шарнирному опиранию SSSS.")
+        if data.d2:
+            missing = len(data.points) - len(data.d2_included)
+            notes.append(f"МКР D2 рассчитан в отдельном процессе при каждом q для той же пластины и сетки (та же дискретная "
+                         f"задача, D-049.1): точек D2 на графике — {len(data.d2_included)}"
+                         + (f"; без значения — {missing} (состояние и причина в таблице)" if missing else "")
+                         + ". Разность КК-ВИМ − D2 — не ошибка модели пластины. Время — одно исполнение каждого метода, "
+                         "наблюдение, а не сравнение алгоритмов.")
         for n in notes:
             table.body.addWidget(label(n, "secondary", wrap=True))
         split = QSplitter(Qt.Orientation.Vertical)

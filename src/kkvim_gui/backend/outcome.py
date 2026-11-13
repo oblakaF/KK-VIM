@@ -84,6 +84,7 @@ class RunOutcome:
     s_requested: int | None = None  # the requested (fixed or limiting) number of half-steps; None for R3 (s_max is a parameter)
     decisions: tuple = ()  # decisions that authorize the route
     limitations: tuple = ()  # limits of the route, shown in the run screen, the analysis and the report
+    timing: dict = field(default_factory=dict)  # seconds inside the computing process (backend.process: import_s, solver_s)
 
     def __post_init__(self):
         if self.field_role is not None and self.field_role not in FIELD_ROLES:
