@@ -58,7 +58,7 @@ def test_cccc_benchmark_case_shows_all_references_at_full_precision(qtbot, gui):
     run, a = run_case(qtbot, gui)
     o = run.outcome
     w0 = o.w.copy()
-    index = SOLVER_TABS.index("Сравнение")
+    index = SOLVER_TABS.index("Сравнение с эталоном")
     assert a.tabs.isTabEnabled(index) and a.tabs.widget(index) is a.comparison
     a.tabs.setCurrentIndex(index)
     c = a.comparison.comparison
@@ -107,7 +107,7 @@ def test_saved_report_and_csv_hold_the_table_shown_in_the_tab(qtbot, gui, tmp_pa
     rows = list(csv.DictReader(lines))
     assert [[r["beta_reference [1]"], r["delta_beta [1]"], r["delta_beta_relative [%]"]] for r in rows] == \
         [[row[1], row[3], row[4]] for row in shown]
-    assert [r["reference_source_provenance"] for r in rows] == [row[5] for row in shown]
+    assert [r["reference_source_provenance"] for r in rows] == [row[bm.DETAIL_COLUMN] for row in shown]
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))
     assert data["files"]["comparison"] == "comparison.csv" and data["statuses"]["mark"] == run.outcome.mark
 
@@ -117,7 +117,7 @@ def test_case_without_reference_data_states_it_without_numbers(qtbot, gui, tmp_p
     c = a.comparison.comparison
     assert c.state == bm.UNAVAILABLE and a.comparison.table is None and c.beta is None
     assert "Эталонных данных для этих входных данных нет" in a.comparison.reason.text()
-    assert a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение"))
+    assert a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение с эталоном"))
     paths = a.save_package(tmp_path / "saved")  # saving works without references
     assert "comparison" not in paths and c.reason.split(":")[0] in paths["report"].read_text(encoding="utf-8")
 
@@ -143,4 +143,4 @@ def test_damaged_data_are_reported_in_the_tab(qtbot, gui):
 def test_demonstration_window_keeps_the_tab_disabled(qtbot, qapp):
     w = AnalysisWindow(Session(settings=None))
     qtbot.addWidget(w)
-    assert not w.tabs.isTabEnabled(TABS.index("Сравнение"))
+    assert not w.tabs.isTabEnabled(TABS.index("Сравнение с эталоном"))

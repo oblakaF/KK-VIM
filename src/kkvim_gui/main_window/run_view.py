@@ -13,6 +13,10 @@ PROVISIONAL / NOT_QUALIFIED and every research route (SSSS N = 4-6, CCCC) RESEAR
 NOT_QUALIFIED, with the limits of its route. The scientific status comes from the solver outcome (or, while
 the run is active, from the route of its request), never from N alone; a diagnostic field is never shown
 as a result.
+
+Load series: the runs of a series are ordinary rows of the dispatcher («серия N, точка k из n»); «Нагрузка — прогиб…»
+opens the graph of the selected run's series once it is no longer running; «Стоп» stops the point and cancels the
+rest of the series. SSSS runs show the state of their independent Navier reference (computed in its own process).
 """
 
 from PySide6.QtCore import Qt, Signal
@@ -31,9 +35,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from kkvim_gui.backend import navier_job
 from kkvim_gui.backend.kkvim_adapter import LIMITATIONS, MARK, RESEARCH_MARK
 from kkvim_gui.backend.request import ROUTE_R3, ROUTE_R4
-from kkvim_gui.model.runs import STATUS_TEXT, format_duration
+from kkvim_gui.model.runs import SERIES_STATUS_TEXT, STATUS_TEXT, format_duration
 from kkvim_gui.model.setup_state import summary_rows
 from kkvim_gui.widgets.common import Card, Note, StatusLabel, label, set_help_context
 
@@ -73,6 +78,7 @@ class RunView(QWidget):
     stopRequested = Signal(int)
     analysisRequested = Signal(int)
     exportRequested = Signal(int)
+    seriesRequested = Signal(int)
 
     def __init__(self, session, runs, parent=None):
         super().__init__(parent)
@@ -104,6 +110,7 @@ class RunView(QWidget):
 
         runs.runAdded.connect(self._on_added)
         runs.runChanged.connect(self._on_changed)
+        runs.seriesChanged.connect(lambda _id: self._show_selected())
         session.themeChanged.connect(self._on_theme)
         self._show_selected()
 
@@ -125,7 +132,10 @@ class RunView(QWidget):
         self.export_button = QPushButton("Сохранить результаты…")
         self.export_button.setToolTip("Исходные данные, статусы, история полушагов и поле: JSON и CSV с единицами")
         self.export_button.clicked.connect(lambda: self.exportRequested.emit(self.selected_id))
-        for b in (self.stop_button, self.export_button, self.analysis_button):
+        self.series_button = QPushButton("Нагрузка — прогиб…")
+        self.series_button.setToolTip("График и таблица серии нагрузок выбранного расчёта; сохранение load_series.csv")
+        self.series_button.clicked.connect(self._request_series)
+        for b in (self.stop_button, self.export_button, self.series_button, self.analysis_button):
             head.addWidget(b)
         card.body.addLayout(head)
         statuses = QHBoxLayout()
@@ -155,14 +165,17 @@ class RunView(QWidget):
         grid.setVerticalSpacing(5)
         grid.setColumnStretch(1, 1)
         self.details = {}
-        rows = ("Проект", "Метод", "Параметры", "Пластина", "Этап", "Счётчики", "Прошло времени", "Протокол")
+        rows = ("Метод", "Параметры", "Пластина", "Серия нагрузок", "Эталон Навье", "Этап", "Счётчики",
+                "Прошло времени", "Протокол")
         for i, name in enumerate(rows):
             grid.addWidget(label(name, "fieldLabel"), i, 0, Qt.AlignmentFlag.AlignTop)
             value = label("", wrap=True)
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             grid.addWidget(value, i, 1)
             self.details[name] = value
-        self.counter_label = grid.itemAtPosition(5, 0).widget()
+        self.counter_label = grid.itemAtPosition(rows.index("Счётчики"), 0).widget()
+        self.series_label = grid.itemAtPosition(rows.index("Серия нагрузок"), 0).widget()
+        self.navier_label = grid.itemAtPosition(rows.index("Эталон Навье"), 0).widget()
         card.body.addLayout(grid)
         card.body.addWidget(label("Важные сообщения", "cardTitle"))
         self.important = label("", wrap=True)
@@ -255,6 +268,25 @@ class RunView(QWidget):
     def selected(self):
         return self.runs.get(self.selected_id) if self.selected_id is not None else None
 
+    def selected_series(self):
+        run = self.selected()
+        return None if run is None or run.series_id is None else self.runs.get_series(run.series_id)
+
+    def _request_series(self):
+        series = self.selected_series()
+        if series is not None and not series.active:
+            self.seriesRequested.emit(series.series_id)
+
+    @staticmethod
+    def navier_text(run):
+        nav = run.navier
+        if nav is None:
+            return "не применяется (решение Навье — только для SSSS)" if run.request is not None and \
+                run.request.supports != "SSSS" else "—"
+        if nav["state"] == navier_job.OK:
+            return f"w в центре = {nav['w_m']!r} m (M = {nav['M']}, отдельный процесс)"
+        return navier_job.STATE_TEXT.get(nav["state"], nav["state"]) if nav["state"] == navier_job.PENDING else nav["reason"]
+
     def _show_selected(self):
         run = self.selected()
         has = run is not None
@@ -267,6 +299,9 @@ class RunView(QWidget):
         self.analysis_button.setText("Открыть диагностику (запрошенный расчёт не выполнен)" if diagnostic
                                      else "Открыть анализ результатов")
         self.export_button.setVisible(has and run.outcome is not None)
+        series = self.selected_series() if has else None
+        self.series_button.setVisible(series is not None)
+        self.series_button.setEnabled(series is not None and not series.active)
         outcome = run.outcome if has else None
         if has and run.is_demo:
             self.results_note.text.setText(RESULTS_TEXT)
@@ -298,13 +333,23 @@ class RunView(QWidget):
         rows = dict(summary_rows(run.snapshot))
         mark = self._mark(run)
         tail = " · TEST DATA" if run.is_demo else (f" · {mark}" if mark else "")
+        progress = ""
+        if series is not None:
+            point = series.run_ids.index(run.run_id) + 1
+            progress = (f" · серия {series.series_id}: точка {point} из {len(series.requests)} "
+                        f"({SERIES_STATUS_TEXT[series.status].lower()})")
         self.summary_text.setText(f"{run.method} · {run.params_text()} · {rows['Закрепление']} · "
-                                  f"{rows['Геометрия']}{tail}")
+                                  f"{rows['Геометрия']}{progress}{tail}")
         d = self.details
-        d["Проект"].setText(run.project)
         d["Метод"].setText(f"{run.method} · {run.snapshot.theory}")
         d["Параметры"].setText(f"{run.params_text()} (N — число членов)")
         d["Пластина"].setText(f"{rows['Геометрия']} · {rows['Закрепление']} · {rows['Нагрузка']}")
+        self.series_label.setVisible(series is not None)
+        d["Серия нагрузок"].setVisible(series is not None)
+        if series is not None:
+            d["Серия нагрузок"].setText(f"№ {series.series_id}: q = " + "; ".join(f"{q!r}" for q in series.loads)
+                                        + f" Pa — {SERIES_STATUS_TEXT[series.status].lower()}")
+        d["Эталон Навье"].setText(self.navier_text(run))
         d["Этап"].setText(run.stage)
         self.counter_label.setVisible(run.iterative)
         d["Счётчики"].setVisible(run.iterative)

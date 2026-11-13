@@ -28,5 +28,15 @@
   "mark.provisional": "PROVISIONAL / NOT_QUALIFIED",
   "mark.research": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
   "mark.diagnostic": "ДИАГНОСТИКА · РАСЧЁТ НЕ ЗАВЕРШЁН",
-  "surface.title": "Деформированная форма пластины (аксонометрия)"
+  "surface.title": "Деформированная форма пластины (аксонометрия)",
+  "surface.colorbar": "w, mm (цвет — истинный прогиб)",
+  "surface.edge.x": "x: 0 … {a} m",
+  "surface.edge.y": "y: 0 … {b} m",
+  "series.title": "Нагрузка — прогиб",
+  "axis.q": "q, kPa",
+  "axis.w_centre": "w в центре (a/2, b/2), mm",
+  "axis.w_maxabs": "w в узле max|w|, mm",
+  "legend.series.kkvim": "КК-ВИМ (расчёт при каждом q)",
+  "legend.series.navier": "Навье (эталон, M = {M})",
+  "legend.series.excluded": "не завершён / диагностика (нет точки)"
 }

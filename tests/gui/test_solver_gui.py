@@ -195,12 +195,15 @@ def test_r4_from_the_form_to_figures_history_and_export(qtbot, gui, tmp_path):
     assert rv.details_tag.text() == MARK and MARK in rv.summary_text.text()
     assert rv.analysis_button.isVisibleTo(rv) and rv.analysis_button.isEnabled()
     w0, wb0 = o.w.copy(), o.w_bar.copy()
+    qtbot.waitUntil(lambda: not w.runs.references_pending, timeout=60_000)  # the Navier reference process (SSSS)
     with qtbot.waitSignal(w.analysisRequested):
         rv.analysis_button.click()
     a = gui.analysis_windows[-1]
     assert a.outcome is o and [a.tabs.tabText(i) for i in range(a.tabs.count())] == list(SOLVER_TABS)
-    assert a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение"))     # states itself: no reference for these inputs
-    assert a.comparison.comparison.state == "unavailable" and a.comparison.table is None
+    assert a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение с эталоном"))
+    c = a.comparison.comparison  # SSSS N = 2: the Navier reference of these inputs as reference data only
+    assert c.state == "available" and c.live and any("справочные данные" in n for n in c.notes)
+    assert o.mark == MARK and o.field_role == "research"  # the comparison never promotes the route
     assert a.header.badge.isVisibleTo(a.header) and "PROVISIONAL" in a.header.badge.text()
     assert MARK in a.status_accept.text() and MARK in a.fields.figure.mark.text()
     np.testing.assert_array_equal(a.fields.figure.image.image, o.w * 1000.0)   # the solver array, in mm
@@ -267,7 +270,8 @@ def test_cccc_and_n_4_6_are_routed_only_as_research(qtbot, gui):
     sv.supports.set_current("CCCC")
     assert sv.cccc_half_steps.isVisibleTo(sv) and sv.cccc_half_steps.currentData() == 1   # s = 1 by default
     assert not sv.half_steps.isVisibleTo(sv) and not sv.research.isVisibleTo(sv)
-    assert all("исследование" in sv.N.itemText(i) for i in range(len(N_VALUES)))
+    assert [sv.N.itemText(i) for i in range(len(N_VALUES))] == [str(n) for n in N_VALUES]  # N only
+    assert "RESEARCH_ONLY" in sv.route_status.text()  # the status of the route is a separate line
     sv.supports.set_current("SSSS")
     sv.N.setCurrentIndex(N_VALUES.index(4))
     assert sv.ssss_research.isVisibleTo(sv) and not sv.ssss_research.isChecked()
@@ -277,10 +281,13 @@ def test_cccc_and_n_4_6_are_routed_only_as_research(qtbot, gui):
 
 def test_r4_parameters_are_shown_only_for_n_2_3(qtbot, gui):
     sv = gui.main_window.setup_view
+    sv.advanced_toggle.setChecked(True)  # «Дополнительные параметры расчёта» (collapsed by default)
+    sv.details_toggle.setChecked(True)   # «Технические подробности маршрута»
     assert sv.tol_E.isVisibleTo(sv) and not sv.half_steps.isVisibleTo(sv)
     sv.N.setCurrentIndex(2)
     assert not sv.tol_E.isVisibleTo(sv) and sv.half_steps.isVisibleTo(sv) and sv.research.isVisibleTo(sv)
     assert sv.r4_note.isVisibleTo(sv) and MARK in sv.r4_note.text.text()
+    assert MARK in sv.route_status.text()  # the status of the route is visible without opening the details
     assert gui.main_window.setup_model.state.r4_mode == R4_NORMATIVE
 
 
@@ -391,7 +398,7 @@ def test_demo_backend_only_on_request_and_marked_test_data(qtbot, qapp):
     for g in (real, demo):
         qtbot.addWidget(g.main_window)
     assert not real.main_window.header.badge.isVisibleTo(real.main_window.header)
-    assert real.main_window.start_view.table.rowCount() == 0          # no invented projects without --demo
+    assert real.main_window.start_view.table is None                  # no invented projects without --demo
     assert demo.main_window.start_view.table.rowCount() > 0
     assert demo.main_window.header.badge.text().startswith("TEST DATA")
     assert AnalysisWindow(session).outcome is None           # without a solver run: placeholders only

@@ -21,6 +21,11 @@ Method parameters (from kkvim, the single source of their defaults):
 - CCCC, N = 1–6 — research only: the number of half-steps is a choice (N = 1: s = 1…8; N = 2–6: s = 1 or 2;
   s = 2 runs under the solver's RN-5 and RT-7, s >= 3 is not offered).
 A change of N or of the supports resets every research choice (normative R4, no N = 4–6 research, s = 1 for CCCC).
+
+Load: one uniform load q, or a load series (``load_mode == "series"``): the field "q_series" holds several values of q
+in the unit chosen for q, separated by ";" or spaces ("," is the decimal comma). ``to_series_requests`` gives one
+RunRequest per value: the request of the same form with only the text of q replaced, so geometry, material, supports,
+N, grid and every method parameter are exactly those of a single run.
 """
 
 from dataclasses import dataclass, field, replace
@@ -35,6 +40,8 @@ from kkvim_gui.model.numbers import parse_number
 
 POSITIVE = "Значение должно быть больше нуля."
 COUNT = "Нужно целое число не меньше 1."
+SERIES_MIN, SERIES_MAX = 2, 20
+SERIES_SEPARATORS = (";", "\n", "\t", " ")
 RESEARCH_REQUIRED = ("SSSS, N = 4–6 — только исследование (RESEARCH_ONLY, D-056.7): включите исследовательский режим "
                      "N = 4–6, иначе расчёт не выполняется.")
 
@@ -57,8 +64,9 @@ FIELDS = {
         FieldSpec("E", "Модуль упругости E", "positive", ("GPa", "MPa", "Pa")),
         FieldSpec("nu", "Коэффициент Пуассона ν", "number"),
         FieldSpec("q", "Интенсивность q", "number", ("kPa", "Pa", "MPa")),
-        FieldSpec("n_x", "Интервалов по x n_x", "count"),
-        FieldSpec("n_y", "Интервалов по y n_y", "count"),
+        FieldSpec("q_series", "Значения q серии", "series"),
+        FieldSpec("n_x", "Разбиение по X (nₓ)", "count"),
+        FieldSpec("n_y", "Разбиение по Y (nᵧ)", "count"),
         FieldSpec("tol_inf", "Допуск tol_∞", "positive", scope=("r3",)),
         FieldSpec("tol_E", "Допуск tol_E", "positive", scope=("r3",)),
         FieldSpec("s_min", "Мин. полушагов s_min", "count", scope=("r3",)),
@@ -67,6 +75,7 @@ FIELDS = {
     )
 }
 THEORY = "Кирхгоф–Ляв"
+LOAD_MODES = ("single", "series")
 N_VALUES = (1, 2, 3, 4, 5, 6)  # every N has a route (request.route_of); each route has its own domain and status
 R4_MODE_TEXT = {
     R4_NORMATIVE: "Нормативный D-047: только s = 1, далее NOT_QUALIFIED",
@@ -86,7 +95,7 @@ def _number_text(value):
 def _default_texts():
     s = placeholders.SETUP  # initial values of the form (an example plate, not a result)
     return {"a": s["a"][0], "b": s["b"][0], "h": s["h"][0], "E": s["E"][0], "nu": s["nu"], "q": s["q"][0],
-            "n_x": "80", "n_y": "40",
+            "q_series": "1; 2,5; 5; 7,5; 10", "n_x": "80", "n_y": "40",
             "tol_inf": _number_text(DEFAULTS["tol_inf"]), "tol_E": _number_text(DEFAULTS["tol_E"]),
             "s_min": str(DEFAULTS["s_min"]), "s_max": str(DEFAULTS["s_max"]),
             "half_steps": str(DEFAULTS["half_steps"])}
@@ -110,9 +119,35 @@ def cccc_half_steps_of(N):
     return CCCC_HALF_STEPS[route_of("CCCC", N)]
 
 
+def series_texts(text):
+    """The value texts of a load-series field, in the order entered (separators: ";" and white space)."""
+    for sep in SERIES_SEPARATORS[:-1]:
+        text = text.replace(sep, " ")
+    return [part for part in text.split(" ") if part]
+
+
+def parse_series(text):
+    """(values, error) of a load-series field: SERIES_MIN...SERIES_MAX distinct numbers."""
+    parts = series_texts(text)
+    values = []
+    for part in parts:
+        parsed = parse_number(part)
+        if not parsed.ok:
+            return None, f"«{part}»: {parsed.error}"
+        values.append(parsed.value)
+    if not SERIES_MIN <= len(values) <= SERIES_MAX:
+        return None, (f"Нужно от {SERIES_MIN} до {SERIES_MAX} значений q через «;» или пробел (десятичный разделитель — "
+                      "точка или запятая).")
+    if len(set(values)) != len(values):
+        return None, "Значения q серии не должны повторяться."
+    return values, None
+
+
 def validate_field(key, text):
     """(value, error) for one field."""
     spec = FIELDS[key]
+    if spec.rule == "series":
+        return parse_series(text)
     parsed = parse_number(text)
     if not parsed.ok:
         return None, parsed.error
@@ -138,6 +173,7 @@ class SetupState:
     strict: bool = False
     ssss_research: bool = False  # SSSS N = 4-6: the explicit research choice (D-056.7)
     cccc_half_steps: int = 1  # CCCC: the exact number of half-steps; s = 1 by default (no continuation)
+    load_mode: str = "single"  # "single": one load q; "series": the loads of "q_series", one run each
 
     def with_text(self, key, text):
         return replace(self, texts={**self.texts, key: text})
@@ -156,6 +192,8 @@ class SetupState:
             raise ValueError(f"unknown R4 mode {choices['r4_mode']!r}")
         if "transform" in choices and choices["transform"] not in TRANSFORMS:
             raise ValueError(f"unknown transform {choices['transform']!r}")
+        if "load_mode" in choices and choices["load_mode"] not in LOAD_MODES:
+            raise ValueError(f"unknown load mode {choices['load_mode']!r}")
         changed = any(key in choices and choices[key] != getattr(self, key) for key in ("N", "supports"))
         if changed:  # no implicit research continuation after a change of N or of the supports (D-048.5, D-056.7)
             choices.setdefault("r4_mode", R4_NORMATIVE)
@@ -179,10 +217,15 @@ class SetupState:
         """True only if the research continuation through a QR is chosen explicitly (D-048.5)."""
         return self.r4_mode in R4_RESEARCH_MODES
 
+    @property
+    def series(self):
+        return self.load_mode == "series"
+
     def active_fields(self):
-        """Fields that take part in a run of the current supports and N, in form order."""
+        """Fields that take part in a run of the current supports, N and load mode, in form order."""
         scope = self.scope
-        return [key for key, spec in FIELDS.items() if "all" in spec.scope or scope in spec.scope]
+        skip = "q" if self.series else "q_series"
+        return [key for key, spec in FIELDS.items() if ("all" in spec.scope or scope in spec.scope) and key != skip]
 
 
 def validate(state):
@@ -232,16 +275,33 @@ def to_config(state):
     return {
         "geometry": {k: quantity(k) for k in ("a", "b", "h")},
         "material": {"E": quantity("E"), "nu": quantity("nu")},
-        "load": {"type": "uniform", "q": quantity("q")},
+        "load": ({"type": "uniform", "series": {"values": _value(state, "q_series"), "unit": state.units["q"]}}
+                 if state.series else {"type": "uniform", "q": quantity("q")}),
         "supports": state.supports,
         "theory": state.theory,
         "method": method,
     }
 
 
+def to_series_requests(state):
+    """One RunRequest per load of the series (only the text of q differs), or None if the form is invalid."""
+    if not state.series or validate(state):
+        return None
+    single = replace(state, load_mode="single")
+    return [to_request(single.with_text("q", text)) for text in series_texts(state.texts["q_series"])]
+
+
+def series_preview(state):
+    """The loads of the series as entered, for the preview before the run: [(text, unit)], or None if invalid."""
+    values, error = parse_series(state.texts.get("q_series", ""))
+    if error:
+        return None
+    return [(text, state.units["q"]) for text in series_texts(state.texts["q_series"])]
+
+
 def to_request(state):
-    """RunRequest in the base SI units for the solver, or None if the form is invalid."""
-    if validate(state):
+    """RunRequest in the base SI units for the solver, or None if the form is invalid (a series: ``to_series_requests``)."""
+    if validate(state) or state.series:
         return None
     si = {key: units.to_base(_value(state, key), state.units[key]) for key in ("a", "b", "h", "E", "q")}
     entered = tuple((key, state.texts[key], state.units.get(key, "")) for key in state.active_fields())
@@ -283,7 +343,8 @@ def summary_rows(state):
     return [
         ("Геометрия", f"a {show('a')} · b {show('b')} · h {show('h')}"),
         ("Материал", f"E {show('E')} · ν {show('nu')}"),
-        ("Нагрузка", f"равномерная, q {show('q')}"),
+        ("Нагрузка", (f"равномерная, серия q: {'; '.join(series_texts(state.texts['q_series'])) or '—'} {state.units['q']}"
+                      if state.series else f"равномерная, q {show('q')}")),
         ("Закрепление", state.supports),
         ("Метод", method_text(state)),
         ("Сетка", f"n_x {show('n_x')} · n_y {show('n_y')}"),

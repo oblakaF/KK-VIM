@@ -16,7 +16,8 @@ SIZE = (1100, 820)
 def view_record(outcome, factor=None) -> dict:
     factor = auto_factor(outcome.x, outcome.y, outcome.w) if factor is None else float(factor)
     return {"field_png": "colour field of w in mm on the result nodes with 10 isolines (no exaggeration)",
-            "surface_png": "axonometric wireframe of the stored field; drawn height = -factor * w",
+            "surface_png": ("axonometric colour-mapped surface of the stored field (viridis; colour = true w in mm, "
+                            "independent of the factor) with a thin node mesh; drawn height = -factor * w"),
             "exaggeration_factor": factor, "exaggeration_text": exaggeration_text(factor),
             "values_scaled": False}
 

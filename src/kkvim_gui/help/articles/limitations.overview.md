@@ -2,9 +2,20 @@
 id: limitations.overview
 title: Ограничения программы
 category: limitations
-summary: SSSS: N = 1 — R3 (ACCEPTED), N = 2–3 — R4 (PROVISIONAL), N = 4–6 — исследование; CCCC N = 1–6 — только исследование (RESEARCH_ONLY), s ≥ 3 не исполняется; моменты и проекты .kkv не реализованы.
-keywords: ограничения, CCCC, PROVISIONAL, NOT_QUALIFIED, демонстрационный режим, TEST DATA
-related: start.overview
-sources: README.md; docs/gui/GUI_DESIGN.md, раздел 9
-status: stub
+summary: Линейная пластина Кирхгофа–Лява, равномерная нагрузка, SSSS и CCCC. Принят только решатель SSSS, N = 1; остальные режимы не квалифицированы. Моменты и проекты не реализованы.
+keywords: ограничения, CCCC, PROVISIONAL, NOT_QUALIFIED, RESEARCH_ONLY, демонстрационный режим, TEST DATA
+related: start.overview, status.overview, bc.overview
+sources: README.md; docs/gui/GUI_DESIGN.md, раздел 9; docs/DECISIONS.md
+status: draft
 ---
+- **Модель:** линейная теория Кирхгофа–Лява, статика, постоянная толщина, однородный изотропный упругий материал,
+  равномерная нагрузка q.
+- **Закрепление:** SSSS или CCCC на всех четырёх краях.
+- **Статус режимов:** SSSS, N = 1 — принятый решатель R3 в утверждённой области; SSSS, N = 2–3 — PROVISIONAL /
+  NOT_QUALIFIED; SSSS, N = 4–6 и CCCC, N = 1–6 — RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED. Для CCCC при N ≥ 2
+  выполняется не больше двух полушагов.
+- **Результаты:** значения в узлах сетки; между узлами значения не интерполируются. Изгибающие моменты и напряжения не
+  выводятся.
+- **Сравнение:** знаковые разности без утверждённого порога согласия; сравнение не меняет научный статус.
+- **Не реализовано:** сохранение и открытие проектов, конструктор отчёта PDF/XLSX, другие теории пластин и нагрузки.
+- **Демонстрационный режим** (`--demo`) показывает данные TEST DATA, а не результаты решателя.

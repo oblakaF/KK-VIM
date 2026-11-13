@@ -7,14 +7,17 @@ figures carry the session-wide "Графики RU | EN" switch.
 - A solver run (``run`` with a ``RunOutcome``): every tab is drawn from the solver arrays and rows
   (``analysis.results``); «Экспорт ▾» writes JSON and CSV with units and statuses. The window keeps
   its run: later changes in the main window do not affect it.
-- "Сравнение" (``analysis.comparison``): the run next to saved independent references read as data
-  (``backend.benchmarks``); for a diagnostic field or inputs without a reference it states why, with no numbers.
+- «Сравнение с эталоном» (``analysis.comparison``): the run next to independent references — for SSSS the Navier
+  reference computed for its own inputs in a separate process (``RunRecord.navier``; while it is computed the tab says so
+  and is rebuilt when it arrives), for CCCC the saved references read as data (``backend.benchmarks``); for a
+  diagnostic field or inputs without a reference it states why, with no numbers.
+- «Нагрузка — прогиб» (``analysis.series``): only for a run of a finished load series.
 - Without a solver run (``--demo``): the layout with TEST DATA placeholders, never results.
 """
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -49,9 +52,9 @@ from kkvim_gui.widgets.common import (
 )
 from kkvim_gui.widgets.header import AppHeader, app_icon
 
-TABS = ("Обзор", "Поля", "Сечения", "Численные значения", "Сходимость", "Сравнение")
-SOLVER_TABS = ("Обзор", "Поля", "Сечения", "Численные значения", "История полушагов", "Энергия и диагностика",
-               "Сравнение")
+TABS = ("Результат", "Прогиб", "Сечения", "Значения в узлах", "Итерации", "Сравнение с эталоном")
+SOLVER_TABS = ("Результат", "Прогиб", "Сечения", "Значения в узлах", "Итерации", "Диагностика", "Сравнение с эталоном")
+SERIES_TAB = "Нагрузка — прогиб"
 SOLVER_TAB_HELP = ("results.overview", "results.overview", "results.overview", "results.overview",
                    "iterations.overview", "iterations.overview", "verification.overview")
 TAB_HELP = (
@@ -59,8 +62,13 @@ TAB_HELP = (
     "results.overview", "iterations.overview", "verification.overview",
 )
 COMPARISON_TOOLTIP = "Сравнение с эталонами — только для расчёта решателя, не для демонстрационных данных"
-COMPARISON_SOLVER_TOOLTIP = ("Текущий расчёт рядом с сохранёнными независимыми эталонами (опубликованное решение, D2, МКЭ, "
-                             "Навье): знаковые разности без порога согласия")
+COMPARISON_SOLVER_TOOLTIP = ("Текущий расчёт рядом с независимым эталоном: SSSS — решение Навье для этих входных данных; "
+                             "CCCC — сохранённые эталоны (опубликованное решение, D2, МКЭ). Знаковые разности без порога")
+SECTIONS_TOOLTIP = "Профили прогиба вдоль выбранных линий узлов сетки: w(x) при y = const и w(y) при x = const"
+TAB_TOOLTIPS = {"Прогиб": "Поле прогиба w(x, y): карта с изолиниями или цветной 3D-вид",
+                "Сечения": SECTIONS_TOOLTIP, "Значения в узлах": "Таблица w во всех узлах сетки результата",
+                "Итерации": "Как изменялся результат по полушагам s; подробная таблица — по кнопке",
+                "Диагностика": "Энергия Π_h по полушагам, невязка, параметры решателя и ограничения маршрута"}
 REPORT_TOOLTIP = (
     "Конструктор отчёта: выбор рисунков, полей и таблиц, PDF/PNG/SVG, XLSX, язык рисунков, "
     "папка отчёта с manifest.json — после появления графиков и таблиц (GUI_DESIGN.md, 18)"
@@ -139,10 +147,12 @@ class AnalysisWindow(QMainWindow):
     settingsRequested = Signal()
     helpRequested = Signal()
 
-    def __init__(self, session, model_rows=None, run=None, parent=None):
-        """model_rows: input parameters of the analysed run; run: a finished solver run (None: demonstration)."""
+    def __init__(self, session, model_rows=None, run=None, series=None, parent=None):
+        """model_rows: input parameters of the analysed run; run: a finished solver run (None: demonstration);
+        series: ``model.series.SeriesData`` of the finished load series of the run, if any."""
         super().__init__(parent)
         self.session = session
+        self.series = series
         self.model_rows = tuple(model_rows) if model_rows else MODEL_ROWS
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowIcon(app_icon())
@@ -239,13 +249,10 @@ class AnalysisWindow(QMainWindow):
         strip_lay = QHBoxLayout(strip)
         strip_lay.setContentsMargins(16, 6, 16, 6)
         strip_lay.setSpacing(24)
-        (k1, t1), (k2, t2), (k3, t3) = results.statuses(outcome, run)
-        self.status_run, self.status_stop, self.status_accept = (StatusLabel(k1, t1), StatusLabel(k2, t2),
-                                                                 StatusLabel(k3, t3))
+        self.status_run, self.status_stop, self.status_accept = results.status_labels(outcome, run)
         for w in (self.status_run, self.status_stop, self.status_accept):
-            strip_lay.addWidget(w)
-        strip_lay.addStretch(1)
-        self.data_note = label(f"Данные: решатель KK-VIM {outcome.solver}" + (f" · {outcome.mark}" if outcome.mark else ""),
+            strip_lay.addWidget(w, 1)  # long statuses (diagnostics) wrap instead of being cut
+        self.data_note = label(f"Решатель KK-VIM {outcome.solver}" + (f" · {outcome.mark}" if outcome.mark else ""),
                                "secondary")
         strip_lay.addWidget(self.data_note)
         lay.addWidget(strip)
@@ -255,33 +262,46 @@ class AnalysisWindow(QMainWindow):
         self.tabs.setTabPosition(QTabWidget.TabPosition.North)
         self.tabs.setDocumentMode(True)
         s = self.session
-        self.overview = results.OverviewTab(s, outcome, run, self.model_rows, elapsed)
+        from kkvim_gui.analysis.comparison import ComparisonTab
+
+        self._navier = getattr(run, "navier", None)  # None: a run without a reference record
+        self.comparison = ComparisonTab(outcome, run, navier=self._navier)  # states itself when no reference applies
+        self.overview = results.OverviewTab(s, outcome, run, self.model_rows, elapsed, comparison=self.comparison.comparison)
         self.fields = results.FieldsTab(s, outcome, self.model_rows, trailing=self._trailing())
         self.sections = results.SectionsTab(s, outcome, trailing=self._trailing())
         self.values = results.ValuesTab(outcome, trailing=(self._export_button(),))
         self.history = results.HistoryTab(s, outcome, trailing=self._trailing())
         self.energy = results.EnergyTab(s, outcome, trailing=self._trailing())
-        from kkvim_gui.analysis.comparison import ComparisonTab
-
-        self.comparison = ComparisonTab(outcome, run)  # states itself when no reference applies
         for widget, name in zip((self.overview, self.fields, self.sections, self.values, self.history, self.energy,
                                  self.comparison), SOLVER_TABS, strict=True):
             self.tabs.addTab(widget, name)
+            if name in TAB_TOOLTIPS:
+                self.tabs.setTabToolTip(self.tabs.count() - 1, TAB_TOOLTIPS[name])
         self.tabs.setTabToolTip(6, COMPARISON_SOLVER_TOOLTIP)
         for i, topic in enumerate(SOLVER_TAB_HELP):
             set_help_context(self.tabs.widget(i), topic)
-        self.report_button = QPushButton("Собрать отчёт…")
-        self.report_button.setEnabled(False)
-        self.report_button.setToolTip(REPORT_TOOLTIP)
+        self.series_tab = None
+        if self.series is not None:
+            from kkvim_gui.analysis.series import SeriesTab
+
+            self.series_tab = SeriesTab(s, self.series)
+            self.tabs.addTab(self.series_tab, SERIES_TAB)
+        self._navier_timer = None
+        if self._navier is not None and self._navier.get("state") == "pending":
+            self._navier_timer = QTimer(self)
+            self._navier_timer.setInterval(300)
+            self._navier_timer.timeout.connect(self._check_navier)
+            self._navier_timer.start()
+        self.report_button = None  # the report constructor (GUI-D18, P7) is not offered as a disabled button
         self.save_button = QPushButton("Сохранить расчёт и отчёт…")
-        self.save_button.setToolTip("Папка расчёта: manifest.json, history.csv, field.csv, рисунки PNG и "
-                                    "читаемый отчёт report.html")
+        self.save_button.setProperty("variant", "primary")
+        self.save_button.setToolTip("Папка расчёта: manifest.json, history.csv, field.csv, рисунки PNG, report.html и, "
+                                    "если есть сравнение с эталоном, comparison.csv")
         self.save_button.clicked.connect(self._save_package_dialog)
         corner = QWidget()
         corner_lay = QHBoxLayout(corner)
         corner_lay.setContentsMargins(0, 4, 16, 4)
         corner_lay.addWidget(self.save_button)
-        corner_lay.addWidget(self.report_button)
         self.tabs.setCornerWidget(corner, Qt.Corner.TopRightCorner)
         self.tabs.setCurrentIndex(0)
         lay.addWidget(self.tabs, 1)
@@ -294,6 +314,30 @@ class AnalysisWindow(QMainWindow):
         else:
             self.statusBar().addWidget(label(f"●  Результаты решателя KK-VIM загружены{mark}"), 1)
         fit_to_screen(self)
+
+    def _check_navier(self):
+        """The Navier reference of an SSSS run arrived after the window opened: rebuild the comparison with it."""
+        navier = getattr(self.run, "navier", None)
+        if navier is None or navier is self._navier or navier.get("state") == "pending":
+            return
+        self._navier_timer.stop()
+        self.set_navier(self.run.navier)
+
+    def set_navier(self, navier):
+        from kkvim_gui.analysis.comparison import ComparisonTab
+
+        self._navier = navier
+        index = self.tabs.indexOf(self.comparison)
+        current = self.tabs.currentIndex()
+        old = self.comparison
+        self.comparison = ComparisonTab(self.outcome, self.run, navier=navier)
+        self.tabs.removeTab(index)
+        self.tabs.insertTab(index, self.comparison, SOLVER_TABS[6])
+        self.tabs.setTabToolTip(index, COMPARISON_SOLVER_TOOLTIP)
+        set_help_context(self.comparison, SOLVER_TAB_HELP[6])
+        self.tabs.setCurrentIndex(current)
+        old.deleteLater()
+        self.overview.set_comparison(self.comparison.comparison)
 
     def _trailing(self):
         return (FigureLanguageSwitch(self.session), self._export_button())

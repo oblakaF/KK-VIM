@@ -9,6 +9,14 @@ fixed by D-048); for SSSS N = 4–6 the explicit research switch and the number 
 of half-steps (N = 1: 1…8; N ≥ 2: 1 or 2, s = 2 under the solver's RN-5 and RT-7). Every research choice is off
 by default and is reset when N or the supports change.
 
+User-facing layout (GUI-PLATE-WORKFLOW-UX-01): plain labels («SSSS — шарнирное опирание», «Число членов N», «Разбиение по X
+(nₓ)»); the list of N shows only 1…6 and the scientific status of the chosen route is a separate line; the stopping
+parameters of R3 and the R4 mode, DST path and half-step limit are in the collapsed «Дополнительные параметры расчёта»
+(the approved defaults are kept without opening it; a field with an error opens it); the decision numbers, guards and
+limits of the route are in the collapsed «Технические подробности маршрута». No guard or check is removed: the same
+model, the same validation and the same solver checks run. Load: «Одна нагрузка» or «Серия нагрузок» (several q, one
+run each); the loads of a series are shown before the run.
+
 All values live in one SetupModel shared with the main window, so they survive switching
 between sections (GUI_DESIGN.md, 5.2). Numeric fields keep exactly the text the user typed;
 it is parsed ("." or ",", sign, exponent) and formally checked when the value is committed
@@ -42,13 +50,14 @@ from kkvim_gui.backend.request import R4_NORMATIVE, R4_RESEARCH_MODES, R4_RESEAR
 from kkvim_gui.main_window.plate_scheme import PlateScheme
 from kkvim_gui.model.setup_model import SetupModel
 from kkvim_gui.model.setup_state import (FIELDS, N_VALUES, R4_MODE_TEXT, RESEARCH_RULE_TEXT, cccc_half_steps_of, scope_of,
-                                         validate_field)
+                                         series_preview, validate_field)
 from kkvim_gui.session import Session
 from kkvim_gui.widgets.common import (
     Card,
     FieldGrid,
     Note,
     SegmentedControl,
+    StatusLabel,
     UnitField,
     error_label,
     label,
@@ -59,30 +68,33 @@ from kkvim_gui.widgets.common import (
 )
 
 SUPPORT_TEXT = {
-    "SSSS": "Шарнирное опирание всех четырёх краёв",
-    "CCCC": "Жёсткая заделка всех четырёх краёв — только исследование (RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED)",
+    "SSSS": "Все четыре края шарнирно оперты: прогиб на краях равен нулю, края могут поворачиваться.",
+    "CCCC": "Все четыре края жёстко заделаны: на краях равны нулю прогиб и угол поворота.",
 }
+SUPPORT_LABELS = {"SSSS": "SSSS — шарнирное опирание", "CCCC": "CCCC — жёсткая заделка"}
+CCCC_WARNING = "Исследовательский режим — научная квалификация не завершена."
+ROUTE_STATUS = {  # the scientific status of the chosen route, shown next to N (never in the list of N)
+    "r3": ("success", "SSSS, N = 1: принятый решатель R3 в утверждённой области (0,2 ≤ b/a ≤ 5)"),
+    "r4": ("warning", "SSSS, N = 2–3: PROVISIONAL / NOT_QUALIFIED"),
+    "r46": ("warning", "SSSS, N = 4–6: RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"),
+    "cccc": ("warning", "CCCC, N = 1–6: RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"),
+}
+ADVANCED_TITLE = "Дополнительные параметры расчёта"
+ADVANCED_NOTE = ("По умолчанию — утверждённые значения решателя; для обычного расчёта их менять не нужно. Наведите указатель "
+                 "на название параметра или нажмите ⓘ — объяснение откроется в справке.")
+DETAILS_TITLE = "Технические подробности маршрута"
+LOAD_MODES_TEXT = {"single": "Одна нагрузка", "series": "Серия нагрузок"}
+SERIES_HINT = "Несколько значений q через «;» или пробел; десятичный разделитель — точка или запятая. От 2 до 20 значений."
 CCCC_TOOLTIP = ("CCCC — исследовательские режимы: N = 1 (D-061), N = 2–3 (D-063, D-065), N = 4–6 (D-067, D-068). "
                 "Результат никогда не квалифицирован")
 CCCC_PREVIEW_TEXT = "CCCC — недоступно в этой версии"
-N_TEXT = {
-    "SSSS": {1: "1 — R3, принятый", 2: "2 — R4, NOT_QUALIFIED", 3: "3 — R4, NOT_QUALIFIED",
-             4: "4 — исследование", 5: "5 — исследование", 6: "6 — исследование"},
-    "CCCC": {1: "1 — исследование, s ≤ 8", 2: "2 — исследование, s ≤ 2", 3: "3 — исследование, s ≤ 2",
-             4: "4 — исследование, s ≤ 2", 5: "5 — исследование, s ≤ 2", 6: "6 — исследование, s ≤ 2"},
-}
-N_TOOLTIP = ("N — число членов разделённого представления (D-003). SSSS: N = 1 — R3 (ACCEPTED), N = 2–3 — R4 "
-             "(PROVISIONAL / NOT_QUALIFIED), N = 4–6 — только исследование (D-056.7). CCCC: N = 1–6 — только исследование "
-             "(D-061, D-063, D-065, D-067, D-068). N никогда не уменьшается")
+N_TEXT = {n: str(n) for n in N_VALUES}  # the list shows N only; the status of the route is a separate line
 THEORIES = (
     ("Кирхгоф–Ляв", True),
     ("Тимошенко — планируется", False),
     ("Редди — планируется", False),
 )
-STATUS_OK = (
-    "✓  Формальная проверка ввода пройдена. Научные проверки ввода (диапазон b/a, ν, сетка) "
-    "выполняет решатель KK-VIM перед запуском."
-)
+STATUS_OK = "✓  Ввод проверен. Перед запуском решатель KK-VIM проверит отношение сторон, ν и сетку."
 STATUS_OK_DEMO = "✓  Формальная проверка ввода пройдена. Демонстрационный режим: решатель не вызывается (TEST DATA)."
 R3_NOTE = (
     "N = 1 — принятый решатель R3 (D-043). Параметры остановки — NUMERICAL_SPEC.md 11.2; по умолчанию — "
@@ -122,6 +134,7 @@ RESEARCH_TOOLTIP = (
     "Выбор сбрасывается при смене N."
 )
 TRANSFORM_LABEL = "Преобразование DST"
+N_LABEL = "Число членов N"
 LOCK_BANNER = (
     "Выполняется расчёт. Изменение параметров временно заблокировано. "
     "Просмотр и копирование доступны"
@@ -192,18 +205,33 @@ class SetupView(QWidget):
         load = Card("Нагрузка")
         self.load_uniform = QRadioButton("Равномерно распределённая")
         self.load_uniform.setChecked(True)
-        self.load_uniform.setToolTip("Единственный вид нагрузки первой реализации (D-005)")
+        self.load_uniform.setToolTip("Нагрузка q одинакова во всех точках пластины и направлена по прогибу")
         load.body.addWidget(self.load_uniform)
+        self.load_mode = SegmentedControl(LOAD_MODES_TEXT, st.load_mode)
+        set_help(self.load_mode, "param.load.series")
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(self.load_mode)
+        mode_row.addStretch(1)
+        load.body.addLayout(mode_row)
         lg = FieldGrid()
         self.q = UnitField(t["q"], u["q"], FIELDS["q"].units)
-        lg.add_row("Интенсивность q", self.q)
+        self.q_label = lg.add_row("Интенсивность q", self.q, topic="param.load.q")
+        self.q_series = UnitField(t["q_series"])
+        self.q_series_label = lg.add_row("Значения q серии", self.q_series, topic="param.load.series")
+        self.q_series_unit = label(u["q"], "secondary")
         load.body.addLayout(lg)
+        self.series_hint = label(SERIES_HINT, "secondary", wrap=True)
+        load.body.addWidget(self.series_hint)
+        self.series_preview = label("", wrap=True)
+        self.series_preview.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        load.body.addWidget(self.series_preview)
         load.body.addStretch(1)
 
         supports = Card("Граничные условия")
-        self.supports = SegmentedControl({"SSSS": "SSSS", "CCCC": CCCC_PREVIEW_TEXT if self.preview else "CCCC — исследование"},
-                                         st.supports)
-        self.supports.buttons["CCCC"].setToolTip(CCCC_TOOLTIP)
+        self.supports = SegmentedControl({"SSSS": SUPPORT_LABELS["SSSS"],
+                                          "CCCC": CCCC_PREVIEW_TEXT if self.preview else SUPPORT_LABELS["CCCC"]}, st.supports)
+        set_help(self.supports.buttons["SSSS"], "bc.overview")
+        set_help(self.supports.buttons["CCCC"], "bc.overview")
         self.supports.buttons["CCCC"].setEnabled(not self.preview)
         row = QHBoxLayout()
         row.addWidget(self.supports)
@@ -211,9 +239,10 @@ class SetupView(QWidget):
         supports.body.addLayout(row)
         self.support_text = label(SUPPORT_TEXT[st.supports], "secondary", wrap=True)
         supports.body.addWidget(self.support_text)
+        self.cccc_warning = Note(CCCC_WARNING, "testdata")
+        supports.body.addWidget(self.cccc_warning)
         self.errors_supports = error_label()
         supports.body.addWidget(self.errors_supports)
-        supports.body.addWidget(label("Другие закрепления — в последующих этапах проекта", "secondary", wrap=True))
         supports.body.addStretch(1)
 
         method = Card("Расчётная модель и метод КК-ВИМ")
@@ -231,19 +260,24 @@ class SetupView(QWidget):
         _disable_items(self.N, [n in self.n_selectable for n in N_VALUES])
         self.N.setCurrentIndex(N_VALUES.index(st.N))
         self._n_supports = st.supports
-        self.N.setToolTip(PREVIEW_N_TOOLTIP if self.preview else N_TOOLTIP)
+        if self.preview:
+            self.N.setToolTip(PREVIEW_N_TOOLTIP)
+        else:
+            set_help(self.N, "param.N")
         self.n_x = UnitField(t["n_x"])
         self.n_y = UnitField(t["n_y"])
-        for w in (self.n_x, self.n_y):
-            w.setToolTip(f"Число интервалов равномерной сетки (не меньше {CAPABILITIES['n_min']}); "
-                         "при N ≥ 2 — не меньше 2N (CCCC N ≥ 4: 2N + 1); CCCC: 7…1280")
+        set_help(self.n_x, "param.grid.nx")
+        set_help(self.n_y, "param.grid.ny")
         self.tol_inf = UnitField(t["tol_inf"])
         self.tol_E = UnitField(t["tol_E"])
         self.s_min = UnitField(t["s_min"])
         self.s_max = UnitField(t["s_max"])
-        self.strict = QCheckBox("Строгий режим (11.4)")
+        for w, topic in ((self.tol_inf, "param.stop.tol_inf"), (self.tol_E, "param.stop.tol_E"),
+                         (self.s_min, "param.stop.s_min"), (self.s_max, "param.stop.s_max")):
+            set_help(w, topic)
+        self.strict = QCheckBox("Строгий режим")
         self.strict.setChecked(st.strict)
-        self.strict.setToolTip("tol_∞/100 и max(tol_E/100, 10·ε_floor) — NUMERICAL_SPEC.md 11.2, 11.4")
+        set_help(self.strict, "param.stop.strict")
         self.research = QCheckBox(RESEARCH_TEXT)
         self.research.setChecked(st.research)
         self.research.setToolTip(RESEARCH_TOOLTIP)
@@ -279,29 +313,32 @@ class SetupView(QWidget):
                                    "фиксированного числа — точное число полушагов")
         self.fields = {
             "a": self.a, "b": self.b, "h": self.h, "E": self.E, "nu": self.nu, "q": self.q,
-            "n_x": self.n_x, "n_y": self.n_y, "tol_inf": self.tol_inf, "tol_E": self.tol_E,
+            "q_series": self.q_series, "n_x": self.n_x, "n_y": self.n_y, "tol_inf": self.tol_inf, "tol_E": self.tol_E,
             "s_min": self.s_min, "s_max": self.s_max, "half_steps": self.half_steps,
         }
         by_widget = {**g.errors, **m.errors, **lg.errors}
         self.errors = {key: by_widget[f] for key, f in self.fields.items() if f in by_widget}
         self._method_cells = []
         self._cell_scopes = {}
-        for text, w, topic, scopes in (
-            ("Теория", self.theory, "param.theory", ("all",)),
-            ("Число членов N", self.N, None, ("all",)),
-            ("Интервалов по x n_x", self.n_x, None, ("all",)),
-            ("Интервалов по y n_y", self.n_y, None, ("all",)),
-            ("Допуск tol_∞", self.tol_inf, None, ("r3",)),
-            ("Допуск tol_E", self.tol_E, None, ("r3",)),
-            ("Мин. полушагов s_min", self.s_min, None, ("r3",)),
-            ("Макс. полушагов s_max", self.s_max, None, ("r3",)),
-            ("Режим остановки", self.strict, None, ("r3",)),
-            ("Режим R4", self.research, None, ("r4",)),
-            ("Остановка исследования", self.research_rule, None, ("r4",)),
-            (TRANSFORM_LABEL, self.transform, None, ("r4",)),
-            ("Режим N = 4–6", self.ssss_research, None, ("r46",)),
-            ("Полушагов (предел)", self.half_steps, None, ("r4", "r46")),
-            (CCCC_STEPS_TEXT, self.cccc_half_steps, None, ("cccc",)),
+        self._advanced_cells = set()
+        half_steps_cells = []
+        for text, w, topic, scopes, advanced in (
+            ("Теория", self.theory, "param.theory", ("all",), False),
+            (N_LABEL, self.N, None if self.preview else "param.N", ("all",), False),
+            ("Разбиение по X (nₓ)", self.n_x, "param.grid.nx", ("all",), False),
+            ("Разбиение по Y (nᵧ)", self.n_y, "param.grid.ny", ("all",), False),
+            ("Режим N = 4–6", self.ssss_research, None, ("r46",), False),
+            ("Полушагов (ровно)", self.half_steps, "param.halfsteps", ("r46",), False),
+            (CCCC_STEPS_TEXT, self.cccc_half_steps, "param.halfsteps", ("cccc",), False),
+            ("Допуск tol_∞", self.tol_inf, "param.stop.tol_inf", ("r3",), True),
+            ("Допуск tol_E", self.tol_E, "param.stop.tol_E", ("r3",), True),
+            ("Мин. полушагов s_min", self.s_min, "param.stop.s_min", ("r3",), True),
+            ("Макс. полушагов s_max", self.s_max, "param.stop.s_max", ("r3",), True),
+            ("Режим остановки", self.strict, "param.stop.strict", ("r3",), True),
+            ("Режим R4", self.research, None, ("r4",), True),
+            ("Остановка исследования", self.research_rule, None, ("r4",), True),
+            (TRANSFORM_LABEL, self.transform, None, ("r4",), True),
+            ("Полушагов (предел)", self.half_steps, "param.halfsteps", ("r4",), True),
         ):
             cell = QWidget()
             box = QVBoxLayout(cell)
@@ -321,20 +358,50 @@ class SetupView(QWidget):
             if w is self.ssss_research:
                 self.errors_research = error_label()
                 box.addWidget(self.errors_research)
+            if w is self.N:
+                self.route_status = StatusLabel(*ROUTE_STATUS[st.scope])
+                self.route_status.setWordWrap(True)
+                box.addWidget(self.route_status)
             box.addStretch(1)
+            if w is self.half_steps:  # the same field: research N = 4-6 (main block), R4 (advanced)
+                half_steps_cells.append(cell)
             self._method_cells.append(cell)
             self._cell_scopes[cell] = scopes
+            if advanced:
+                self._advanced_cells.add(cell)
+        self._half_steps_cells = tuple(half_steps_cells)  # (research N = 4-6 cell, R4 cell)
         method.body.addLayout(self.method_grid)
+        self.advanced_toggle = self._toggle(ADVANCED_TITLE)
+        self.advanced_box = QWidget()
+        advanced_lay = QVBoxLayout(self.advanced_box)
+        advanced_lay.setContentsMargins(0, 0, 0, 0)
+        advanced_lay.addWidget(label(ADVANCED_NOTE, "secondary", wrap=True))
+        self.advanced_grid = QGridLayout()
+        self.advanced_grid.setHorizontalSpacing(12)
+        self.advanced_grid.setVerticalSpacing(8)
+        advanced_lay.addLayout(self.advanced_grid)
+        self.advanced_box.setVisible(False)
+        self.advanced_toggle.toggled.connect(self._show_advanced)
+        method.body.addWidget(self.advanced_toggle)
+        method.body.addWidget(self.advanced_box)
         self.preview_note = Note(PREVIEW_NOTE) if self.preview else None
         if self.preview_note is not None:
             method.body.addWidget(self.preview_note)
+        self.details_toggle = self._toggle(DETAILS_TITLE)
+        self.details_box = QWidget()
+        details_lay = QVBoxLayout(self.details_box)
+        details_lay.setContentsMargins(0, 0, 0, 0)
         self.r3_note = Note(R3_NOTE)
         self.r4_note = Note(R4_NOTE, "testdata")
         self.r46_note = Note(R46_NOTE, "testdata")
         self.cccc_note = Note(CCCC_NOTE, "testdata")
         self.scope_notes = {"r3": self.r3_note, "r4": self.r4_note, "r46": self.r46_note, "cccc": self.cccc_note}
         for note in self.scope_notes.values():
-            method.body.addWidget(note)
+            details_lay.addWidget(note)
+        self.details_box.setVisible(False)
+        self.details_toggle.toggled.connect(lambda on: self._expand(self.details_toggle, self.details_box, on))
+        method.body.addWidget(self.details_toggle)
+        method.body.addWidget(self.details_box)
 
         summary = Card("Сводка")
         self.summary_grid = QGridLayout()
@@ -395,15 +462,11 @@ class SetupView(QWidget):
         self.goto_error.setVisible(False)
         self.goto_error.clicked.connect(self.focus_first_error)
         bl.addWidget(self.goto_error)
-        self.save_button = QPushButton("Сохранить проект")
-        self.save_button.setEnabled(False)
-        self.save_button.setToolTip("Сохранение .kkv — следующий этап")
         self.run_button = QPushButton("▶  Выполнить расчёт")
         self.run_button.setProperty("variant", "primary")
         self.run_button.setToolTip("Выполнить расчёт (F5). Демонстрационный режим: TEST DATA" if demo else
-                                   "Выполнить расчёт решателем KK-VIM в отдельном процессе (F5)")
+                                   "Выполнить расчёт решателем KK-VIM (F5)")
         self.run_button.clicked.connect(self.try_run)
-        bl.addWidget(self.save_button)
         bl.addWidget(self.run_button)
         outer.addWidget(bar)
 
@@ -415,6 +478,7 @@ class SetupView(QWidget):
             if f.unit_combo is not None:
                 f.unit_combo.currentTextChanged.connect(lambda unit, k=key: self.model.set_unit(k, unit))
         self.supports.changed.connect(lambda key: self.model.set_choice(supports=key))
+        self.load_mode.changed.connect(lambda key: self.model.set_choice(load_mode=key))
         self.N.currentIndexChanged.connect(lambda i: self.model.set_choice(N=self.N.itemData(i)))
         self.strict.toggled.connect(lambda on: self.model.set_choice(strict=on))
         self.research.toggled.connect(self._on_research)
@@ -426,6 +490,35 @@ class SetupView(QWidget):
         self.model.changed.connect(self.refresh)
         self.refresh()
 
+    @staticmethod
+    def _toggle(text):
+        button = QToolButton()
+        button.setCheckable(True)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        button.setArrowType(Qt.ArrowType.RightArrow)
+        button.setText(text)
+        return button
+
+    @staticmethod
+    def _expand(button, box, on):
+        button.setArrowType(Qt.ArrowType.DownArrow if on else Qt.ArrowType.RightArrow)
+        box.setVisible(on)
+
+    def _show_advanced(self, on):
+        self._expand(self.advanced_toggle, self.advanced_box, on)
+
+    def open_advanced(self):
+        """Open «Дополнительные параметры расчёта» (a field with an error there must be visible)."""
+        if not self.advanced_toggle.isChecked():
+            self.advanced_toggle.setChecked(True)
+
+    ADVANCED_KEYS = ("tol_inf", "tol_E", "s_min", "s_max", "transform")
+
+    def _advanced_error(self):
+        scope = self.model.state.scope
+        keys = [k for k in self.ADVANCED_KEYS if k in self.shown_errors]
+        return bool(keys) or ("half_steps" in self.shown_errors and scope == "r4")
+
     # Model binding and validation
     def _on_research(self, on):
         """The research continuation is chosen only by this explicit switch (D-048.5)."""
@@ -434,7 +527,7 @@ class SetupView(QWidget):
     def _n_text(self, supports, n):
         if self.preview and n not in self.n_selectable:
             return f"{n} — недоступно в этой версии"
-        return N_TEXT[supports if supports in N_TEXT else "SSSS"][n]
+        return N_TEXT[n]
 
     def _fill_cccc_steps(self, N, current):
         self.cccc_half_steps.blockSignals(True)
@@ -472,7 +565,12 @@ class SetupView(QWidget):
                 f.unit_combo.setCurrentText(st.units[key])
         if self.supports.current() != st.supports:
             self.supports.set_current(st.supports)
+        if self.load_mode.current() != st.load_mode:
+            self.load_mode.set_current(st.load_mode)
         self.support_text.setText(SUPPORT_TEXT[st.supports])
+        self.cccc_warning.setVisible(st.supports == "CCCC")
+        self.route_status.set_status(*ROUTE_STATUS[st.scope])
+        self._show_load(st)
         if self._n_supports != st.supports:  # the N items name the route of the selected supports
             self._n_supports = st.supports
             for i, n in enumerate(N_VALUES):
@@ -524,11 +622,32 @@ class SetupView(QWidget):
         if transform_error != self.shown_errors.get("transform"):
             self._show_error("transform", transform_error)
             self._update_status()
+        if self._advanced_error():
+            self.open_advanced()
+
+    def _show_load(self, st):
+        series = st.series
+        for w in (self.q, self.q_label):
+            w.setVisible(not series)
+        for w in (self.q_series, self.q_series_label, self.series_hint, self.series_preview):
+            w.setVisible(series)
+        if "q" in self.shown_errors and series:
+            self._show_error("q", None)
+        if "q_series" in self.shown_errors and not series:
+            self._show_error("q_series", None)
+        loads = series_preview(st) if series else None
+        if series:
+            self.series_preview.setText(
+                f"Будет выполнено расчётов: {len(loads)} — q = " + "; ".join(f"{t} {u}" for t, u in loads)
+                if loads else "Значения q серии ещё не заданы правильно.")
+        self.run_button.setText("▶  Рассчитать серию" if series else "▶  Выполнить расчёт")
 
     def check_field(self, key):
         _, error = validate_field(key, self.model.state.texts[key])
         self._show_error(key, error)
         self._update_status()
+        if error and self._advanced_error():
+            self.open_advanced()
         return error is None
 
     def check_all(self):
@@ -539,6 +658,8 @@ class SetupView(QWidget):
         self._show_error("transform", errors.get("transform"))
         self._show_error("research", errors.get("research"))
         self._update_status()
+        if self._advanced_error():
+            self.open_advanced()
         return errors
 
     def _show_error(self, key, error):
@@ -581,7 +702,7 @@ class SetupView(QWidget):
         for key, b in self.supports.buttons.items():
             b.setEnabled(not locked and not (self.preview and key == "CCCC"))
         for w in (self.theory, self.N, self.load_uniform, self.strict, self.research, self.transform, self.ssss_research,
-                  self.cccc_half_steps):
+                  self.cccc_half_steps, self.load_mode):
             w.setEnabled(not locked)
         self.research_rule.setEnabled(not locked and self.model.state.research)
         self._update_status()
@@ -613,6 +734,8 @@ class SetupView(QWidget):
     def focus_first_error(self):
         for key, f in self.fields.items():
             if key in self.shown_errors:
+                if key in self.ADVANCED_KEYS or (key == "half_steps" and self.model.state.scope == "r4"):
+                    self.open_advanced()
                 self.scroll.ensureWidgetVisible(f, 16, 48)
                 f.edit.setFocus(Qt.FocusReason.OtherFocusReason)
                 return f
@@ -622,6 +745,7 @@ class SetupView(QWidget):
             button.setFocus(Qt.FocusReason.OtherFocusReason)
             return button
         if "transform" in self.shown_errors:
+            self.open_advanced()
             self.scroll.ensureWidgetVisible(self.transform, 16, 48)
             self.transform.setFocus(Qt.FocusReason.OtherFocusReason)
             return self.transform
@@ -692,20 +816,33 @@ class SetupView(QWidget):
         self._layout_method_cells()
 
     def _layout_method_cells(self):
-        """Method fields of the selected solver: three per row, or one per row in the narrow layout."""
+        """Method fields of the selected solver: three per row, or one per row in the narrow layout; the stopping and
+        mode parameters in «Дополнительные параметры расчёта»."""
         per_row = 1 if self.mode == "narrow" else 3
         scope = getattr(self, "_scope", None) or self.model.state.scope
         visible = [cell for cell in self._method_cells if "all" in self._cell_scopes[cell] or scope in self._cell_scopes[cell]]
+        main = [cell for cell in visible if cell not in self._advanced_cells]
+        advanced = [cell for cell in visible if cell in self._advanced_cells]
         for cell in self._method_cells:
             self.method_grid.removeWidget(cell)
-        for i, cell in enumerate(visible):
-            r, col = divmod(i, per_row)
-            self.method_grid.addWidget(cell, r, col)
+            self.advanced_grid.removeWidget(cell)
+        # the field "half_steps" belongs to one cell at a time: the research cell (N = 4-6) or the R4 cell
+        main_cell, r4_cell = self._half_steps_cells
+        holder = r4_cell if scope == "r4" else main_cell
+        holder.layout().insertWidget(1, self.half_steps)
+        holder.layout().insertWidget(2, self.errors["half_steps"])
+        for grid, cells in ((self.method_grid, main), (self.advanced_grid, advanced)):
+            for i, cell in enumerate(cells):
+                r, col = divmod(i, per_row)
+                grid.addWidget(cell, r, col)
+            for col in range(3):
+                grid.setColumnStretch(col, 1 if col < per_row else 0)
         # visibility after the layout: a cell is shown only once it belongs to the card (never as a window)
         for cell in self._method_cells:
             cell.setVisible(cell in visible)
-        for col in range(3):
-            self.method_grid.setColumnStretch(col, 1 if col < per_row else 0)
+        has_advanced = bool(advanced)
+        self.advanced_toggle.setVisible(has_advanced)
+        self.advanced_box.setVisible(has_advanced and self.advanced_toggle.isChecked())
 
     def unit_fields(self):
         return list(self.fields.values())

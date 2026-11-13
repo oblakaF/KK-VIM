@@ -5,6 +5,13 @@ result); nothing is recomputed here except unit scaling for display (w in mm = w
 search of the node with the largest |w|. The field figure is static (GUI-D13); X–Y plots keep the
 pan and zoom of pyqtgraph. Every R4 figure carries PROVISIONAL / NOT_QUALIFIED; texts of figures
 follow the session figure language (GUI_DESIGN.md, 7).
+
+User-facing layout (GUI-PLATE-WORKFLOW-UX-01): the status strip and the «Результат» tab state three things separately
+and briefly — whether the run completed, the numerical stopping result and the scientific applicability — with the full
+solver texts in tooltips and in «Технические подробности»; a research, provisional or diagnostic result always carries
+its visible mark. Cross-sections are chosen by node index (slider and spin box) with the actual coordinate shown; the
+default is the centre line when it is a node. The half-step history shows the change of the field first and the full
+table behind «Подробная таблица».
 """
 
 import math
@@ -22,9 +29,12 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QScrollArea,
+    QSlider,
+    QSpinBox,
     QSplitter,
     QStackedWidget,
     QTableView,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -321,23 +331,75 @@ FIELD_ROLE_TEXT = {
 
 
 def statuses(outcome, run):
-    """(kind, text) of execution, stop and scientific status of the result."""
+    """(kind, text) of execution, stop and scientific status of the result: short texts (the full ones: status_details)."""
     if outcome.is_error:
-        execution = ("error", f"Расчёт не завершён: ошибка решателя {outcome.status}; поле — только диагностика")
+        execution = ("error", f"Расчёт не завершён: ошибка решателя {outcome.status}; поле только диагностическое")
     elif not outcome.requested_completed:
-        execution = ("warning", (f"Запрошенный расчёт не выполнен: {outcome.status}; поле последнего выполненного "
-                                 "полушага — только диагностика"))
+        execution = ("warning", f"Расчёт не завершён как запрошено ({outcome.status}): поле только диагностическое")
     else:
-        execution = ("success", "Запрошенный расчёт выполнен")
+        execution = ("success", "Расчёт завершён")
     kind = STOP_STATUS[outcome.stop_kind]
     if outcome.mark and kind == "success":
         kind = "warning"  # an R4 stabilization is PROVISIONAL, not a success of the method
-    stop = (kind, f"{outcome.stop_text} (s = {outcome.s}, k = {outcome.k})")
-    decisions = f" ({', '.join(outcome.decisions)})" if outcome.mark and outcome.decisions else ""
+    stop = (kind, f"{outcome.stop_text} · s = {outcome.s}, k = {outcome.k}")
     science = (outcome.science_kind if outcome.mark else "neutral",
-               f"Научный статус: {outcome.mark}{decisions}" if outcome.mark else
-               "Научный статус: решатель R3 ACCEPTED (D-043); расчёт — не научная приёмка")
+               f"Научный статус: {outcome.mark}" if outcome.mark else "Научный статус: принятый решатель R3 (ACCEPTED)")
     return execution, stop, science
+
+
+def status_details(outcome):
+    """The full texts behind the three short statuses (tooltips and «Технические подробности»)."""
+    decisions = ", ".join(outcome.decisions)
+    return (f"Статус решателя: {outcome.status}" + (f". Причина: {outcome.reason}" if outcome.reason else "")
+            + (f". Ошибка: {outcome.error}" if outcome.error else ""),
+            f"{outcome.stop_text}. s — выполненные полушаги, k = ⌊s/2⌋ — завершённые циклы (D-030). Выполнение критерия "
+            "остановки не доказывает точности модели или метода",
+            f"{outcome.science_text}" + (f" ({decisions})" if decisions else ""))
+
+
+def status_labels(outcome, run):
+    """StatusLabel widgets of the three statuses with the full texts as tooltips."""
+    out = []
+    for (kind, text), detail in zip(statuses(outcome, run), status_details(outcome), strict=True):
+        w = StatusLabel(kind, text)
+        w.setWordWrap(True)
+        w.setToolTip(detail)
+        out.append(w)
+    return out
+
+
+def expander(title, content, expanded=False):
+    """A collapsible section: a toggle button and its content (returns the button and a container)."""
+    box = QWidget()
+    lay = QVBoxLayout(box)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.setSpacing(6)
+    button = QToolButton()
+    button.setCheckable(True)
+    button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+    button.setText(title)
+    lay.addWidget(button)
+    lay.addWidget(content)
+
+    def show(on):
+        button.setArrowType(Qt.ArrowType.DownArrow if on else Qt.ArrowType.RightArrow)
+        content.setVisible(on)
+
+    button.toggled.connect(show)
+    button.setChecked(expanded)
+    show(expanded)
+    return button, box
+
+
+def centre_value(outcome):
+    """The stored w at the centre node (a/2, b/2), or None if the centre is not a node (no interpolation)."""
+    from kkvim_gui.backend.benchmarks import centre_node
+
+    c = centre_node(outcome) if outcome.has_field else None
+    if c is None:
+        return None
+    return {**c, "w": float(outcome.w[c["i"], c["j"]]),
+            "w_bar": None if outcome.w_bar is None else float(outcome.w_bar[c["i"], c["j"]])}
 
 
 def input_rows(outcome, model_rows):
@@ -372,39 +434,139 @@ def key_values(outcome, elapsed_text):
     return rows
 
 
+APPLICABILITY = {
+    None: "Принятый решатель R3 в утверждённой области. Отдельный расчёт не является научной приёмкой.",
+}
+SCIENCE_NOTE = {  # a visible warning of every non-accepted route (the full texts are in the details)
+    "PROVISIONAL / NOT_QUALIFIED": "Результат не квалифицирован: PROVISIONAL / NOT_QUALIFIED.",
+    "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED": ("Исследовательский режим — научная квалификация не завершена "
+                                                   "(RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED)."),
+}
+
+
 class OverviewTab(QWidget):
-    def __init__(self, session, outcome, run, model_rows, elapsed_text, parent=None):
+    """«Результат»: the plate and load, the deflection, the completion, the applicability and the comparison."""
+
+    def __init__(self, session, outcome, run, model_rows, elapsed_text, comparison=None, parent=None):
         super().__init__(parent)
-        grid = QGridLayout()
-        inputs = Card("Входные данные")
-        inputs.body.addLayout(key_value(input_rows(outcome, model_rows)))
-        inputs.body.addStretch(1)
-        status_card = Card("Статусы")
-        for kind, text in statuses(outcome, run):
-            s = StatusLabel(kind, text)
-            s.setWordWrap(True)
-            status_card.body.addWidget(s)
+        self.outcome = outcome
+        rows = dict(model_rows)
+        r = outcome.request
+        plate = Card("Пластина и нагрузка")
+        plate.body.addLayout(key_value([(k, rows[k]) for k in ("Геометрия", "Материал", "Нагрузка", "Закрепление")
+                                        if k in rows] + [("Метод и сетка", f"КК-ВИМ, N = {r.N} · сетка {r.n_x} × {r.n_y}")]))
+        plate.body.addStretch(1)
+        deflection = Card("Прогиб", right=label(outcome.mark or "", "tag"))
+        self.deflection_rows = self._deflection_rows(outcome)
+        deflection.body.addLayout(key_value(self.deflection_rows))
+        if outcome.diagnostic_only or outcome.is_error:
+            deflection.body.addWidget(Note("Поле только диагностическое (последний выполненный полушаг): это не результат.",
+                                           "testdata"))
+        deflection.body.addStretch(1)
+        completion = Card("Расчёт")
+        self.status_widgets = status_labels(outcome, run)
+        for w in self.status_widgets[:2]:
+            completion.body.addWidget(w)
+        completion.body.addWidget(label(f"Время расчёта: {elapsed_text}", "secondary"))
+        completion.body.addStretch(1)
+        science = Card("Научная применимость")
+        science.body.addWidget(self.status_widgets[2])
+        science.body.addWidget(label(APPLICABILITY[None] if outcome.mark is None else
+                                     SCIENCE_NOTE.get(outcome.mark, outcome.mark), "secondary", wrap=True))
+        science.body.addStretch(1)
+        self.comparison_card = Card("Сравнение с эталоном")
+        self.comparison_body = QVBoxLayout()
+        self.comparison_card.body.addLayout(self.comparison_body)
+        self.comparison_card.body.addStretch(1)
+        self.set_comparison(comparison)
+        details = QWidget()
+        dl = QVBoxLayout(details)
+        dl.setContentsMargins(0, 0, 0, 0)
+        dl.addLayout(key_value(input_rows(outcome, model_rows)[len(model_rows):] + key_values(outcome, elapsed_text)
+                               + [("Полный статус", " · ".join(status_details(outcome)))]))
         for note in outcome.notes:
-            status_card.body.addWidget(Note(note, "testdata" if outcome.mark else "info"))
-        if outcome.mark and outcome.limitations:  # the full list scrolls in "Энергия и диагностика"
-            status_card.body.addWidget(Note(f"Ограничения маршрута ({len(outcome.limitations)}): вкладка «Энергия и "
-                                            "диагностика» и report.html", "testdata"))
-        status_card.body.addStretch(1)
-        key = Card("Ключевые значения", right=label(outcome.mark or "", "tag"))
-        key.body.addLayout(key_value(key_values(outcome, elapsed_text)))
-        key.body.addStretch(1)
-        grid.addWidget(inputs, 0, 0)
-        grid.addWidget(status_card, 0, 1)
-        grid.addWidget(key, 0, 2)
+            dl.addWidget(Note(note, "testdata" if outcome.mark else "info"))
+        if outcome.limitations:
+            dl.addWidget(Note(f"Ограничения маршрута ({len(outcome.limitations)}): вкладка «Диагностика» и report.html",
+                              "testdata" if outcome.mark else "info"))
+        self.details_button, details_box = expander("Технические подробности", details)
+        grid = QGridLayout()
+        grid.addWidget(plate, 0, 0)
+        grid.addWidget(deflection, 0, 1)
+        grid.addWidget(completion, 0, 2)
+        grid.addWidget(science, 1, 0)
+        grid.addWidget(self.comparison_card, 1, 1, 1, 2)
+        grid.addWidget(details_box, 2, 0, 1, 3)
         self.field = FieldFigure(session, outcome, compact=True) if outcome.has_field else None
         if self.field is not None:
-            grid.addWidget(self.field, 1, 0, 1, 3)
-            grid.setRowStretch(1, 1)
+            self.field.setMinimumHeight(260)
+            grid.addWidget(self.field, 3, 0, 1, 3)
+            grid.setRowStretch(3, 1)
         for c in range(3):
             grid.setColumnStretch(c, 1)
+        content = padded(grid)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(content)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(padded(grid))
+        lay.addWidget(scroll)
+
+    @staticmethod
+    def _deflection_rows(outcome):
+        c = centre_value(outcome)
+        e = outcome.extremum()
+        rows = []
+        if c is not None:
+            rows.append(("w в центре (a/2, b/2)", f"{fmt(c['w'] * MM, 6)} mm"))
+        elif outcome.has_field:
+            rows.append(("w в центре", "центр не является узлом сетки — значение не интерполируется"))
+        if e is not None:
+            rows += [("Максимальный |w| (по узлам)", f"{fmt(e['w'] * MM, 6)} mm"),
+                     ("Узел максимума", f"x = {fmt(e['x'], 6)} m, y = {fmt(e['y'], 6)} m")]
+        if c is not None and c["w_bar"] is not None:
+            rows.append(("w̄ = wD/(qa⁴) в центре", fmt(c["w_bar"], 6)))
+        return rows or [("Поле прогиба", "не получено")]
+
+    def set_comparison(self, comparison):
+        """Show the state of the comparison with the independent reference (it may arrive after the window opened)."""
+        while self.comparison_body.count():
+            item = self.comparison_body.takeAt(0)
+            if item.widget() is not None:
+                item.widget().deleteLater()
+        self.comparison_rows = []
+        if comparison is None:
+            self.comparison_body.addWidget(label("Сравнение недоступно.", "secondary", wrap=True))
+            return
+        from kkvim_gui.backend import benchmarks
+
+        if comparison.has_numbers:
+            row = comparison.rows[0]
+            ref = row.reference
+            rows = [("КК-ВИМ — w в центре", f"{fmt(comparison.w_centre_m * MM, 8)} mm")]
+            if ref.w_centre_m is not None:
+                rows.append((f"{ref.title} — w в центре", f"{fmt(ref.w_centre_m * MM, 8)} mm"))
+            if row.delta_w_m is not None:
+                rows.append(("Разность Δw = w_КК-ВИМ − w_эталона", f"{fmt(row.delta_w_m * MM, 6)} mm"))
+            rows += [("Относительная разность Δβ/β", f"{fmt(row.rel_pct, 6)} %"),
+                     ("β КК-ВИМ / β эталона", f"{fmt(row.beta_kkvim, 8)} / {fmt(ref.beta, 8)}")]
+            if len(comparison.rows) > 1:
+                rows.append(("Другие эталоны", f"ещё {len(comparison.rows) - 1}: вкладка «Сравнение с эталоном»"))
+            self.comparison_rows = rows
+            self.comparison_body.addLayout(key_value(rows))
+            if self.outcome.mark and comparison.live:
+                self.comparison_body.addWidget(Note(f"Для этого маршрута ({self.outcome.mark}) решение Навье — справочные "
+                                                    "данные: статус расчёта не меняется.", "testdata"))
+            self.comparison_body.addWidget(label("Знаковые разности без порога согласия; сравнение не меняет научный "
+                                                 "статус и не является оценкой точности метода.", "secondary", wrap=True))
+        else:
+            kind = "warning" if comparison.state != benchmarks.PENDING else "neutral"
+            w = StatusLabel(kind, benchmarks.STATE_TITLE[comparison.state])
+            w.setWordWrap(True)
+            self.comparison_body.addWidget(w)
+            if comparison.reason:
+                self.comparison_body.addWidget(label(comparison.reason, "secondary", wrap=True))
 
 
 class FieldsTab(QWidget):
@@ -416,12 +578,17 @@ class FieldsTab(QWidget):
 
         self.figure = FieldFigure(session, outcome, isolines=True)
         self.surface = SurfaceFigure(session, outcome)
-        self.view = SegmentedControl({"map": "Карта и изолинии", "surface": "3D-вид"}, "map")
+        self.view = SegmentedControl({"map": "Карта и изолинии", "surface": "3D-вид (цвет)"}, "map")
         self.quantity = SegmentedControl({"w": "Прогиб w, mm", "w_bar": "Безразмерный w̄"}, "w")
         self.quantity.changed.connect(self.figure.set_quantity)
         self.cmap = QComboBox()
         self.cmap.addItems(["viridis", "cividis"])
         self.cmap.currentTextChanged.connect(self.figure.set_colormap)
+        self.cmap.currentTextChanged.connect(self.surface.set_colormap)
+        self.mesh = QCheckBox("Сетка")
+        self.mesh.setChecked(True)
+        self.mesh.setToolTip("Тонкие линии узлов сетки поверх цветной поверхности")
+        self.mesh.toggled.connect(self.surface.set_mesh)
         self.isolines = QCheckBox("Изолинии")
         self.isolines.setChecked(True)
         self.isolines.toggled.connect(self.figure.set_isolines)
@@ -431,9 +598,10 @@ class FieldsTab(QWidget):
             self.factor.addItem("×1 (истинный)" if value == 1.0 else f"×{fmt(value, 3)}", value)
         self.factor.setToolTip("Масштаб прогиба только на изображении 3D-вида; числовые значения не изменяются")
         self.factor.currentIndexChanged.connect(lambda i: self.surface.set_factor(self.factor.itemData(i)))
-        self.map_controls = (self.quantity, labelled("Шкала", self.cmap), self.isolines)
-        self.surface_controls = (labelled("Масштаб прогиба", self.factor),)
-        bar = toolbar(self.view, *self.map_controls, *self.surface_controls, trailing=trailing)
+        self.map_controls = (self.quantity, self.isolines)
+        self.surface_controls = (labelled("Масштаб прогиба", self.factor), self.mesh)
+        bar = toolbar(self.view, labelled("Шкала", self.cmap), *self.map_controls, *self.surface_controls,
+                      trailing=trailing)
         self.stack = QStackedWidget()
         self.stack.addWidget(self.figure)
         self.stack.addWidget(self.surface)
@@ -493,32 +661,69 @@ class FieldsTab(QWidget):
         return panel
 
 
+class NodeSelector(QWidget):
+    """A node line of the result grid: slider and spin box of the index with the actual coordinate (no interpolation)."""
+
+    def __init__(self, name, nodes, index, parent=None):
+        super().__init__(parent)
+        self.name, self.nodes = name, nodes
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(6)
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setRange(0, len(nodes) - 1)
+        self.slider.setMinimumWidth(120)
+        self.spin = QSpinBox()
+        self.spin.setRange(0, len(nodes) - 1)
+        self.spin.setPrefix(f"{'j' if name == 'y' else 'i'} = ")
+        self.text = label("", "secondary")
+        self.text.setMinimumWidth(110)
+        lay.addWidget(self.slider, 1)
+        lay.addWidget(self.spin)
+        lay.addWidget(self.text)
+        self.slider.valueChanged.connect(self.spin.setValue)
+        self.spin.valueChanged.connect(self.slider.setValue)
+        self.spin.valueChanged.connect(self._show)
+        self.set_index(index)
+
+    def _show(self, index):
+        self.text.setText(f"{self.name} = {fmt(float(self.nodes[index]), 6)} m")
+
+    def set_index(self, index):
+        self.spin.setValue(index)
+        self._show(index)
+
+    def index(self):
+        return self.spin.value()
+
+
 class SectionsTab(QWidget):
     """w(x) at a node row y_j and w(y) at a node column x_i, both from the stored field."""
+
+    TOOLTIP = "Профили прогиба вдоль выбранных линий узлов сетки: w(x) при y = const и w(y) при x = const"
 
     def __init__(self, session, outcome, trailing=(), parent=None):
         super().__init__(parent)
         self.outcome = outcome
         e = outcome.extremum()
-        self.at_y, self.at_x = QComboBox(), QComboBox()
-        for j, y in enumerate(outcome.y):
-            self.at_y.addItem(f"y = {fmt(y, 6)} m (j = {j})", j)
-        for i, x in enumerate(outcome.x):
-            self.at_x.addItem(f"x = {fmt(x, 6)} m (i = {i})", i)
-        self.fig_x = Figure(session, outcome, "section.x.title", {"y": float(outcome.y[e["j"]])})
-        self.fig_y = Figure(session, outcome, "section.y.title", {"x": float(outcome.x[e["i"]])})
+        c = centre_value(outcome)
+        i0, j0 = (c["i"], c["j"]) if c is not None else (e["i"], e["j"])  # the centre line when it is a node
+        self.at_y = NodeSelector("y", outcome.y, j0)
+        self.at_x = NodeSelector("x", outcome.x, i0)
+        self.fig_x = Figure(session, outcome, "section.x.title", {"y": float(outcome.y[j0])})
+        self.fig_y = Figure(session, outcome, "section.y.title", {"x": float(outcome.x[i0])})
         self.fig_x.set_axes("axis.x", "axis.w")
         self.fig_y.set_axes("axis.y", "axis.w")
-        self.curve_x = self.fig_x.plot.plot(pen=pg.mkPen(session.tokens["accent"], width=2))
-        self.curve_y = self.fig_y.plot.plot(pen=pg.mkPen(session.tokens["accent"], width=2))
-        self.at_y.currentIndexChanged.connect(lambda _: self.update_x())
-        self.at_x.currentIndexChanged.connect(lambda _: self.update_y())
-        self.at_y.setCurrentIndex(e["j"])
-        self.at_x.setCurrentIndex(e["i"])
+        self.curve_x = self.fig_x.plot.plot(pen=pg.mkPen(session.tokens["accent"], width=2), symbol="o", symbolSize=4,
+                                            symbolBrush=session.tokens["accent"])
+        self.curve_y = self.fig_y.plot.plot(pen=pg.mkPen(session.tokens["accent"], width=2), symbol="o", symbolSize=4,
+                                            symbolBrush=session.tokens["accent"])
+        self.at_y.spin.valueChanged.connect(lambda _: self.update_x())
+        self.at_x.spin.valueChanged.connect(lambda _: self.update_y())
         self.update_x()
         self.update_y()
-        bar = toolbar(labelled("Сечение w(x) при", self.at_y), labelled("Сечение w(y) при", self.at_x),
-                      trailing=trailing)
+        bar = toolbar(labelled("w(x) при", self.at_y), labelled("w(y) при", self.at_x), trailing=trailing)
+        bar.setToolTip(self.TOOLTIP)
         row = QHBoxLayout()
         row.addWidget(self.fig_x)
         row.addWidget(self.fig_y)
@@ -527,12 +732,12 @@ class SectionsTab(QWidget):
         lay.addWidget(page(bar, padded(row)))
 
     def update_x(self):
-        j = self.at_y.currentData()
+        j = self.at_y.index()
         self.curve_x.setData(self.outcome.x, self.outcome.w[:, j] * MM)
         self.fig_x.set_title("section.x.title", y=float(self.outcome.y[j]))
 
     def update_y(self):
-        i = self.at_x.currentData()
+        i = self.at_x.index()
         self.curve_y.setData(self.outcome.y, self.outcome.w[i, :] * MM)
         self.fig_y.set_title("section.y.title", x=float(self.outcome.x[i]))
 
@@ -571,6 +776,22 @@ def positive_series(s_values, values):
 class HistoryTab(QWidget):
     """Half-step history: ε^∞ and ε^E (log scale) with the tolerances, and the full table of rows."""
 
+    TITLE = "Как изменялся результат при итерациях"
+
+    @staticmethod
+    def _intro(outcome):
+        order = "Порядок полушагов: Y¹, X², Y³, X⁴, … — на каждом полушаге одна функция задана, другая ищется."
+        counters = (f"s — число выполненных полушагов (здесь s = {outcome.s}), k = ⌊s/2⌋ — число завершённых циклов "
+                    f"(k = {outcome.k}).")
+        if outcome.route == "ssss_r3":
+            rule = ("График: ε^∞ и ε^E — относительное изменение поля между соседними полушагами (по максимуму и в "
+                    "энергетической норме). Остановка CONVERGED — когда оба не больше допусков на двух полушагах подряд; "
+                    "это правило остановки, а не доказательство точности.")
+        else:
+            rule = (f"Как закончился расчёт: {outcome.stop_text}. Выполнение заданного числа полушагов — не сходимость. "
+                    "График показывает изменение поля между полушагами, если оно вычислено.")
+        return " ".join((counters, order, rule))
+
     def __init__(self, session, outcome, trailing=(), parent=None):
         super().__init__(parent)
         self.figure = Figure(session, outcome, "hist.title")
@@ -598,12 +819,16 @@ class HistoryTab(QWidget):
         headers = [c.title + (f", {c.unit}" if c.unit else "") for c in outcome.columns]
         keys = [c.key for c in outcome.columns]
         self.model = RowsModel(headers, len(outcome.history), lambda r: tuple(outcome.history[r].get(k) for k in keys))
-        table = Card("История полушагов", right=label(outcome.mark or "KK-VIM", "tag"))
-        table.body.addWidget(table_view(self.model))
+        intro = Card(self.TITLE, right=label(outcome.mark or "KK-VIM", "tag"))
+        intro.body.addWidget(label(self._intro(outcome), "secondary", wrap=True))
+        self.table = table_view(self.model)
+        self.table_button, table_box = expander(f"Подробная таблица: {len(outcome.history)} полушагов, "
+                                                f"{len(outcome.columns)} величин", self.table)
+        intro.body.addWidget(table_box)
         split = QSplitter(Qt.Orientation.Vertical)
         split.addWidget(self.figure)
-        split.addWidget(table)
-        split.setSizes([300, 300])
+        split.addWidget(intro)
+        split.setSizes([360, 220])
         box = QVBoxLayout()
         box.addWidget(split)
         lay = QVBoxLayout(self)

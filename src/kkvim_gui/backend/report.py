@@ -6,9 +6,10 @@
   ``field_diagnostic.csv``) — the export of ``backend.export``;
 - the figures rendered by the interface (PNG; the caller passes a function that writes them);
 - ``report.html`` — a readable report built from the same ``RunOutcome`` as the export files;
-- ``comparison.csv`` — only when the run has a comparison with the saved independent references
-  (``backend.benchmarks``): the same ``Comparison`` object as the "Сравнение" tab, the same table texts in the report
-  section "Сравнение с независимыми эталонами", the same binary64 values in the CSV. Without a comparison (other inputs,
+- ``comparison.csv`` — only when the run has a comparison with independent references (``backend.benchmarks``: the
+  saved references or, for SSSS, the Navier reference computed for the run's own inputs): the same ``Comparison`` object
+  as the "Сравнение с эталоном" tab, the same table texts in the report section "Сравнение с независимыми эталонами",
+  the same binary64 values in the CSV. Without a comparison (other inputs,
   a diagnostic field, demonstration data, damaged reference data) the report states the reason and no CSV is written;
   the reference data never prevent saving the calculation.
 
@@ -42,8 +43,8 @@ LIMITATIONS = (  # common to every route; the limits of the route itself come fr
     "Теории Тимошенко и Редди в этой версии недоступны.",
     "Результат — значения в узлах сетки n_x × n_y; максимальный |w| найден по узлам, а не между ними.",
     "Моменты и напряжения в этой версии не выводятся.",
-    "Сравнение с эталонами — только при точном совпадении входных данных с сохранёнными эталонами (раздел 6); "
-    "порога согласия нет, научный статус расчёта оно не меняет.",
+    "Сравнение с эталонами (раздел 6): SSSS — эталон Навье, рассчитанный для тех же входных данных; CCCC — сохранённые "
+    "эталоны только при точном совпадении входных данных. Порога согласия нет, научный статус расчёта оно не меняет.",
     "Масштаб прогиба на 3D-виде увеличен только для изображения; все числа отчёта и файлов — без увеличения.",
 )
 IMAGE_TITLES = {"field_png": "Поле прогиба w(x, y) с изолиниями", "surface_png": "Деформированная форма (3D-вид)"}
@@ -52,16 +53,17 @@ COMPARISON_FILE = "comparison.csv"
 COMPARISON_COLUMNS = (  # (name, unit): "1" dimensionless, "" text or count
     ("reference_kind", ""), ("reference_method", ""), ("reference_source_provenance", ""),
     ("beta_reference", "1"), ("w_centre_reference", "m"), ("beta_kkvim", "1"), ("w_centre_kkvim", "m"),
-    ("delta_beta", "1"), ("delta_beta_relative", "%"),
+    ("delta_beta", "1"), ("delta_beta_relative", "%"), ("delta_w_centre", "m"),
     ("supports", ""), ("N", ""), ("a", "m"), ("b", "m"), ("h", "m"), ("E", "Pa"), ("nu", "1"), ("q", "Pa"),
     ("n_x", ""), ("n_y", ""), ("centre_i", ""), ("centre_j", ""), ("x_centre", "m"), ("y_centre", "m"),
     ("D", "N·m"), ("w_bar_solver_centre", "1"), ("half_steps_completed", ""), ("half_steps_requested", ""),
     ("solver_status", ""), ("requested_run_completed", ""), ("field_role", ""), ("scientific_status", ""),
-    ("mark", ""), ("reference_data", ""), ("reference_data_payload_sha256", ""),
+    ("mark", ""), ("reference_data", ""), ("reference_data_payload_sha256", ""), ("reference_level_M", ""),
 )
 COMPARISON_DEFINITIONS = (
-    "# comparison with saved independent references: beta = w(a/2, b/2) * D / (q * a^4); "
-    "delta_beta = beta_kkvim - beta_reference; delta_beta_relative = delta_beta / beta_reference * 100 %",
+    "# comparison with independent references: beta = w(a/2, b/2) * D / (q * a^4); "
+    "delta_beta = beta_kkvim - beta_reference; delta_beta_relative = delta_beta / beta_reference * 100 %; "
+    "delta_w_centre = w_centre_kkvim - w_centre_reference",
     "# signed differences only: no agreement threshold is approved; the comparison is not a scientific acceptance "
     "and does not change the status of the run",
 )
@@ -113,10 +115,10 @@ def _rows(rows) -> str:
     return "\n".join(f"<tr><th>{_e(k)}</th><td>{v}</td></tr>" for k, v in rows)
 
 
-def comparison_of(outcome: RunOutcome) -> benchmarks.Comparison:
+def comparison_of(outcome: RunOutcome, navier=None) -> benchmarks.Comparison:
     """``benchmarks.compare`` of the outcome; any failure of the reference data becomes DATA_ERROR, never a lost package."""
     try:
-        return benchmarks.compare(outcome)
+        return benchmarks.compare(outcome, navier=navier)
     except Exception as exc:  # noqa: BLE001 - the calculation package must stay savable without the reference data
         supports = getattr(getattr(outcome, "request", None), "supports", "")
         return benchmarks.Comparison(benchmarks.DATA_ERROR, f"Сравнение недоступно: данные эталонов не прочитаны ({exc}).",
@@ -129,9 +131,10 @@ def comparison_rows(outcome: RunOutcome, c: benchmarks.Comparison) -> list[tuple
     run = (r.supports, r.N, r.a, r.b, r.t, r.E, r.nu, r.q, r.n_x, r.n_y, c.centre["i"], c.centre["j"], c.centre["x"],
            c.centre["y"], c.D, c.w_bar_solver, outcome.s, outcome.s_requested, outcome.status, outcome.requested_completed,
            outcome.field_role, export.scientific_status(outcome), outcome.mark or "",
-           f"{benchmarks.DATA_FILE} ({benchmarks.SCHEMA})", benchmarks.PAYLOAD_SHA256)
+           benchmarks.source_text(c) if c.live else f"{benchmarks.DATA_FILE} ({benchmarks.SCHEMA})",
+           "" if c.live else benchmarks.PAYLOAD_SHA256, c.navier["M"] if c.live else "")
     return [(x.reference.kind, x.reference.title, x.reference.detail, x.reference.beta, x.reference.w_centre_m,
-             x.beta_kkvim, c.w_centre_m, x.delta, x.rel_pct, *run) for x in c.rows]
+             x.beta_kkvim, c.w_centre_m, x.delta, x.rel_pct, x.delta_w_m, *run) for x in c.rows]
 
 
 def write_comparison_csv(outcome: RunOutcome, c: benchmarks.Comparison, path) -> Path:
@@ -144,22 +147,24 @@ def write_comparison_csv(outcome: RunOutcome, c: benchmarks.Comparison, path) ->
 
 
 def _comparison_section(outcome: RunOutcome, c: benchmarks.Comparison, csv_name) -> str:
-    """Section 6: the same Comparison as the "Сравнение" tab, its table texts (benchmarks.cells) and statuses."""
+    """Section 6: the same Comparison as the "Сравнение с эталоном" tab, its table texts (benchmarks.cells) and statuses."""
     reason = c.reason
     if outcome.is_demo:
         reason = "Демонстрационные данные (TEST DATA): решатель не вызывался, сравнение не выполняется."
-    if c.state == benchmarks.DATA_ERROR:
+    if c.live:
+        data = benchmarks.source_text(c)
+    elif c.state == benchmarks.DATA_ERROR:
         data = f"не прошли проверку; ожидались {benchmarks.dataset_text()}"
     elif c.data is not None:
         data = f"{benchmarks.dataset_text()} — проверено при чтении"
     else:
         data = f"не читались (сравнение не выполняется); версия программы: {benchmarks.dataset_text()}"
-    rows = [("Состояние сравнения", f"<b>{_e(benchmarks.STATE_TITLE[c.state])}</b>")]
+    rows = [("Состояние сравнения", f"<b>{_e(benchmarks.state_title(c))}</b>")]
     if reason:
         rows.append(("Причина", _e(reason)))
-    rows += [("Данные эталонов", _e(data)),
+    rows += [("Источник эталона", _e(data)),
              ("Статус решателя", _e(outcome.status)),
-             ("Научный статус", _e(" · ".join(t for t in (outcome.mark, outcome.science_text) if t))),
+             ("Научный статус", _e(outcome.science_text)),  # the text starts with the mark of a non-accepted route
              ("Роль поля", _e(ROLE_TITLE.get(outcome.field_role, "поле не получено")))]
     if not c.has_numbers:
         rows.append(("Файл comparison.csv", "не создан: сравнения с числами для этого расчёта нет"))

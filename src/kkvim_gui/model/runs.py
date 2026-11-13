@@ -7,7 +7,17 @@ Two backends:
   k are shown when the run ends;
 - the demonstration backend (only with ``--demo``): synthetic stages, marked TEST DATA, never a result.
 
-At most one run is active; a second start while a run is active is refused. Each run has its own
+At most one run is active; a second start while a run is active is refused.
+
+Independent Navier reference (SSSS): with a run of SSSS supports the manager starts ``backend.navier_job.NavierJob`` —
+a separate process with the physical input only (never the KK-VIM result) — and keeps its point record in
+``RunRecord.navier`` ("pending" until it answers). The KK-VIM result is never changed by it.
+
+Load series (``start_series``): the same setup with several loads q, run one after another, each as an ordinary
+solver run of the dispatcher (its own process, check, outcome and statuses); only q differs between the requests.
+Every request is checked by ``check_request`` before the first run starts; a rejected point refuses the series.
+«Стоп» on a run of a series stops that run and cancels the points not yet started. The Navier reference of an SSSS
+series is one job for all loads (each load evaluated by the reference itself). Each run has its own
 timer. Results of a finished solver run are kept as a ``RunOutcome`` (immutable copies of the solver
 arrays). The protocol of every solver run (manifest.json and history.csv) is written to
 ``protocol_dir`` when it is set. KK-VIM counters follow D-030: s — completed coordinate half-steps;
@@ -22,7 +32,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from kkvim_gui import placeholders
-from kkvim_gui.backend import export
+from kkvim_gui.backend import export, navier_job
 from kkvim_gui.backend.kkvim_adapter import (
     RESEARCH_MARK,
     ROUTES,
@@ -85,6 +95,8 @@ class RunRecord:
     protocol_path: Path | None = None
     important: list = field(default_factory=list)   # (time, level, text)
     detailed: list = field(default_factory=list)
+    navier: dict | None = None        # point record of the Navier reference (SSSS; backend.navier_job), None otherwise
+    series_id: int | None = None      # the load series of this run, if any
     _t0: float = 0.0
     _elapsed_final: float | None = None
     _process: object = None
@@ -143,9 +155,38 @@ class RunRecord:
             self.important.append(entry)
 
     def meta(self, now):
-        return {"run_id": self.run_id, "started": self.started.isoformat(timespec="seconds"),
+        meta = {"run_id": self.run_id, "started": self.started.isoformat(timespec="seconds"),
                 "execution_status": self.status, "elapsed_s": round(self.elapsed(now), 3),
                 "data_origin": self.data_origin}
+        if self.series_id is not None:
+            meta["series_id"] = self.series_id
+        return meta
+
+
+SERIES_MAX = 20  # points of one load series
+SERIES_STATUS_TEXT = {"running": "Выполняется", "finished": "Завершена", "cancelled": "Остановлена пользователем"}
+
+
+@dataclass
+class SeriesRecord:
+    """A load series: the same setup at several loads q, every point an ordinary run of the dispatcher."""
+
+    series_id: int
+    started: datetime
+    snapshot: object                   # SetupState at the start
+    requests: tuple                    # RunRequest of every point, in the order entered
+    run_ids: list = field(default_factory=list)   # runs started so far (point k -> run_ids[k])
+    status: str = "running"            # "running" | "finished" | "cancelled"
+    navier: dict | None = None         # job record of the Navier reference of all loads (SSSS), or None
+    _job: object = None
+
+    @property
+    def loads(self):
+        return tuple(r.q for r in self.requests)
+
+    @property
+    def active(self):
+        return self.status == "running"
 
 
 class RunManager(QObject):
@@ -154,13 +195,19 @@ class RunManager(QObject):
     runAdded = Signal(int)
     runChanged = Signal(int)
     activeChanged = Signal(bool)
+    seriesChanged = Signal(int)
 
-    def __init__(self, clock=time.monotonic, process_factory=SolverProcess, protocol_dir=None, parent=None):
+    def __init__(self, clock=time.monotonic, process_factory=SolverProcess, protocol_dir=None, parent=None,
+                 navier_factory=navier_job.NavierJob):
+        """navier_factory(inputs) -> job with poll()/terminate() (``backend.navier_job.NavierJob``); None: no reference."""
         super().__init__(parent)
         self.clock = clock
         self.process_factory = process_factory
+        self.navier_factory = navier_factory
         self.protocol_dir = Path(protocol_dir) if protocol_dir else None
         self.runs = []
+        self.series = []
+        self._navier_jobs = []  # (job, callback(record)) still running
         self._timer = QTimer(self)
         self._timer.setInterval(200)
         self._timer.timeout.connect(self.tick)
@@ -191,7 +238,7 @@ class RunManager(QObject):
 
     # Solver -----------------------------------------------------------------------------------------
 
-    def start(self, snapshot, request):
+    def start(self, snapshot, request, series=None):
         """Start the solver in a separate process for a request that passed ``check_request``.
 
         The check is repeated here: a rejected request raises ``AdapterInputError`` and no process is created
@@ -201,6 +248,11 @@ class RunManager(QObject):
         if problems:
             raise AdapterInputError("; ".join(problems))
         run = self._new_run(snapshot, "КК-ВИМ", ORIGIN_SOLVER, "Расчёт в отдельном процессе", request=request)
+        if series is not None:
+            run.series_id = series.series_id
+            run.navier = self._series_point(series, request)
+        elif request.supports == "SSSS":
+            self._start_navier(request, [request.q], lambda record, r=run: self._set_navier(r, record))
         route = ROUTES[request.route]
         solver = f"{route['solver']} ({route['call']}; {', '.join(route['decisions'])})"
         run.log("ИНФО", "Формальная проверка ввода и проверка ввода решателем выполнены")
@@ -214,9 +266,117 @@ class RunManager(QObject):
             run.log("ПРЕДУПРЕЖДЕНИЕ", "R4: все результаты PROVISIONAL / NOT_QUALIFIED (D-047, D-048)", important=True)
         elif request.route != ROUTE_R3:
             run.log("ПРЕДУПРЕЖДЕНИЕ", f"Только исследование: все результаты {RESEARCH_MARK}", important=True)
+        if series is not None:
+            series.run_ids.append(run.run_id)  # before runAdded: the dispatcher shows the point of its series
+            run.log("ИНФО", f"Серия нагрузок {series.series_id}: точка {len(series.run_ids)} из {len(series.requests)}, "
+                            f"q = {request.q!r} Pa", important=True)
         run.log("ЭТАП", run.stage)
         run._process = self.process_factory(request)
         return self._register(run)
+
+    # Independent Navier reference (SSSS) ------------------------------------------------------------
+
+    def _start_navier(self, request, loads, callback):
+        """Start the reference job of ``loads``; the record goes to ``callback`` (pending until it answers)."""
+        if self.navier_factory is None:
+            return None
+        callback(navier_job.pending_record())
+        try:
+            job = self.navier_factory(navier_job.worker_input(request, loads))
+        except OSError as exc:
+            callback({"state": navier_job.FAILED, "reason": f"процесс эталона Навье не запущен: {exc}"})
+            return None
+        self._navier_jobs.append((job, callback))
+        self._timer.start()
+        return job
+
+    def _set_navier(self, run, job_record):
+        run.navier = job_record if job_record.get("state") == navier_job.PENDING else \
+            navier_job.point_record(job_record, run.request)
+        if run.navier["state"] == navier_job.OK:
+            run.log("ИНФО", f"Эталон Навье (отдельный процесс, M = {run.navier['M']}): w в центре = {run.navier['w_m']!r} m")
+        elif run.navier["state"] != navier_job.PENDING:
+            run.log("ИНФО", f"Эталон Навье не получен: {run.navier['reason']}", important=True)
+        self.runChanged.emit(run.run_id)
+
+    def _poll_navier(self):
+        for job, callback in list(self._navier_jobs):
+            record = job.poll()
+            if record is not None:
+                self._navier_jobs.remove((job, callback))
+                callback(record)
+
+    @property
+    def references_pending(self):
+        return bool(self._navier_jobs)
+
+    # Load series ---------------------------------------------------------------------------------------
+
+    def start_series(self, snapshot, requests):
+        """Start a load series: every request is checked first; the points run one after another."""
+        requests = tuple(requests)
+        if not 2 <= len(requests) <= SERIES_MAX:
+            raise AdapterInputError(f"серия нагрузок: нужно от 2 до {SERIES_MAX} значений q")
+        if self.active is not None:
+            raise RuntimeError("a run is already active")
+        problems = []
+        for k, request in enumerate(requests, start=1):
+            problems += [f"q = {request.q!r} Pa (точка {k}): {p}" for p in check_request(request)]
+        if problems:
+            raise AdapterInputError("; ".join(problems))
+        series = SeriesRecord(series_id=len(self.series) + 1, started=datetime.now(), snapshot=snapshot, requests=requests)
+        self.series.append(series)
+        if requests[0].supports == "SSSS":
+            series._job = self._start_navier(requests[0], [r.q for r in requests],
+                                             lambda record, s=series: self._set_series_navier(s, record))
+        self._start_point(series)
+        return series
+
+    def _series_point(self, series, request):
+        if series.navier is None:
+            return None
+        if series.navier.get("state") == navier_job.PENDING:
+            return navier_job.pending_record()
+        return navier_job.point_record(series.navier, request)
+
+    def _set_series_navier(self, series, record):
+        series.navier = record
+        for run_id in series.run_ids:
+            run = self.get(run_id)
+            run.navier = self._series_point(series, run.request)
+            self.runChanged.emit(run_id)
+        self.seriesChanged.emit(series.series_id)
+
+    def _start_point(self, series):
+        request = series.requests[len(series.run_ids)]
+        run = self.start(series.snapshot, request, series=series)
+        self.seriesChanged.emit(series.series_id)
+        return run
+
+    def _advance_series(self, run):
+        """After a run of a series ended: start the next point, or close the series."""
+        series = self.get_series(run.series_id)
+        if series is None or not series.active:
+            return
+        if len(series.run_ids) < len(series.requests):
+            self._start_point(series)
+        else:
+            series.status = "finished"
+            self.seriesChanged.emit(series.series_id)
+
+    def get_series(self, series_id):
+        return next((s for s in self.series if s.series_id == series_id), None)
+
+    def stop_series(self, series_id):
+        """Cancel a series: the active point is stopped, the points not yet started are not run."""
+        series = self.get_series(series_id)
+        if series is None or not series.active:
+            return
+        series.status = "cancelled"
+        active = self.active
+        if active is not None and active.series_id == series_id:
+            self.stop(active.run_id)
+        self.seriesChanged.emit(series_id)
 
     def _poll_solver(self, run):
         message = run._process.poll()
@@ -255,6 +415,7 @@ class RunManager(QObject):
             run.log("ПРЕДУПРЕЖДЕНИЕ", f"Запрошенный расчёт не выполнен ({outcome.status}): поле последнего выполненного полушага "
                                       f"s = {outcome.s} — только диагностика, не результат", important=True)
         self._save_protocol(run)
+        self._advance_series(run)
 
     def _save_protocol(self, run):
         if self.protocol_dir is None or run.outcome is None:
@@ -302,9 +463,11 @@ class RunManager(QObject):
     # Common -------------------------------------------------------------------------------------------
 
     def tick(self):
+        self._poll_navier()
         run = self.active
         if run is None:
-            self._timer.stop()
+            if not self._navier_jobs:
+                self._timer.stop()
             return
         if run.is_demo:
             self._tick_demo(run)
@@ -321,13 +484,15 @@ class RunManager(QObject):
         run.status = status
         run.stage = stage
         if self.active is None:
-            self._timer.stop()
+            if not self._navier_jobs:
+                self._timer.stop()
             self.activeChanged.emit(False)
 
     def _fail(self, run, message):
         self._end(run, "error", "Ошибка")
         run.stop_criterion = "error"
         run.log("ОШИБКА", message, important=True)
+        self._advance_series(run)
 
     def stop(self, run_id):
         run = self.get(run_id)
@@ -335,6 +500,10 @@ class RunManager(QObject):
             return
         if run._process is not None:
             run._process.terminate()
+        series = self.get_series(run.series_id)
+        if series is not None and series.active:  # «Стоп» of a point cancels the rest of its series
+            series.status = "cancelled"
+            self.seriesChanged.emit(series.series_id)
         self._end(run, "stopped", "Остановлен пользователем")
         run.log("ПРЕДУПРЕЖДЕНИЕ",
                 f"Остановлен пользователем через {format_duration(run._elapsed_final)}; "
@@ -352,7 +521,13 @@ class RunManager(QObject):
         self.runChanged.emit(run.run_id)
 
     def shutdown(self):
-        """Terminate the process of an active run (application exit)."""
+        """Terminate the process of an active run and every reference process (application exit)."""
+        for series in self.series:
+            if series.active:
+                series.status = "cancelled"
         run = self.active
         if run is not None and run._process is not None:
             run._process.terminate()
+        for job, _ in self._navier_jobs:
+            job.terminate()
+        self._navier_jobs.clear()

@@ -91,6 +91,7 @@ def run_case(qtbot, window, texts):
     run = window.runs.active
     assert run is not None, window.setup_view.check_text.text()
     qtbot.waitUntil(lambda: window.runs.active is None, timeout=120_000)
+    qtbot.waitUntil(lambda: not window.runs.references_pending, timeout=120_000)  # the Navier reference process (SSSS)
     return run
 
 
@@ -233,10 +234,10 @@ def test_workflow_matches_the_accepted_solver_and_saves_what_is_shown(qtbot, pre
     fields.factor.setCurrentIndex(fields.factor.findData(1.0))
     assert fields.surface.factor == 1.0 and "истинный" in fields.surface.scale_note.text()
     fields.factor.setCurrentIndex(fields.factor.findData(1e3))
-    u, v = fields.surface.mesh.getData()
-    pu, pv = surface.surface_polylines(o.x, o.y, o.w, 1e3)
-    assert np.allclose(u[~np.isnan(u)], pu[~np.isnan(pu)], rtol=0, atol=1e-12) and np.array_equal(
-        np.isnan(v), np.isnan(pv))
+    cells = surface.surface_cells(o.x, o.y, o.w, 1e3)  # the drawn surface: projected node cells of the stored field
+    drawn = fields.surface.surface.cells
+    assert len(drawn) == len(cells) and all(np.array_equal(u, cu) and np.array_equal(v, cv)
+                                            for (u, v, _), (cu, cv, _) in zip(drawn, cells, strict=True))
     e = o.extremum()
     assert np.sign(e["w"]) == np.sign(si["q"])
     assert f"{e['i']}, j = {e['j']}" in " ".join(label_texts(window.fields))
@@ -245,9 +246,11 @@ def test_workflow_matches_the_accepted_solver_and_saves_what_is_shown(qtbot, pre
     paths = window.save_package(tmp_path / "saved")
     assert np.array_equal(o.w, w_before)  # the drawing factor never touches the values
     files = {"manifest", "history", "field", "field_png", "surface_png", "report"}
-    if window.comparison.comparison.has_numbers:  # the benchmark square: the tab's comparison is saved as well
+    c = window.comparison.comparison
+    if c.has_numbers:  # SSSS: the Navier reference of these inputs; the tab's comparison is saved as well
         files.add("comparison")
-    assert set(paths) == files and (si == SQUARE[1]) == ("comparison" in paths)
+    assert set(paths) == files and c.live and c.has_numbers == ("comparison" in paths)
+    assert c.rows[0].reference.w_centre_m == run.navier["w_m"] and np.sign(c.rows[0].reference.w_centre_m) == np.sign(si["q"])
     for key in ("field_png", "surface_png"):
         assert paths[key].stat().st_size > 10_000 and paths[key].read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))

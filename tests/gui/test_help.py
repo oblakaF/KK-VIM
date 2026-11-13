@@ -196,8 +196,10 @@ def test_help_centre_search_and_links(qtbot, gui):
     all_topics = hw.topics_in_index()
     assert all_topics == sorted(all_topics, key=lambda t: get(t).title.casefold().replace("ё", "е"))
     hw.search.setText("Пуассон")
-    assert hw.topics_in_index() == ["param.material.nu"]
-    assert hw.found.text() == "Найдено: 1"
+    found = hw.topics_in_index()
+    assert found[0] == "param.material.nu" or "param.material.nu" in found  # the article of ν and those that mention it
+    assert all("пуассон" in (get(t).title + get(t).summary + get(t).body).casefold() for t in found)
+    assert hw.found.text() == f"Найдено: {len(found)}"
     hw.search.setText("")
     assert hw.topics_in_index() == all_topics
     hw.view.anchorClicked.emit(QUrl("topic:param.geometry.b"))

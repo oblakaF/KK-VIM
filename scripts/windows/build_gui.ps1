@@ -133,9 +133,11 @@ try {
         $stagingPython = Join-Path $staging "Scripts\python.exe"
         Invoke-Checked "install locked dependencies" { uv pip install --python $stagingPython -r $requirements }
         Invoke-Checked "install the kkvim wheel" { uv pip install --python $stagingPython --no-deps $wheel.FullName }
-        $probe = "import sys, kkvim, kkvim_gui.app, PySide6, pyqtgraph; from kkvim_gui.backend.request import route_of; " +
+        $probe = "import sys, kkvim, kkvim_gui.app, PySide6, pyqtgraph, kkvim_navier_worker, kkvim_reference.navier; " +
+                 "from kkvim_gui.backend.request import route_of; " +
                  "assert route_of('CCCC', 6) == 'cccc_n46' and route_of('SSSS', 4) == 'ssss_n46'; " +
-                 "assert kkvim.__file__.startswith(sys.prefix) and kkvim_gui.app.__file__.startswith(sys.prefix); print('kkvim-gui ok')"
+                 "assert kkvim.__file__.startswith(sys.prefix) and kkvim_gui.app.__file__.startswith(sys.prefix); " +
+                 "assert kkvim_navier_worker.__file__.startswith(sys.prefix); print('kkvim-gui ok')"
         Invoke-Checked "import check" { & $stagingPython -c $probe }
         Test-Program $staging
         $stamp = [ordered]@{

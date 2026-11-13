@@ -1,7 +1,9 @@
 """Infrastructure check: the GUI stays outside the scientific packages (docs/gui/GUI_DESIGN.md, 3.1).
 
 - kkvim and kkvim_reference never import kkvim_gui;
-- kkvim_gui never imports kkvim_reference.
+- kkvim_gui never imports kkvim_reference;
+- the Navier worker (kkvim_navier_worker, started by the GUI as a separate process) imports kkvim_reference only: never
+  kkvim or kkvim_gui; kkvim_gui never imports the worker, and the scientific packages never import it.
 
 Static analysis with ast, like tests/test_package_independence.py; no Qt needed.
 """
@@ -17,6 +19,11 @@ FORBIDDEN = (
     ("kkvim", "kkvim_gui"),
     ("kkvim_reference", "kkvim_gui"),
     ("kkvim_gui", "kkvim_reference"),
+    ("kkvim_gui", "kkvim_navier_worker"),
+    ("kkvim_navier_worker", "kkvim"),
+    ("kkvim_navier_worker", "kkvim_gui"),
+    ("kkvim", "kkvim_navier_worker"),
+    ("kkvim_reference", "kkvim_navier_worker"),
 )
 
 

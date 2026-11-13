@@ -28,5 +28,15 @@
   "mark.provisional": "PROVISIONAL / NOT_QUALIFIED",
   "mark.research": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
   "mark.diagnostic": "DIAGNOSTIC · RUN NOT COMPLETED",
-  "surface.title": "Deformed plate shape (axonometric view)"
+  "surface.title": "Deformed plate shape (axonometric view)",
+  "surface.colorbar": "w (mm), colour = true deflection",
+  "surface.edge.x": "x: 0 … {a} m",
+  "surface.edge.y": "y: 0 … {b} m",
+  "series.title": "Load — deflection",
+  "axis.q": "q (kPa)",
+  "axis.w_centre": "w at the centre (a/2, b/2) (mm)",
+  "axis.w_maxabs": "w at the node of max|w| (mm)",
+  "legend.series.kkvim": "KK-VIM (a run at every q)",
+  "legend.series.navier": "Navier (reference, M = {M})",
+  "legend.series.excluded": "not completed / diagnostic (no point)"
 }
