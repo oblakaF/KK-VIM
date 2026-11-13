@@ -207,3 +207,153 @@ def test_comparison_record_is_json_with_exact_floats():
     back = json.loads(json.dumps(bm.as_record(c)))
     assert back["beta"] == c.beta and [r["delta"] for r in back["rows"]] == [r.delta for r in c.rows]
     assert dataclasses.is_dataclass(c)
+
+
+# --- saved calculation package: report.html and comparison.csv (GUI-BENCHMARK-REPORT-01) ------------------------------
+
+OLD_PAYLOAD_SHA256 = "4229dc714c19a6c10a56cc05abdaf48d43102db688be134fbc3b4ba71b6090bb"  # before the O-1 wording fix
+OLD_D2_SOURCE = "REUSED committed docs/results/r5_cccc_references/d2_external.csv (QA 3e6fe2b), checked by recomputation"
+
+
+def committed_d2_square():
+    return {r["nx"]: r for r in csv.DictReader(open(ROOT / "docs/results/r5_cccc_references/d2_external.csv",
+                                                    encoding="utf-8")) if r["r"] == "1"}
+
+
+def test_o1_d2_square_64_provenance_states_the_recomputation_not_a_bitwise_reuse():
+    p = bm.load()
+    square = p["cccc"][0]["grids"]
+    rows = committed_d2_square()
+    g32, g64 = square[1]["D2"], square[2]["D2"]
+    assert g32["beta"] == float(rows["32"]["alpha_ref"]) and g32["source"] == OLD_D2_SOURCE  # bitwise reuse: true
+    assert g64["beta"] == 0.0012679950248812037 and np.nextafter(g64["beta"], 1.0) == float(rows["64"]["alpha_ref"])
+    assert "REUSED" not in g64["source"] and "NOT bitwise equal" in g64["source"] and "1 ULP" in g64["source"]
+    assert rows["64"]["alpha_ref"] in g64["source"]  # the committed value quoted as printed
+    old = json.loads(json.dumps(p))  # the numerical dataset is unchanged: only that provenance text differs
+    old["cccc"][0]["grids"][2]["D2"]["source"] = OLD_D2_SOURCE
+    assert hashlib.sha256(bm.canonical(old)).hexdigest() == OLD_PAYLOAD_SHA256
+
+
+def read_comparison_csv(path):
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    comments = [x for x in lines if x.startswith("#")]
+    return comments, list(csv.DictReader(x for x in lines if not x.startswith("#")))
+
+
+def save(o, folder, **kw):
+    from kkvim_gui.backend import report
+
+    return report.write_package(o, folder, {"run_id": 1}, **kw)
+
+
+def test_report_and_csv_reproduce_the_comparison_of_a_real_cccc_run(tmp_path):
+    """A real CCCC N = 1 run (16 x 16, s = 1): report.html and comparison.csv hold the comparison of the tab."""
+    import html
+
+    from kkvim_gui.backend import export, kkvim_adapter, report
+
+    o = kkvim_adapter.execute(request(n_x=16, n_y=16, half_steps=1))
+    w0 = o.w.copy()
+    c = bm.compare(o)
+    paths = save(o, tmp_path / "pkg")
+    assert (o.w == w0).all() and not o.w.flags.writeable  # the solver result is not modified
+    assert paths["comparison"].name == "comparison.csv"
+    manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    assert manifest["files"]["comparison"] == "comparison.csv" and manifest["schema_version"] == export.SCHEMA_VERSION
+    assert set(manifest["files"]) == {"history", "field", "comparison", "report"}
+    text = paths["report"].read_text(encoding="utf-8")
+    assert f"6. {report.COMPARISON_TITLE}" in text and bm.dataset_text() in text and "проверено при чтении" in text
+    assert "".join(f"<th>{html.escape(h)}</th>" for h in bm.HEADERS) in text
+    for row in c.rows:  # the same texts as the tab (bm.cells), escaped only
+        assert "<tr>" + "".join(f"<td>{html.escape(t)}</td>" for t in bm.cells(row)) + "</tr>" in text
+    for value in (c.w_centre_m, c.beta, c.D, c.w_bar_solver):
+        assert repr(value) in text
+    assert o.status in text and o.mark in text and report.ROLE_TITLE[o.field_role] in text
+    comments, rows = read_comparison_csv(paths["comparison"])
+    assert comments[0] == f"# {o.mark}" and any("no agreement threshold" in x for x in comments)
+    assert list(rows[0]) == [f"{n} [{u}]" if u else n for n, u in report.COMPARISON_COLUMNS]
+    assert [r["reference_kind"] for r in rows] == ["published", "D2", "FEM"]
+    for r, x in zip(rows, c.rows, strict=True):
+        assert r["beta_reference [1]"] == repr(x.reference.beta) == bm.cells(x)[1]
+        assert r["delta_beta [1]"] == repr(x.delta) == bm.cells(x)[3]
+        assert r["delta_beta_relative [%]"] == repr(x.rel_pct) == bm.cells(x)[4]
+        assert float(r["delta_beta [1]"]) == float(r["beta_kkvim [1]"]) - float(r["beta_reference [1]"])
+        assert float(r["beta_kkvim [1]"]) == c.beta and r["reference_source_provenance"] == x.reference.detail
+        assert r["w_centre_reference [m]"] == ("" if x.reference.w_centre_m is None else repr(x.reference.w_centre_m))
+        ids = (r["supports"], r["N"], r["n_x"], r["n_y"], r["centre_i"], r["centre_j"])
+        assert ids == ("CCCC", "1", "16", "16", "8", "8")
+        assert float(r["a [m]"]) == 1.0 and float(r["b [m]"]) == 1.0 and float(r["D [N·m]"]) == o.D
+        assert r["solver_status"] == o.status and r["mark"] == o.mark and r["field_role"] == "research"
+        assert r["scientific_status"] == manifest["statuses"]["scientific_status"]
+        assert r["requested_run_completed"] == "true" and r["half_steps_completed"] == "1"
+        assert r["reference_data_payload_sha256"] == bm.PAYLOAD_SHA256
+    field = list(csv.DictReader(x for x in paths["field"].read_text(encoding="utf-8").splitlines() if not x.startswith("#")))
+    centre = next(f for f in field if f["i"] == "8" and f["j"] == "8")
+    assert float(centre["w [m]"]) == float(rows[0]["w_centre_kkvim [m]"]) == c.w_centre_m  # the saved field
+
+
+def test_ssss_package_compares_with_navier(tmp_path):
+    from kkvim_gui.backend import kkvim_adapter
+
+    defaults = {k: kkvim_adapter.DEFAULTS[k] for k in ("tol_inf", "tol_E", "s_min", "s_max")}
+    o = kkvim_adapter.execute(request(supports="SSSS", n_x=16, n_y=16, half_steps=None, **defaults))
+    assert o.status == "CONVERGED" and o.field_role == "accepted"
+    c = bm.compare(o)
+    paths = save(o, tmp_path / "pkg")
+    _, rows = read_comparison_csv(paths["comparison"])
+    assert [r["reference_kind"] for r in rows] == ["navier"] and rows[0]["delta_beta [1]"] == repr(c.rows[0].delta)
+    assert rows[0]["mark"] == "" and "ACCEPTED solver (D-043)" in rows[0]["scientific_status"]
+
+
+@pytest.mark.parametrize("kw, state", [
+    (dict(b=1.5), bm.UNAVAILABLE),                                   # unsupported geometry
+    (dict(n_x=31, n_y=31), bm.UNAVAILABLE),                          # no centre node
+    (dict(role=ROLE_DIAGNOSTIC, completed=False), bm.DIAGNOSTIC),     # protective stop: diagnostic field
+    (dict(role=ROLE_RESEARCH, completed=False), bm.DIAGNOSTIC),       # incomplete
+    (dict(origin="demo"), bm.NO_RUN),                                # demonstration data
+])
+def test_no_comparison_no_csv_and_the_reason_in_the_report(tmp_path, kw, state):
+    from kkvim_gui.backend import report
+
+    o = outcome(**kw)
+    paths = save(o, tmp_path / "pkg")
+    assert bm.compare(o).state == state and "comparison" not in paths
+    assert not any(p.name.startswith("comparison") for p in (tmp_path / "pkg").iterdir())
+    manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    assert "comparison" not in manifest["files"]
+    text = paths["report"].read_text(encoding="utf-8")
+    assert report.COMPARISON_TITLE in text and bm.STATE_TITLE[state] in text and "не создан" in text
+    assert "Δβ = β_КК-ВИМ" not in text  # no reference table
+    if state == bm.NO_RUN:
+        assert "TEST DATA" in text
+
+
+@pytest.mark.parametrize("failure", [bm.BenchmarkDataError("контрольная сумма"), RuntimeError("unexpected")])
+def test_damaged_reference_data_never_prevent_saving(tmp_path, monkeypatch, failure):
+    def broken(text=None):
+        raise failure
+
+    monkeypatch.setattr(bm, "load", broken)
+    paths = save(outcome(), tmp_path / "pkg")
+    assert "comparison" not in paths and paths["field"].exists() and paths["manifest"].exists()
+    text = paths["report"].read_text(encoding="utf-8")
+    assert bm.STATE_TITLE[bm.DATA_ERROR] in text and "не прошли проверку" in text and "Δβ = β_КК-ВИМ" not in text
+
+
+def test_existing_package_is_never_overwritten(tmp_path):
+    folder = tmp_path / "pkg"
+    folder.mkdir()
+    (folder / "comparison.csv").write_text("user data", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        save(outcome(), folder)
+    assert [p.name for p in folder.iterdir()] == ["comparison.csv"]
+    assert (folder / "comparison.csv").read_text(encoding="utf-8") == "user data"
+
+
+def test_the_package_uses_the_comparison_object_it_is_given(tmp_path):
+    """The analysis window passes the Comparison of its tab: the report shows exactly that object."""
+    o = outcome()
+    c = bm.compare(o)
+    paths = save(o, tmp_path / "pkg", comparison=c)
+    _, rows = read_comparison_csv(paths["comparison"])
+    assert [float(r["delta_beta [1]"]) for r in rows] == [x.delta for x in c.rows]

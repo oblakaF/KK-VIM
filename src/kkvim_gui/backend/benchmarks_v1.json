@@ -72,7 +72,7 @@
        "w_centre_m": 6.593574129382259e-05,
        "e_D2_m": 6.710733400088517e-21,
        "refinement_steps": 3,
-       "source": "REUSED committed docs/results/r5_cccc_references/d2_external.csv (QA 3e6fe2b), checked by recomputation",
+       "source": "new D2 recomputation (r5_cccc_d2); NOT bitwise equal to the committed docs/results/r5_cccc_references/d2_external.csv (QA 3e6fe2b) value 0.0012679950248812039 as printed: differs by 1 ULP (2.168404344971009e-19)",
        "call": "r5_cccc_d2.solve(D2Problem(1.0, 1.0, 64, 64, D, 1000.0))"
       },
       "FEM": {
@@ -354,5 +354,5 @@
    }
   }
  },
- "payload_sha256": "4229dc714c19a6c10a56cc05abdaf48d43102db688be134fbc3b4ba71b6090bb"
+ "payload_sha256": "3543073f2b0f642a9e3bb0a571c400e9d2dc3eba1bda436755d5ae9bbb27b568"
 }

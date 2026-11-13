@@ -184,13 +184,14 @@ class SmokeTest:
                            analysis_badge_visible=not window.header.badge.isHidden(),
                            package={k: str(v) for k, v in paths.items()},
                            manifest_statuses=manifest["statuses"], manifest_marks=manifest["marks"],
-                           comparison=comparison)
+                           manifest_files=manifest["files"], comparison=comparison)
         if self.case is None:
             ok = o.status == "CONVERGED"
         else:
             ok = (self.case.get("expect_status", o.status) == o.status
                   and self.case.get("expect_field_role", o.field_role) == o.field_role
                   and self.case.get("expect_comparison", comparison["state"]) == comparison["state"]
+                  and ("comparison" in manifest["files"]) == (comparison["state"] == "available")
                   and manifest["statuses"]["solver_status"] == o.status
                   and manifest["statuses"]["field_role"] == o.field_role)
         self._finish(0 if ok else 1, "ok" if ok else "unexpected status or field role")
@@ -203,12 +204,14 @@ class SmokeTest:
         window.tabs.setCurrentWidget(tab)
         QApplication.processEvents()
         window.grab().save(str(self.folder / "screen_analysis_comparison.png"))
-        shown = []
+        shown, tips = [], []
         if tab.table is not None:
             model = tab.table.model()
             shown = [[model.data(model.index(i, j)) for j in range(model.columnCount())] for i in range(model.rowCount())]
+            tips = [model.data(model.index(i, benchmarks.DETAIL_COLUMN), Qt.ItemDataRole.ToolTipRole)
+                    for i in range(model.rowCount())]
         return {**benchmarks.as_record(tab.comparison), "tab_enabled": window.tabs.isTabEnabled(window.tabs.indexOf(tab)),
-                "state_text": tab.state_label.text(), "table_shown": shown}
+                "state_text": tab.state_label.text(), "table_shown": shown, "provenance_tooltips": tips}
 
     def _finish(self, code, text):
         self.report.update(exit_code=code, result=text, seconds=round(time.monotonic() - self.t0, 2))

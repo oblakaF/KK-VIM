@@ -141,7 +141,7 @@ def test_report_and_package_without_figures_hold_the_outcome_values(tmp_path):
                          s_max=kkvim_adapter.DEFAULTS["s_max"])
     o = kkvim_adapter.execute(request)
     paths = report.write_package(o, tmp_path / "pkg", {"run_id": 1})
-    assert set(paths) == {"manifest", "history", "field", "report"}
+    assert set(paths) == {"manifest", "history", "field", "comparison", "report"}  # the benchmark square (Navier)
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))
     e, c = o.extremum(), report.centre_node(o)
     assert c is not None and (c["i"], c["j"]) == (12, 12) and c["w"] == float(o.w[12, 12])
@@ -244,7 +244,10 @@ def test_workflow_matches_the_accepted_solver_and_saves_what_is_shown(qtbot, pre
     w_before = o.w.copy()
     paths = window.save_package(tmp_path / "saved")
     assert np.array_equal(o.w, w_before)  # the drawing factor never touches the values
-    assert set(paths) == {"manifest", "history", "field", "field_png", "surface_png", "report"}
+    files = {"manifest", "history", "field", "field_png", "surface_png", "report"}
+    if window.comparison.comparison.has_numbers:  # the benchmark square: the tab's comparison is saved as well
+        files.add("comparison")
+    assert set(paths) == files and (si == SQUARE[1]) == ("comparison" in paths)
     for key in ("field_png", "surface_png"):
         assert paths[key].stat().st_size > 10_000 and paths[key].read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))

@@ -61,9 +61,11 @@ def fmt(value, digits=4):
 class RowsModel(QAbstractTableModel):
     """Read-only table: headers and a function row -> tuple of values (no copy of large arrays)."""
 
-    def __init__(self, headers, count, row, digits=6, parent=None):
+    def __init__(self, headers, count, row, digits=6, parent=None, tooltip=None):
+        """tooltip(row, column) -> text: optional full text of a cell (read-only access to a narrowed column)."""
         super().__init__(parent)
         self._headers, self._count, self._row, self._digits = list(headers), count, row, digits
+        self._tooltip = tooltip
 
     def rowCount(self, parent=QModelIndex()):  # noqa: B008, N802 - Qt API
         return 0 if parent.isValid() else self._count
@@ -79,6 +81,8 @@ class RowsModel(QAbstractTableModel):
             return fmt(value, self._digits)
         if role == Qt.ItemDataRole.UserRole:
             return value
+        if role == Qt.ItemDataRole.ToolTipRole and self._tooltip is not None:
+            return self._tooltip(index.row(), index.column())
         if role == Qt.ItemDataRole.TextAlignmentRole and isinstance(value, (int, float, np.number)):
             return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return None

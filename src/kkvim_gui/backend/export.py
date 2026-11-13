@@ -89,6 +89,11 @@ def marks(outcome: RunOutcome) -> list[str]:
     return out
 
 
+def scientific_status(outcome: RunOutcome) -> str:
+    """The scientific status written to the manifest (and to comparison.csv)."""
+    return outcome.mark or "R3 ACCEPTED solver (D-043); a single run is not a scientific acceptance"
+
+
 def field_file_name(outcome: RunOutcome) -> str | None:
     """The file name of the field of ``outcome`` (role, TEST DATA suffix), or None without a field."""
     if outcome.field_file is None:
@@ -126,7 +131,7 @@ def manifest(outcome: RunOutcome, run_meta: dict | None = None, log=(), files=No
             "error": outcome.error,
             "stop": {"kind": outcome.stop_kind, "text": outcome.stop_text},
             "scientific": {"kind": outcome.science_kind, "text": outcome.science_text},
-            "scientific_status": outcome.mark or "R3 ACCEPTED solver (D-043); a single run is not a scientific acceptance",
+            "scientific_status": scientific_status(outcome),
             "mark": outcome.mark,
             "requested_run_completed": outcome.requested_completed,
             "field_role": outcome.field_role,

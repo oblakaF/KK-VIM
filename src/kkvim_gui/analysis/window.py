@@ -318,7 +318,8 @@ class AnalysisWindow(QMainWindow):
         return export.write_result(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed)
 
     def save_package(self, folder):
-        """Calculation package of this run (export files, PNG figures, report.html) in a new subfolder."""
+        """Calculation package of this run (export files, PNG figures, report.html and, when the "Сравнение" tab
+        shows a comparison, comparison.csv: the tab's own Comparison object) in a new subfolder."""
         from kkvim_gui.analysis import snapshots
         from kkvim_gui.backend import report
 
@@ -326,7 +327,8 @@ class AnalysisWindow(QMainWindow):
         meta = self.run.meta(self.run._t0 + (self.run._elapsed_final or 0.0))
         return report.write_package(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed,
                                     render=snapshots.renderer(self.session, self.outcome, factor),
-                                    view=snapshots.view_record(self.outcome, factor))
+                                    view=snapshots.view_record(self.outcome, factor),
+                                    comparison=self.comparison.comparison)
 
     def _save_package_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Папка для расчёта и отчёта")

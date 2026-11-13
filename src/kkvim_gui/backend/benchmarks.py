@@ -23,7 +23,7 @@ import numpy as np
 DATA_FILE = "benchmarks_v1.json"
 SCHEMA = "kkvim-gui-benchmarks/1"
 # SHA256 of the canonical JSON of the payload (independent of line endings of the checkout)
-PAYLOAD_SHA256 = "4229dc714c19a6c10a56cc05abdaf48d43102db688be134fbc3b4ba71b6090bb"
+PAYLOAD_SHA256 = "3543073f2b0f642a9e3bb0a571c400e9d2dc3eba1bda436755d5ae9bbb27b568"
 
 AVAILABLE = "available"  # at least one reference matches: numbers are shown
 UNAVAILABLE = "unavailable"  # no reference for these inputs or no exact centre node
@@ -33,6 +33,17 @@ NO_RUN = "no_run"  # no solver result (demonstration or no field)
 
 KIND_TITLE = {"published": "Опубликованное решение (Taylor, Govindjee 2002)", "D2": "D2 (та же дискретная задача)",
               "FEM": "МКЭ, элемент Морли (другая дискретизация)", "navier": "Аналитическое решение Навье"}
+STATE_TITLE = {
+    AVAILABLE: "Сравнение с сохранёнными эталонами: знаковые разности, без порога согласия",
+    UNAVAILABLE: "Эталонные данные для этого расчёта недоступны",
+    DIAGNOSTIC: "Сравнение не выполняется: поле диагностическое",
+    DATA_ERROR: "Данные эталонов повреждены или отсутствуют",
+    NO_RUN: "Нет результата решателя",
+}
+# one layout of the reference table for the "Сравнение" tab and report.html (comparison.csv carries the same values)
+HEADERS = ("Эталон", "β эталона", "w эталона в центре, m", "Δβ = β_КК-ВИМ − β_эталона", "Δβ / β_эталона, %",
+           "Метод, сетка, происхождение")
+DETAIL_COLUMN = HEADERS.index("Метод, сетка, происхождение")
 
 
 class BenchmarkDataError(Exception):
@@ -188,6 +199,22 @@ def compare(outcome, text: str | None = None) -> Comparison:
     rows = tuple(Row(ref, beta, beta - ref.beta, (beta - ref.beta) / ref.beta * 100.0) for ref in refs)
     return Comparison(AVAILABLE, "", supports, centre, w_c, beta, w_bar, outcome.D, rows, tuple(missing),
                       _notes(supports), data)
+
+
+def full(value) -> str:
+    """Full-precision text of a number (shortest repr that round-trips the binary64 value); "—" for None."""
+    return "—" if value is None else repr(float(value))
+
+
+def cells(row: Row) -> tuple:
+    """Texts of one reference row in the order of HEADERS (the same in the tab and in report.html)."""
+    ref = row.reference
+    return (ref.title, full(ref.beta), full(ref.w_centre_m), full(row.delta), full(row.rel_pct), ref.detail)
+
+
+def dataset_text() -> str:
+    """Version and integrity identifier of the reference data of this program."""
+    return f"{DATA_FILE}, схема {SCHEMA}, SHA256 содержимого {PAYLOAD_SHA256}"
 
 
 def as_record(c: Comparison) -> dict:

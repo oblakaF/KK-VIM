@@ -5,7 +5,12 @@
 - ``manifest.json``, ``history.csv`` and the field file of its role (``field.csv``, ``field_research.csv`` or
   ``field_diagnostic.csv``) — the export of ``backend.export``;
 - the figures rendered by the interface (PNG; the caller passes a function that writes them);
-- ``report.html`` — a readable report built from the same ``RunOutcome`` as the export files.
+- ``report.html`` — a readable report built from the same ``RunOutcome`` as the export files;
+- ``comparison.csv`` — only when the run has a comparison with the saved independent references
+  (``backend.benchmarks``): the same ``Comparison`` object as the "Сравнение" tab, the same table texts in the report
+  section "Сравнение с независимыми эталонами", the same binary64 values in the CSV. Without a comparison (other inputs,
+  a diagnostic field, demonstration data, damaged reference data) the report states the reason and no CSV is written;
+  the reference data never prevent saving the calculation.
 
 Every number of the report is taken from the outcome; the report shows it in the interface form and, next to it,
 in Python's round-trip form (``repr``), so the report can be checked against ``manifest.json`` and ``field.csv``
@@ -21,7 +26,7 @@ from pathlib import Path
 import numpy as np
 
 from kkvim_gui import program_version
-from kkvim_gui.backend import export
+from kkvim_gui.backend import benchmarks, export
 from kkvim_gui.backend.outcome import RunOutcome
 
 PREVIEW_TITLE = "KK-VIM — отчёт расчёта"
@@ -36,10 +41,30 @@ ROLE_TITLE = {
 LIMITATIONS = (  # common to every route; the limits of the route itself come from the outcome (``RunOutcome.limitations``)
     "Теории Тимошенко и Редди в этой версии недоступны.",
     "Результат — значения в узлах сетки n_x × n_y; максимальный |w| найден по узлам, а не между ними.",
-    "Моменты, напряжения и сравнение с эталонами в этой версии не выводятся.",
+    "Моменты и напряжения в этой версии не выводятся.",
+    "Сравнение с эталонами — только при точном совпадении входных данных с сохранёнными эталонами (раздел 6); "
+    "порога согласия нет, научный статус расчёта оно не меняет.",
     "Масштаб прогиба на 3D-виде увеличен только для изображения; все числа отчёта и файлов — без увеличения.",
 )
 IMAGE_TITLES = {"field_png": "Поле прогиба w(x, y) с изолиниями", "surface_png": "Деформированная форма (3D-вид)"}
+COMPARISON_TITLE = "Сравнение с независимыми эталонами"
+COMPARISON_FILE = "comparison.csv"
+COMPARISON_COLUMNS = (  # (name, unit): "1" dimensionless, "" text or count
+    ("reference_kind", ""), ("reference_method", ""), ("reference_source_provenance", ""),
+    ("beta_reference", "1"), ("w_centre_reference", "m"), ("beta_kkvim", "1"), ("w_centre_kkvim", "m"),
+    ("delta_beta", "1"), ("delta_beta_relative", "%"),
+    ("supports", ""), ("N", ""), ("a", "m"), ("b", "m"), ("h", "m"), ("E", "Pa"), ("nu", "1"), ("q", "Pa"),
+    ("n_x", ""), ("n_y", ""), ("centre_i", ""), ("centre_j", ""), ("x_centre", "m"), ("y_centre", "m"),
+    ("D", "N·m"), ("w_bar_solver_centre", "1"), ("half_steps_completed", ""), ("half_steps_requested", ""),
+    ("solver_status", ""), ("requested_run_completed", ""), ("field_role", ""), ("scientific_status", ""),
+    ("mark", ""), ("reference_data", ""), ("reference_data_payload_sha256", ""),
+)
+COMPARISON_DEFINITIONS = (
+    "# comparison with saved independent references: beta = w(a/2, b/2) * D / (q * a^4); "
+    "delta_beta = beta_kkvim - beta_reference; delta_beta_relative = delta_beta / beta_reference * 100 %",
+    "# signed differences only: no agreement threshold is approved; the comparison is not a scientific acceptance "
+    "and does not change the status of the run",
+)
 
 
 def _e(text) -> str:
@@ -88,9 +113,80 @@ def _rows(rows) -> str:
     return "\n".join(f"<tr><th>{_e(k)}</th><td>{v}</td></tr>" for k, v in rows)
 
 
-def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None) -> str:
+def comparison_of(outcome: RunOutcome) -> benchmarks.Comparison:
+    """``benchmarks.compare`` of the outcome; any failure of the reference data becomes DATA_ERROR, never a lost package."""
+    try:
+        return benchmarks.compare(outcome)
+    except Exception as exc:  # noqa: BLE001 - the calculation package must stay savable without the reference data
+        supports = getattr(getattr(outcome, "request", None), "supports", "")
+        return benchmarks.Comparison(benchmarks.DATA_ERROR, f"Сравнение недоступно: данные эталонов не прочитаны ({exc}).",
+                                     supports)
+
+
+def comparison_rows(outcome: RunOutcome, c: benchmarks.Comparison) -> list[tuple]:
+    """Rows of comparison.csv in the order of COMPARISON_COLUMNS: the values of ``c`` and of the outcome, not recomputed."""
+    r = outcome.request
+    run = (r.supports, r.N, r.a, r.b, r.t, r.E, r.nu, r.q, r.n_x, r.n_y, c.centre["i"], c.centre["j"], c.centre["x"],
+           c.centre["y"], c.D, c.w_bar_solver, outcome.s, outcome.s_requested, outcome.status, outcome.requested_completed,
+           outcome.field_role, export.scientific_status(outcome), outcome.mark or "",
+           f"{benchmarks.DATA_FILE} ({benchmarks.SCHEMA})", benchmarks.PAYLOAD_SHA256)
+    return [(x.reference.kind, x.reference.title, x.reference.detail, x.reference.beta, x.reference.w_centre_m,
+             x.beta_kkvim, c.w_centre_m, x.delta, x.rel_pct, *run) for x in c.rows]
+
+
+def write_comparison_csv(outcome: RunOutcome, c: benchmarks.Comparison, path) -> Path:
+    if not c.has_numbers:
+        raise ValueError("no comparison with numbers: comparison.csv is not written")
+    path = Path(path)
+    header = [f"{name} [{unit}]" if unit else name for name, unit in COMPARISON_COLUMNS]
+    export._write_csv(path, [*export._header_lines(outcome), *COMPARISON_DEFINITIONS], header, comparison_rows(outcome, c))
+    return path
+
+
+def _comparison_section(outcome: RunOutcome, c: benchmarks.Comparison, csv_name) -> str:
+    """Section 6: the same Comparison as the "Сравнение" tab, its table texts (benchmarks.cells) and statuses."""
+    reason = c.reason
+    if outcome.is_demo:
+        reason = "Демонстрационные данные (TEST DATA): решатель не вызывался, сравнение не выполняется."
+    if c.state == benchmarks.DATA_ERROR:
+        data = f"не прошли проверку; ожидались {benchmarks.dataset_text()}"
+    elif c.data is not None:
+        data = f"{benchmarks.dataset_text()} — проверено при чтении"
+    else:
+        data = f"не читались (сравнение не выполняется); версия программы: {benchmarks.dataset_text()}"
+    rows = [("Состояние сравнения", f"<b>{_e(benchmarks.STATE_TITLE[c.state])}</b>")]
+    if reason:
+        rows.append(("Причина", _e(reason)))
+    rows += [("Данные эталонов", _e(data)),
+             ("Статус решателя", _e(outcome.status)),
+             ("Научный статус", _e(" · ".join(t for t in (outcome.mark, outcome.science_text) if t))),
+             ("Роль поля", _e(ROLE_TITLE.get(outcome.field_role, "поле не получено")))]
+    if not c.has_numbers:
+        rows.append(("Файл comparison.csv", "не создан: сравнения с числами для этого расчёта нет"))
+        return f"<h2>6. {_e(COMPARISON_TITLE)}</h2><table>{_rows(rows)}</table>"
+    ce = c.centre
+    rows += [
+        ("Узел центра", _e(f"i = {ce['i']}, j = {ce['j']}: x = {ce['x']!r} m, y = {ce['y']!r} m (точно a/2, b/2)")),
+        ("Прогиб в центре w_c (КК-ВИМ)", f"{_e(benchmarks.full(c.w_centre_m))} m"),
+        ("Жёсткость D (kkvim)", f"{_e(benchmarks.full(c.D))} N·m"),
+        ("β = w_c·D/(q·a⁴) (КК-ВИМ)", f"<b>{_e(benchmarks.full(c.beta))}</b>"),
+        ("w̄ решателя в этом узле", f"{_e(benchmarks.full(c.w_bar_solver))} (MATH_SPEC 2.5, контроль)"),
+        ("Файл comparison.csv", f"<code>{_e(csv_name)}</code> — те же значения"),
+    ]
+    head = "".join(f"<th>{_e(h)}</th>" for h in benchmarks.HEADERS)
+    body = "\n".join("<tr>" + "".join(f"<td>{_e(t)}</td>" for t in benchmarks.cells(x)) + "</tr>" for x in c.rows)
+    missing = "".join(f"<li>{_e(benchmarks.KIND_TITLE[k])}: {_e(why)}.</li>" for k, why in c.missing)
+    notes = "".join(f"<li>{_e(n)}</li>" for n in c.notes)
+    return (f"<h2>6. {_e(COMPARISON_TITLE)}</h2><table>{_rows(rows)}</table>\n"
+            f"<table class=\"h c\"><tr>{head}</tr>\n{body}</table>\n"
+            + (f"<p>Нет данных:</p><ul>{missing}</ul>" if missing else "")
+            + f"<p>Как читать сравнение:</p><ul>{notes}</ul>")
+
+
+def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None, comparison=None) -> str:
     r = outcome.request
     view = view or {}
+    comparison = comparison if comparison is not None else comparison_of(outcome)
     s = summary(outcome)
     e, c = s["w_max_abs_node"], s["w_centre_node"]
     created = datetime.now().isoformat(timespec="seconds")
@@ -168,7 +264,9 @@ background:#fff;line-height:1.45}}
 h1{{font-size:22px}} h2{{font-size:17px;margin-top:28px;border-bottom:1px solid #DCE3EA;padding-bottom:4px}}
 table{{border-collapse:collapse;width:100%;font-size:14px}} th,td{{border:1px solid #DCE3EA;padding:4px 8px;
 text-align:left;vertical-align:top}} th{{background:#F3F6F9;font-weight:600;width:32%}}
-table.h th{{width:auto}} .banner{{background:#FFF4E0;border:1px solid #E3AE52;padding:8px 12px}}
+table.h th{{width:auto}} table.c td{{font-family:Consolas,monospace;font-size:12px;overflow-wrap:anywhere}}
+table.c td:first-child,table.c td:last-child{{font-family:inherit;font-size:13px}}
+.banner{{background:#FFF4E0;border:1px solid #E3AE52;padding:8px 12px}}
 .x{{color:#5F6E7C;font-family:Consolas,monospace;font-size:12px}} figure{{margin:12px 0}}
 img{{max-width:100%;border:1px solid #DCE3EA}} figcaption{{font-size:13px;color:#5F6E7C}}
 </style></head><body>
@@ -183,28 +281,33 @@ img{{max-width:100%;border:1px solid #DCE3EA}} figcaption{{font-size:13px;color:
 <p class="x">В скобках — точные значения массивов решателя (repr), те же, что в manifest.json и field.csv.</p>
 {images}
 <h2>5. Статус расчёта</h2><table>{_rows(statuses)}</table>
-<h2>6. История полушагов</h2><table class="h"><tr>{head}</tr>
+{_comparison_section(outcome, comparison, files.get("comparison"))}
+<h2>7. История полушагов</h2><table class="h"><tr>{head}</tr>
 {body}</table>
-<h2>7. Ограничения применимости</h2><ul>{"".join(f"<li>{_e(t)}</li>" for t in (*outcome.limitations, *LIMITATIONS))}</ul>
-<h2>8. Файлы расчёта</h2><ul>{file_list}</ul>
+<h2>8. Ограничения применимости</h2><ul>{"".join(f"<li>{_e(t)}</li>" for t in (*outcome.limitations, *LIMITATIONS))}</ul>
+<h2>9. Файлы расчёта</h2><ul>{file_list}</ul>
 </body></html>
 """
 
 
-def write_package(outcome: RunOutcome, folder, run_meta=None, log=(), render=None, view=None) -> dict:
+def write_package(outcome: RunOutcome, folder, run_meta=None, log=(), render=None, view=None, comparison=None) -> dict:
     """Write the calculation package into ``folder`` and return {name: path}.
 
     ``render(folder) -> {"field_png": path, "surface_png": path}`` draws the figures (Qt, by the caller); it is
     called only for a result with a field. ``view`` records how the figures were drawn (e.g. the exaggeration).
+    ``comparison``: the ``benchmarks.Comparison`` shown in the "Сравнение" tab of this outcome (computed here if None).
     """
     folder = Path(folder)
-    paths = export.write_result(outcome, folder, run_meta, log)
+    paths = export.write_result(outcome, folder, run_meta, log)  # refuses an existing non-empty folder
     if render is not None and outcome.has_field:
         paths.update({k: Path(v) for k, v in render(folder).items()})
+    comparison = comparison if comparison is not None else comparison_of(outcome)
+    if comparison.has_numbers:
+        paths["comparison"] = write_comparison_csv(outcome, comparison, folder / COMPARISON_FILE)
     suffix = "_TEST-DATA" if outcome.is_demo else ""
     paths["report"] = folder / f"report{suffix}.html"
     files = {name: path.name for name, path in paths.items() if name != "manifest"}
-    paths["report"].write_text(report_html(outcome, files, run_meta, view), encoding="utf-8")
+    paths["report"].write_text(report_html(outcome, files, run_meta, view, comparison), encoding="utf-8")
     data = export.manifest(outcome, run_meta, log, files)
     data["report_summary"] = export._plain(summary(outcome))
     data["visualization"] = export._plain(view or {})

@@ -78,12 +78,48 @@ def test_cccc_benchmark_case_shows_all_references_at_full_precision(qtbot, gui):
     assert full(c.beta) == repr(c.beta)
 
 
-def test_case_without_reference_data_states_it_without_numbers(qtbot, gui):
+def test_full_provenance_is_readable_in_the_tooltip(qtbot, gui):
+    """O-2: the provenance column is cut by the window width; its tooltip gives the full read-only text."""
+    from PySide6.QtCore import Qt
+
+    run, a = run_case(qtbot, gui)
+    m = a.comparison.table.model()
+    for i, r in enumerate(a.comparison.comparison.rows):
+        tip = m.data(m.index(i, bm.DETAIL_COLUMN), Qt.ItemDataRole.ToolTipRole)
+        assert tip == f"{r.reference.title}\n{r.reference.detail}"
+        assert m.data(m.index(i, 3), Qt.ItemDataRole.ToolTipRole) == repr(r.delta)
+    assert a.comparison.table.editTriggers() == a.comparison.table.EditTrigger.NoEditTriggers
+
+
+def test_saved_report_and_csv_hold_the_table_shown_in_the_tab(qtbot, gui, tmp_path):
+    """GUI-BENCHMARK-REPORT-01: the package saved from the analysis window repeats the tab, value by value."""
+    import csv
+    import html
+    import json
+
+    run, a = run_case(qtbot, gui)
+    shown = cell_texts(a.comparison)
+    paths = a.save_package(tmp_path / "saved")
+    text = paths["report"].read_text(encoding="utf-8")
+    for row in shown:
+        assert "<tr>" + "".join(f"<td>{html.escape(t)}</td>" for t in row) + "</tr>" in text
+    lines = [x for x in paths["comparison"].read_text(encoding="utf-8").splitlines() if not x.startswith("#")]
+    rows = list(csv.DictReader(lines))
+    assert [[r["beta_reference [1]"], r["delta_beta [1]"], r["delta_beta_relative [%]"]] for r in rows] == \
+        [[row[1], row[3], row[4]] for row in shown]
+    assert [r["reference_source_provenance"] for r in rows] == [row[5] for row in shown]
+    data = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    assert data["files"]["comparison"] == "comparison.csv" and data["statuses"]["mark"] == run.outcome.mark
+
+
+def test_case_without_reference_data_states_it_without_numbers(qtbot, gui, tmp_path):
     run, a = run_case(qtbot, gui, b=1.5)
     c = a.comparison.comparison
     assert c.state == bm.UNAVAILABLE and a.comparison.table is None and c.beta is None
     assert "Эталонных данных для этих входных данных нет" in a.comparison.reason.text()
     assert a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение"))
+    paths = a.save_package(tmp_path / "saved")  # saving works without references
+    assert "comparison" not in paths and c.reason.split(":")[0] in paths["report"].read_text(encoding="utf-8")
 
 
 def test_protective_stop_is_not_compared(qtbot, gui):

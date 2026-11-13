@@ -13,20 +13,11 @@ from kkvim_gui.analysis import results
 from kkvim_gui.backend import benchmarks
 from kkvim_gui.widgets.common import Card, Note, StatusLabel, label
 
-HEADERS = ("Эталон", "β эталона", "w эталона в центре, m", "Δβ = β_КК-ВИМ − β_эталона", "Δβ / β_эталона, %",
-           "Метод, сетка, происхождение")
-STATE_TEXT = {
-    benchmarks.AVAILABLE: ("neutral", "Сравнение с сохранёнными эталонами: знаковые разности, без порога согласия"),
-    benchmarks.UNAVAILABLE: ("warning", "Эталонные данные для этого расчёта недоступны"),
-    benchmarks.DIAGNOSTIC: ("warning", "Сравнение не выполняется: поле диагностическое"),
-    benchmarks.DATA_ERROR: ("error", "Данные эталонов повреждены или отсутствуют"),
-    benchmarks.NO_RUN: ("neutral", "Нет результата решателя"),
-}
-
-
-def full(value):
-    """Full-precision text of a number (shortest repr that round-trips the binary64 value)."""
-    return "—" if value is None else repr(float(value))
+HEADERS = benchmarks.HEADERS  # one table layout for this tab and report.html
+STATE_KIND = {benchmarks.AVAILABLE: "neutral", benchmarks.UNAVAILABLE: "warning", benchmarks.DIAGNOSTIC: "warning",
+              benchmarks.DATA_ERROR: "error", benchmarks.NO_RUN: "neutral"}
+STATE_TEXT = {state: (kind, benchmarks.STATE_TITLE[state]) for state, kind in STATE_KIND.items()}
+full = benchmarks.full  # full-precision text of a number (shortest repr that round-trips the binary64 value)
 
 
 class ComparisonTab(QWidget):
@@ -60,9 +51,7 @@ class ComparisonTab(QWidget):
         self.table = None
         if c.has_numbers:
             rows = c.rows
-            model = results.RowsModel(HEADERS, len(rows), lambda i: (
-                rows[i].reference.title, full(rows[i].reference.beta), full(rows[i].reference.w_centre_m),
-                full(rows[i].delta), full(rows[i].rel_pct), rows[i].reference.detail))
+            model = results.RowsModel(HEADERS, len(rows), lambda i: benchmarks.cells(rows[i]), tooltip=self._tooltip)
             self.table = results.table_view(model)
             self.table.setMinimumHeight(40 + 34 * len(rows))
             refs = Card("Эталоны (сохранённые данные, не пересчитываются)")
@@ -88,6 +77,12 @@ class ComparisonTab(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
+
+    def _tooltip(self, i, j):
+        """Full text of a cell: the provenance column is cut by the window width, its tooltip is not (read-only)."""
+        row = self.comparison.rows[i]
+        text = benchmarks.cells(row)[j]
+        return f"{row.reference.title}\n{text}" if j == benchmarks.DETAIL_COLUMN else text
 
     def _run_rows(self):
         o, c = self.outcome, self.comparison
