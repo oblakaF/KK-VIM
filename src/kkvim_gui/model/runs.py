@@ -225,7 +225,11 @@ class RunManager(QObject):
         self.protocol_dir = Path(protocol_dir) if protocol_dir else None
         self.runs = []
         self.series = []
-        self._navier_jobs = []  # (job, callback(record)) still running
+        # (job, callback(manager, record)) still running. The callback gets the manager as an argument and never
+        # closes over it: a closure would make a reference cycle, and a parentless manager would then be freed by
+        # the cyclic garbage collector, possibly in a reader thread of a reference job (a QObject destroyed outside
+        # the GUI thread while its timer is registered there — a native crash; GUI-QT-LIFETIME-REGRESSION-FIX-01).
+        self._navier_jobs = []
         self._timer = QTimer(self)
         self._timer.setInterval(200)
         self._timer.timeout.connect(self.tick)
@@ -271,7 +275,7 @@ class RunManager(QObject):
             run.series_id = series.series_id
             run.navier = self._series_point(series, request)
         elif request.supports == "SSSS":
-            self._start_navier(request, [request.q], lambda record, r=run: self._set_navier(r, record))
+            self._start_navier(request, [request.q], lambda manager, record, r=run: manager._set_navier(r, record))
         route = ROUTES[request.route]
         solver = f"{route['solver']} ({route['call']}; {', '.join(route['decisions'])})"
         run.log("ИНФО", "Формальная проверка ввода и проверка ввода решателем выполнены")
@@ -299,14 +303,15 @@ class RunManager(QObject):
     # Independent Navier reference (SSSS) ------------------------------------------------------------
 
     def _start_navier(self, request, loads, callback):
-        """Start the reference job of ``loads``; the record goes to ``callback`` (pending until it answers)."""
+        """Start the reference job of ``loads``; the record goes to ``callback(self, record)`` (pending until it
+        answers)."""
         if self.navier_factory is None:
             return None
-        callback(navier_job.pending_record())
+        callback(self, navier_job.pending_record())
         try:
             job = self.navier_factory(navier_job.worker_input(request, loads))
         except OSError as exc:
-            callback({"state": navier_job.FAILED, "reason": f"процесс эталона Навье не запущен: {exc}"})
+            callback(self, {"state": navier_job.FAILED, "reason": f"процесс эталона Навье не запущен: {exc}"})
             return None
         self._navier_jobs.append((job, callback))
         self._timer.start()
@@ -326,7 +331,7 @@ class RunManager(QObject):
             record = job.poll()
             if record is not None:
                 self._navier_jobs.remove((job, callback))
-                callback(record)
+                callback(self, record)
 
     @property
     def references_pending(self):
@@ -350,7 +355,7 @@ class RunManager(QObject):
         self.series.append(series)
         if requests[0].supports == "SSSS":
             series._job = self._start_navier(requests[0], [r.q for r in requests],
-                                             lambda record, s=series: self._set_series_navier(s, record))
+                                             lambda manager, record, s=series: manager._set_series_navier(s, record))
         self._start_point(series)
         return series
 

@@ -247,3 +247,42 @@ def test_lock_banner_only_during_an_active_run(window, clock, monkeypatch):
     assert sv.lock_banner.isVisibleTo(sv)
     window.runs.stop(window.runs.active.run_id)             # stopped: banner hidden
     assert not sv.lock_banner.isVisibleTo(sv)
+
+
+@pytest.mark.parametrize("series", [False, True])
+def test_manager_with_a_pending_navier_job_is_freed_without_the_cyclic_collector(qapp, series):
+    """GUI-QT-LIFETIME-REGRESSION-FIX-01: a parentless manager whose Navier job still runs after «Стоп» must be
+    freed by reference counting. A reference cycle through the job callback left it to the cyclic garbage collector,
+    which may run in a reader thread of a reference job: the QObject and its active timer were then destroyed outside
+    the GUI thread (native access violation in the next ``processEvents``)."""
+    import gc
+    import weakref
+    from types import SimpleNamespace
+
+    from kkvim_gui.model.setup_state import to_request, to_series_requests
+
+    def make():
+        jobs = []
+        manager = RunManager(process_factory=lambda request: SimpleNamespace(poll=lambda: None,
+                                                                             terminate=lambda timeout=2.0: True),
+                             navier_factory=lambda inputs: jobs.append(inputs) or SimpleNamespace(
+                                 poll=lambda: None, terminate=lambda timeout=5.0: True))
+        state = SetupState()
+        if series:
+            state = state.with_choice(load_mode="series").with_text("q_series", "1; 2")
+            manager.start_series(state, to_series_requests(state))
+            run = manager.active
+        else:
+            run = manager.start(state, to_request(state))
+        manager.stop(run.run_id)
+        assert jobs and manager.references_pending and manager._timer.isActive()  # the Navier job still runs
+        return weakref.ref(manager)
+
+    enabled = gc.isenabled()
+    gc.disable()  # only reference counting may free the manager here
+    try:
+        ref = make()
+        assert ref() is None
+    finally:
+        if enabled:
+            gc.enable()
