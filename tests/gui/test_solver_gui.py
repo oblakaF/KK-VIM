@@ -199,7 +199,7 @@ def test_r4_from_the_form_to_figures_history_and_export(qtbot, gui, tmp_path):
     with qtbot.waitSignal(w.analysisRequested):
         rv.analysis_button.click()
     a = gui.analysis_windows[-1]
-    assert a.outcome is o and [a.tabs.tabText(i) for i in range(a.tabs.count())] == list(SOLVER_TABS)
+    assert a.outcome is o and [a.tabs.tabText(i) for i in range(a.tabs.count())] == [*SOLVER_TABS, "Циклы VIM-1–3"]
     assert a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение с эталоном"))
     c = a.comparison.comparison  # SSSS N = 2: the Navier reference of these inputs as reference data only
     assert c.state == "available" and c.live and any("справочные данные" in n for n in c.notes)

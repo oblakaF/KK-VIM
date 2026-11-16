@@ -42,5 +42,11 @@
   "d2.section.x.title": "KK-VIM and FDM D2: section at y = {y} m",
   "d2.section.y.title": "KK-VIM and FDM D2: section at x = {x} m",
   "legend.d2": "FDM D2 (computed for this input)",
-  "legend.series.d2": "FDM D2 (run at every q)"
+  "legend.series.d2": "FDM D2 (run at every q)",
+  "cycles.title": "KK-VIM: centre deflection after the completed full cycles of one run",
+  "axis.cycle_k": "completed full cycle k (s = 2k)",
+  "legend.cycle": "KK-VIM {label} (k = {k}, s = {s})",
+  "legend.cycle.navier": "Navier (reference for this input)",
+  "legend.cycle.d2": "FDM D2 (computed for this input)",
+  "legend.series.cycle": "KK-VIM {label} (k = {k}, s = {s}; a run at every q)"
 }

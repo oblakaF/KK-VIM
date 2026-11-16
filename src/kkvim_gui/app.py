@@ -279,8 +279,25 @@ class SmokeTest:
         window.grab().save(str(self.folder / "screen_series.png"))
         kx, ky, nx, ny = window.tab.figure.curves()
         dx, dy = window.tab.figure.d2_curve()
+        cycle_curves = {f"VIM-{k}": dict(zip(("q_kPa", "w_mm"), window.tab.figure.cycle_curve(k), strict=True))
+                        for k in window.tab.figure.cycle_items}
         paths = window.tab.save(self.folder)
         data = series_data(series, main.runs)
+        self.report["cycle_curves"] = cycle_curves
+        self.report["series_toggles"] = [str(k) for k in window.tab.toggles]
+        self.report["series_cycles"] = [None if p.cycles is None else _cycles_record(p.cycles, p.run_id) for p in data.points]
+        package_q = self.case.get("package_q")
+        if package_q is not None:  # the calculation package of the run at this q: report.html with both graphs
+            run = next(main.runs.get(i) for i in series.run_ids if main.runs.get(i).request.q == float(package_q))
+            main.run_view.select(run.run_id)
+            analysis = self.gui.open_analysis()
+            QApplication.processEvents()
+            analysis.tabs.setCurrentWidget(analysis.cycles)
+            self._shot(analysis, "screen_series_run_cycles.png")
+            run_paths = analysis.save_package(self.folder)
+            run_manifest = json.loads(Path(run_paths["manifest"]).read_text(encoding="utf-8"))
+            self.report["series_run_package"] = {k: str(v) for k, v in run_paths.items()}
+            self.report["series_run_vim_cycles"] = run_manifest.get("vim_cycles")
         manifest = json.loads(Path(paths["manifest"]).read_text(encoding="utf-8"))
         points = [{"q": p.q, "run_id": p.run_id, "run_status": p.run_status, "solver_status": p.solver_status,
                    "field_role": p.field_role, "included": p.included, "reason": p.reason, "w_centre_m": p.w_centre_m,
@@ -330,6 +347,7 @@ class SmokeTest:
             self._shot(window, f"screen_analysis_{name}.png")
         comparison = self._comparison(window)
         self.report["overview_comparison"] = window.overview.comparison_rows
+        self._cycles(window)
         if window.d2_tab is not None:
             window.tabs.setCurrentWidget(window.d2_tab)
             QApplication.processEvents()
@@ -378,6 +396,7 @@ class SmokeTest:
                            manifest_statuses=manifest["statuses"], manifest_marks=manifest["marks"],
                            manifest_files=manifest["files"], comparison=comparison,
                            manifest_independent_d2=manifest.get("independent_d2"), manifest_timing=manifest.get("timing"),
+                           manifest_vim_cycles=manifest.get("vim_cycles"),
                            actions=self.actions, processes_left=self.processes_left())
         if self.case is None:
             ok = o.status == "CONVERGED"
@@ -393,6 +412,28 @@ class SmokeTest:
                   and self.case.get("expect_d2", (run.d2 or {}).get("state")) == (run.d2 or {}).get("state")
                   and not self.report["processes_left"])
         self._finish(0 if ok else 1, "ok" if ok else "unexpected status or field role")
+
+    def _cycles(self, window):
+        """Open «Циклы VIM-1–3» as a user would: screenshots with every state and with VIM-2 hidden, the shown table."""
+        tab = window.cycles
+        window.tabs.setCurrentWidget(tab)
+        QApplication.processEvents()
+        self._shot(window, "screen_analysis_cycles.png")
+        drawn, ref = tab.figure.drawn()
+        model = tab.model
+        shown = [[model.data(model.index(i, j)) for j in range(model.columnCount())] for i in range(model.rowCount())]
+        hidden = None
+        if tab.toggles[2].isEnabled():
+            tab.toggles[2].setChecked(False)
+            QApplication.processEvents()
+            self._shot(window, "screen_analysis_cycles_vim2_hidden.png")
+            hidden = sorted(tab.figure.drawn()[0])
+            tab.toggles[2].setChecked(True)
+        self.report["vim_cycles"] = _cycles_record(tab.table, window.run.run_id)
+        self.report["cycles_tab"] = {"title": window.tabs.tabText(window.tabs.indexOf(tab)),
+                                     "drawn_mm": {str(k): v for k, v in drawn.items()}, "reference_mm": ref,
+                                     "table_shown": shown, "drawn_with_vim2_hidden": hidden,
+                                     "toggles_enabled": {str(k): b.isEnabled() for k, b in tab.toggles.items()}}
 
     def _comparison(self, window):
         """Open "Сравнение" as a user would: screenshot, the comparison record and the texts shown in its table."""
@@ -440,6 +481,12 @@ def default_protocol_dir():
     return Path(base) / "runs" if base else None
 
 
+def _cycles_record(table, run_id):
+    from kkvim_gui.backend import vim_cycles
+
+    return vim_cycles.plain(table, run_id)
+
+
 def type_case(model, case):
     """Type a smoke case into the setup form as a user would (values in m and Pa); research choices only if asked."""
     model.set_choice(supports=case["supports"], N=int(case["N"]))
@@ -458,6 +505,9 @@ def type_case(model, case):
         model.set_text("half_steps", str(case["half_steps"]))
         if int(case["N"]) >= 4:
             model.set_choice(ssss_research=bool(case.get("ssss_research", False)))
+    for key in ("tol_inf", "tol_E", "s_min", "s_max"):  # R3 stopping parameters, only if the case sets them
+        if key in case:
+            model.set_text(key, str(case[key]))
 
 
 def installation_record():

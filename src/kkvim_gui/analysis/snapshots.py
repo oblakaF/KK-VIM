@@ -2,7 +2,9 @@
 
 ``renderer`` returns the ``render(folder)`` callback of ``backend.report.write_package``: it builds the colour
 field with isolines and the 3D view off screen (the same figure classes as the analysis window), grabs them and
-saves PNG files. ``view_record`` describes the drawing for the manifest and the report.
+saves PNG files. ``view_record`` describes the drawing for the manifest and the report. With ``cycles`` (a
+``vim_cycles.CycleTable`` that has drawn states) it also draws the VIM-1 … VIM-3 graph, and with ``series`` (the finished
+load series of the run) the load–deflection graph with every curve shown (GUI-VIM-CYCLES-123-01).
 """
 
 from pathlib import Path
@@ -22,13 +24,22 @@ def view_record(outcome, factor=None) -> dict:
             "values_scaled": False}
 
 
-def renderer(session, outcome, factor=None):
+def renderer(session, outcome, factor=None, cycles=None, series=None):
     def render(folder):
         folder = Path(folder)
         suffix = "_TEST-DATA" if outcome.is_demo else ""
         out = {}
-        for key, figure in (("field_png", FieldFigure(session, outcome, isolines=True)),
-                            ("surface_png", SurfaceFigure(session, outcome, factor=factor))):
+        figures = [("field_png", FieldFigure(session, outcome, isolines=True)),
+                   ("surface_png", SurfaceFigure(session, outcome, factor=factor))]
+        if cycles is not None and cycles.drawn:
+            from kkvim_gui.analysis.cycles_tab import CycleFigure
+
+            figures.append(("vim_cycles_png", CycleFigure(session, cycles)))
+        if series is not None:
+            from kkvim_gui.analysis.series import SeriesFigure
+
+            figures.append(("load_series_png", SeriesFigure(session, series)))
+        for key, figure in figures:
             figure.resize(*SIZE)
             figure.ensurePolished()
             figure.layout().activate()

@@ -14,11 +14,14 @@ KK-VIM run at its own q (``RunRecord.outcome``); nothing is scaled, interpolated
   D2 computed in its own process at that q for the same plate and grid. A point is on the D2 curve only if that D2
   answered with a centre value; a failed, cancelled or not started D2 stays in the table with its state and reason.
   Timings of both methods are kept per point (one execution each: observations, never a ranking).
+- VIM-1, VIM-2, VIM-3 (GUI-VIM-CYCLES-123-01): per point the completed full cycles k = 1, 2, 3 of that point's own run,
+  read from its stored half-step history (``backend.vim_cycles``), with the reference of that point (Navier at its q for
+  SSSS, its D2 for CCCC). A cycle the run did not complete, or of a run that did not end as requested, is not drawn.
 """
 
 from dataclasses import dataclass
 
-from kkvim_gui.backend import benchmarks, d2_job, export, navier_job
+from kkvim_gui.backend import benchmarks, d2_job, export, navier_job, vim_cycles
 from kkvim_gui.backend.outcome import ROLE_ACCEPTED, ROLE_RESEARCH
 
 RUN_STATUS_TEXT = {"finished": "завершён", "error": "ошибка", "stopped": "остановлен", "running": "выполняется",
@@ -56,10 +59,15 @@ class SeriesPoint:
     kkvim_wall_s: float | None = None  # KK-VIM: start of the process to the message read by the GUI
     d2_solve_s: float | None = None  # D2: the call r5_cccc_d2.solve in its process
     d2_wall_s: float | None = None  # D2: start of the process to the complete answer read
+    cycles: object = None  # vim_cycles.CycleTable of the point's run (None: no result of a run)
 
     @property
     def on_d2_curve(self) -> bool:
         return self.d2_w_m is not None
+
+    def cycle(self, k):
+        """The VIM-k state of this point's run (vim_cycles.CycleValue), or None without a run result."""
+        return None if self.cycles is None else self.cycles.cycles[k - 1]
 
 
 @dataclass(frozen=True)
@@ -89,6 +97,14 @@ class SeriesData:
     @property
     def d2_included(self):
         return [p for p in self.points if p.on_d2_curve]
+
+    def cycle_included(self, k):
+        """Points whose run's VIM-k state is drawn (completed cycle of a run that ended as requested)."""
+        return [p for p in self.points if p.cycle(k) is not None and p.cycle(k).on_graph]
+
+    @property
+    def cycles_supported(self) -> bool:
+        return any(p.cycles is not None and p.cycles.supported for p in self.points)
 
     @property
     def complete(self) -> bool:
@@ -140,6 +156,7 @@ def _point(index, request, run, navier, d2_requested=False):
     else:
         reason = ""
     w_c = None if centre is None else float(o.w[centre["i"], centre["j"]])
+    common["cycles"] = vim_cycles.cycle_table(o, navier=nav, d2=getattr(run, "d2", None))
     w_max = o.extremum()["w"] if eligible else None
     delta = None if w_c is None or nav_w is None else w_c - nav_w
     d2_w = common.get("d2_w_m")

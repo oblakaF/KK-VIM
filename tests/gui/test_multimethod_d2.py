@@ -233,7 +233,7 @@ def test_series_runs_d2_at_every_q_and_waits_for_it(main, qtbot):
     qtbot.addWidget(gui_tab)
     dx, dy = gui_tab.series_tab.figure.d2_curve()
     assert dx == [0.5, 1.0, 2.0] and dy == [p.d2_w_m * 1000.0 for p in data.points]
-    assert gui_tab.series_tab.model.columnCount() == 17
+    assert gui_tab.series_tab.model.columnCount() == 17 + 2 * 3 + 1  # + VIM-1…3 (w, Δw/w) and their note (CCCC N = 1)
 
 
 def test_stop_during_d2_of_a_series_point_cancels_the_series(main, qtbot):

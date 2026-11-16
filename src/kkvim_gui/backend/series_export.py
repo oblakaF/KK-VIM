@@ -10,7 +10,10 @@ A load series is several real runs, so it is saved as its own package, never dis
   e_D2, the signed difference KK-VIM − D2, and the timings of both methods (one execution each: observations);
 - ``series_manifest.json`` — kind "load_series", schema ``kkvim-gui-load-series/1``, the same rows, provenance of the
   reference and the SHA256 of every file of the package;
-- the graph (PNG), drawn by the interface (``render``).
+- the graph (PNG), drawn by the interface (``render``);
+- ``load_series_vim_cycles.csv`` (GUI-VIM-CYCLES-123-01, routes that record the centre per half-step): for every run
+  of the series the states s = 1 and VIM-1 … VIM-3 (s = 2, 4, 6) from that run's stored history, with the reference of
+  its q (``backend.vim_cycles``); its SHA256 is in the manifest like every file of the package.
 
 The folder must be new or empty (``export.new_folder``): an existing package is never overwritten.
 """
@@ -21,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from kkvim_gui import program_version
-from kkvim_gui.backend import export
+from kkvim_gui.backend import export, vim_cycles
 
 SCHEMA = "kkvim-gui-load-series/1"
 CSV_FILE = "load_series.csv"
@@ -84,6 +87,10 @@ def write_series(data, folder, render=None) -> dict:
     comments = [f"# {m}" for m in marks] + [f"# load series {data.series_id}: {data.supports}, N = {data.N}, route "
                                              f"{data.route}, grid {data.grid[0]} x {data.grid[1]}; status {data.status}"]
     export._write_csv(paths["load_series"], [*comments, *DEFINITIONS], header, rows(data))
+    if data.cycles_supported:
+        paths["load_series_vim_cycles"] = folder / vim_cycles.SERIES_CSV_FILE
+        vim_cycles.write_csv(paths["load_series_vim_cycles"], [(p.run_id, p.cycles) for p in data.points
+                                                               if p.cycles is not None], comments)
     if render is not None:
         paths.update({k: Path(v) for k, v in render(folder).items()})
     nav = data.navier if data.navier_ok else None
@@ -111,6 +118,9 @@ def write_series(data, folder, render=None) -> dict:
             "role": "executed in a separate process at every q for the same plate and grid; the same discrete problem as "
                     "KK-VIM CCCC (D-049.1, D-049.8); not stored benchmark data; not an error estimate of the plate model",
             "points_on_curve": len(data.d2_included)},
+        "vim_cycles": None if not data.cycles_supported else {
+            "labels": vim_cycles.OWNER_NOTE, "file": vim_cycles.SERIES_CSV_FILE,
+            "points_on_curve": {vim_cycles.label(k): len(data.cycle_included(k)) for k in range(1, vim_cycles.K_MAX + 1)}},
         "limits": ["signed differences only; no approved agreement threshold",
                    "every point is a separate KK-VIM run; runs that did not end as requested are kept in the table and are "
                    "not points of the curve", "the series is not a scientific acceptance and does not change any status"],

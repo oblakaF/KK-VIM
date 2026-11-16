@@ -21,6 +21,12 @@ files) and ``timing`` (every timer of both methods with its definition); report.
 (D2)» and «Время вычислений». A D2 that did not run is stated with its reason and writes no file. D2 is a calculation
 executed for this run, never stored benchmark data; comparison.csv names the source of every row.
 
+VIM-1, VIM-2, VIM-3 (GUI-VIM-CYCLES-123-01; ``cycles``: ``backend.vim_cycles.CycleTable``): ``vim_cycles.csv`` and, when
+drawn, ``vim_cycles.png`` (centre deflection after the completed full cycles k = 1, 2, 3 of this run, from its stored
+half-step history, next to its reference); for a run of a finished load series (``series``) also
+``load_series_vim_cycles.csv`` and ``load_series.png``; report.html sections 6в and 6г; the manifest gets ``vim_cycles``
+(the records and the SHA256 of these files).
+
 Every number of the report is taken from the outcome; the report shows it in the interface form and, next to it,
 in Python's round-trip form (``repr``), so the report can be checked against ``manifest.json`` and ``field.csv``
 exactly. Nothing is computed here except unit scaling for display (m -> mm) and lookups of stored values. The
@@ -36,7 +42,7 @@ from pathlib import Path
 import numpy as np
 
 from kkvim_gui import program_version
-from kkvim_gui.backend import benchmarks, d2_job, export
+from kkvim_gui.backend import benchmarks, d2_job, export, vim_cycles
 from kkvim_gui.backend.outcome import RunOutcome
 
 PREVIEW_TITLE = "KK-VIM — отчёт расчёта"
@@ -275,7 +281,72 @@ def _timing_section(timing, d2) -> str:
     return f"<h2>6б. Время вычислений</h2><table>{_rows(rows)}</table>"
 
 
-def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None, comparison=None, d2=None, timing=None) -> str:
+def _cycle_cells(c) -> list:
+    def mm(value):
+        return "—" if value is None else f"{_num(value * 1000.0)} mm"
+
+    return [_e(c.label), str(c.k), str(c.s),
+            "—" if c.w_m is None else f"{mm(c.w_m)} <span class=x>({_exact(c.w_m)} m)</span>",
+            mm(c.ref_w_m), mm(c.delta_w_m), "—" if c.delta_pct is None else f"{_num(c.delta_pct)} %",
+            "да" if c.on_graph else "нет", _e(c.reason or ("неполный цикл: только Y¹; не VIM-1" if c.k == 0 else ""))]
+
+
+def _cycles_section(cycles, files) -> str:
+    """6в: VIM-1 … VIM-3 of this run (GUI-VIM-CYCLES-123-01): the table and the graph of the same records."""
+    if cycles is None:
+        return ""
+    title = "<h2>6в. Полные циклы одного расчёта КК-ВИМ: VIM-1, VIM-2, VIM-3</h2>"
+    ref = vim_cycles.REFERENCE_TITLE.get(cycles.reference, "—")
+    info = [("Обозначения", _e(vim_cycles.OWNER_NOTE)), ("Статус решателя", f"<b>{_e(cycles.solver_status)}</b>"),
+            ("Выполнено", _e(cycles.termination)), ("Остановка", _e(cycles.stop_text)),
+            ("Утверждённый критерий остановки выполнен", "да" if cycles.criterion_met else "нет"),
+            ("Научный статус", _e(cycles.scientific_status)), ("Эталон", _e(ref) + (
+                "" if cycles.ref_w_m is not None else f" — недоступен: {_e(cycles.reference_reason)}")),
+            ("Происхождение значений", _e(cycles.provenance or cycles.route_reason)),
+            ("Файл", f"<code>{_e(files.get('vim_cycles', '—'))}</code>")]
+    head = "".join(f"<th>{h}</th>" for h in ("Состояние", "k", "s", "w в центре КК-ВИМ", "w эталона", "Δw = w_КК-ВИМ − w_эт.",
+                                             "Δw / w_эт.", "На графике", "Примечание"))
+    body = "\n".join("<tr>" + "".join(f"<td>{cell}</td>" for cell in _cycle_cells(c)) + "</tr>"
+                     for c in (cycles.partial, *cycles.cycles))
+    image = (f"<figure><img src=\"{_e(files['vim_cycles_png'])}\" alt=\"VIM-1–3\"><figcaption>Прогиб в центре после "
+             "завершённых полных циклов k (s = 2k) и эталон; те же записи, что в таблице</figcaption></figure>"
+             if "vim_cycles_png" in files else "<p>График не построен: нет ни одного состояния VIM-k, показываемого как "
+                                               "результат (причины — в таблице).</p>")
+    return (f"{title}<table>{_rows(info)}</table>\n<table class=\"h\"><tr>{head}</tr>\n{body}</table>\n{image}\n"
+            "<p class=x>Наличие VIM-3 — не сходимость; разности знаковые, порога согласия нет; более поздний цикл не "
+            "объявляется более точным.</p>")
+
+
+def _series_section(series, files) -> str:
+    """6г: the finished load series of this run, VIM-1 … VIM-3 at every q (each from its own run) and the reference."""
+    if series is None:
+        return ""
+    head = "".join(f"<th>{h}</th>" for h in ("q", "Расчёт", "Статус решателя", "w итог КК-ВИМ", *(
+        f"w {vim_cycles.label(k)} (s = {2 * k})" for k in range(1, vim_cycles.K_MAX + 1)), "w эталона", "Примечание"))
+    lines = []
+    for p in series.points:
+        cells = [f"{_num(p.q)} Pa", f"№ {p.run_id}" if p.run_id else "—", _e(p.solver_status or p.run_status),
+                 "—" if p.w_centre_m is None else f"{_num(p.w_centre_m * 1000.0)} mm"]
+        notes = []
+        for k in range(1, vim_cycles.K_MAX + 1):
+            c = p.cycle(k)
+            cells.append(f"{_num(c.w_m * 1000.0)} mm" if c is not None and c.on_graph else "—")
+            if c is not None and not c.on_graph and c.reason:
+                notes.append(f"{c.label}: {c.reason}")
+        ref = p.navier_w_m if series.navier is not None else p.d2_w_m
+        cells += ["—" if ref is None else f"{_num(ref * 1000.0)} mm", _e("; ".join(notes) or p.reason or "")]
+        lines.append("<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>")
+    image = (f"<figure><img src=\"{_e(files['load_series_png'])}\" alt=\"load-deflection\"><figcaption>Нагрузка — прогиб: "
+             "КК-ВИМ (итог), VIM-1, VIM-2, VIM-3 и эталон при каждом q</figcaption></figure>"
+             if "load_series_png" in files else "")
+    return (f"<h2>6г. Нагрузка — прогиб (серия {series.series_id}): VIM-1–3 и эталон</h2>"
+            f"<p>Каждое q — отдельный расчёт; VIM-k при каждом q — из истории полушагов расчёта этой точки, не пересчёт "
+            f"по нагрузке. Файл: <code>{_e(files.get('load_series_vim_cycles', '—'))}</code></p>"
+            f"<table class=\"h\"><tr>{head}</tr>\n{''.join(lines)}</table>\n{image}")
+
+
+def report_html(outcome: RunOutcome, files: dict, run_meta=None, view=None, comparison=None, d2=None, timing=None,
+                cycles=None, series=None) -> str:
     r = outcome.request
     view = view or {}
     comparison = comparison if comparison is not None else comparison_of(outcome)
@@ -376,6 +447,8 @@ img{{max-width:100%;border:1px solid #DCE3EA}} figcaption{{font-size:13px;color:
 {_comparison_section(outcome, comparison, files.get("comparison"))}
 {_d2_section(outcome, d2, files)}
 {_timing_section(timing, d2)}
+{_cycles_section(cycles, files)}
+{_series_section(series, files)}
 <h2>7. История полушагов</h2><table class="h"><tr>{head}</tr>
 {body}</table>
 <h2>8. Ограничения применимости</h2><ul>{"".join(f"<li>{_e(t)}</li>" for t in (*outcome.limitations, *LIMITATIONS))}</ul>
@@ -403,13 +476,16 @@ def write_d2_field_csv(outcome: RunOutcome, d2, path) -> Path:
 
 
 def write_package(outcome: RunOutcome, folder, run_meta=None, log=(), render=None, view=None, comparison=None,
-                  d2=None, timing=None) -> dict:
+                  d2=None, timing=None, cycles=None, series=None) -> dict:
     """Write the calculation package into ``folder`` and return {name: path}.
 
     ``render(folder) -> {"field_png": path, "surface_png": path}`` draws the figures (Qt, by the caller); it is
     called only for a result with a field. ``view`` records how the figures were drawn (e.g. the exaggeration).
     ``comparison``: the ``benchmarks.Comparison`` shown in the "Сравнение" tab of this outcome (computed here if None).
     ``d2``: the D2 record of the run (``backend.d2_job``), None without D2; ``timing``: ``RunRecord.timing`` of KK-VIM.
+    ``cycles``: the ``vim_cycles.CycleTable`` of the run (vim_cycles.csv, section 6в); ``series``: the finished load series
+    of the run (``model.series.SeriesData``; load_series_vim_cycles.csv, section 6г). The SHA256 of their files are in the
+    manifest (``vim_cycles``).
     """
     folder = Path(folder)
     paths = export.write_result(outcome, folder, run_meta, log)  # refuses an existing non-empty folder
@@ -427,10 +503,21 @@ def write_package(outcome: RunOutcome, folder, run_meta=None, log=(), render=Non
                           "(D-049.1, D-049.8); not stored benchmark data and not a qualified result"}
         paths["d2_result"] = folder / D2_RESULT_FILE
         paths["d2_result"].write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    run_id = (run_meta or {}).get("run_id")
+    if cycles is not None:
+        paths["vim_cycles"] = folder / vim_cycles.CSV_FILE
+        vim_cycles.write_csv(paths["vim_cycles"], [(run_id, cycles)], export._header_lines(outcome))
+    if series is not None:
+        paths["load_series_vim_cycles"] = folder / vim_cycles.SERIES_CSV_FILE
+        vim_cycles.write_csv(paths["load_series_vim_cycles"],
+                             [(p.run_id, p.cycles) for p in series.points if p.cycles is not None],
+                             [f"# load series {series.series_id}: {series.supports}, N = {series.N}, grid {series.grid[0]} x "
+                              f"{series.grid[1]}; every row group is the run of one q"])
     suffix = "_TEST-DATA" if outcome.is_demo else ""
     paths["report"] = folder / f"report{suffix}.html"
     files = {name: path.name for name, path in paths.items() if name != "manifest"}
-    paths["report"].write_text(report_html(outcome, files, run_meta, view, comparison, d2, timing), encoding="utf-8")
+    paths["report"].write_text(report_html(outcome, files, run_meta, view, comparison, d2, timing, cycles, series),
+                               encoding="utf-8")
     data = export.manifest(outcome, run_meta, log, files)
     data["report_summary"] = export._plain(summary(outcome))
     data["visualization"] = export._plain(view or {})
@@ -441,5 +528,10 @@ def write_package(outcome: RunOutcome, folder, run_meta=None, log=(), render=Non
             "files_sha256": {paths[k].name: _sha256(paths[k]) for k in ("d2_field", "d2_result") if k in paths},
         }
     data["timing"] = {"timers": export._plain(timing_table(timing, d2)), "role": d2_job.TIMING_ROLE}
+    if cycles is not None:
+        names = ("vim_cycles", "vim_cycles_png", "load_series_vim_cycles", "load_series_png")
+        data["vim_cycles"] = {**vim_cycles.plain(cycles, run_id),
+                              "series_id": None if series is None else series.series_id,
+                              "files_sha256": {paths[k].name: _sha256(paths[k]) for k in names if k in paths}}
     paths["manifest"].write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return paths

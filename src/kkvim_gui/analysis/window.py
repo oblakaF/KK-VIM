@@ -14,6 +14,9 @@ figures carry the session-wide "Графики RU | EN" switch.
 - «МКР D2» (``analysis.d2_tab``): only for a CCCC run with «МКР — двумерный (D2)» chosen: the D2 solution computed for
   the run's own inputs in a separate process (``RunRecord.d2``), sections next to KK-VIM, node values and the timings of
   both methods; when D2 did not run the tab states why. D2 is also a row of «Сравнение с эталоном».
+- «Циклы VIM-1–3» (``analysis.cycles_tab``, GUI-VIM-CYCLES-123-01): the centre deflection after the completed full
+  cycles k = 1, 2, 3 of this run (s = 2, 4, 6; owner's display labels, not methods and not N) from its stored half-step
+  history, next to the run's reference (Navier for SSSS, D2 for CCCC); rebuilt when a pending reference arrives.
 - «Нагрузка — прогиб» (``analysis.series``): only for a run of a finished load series.
 - Without a solver run (``--demo``): the layout with TEST DATA placeholders, never results.
 """
@@ -284,6 +287,13 @@ class AnalysisWindow(QMainWindow):
         self.tabs.setTabToolTip(6, COMPARISON_SOLVER_TOOLTIP)
         for i, topic in enumerate(SOLVER_TAB_HELP):
             set_help_context(self.tabs.widget(i), topic)
+        from kkvim_gui.analysis.cycles_tab import TAB_TITLE as CYCLES_TITLE
+        from kkvim_gui.analysis.cycles_tab import TAB_TOOLTIP as CYCLES_TOOLTIP
+        from kkvim_gui.analysis.cycles_tab import CyclesTab
+
+        self.cycles = CyclesTab(s, self._cycle_table())
+        self.tabs.addTab(self.cycles, CYCLES_TITLE)
+        self.tabs.setTabToolTip(self.tabs.count() - 1, CYCLES_TOOLTIP)
         self.d2_tab = None
         if self._d2 is not None and self._d2.get("state") != "pending":
             self._add_d2_tab()
@@ -337,6 +347,27 @@ class AnalysisWindow(QMainWindow):
                 self._add_d2_tab()
         self.set_navier(navier)
 
+    def _cycle_table(self):
+        from kkvim_gui.backend import vim_cycles
+
+        return vim_cycles.cycle_table(self.outcome, navier=self._navier, d2=self._d2)
+
+    def _rebuild_cycles(self):
+        """The reference of the run arrived: the cycles tab is drawn again from the same history and the new reference."""
+        from kkvim_gui.analysis.cycles_tab import TAB_TITLE as CYCLES_TITLE
+        from kkvim_gui.analysis.cycles_tab import TAB_TOOLTIP as CYCLES_TOOLTIP
+        from kkvim_gui.analysis.cycles_tab import CyclesTab
+
+        index = self.tabs.indexOf(self.cycles)
+        current = self.tabs.currentIndex()
+        old = self.cycles
+        self.cycles = CyclesTab(self.session, self._cycle_table())
+        self.tabs.removeTab(index)
+        self.tabs.insertTab(index, self.cycles, CYCLES_TITLE)
+        self.tabs.setTabToolTip(index, CYCLES_TOOLTIP)
+        self.tabs.setCurrentIndex(current)
+        old.deleteLater()
+
     def _add_d2_tab(self):
         from kkvim_gui.analysis.d2_tab import TAB_TITLE, TAB_TOOLTIP, D2Tab
 
@@ -360,6 +391,7 @@ class AnalysisWindow(QMainWindow):
         self.tabs.setCurrentIndex(current)
         old.deleteLater()
         self.overview.set_comparison(self.comparison.comparison)
+        self._rebuild_cycles()
 
     def _trailing(self):
         return (FigureLanguageSwitch(self.session), self._export_button())
@@ -391,11 +423,14 @@ class AnalysisWindow(QMainWindow):
 
         factor = self.fields.surface.factor
         meta = self.run.meta(self.run._t0 + (self.run._elapsed_final or 0.0))
+        cycles = self.cycles.table
+        series = self.series if self.series is not None and self.series.complete else None
         return report.write_package(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed,
-                                    render=snapshots.renderer(self.session, self.outcome, factor),
+                                    render=snapshots.renderer(self.session, self.outcome, factor, cycles=cycles,
+                                                              series=series),
                                     view=snapshots.view_record(self.outcome, factor),
                                     comparison=self.comparison.comparison, d2=self._d2,
-                                    timing=getattr(self.run, "timing", None))
+                                    timing=getattr(self.run, "timing", None), cycles=cycles, series=series)
 
     def _save_package_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Папка для расчёта и отчёта")

@@ -8,6 +8,11 @@ at every q is the second curve: only the points where D2 answered with a centre 
 with the state and reason of their D2. q is shown in kPa and w in mm (SI multiples, stated on the axes); the saved
 file keeps Pa and m at full precision. The graph is an interactive pyqtgraph X–Y plot (pan, zoom, reset); its texts
 follow the figure language (GUI-D03).
+
+VIM-1, VIM-2, VIM-3 (GUI-VIM-CYCLES-123-01) are three more curves: at every q the centre deflection after the completed
+full cycles k = 1, 2, 3 of that point's own run, read from its stored half-step history (``backend.vim_cycles``); a point
+whose run did not complete s = 2k, or did not end as requested, has no point on that curve (reason in the table). Every
+curve can be shown or hidden.
 """
 
 from datetime import datetime
@@ -16,6 +21,7 @@ from pathlib import Path
 import pyqtgraph as pg
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -28,7 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from kkvim_gui.analysis.results import MM, RowsModel, fmt, padded, page, table_view, toolbar
-from kkvim_gui.backend import series_export
+from kkvim_gui.backend import series_export, vim_cycles
 from kkvim_gui.figures.text import fig_text
 from kkvim_gui.model.series import RUN_STATUS_TEXT
 from kkvim_gui.widgets.common import Card, FigureLanguageSwitch, Note, SegmentedControl, fit_to_screen, label, set_help_context
@@ -41,9 +47,28 @@ D2_HEADERS = ("МКР D2", "w в центре D2, mm", "Δw = w_КК-ВИМ − 
               "Время D2 (solve), s")
 ROLE_SHORT = {"accepted": "результат R3", "research": "исследование", "diagnostic": "диагностика", None: "—"}
 QUANTITIES = {"centre": "Прогиб в центре", "maxabs": "w в узле max|w|"}
+CYCLE_HEADERS = tuple(h for k in range(1, vim_cycles.K_MAX + 1)
+                      for h in (f"{vim_cycles.label(k)} (s = {2 * k}): w в центре, mm",
+                                f"{vim_cycles.label(k)}: Δw / w_эталона, %"))
+CYCLE_SYMBOLS = {1: "o", 2: "s", 3: "d"}
+CYCLE_COLOURS = {1: "accent", 2: "status.success", 3: "status.error"}
 
 
-def _row(p, d2=False):
+def _cycle_cells(p):
+    cells = []
+    for k in range(1, vim_cycles.K_MAX + 1):
+        c = p.cycle(k)
+        drawn = c is not None and c.on_graph
+        cells += [c.w_m * MM if drawn else None, c.delta_pct if drawn else None]
+    notes = sorted({f"{c.label}: {c.reason}" for c in (p.cycles.cycles if p.cycles else ()) if not c.on_graph and c.reason})
+    return (*cells, "; ".join(notes))
+
+
+def _row(p, d2=False, cycles=False):
+    return _row_methods(p, d2) + (_cycle_cells(p) if cycles else ())
+
+
+def _row_methods(p, d2=False):
     extra = () if not d2 else (
         p.d2_state if not p.d2_reason else f"{p.d2_state}: {p.d2_reason}", None if p.d2_w_m is None else p.d2_w_m * MM,
         None if p.d2_delta_w_m is None else p.d2_delta_w_m * MM, p.d2_rel_pct, p.kkvim_solver_s, p.d2_solve_s)
@@ -89,6 +114,10 @@ class SeriesFigure(QFrame):
                                      symbolSize=8, symbolBrush=t["status.warning"])
         self.d2 = self.plot.plot(pen=pg.mkPen(t["status.warning"], width=2, style=Qt.PenStyle.DashLine), symbol="s",
                                  symbolSize=8, symbolBrush=t["status.warning"])
+        self.cycle_items = {k: self.plot.plot(pen=pg.mkPen(t[CYCLE_COLOURS[k]], width=1, style=Qt.PenStyle.DotLine),
+                                              symbol=CYCLE_SYMBOLS[k], symbolSize=9, symbolBrush=t[CYCLE_COLOURS[k]])
+                            for k in range(1, vim_cycles.K_MAX + 1)}
+        self.shown = {"kkvim": True, "navier": True, "d2": True, **{k: True for k in self.cycle_items}}
         self.restyle()
         session.themeChanged.connect(self.restyle)
         session.figureLanguageChanged.connect(self.redraw)
@@ -105,6 +134,18 @@ class SeriesFigure(QFrame):
     def set_quantity(self, quantity):
         self.quantity = quantity
         self.redraw()
+
+    def set_shown(self, key, shown):
+        """Show or hide one curve: "kkvim", "navier", "d2" or the cycle k (1 … 3)."""
+        self.shown[key] = bool(shown)
+        self.redraw()
+
+    def cycle_curve(self, k):
+        """(xs, ys) in kPa and mm of VIM-k: the points whose own run completed the cycle k (centre only)."""
+        if self.quantity != "centre":
+            return [], []  # the cycle states are recorded at the centre node only
+        pts = sorted(self.data.cycle_included(k), key=lambda p: p.q)
+        return [p.q * KPA for p in pts], [p.cycle(k).w_m * MM for p in pts]
 
     def d2_curve(self):
         """(D2 xs, ys) in kPa and mm: the D2 points actually computed (centre only)."""
@@ -130,14 +171,26 @@ class SeriesFigure(QFrame):
         self.plot.setLabel("bottom", fig_text(lang, "axis.q"))
         self.plot.setLabel("left", fig_text(lang, "axis.w_centre" if self.quantity == "centre" else "axis.w_maxabs"))
         kx, ky, nx, ny = self.curves()
+        if not self.shown["kkvim"]:
+            kx, ky = [], []
+        if not self.shown["navier"]:
+            nx, ny = [], []
         self.legend.clear()
         self.kkvim.setData(kx, ky)
-        self.legend.addItem(self.kkvim, fig_text(lang, "legend.series.kkvim"))
+        self.kkvim.setVisible(bool(kx))
+        if kx:
+            self.legend.addItem(self.kkvim, fig_text(lang, "legend.series.kkvim"))
+        for k, item in self.cycle_items.items():
+            cx, cy = self.cycle_curve(k) if self.shown[k] else ([], [])
+            item.setData(cx, cy)
+            item.setVisible(bool(cx))
+            if cx:
+                self.legend.addItem(item, fig_text(lang, "legend.series.cycle", label=vim_cycles.label(k), k=k, s=2 * k))
         self.navier.setData(nx, ny)
         self.navier.setVisible(bool(nx))
         if nx:
             self.legend.addItem(self.navier, fig_text(lang, "legend.series.navier", M=self.data.navier.get("M")))
-        dx, dy = self.d2_curve()
+        dx, dy = self.d2_curve() if self.shown["d2"] else ([], [])
         self.d2.setData(dx, dy)
         self.d2.setVisible(bool(dx))
         if dx:
@@ -159,9 +212,23 @@ class SeriesTab(QWidget):
                                     + ("; для D2 — его значения и время каждого метода в load_series.csv" if data.d2 else ""))
         self.save_button.clicked.connect(self._save_dialog)
         self.save_button.setEnabled(data.complete)
-        bar = toolbar(self.quantity, trailing=(*trailing, FigureLanguageSwitch(session), self.save_button))
-        headers = HEADERS + D2_HEADERS if data.d2 else HEADERS
-        self.model = RowsModel(headers, len(data.points), lambda i: _row(data.points[i], data.d2), digits=10)
+        self.toggles = {"kkvim": QCheckBox("КК-ВИМ (итог)")}
+        if data.cycles_supported:
+            self.toggles.update({k: QCheckBox(vim_cycles.label(k)) for k in range(1, vim_cycles.K_MAX + 1)})
+        if data.navier is not None:
+            self.toggles["navier"] = QCheckBox("Навье")
+        if data.d2:
+            self.toggles["d2"] = QCheckBox("МКР D2")
+        for key, box in self.toggles.items():
+            box.setChecked(True)
+            box.toggled.connect(lambda shown, k=key: self.figure.set_shown(k, shown))
+            if isinstance(key, int):
+                box.setToolTip(f"{vim_cycles.cycle_text(key)}: при каждом q — из истории полушагов расчёта этой точки")
+        bar = toolbar(self.quantity, *self.toggles.values(),
+                      trailing=(*trailing, FigureLanguageSwitch(session), self.save_button))
+        cycles = data.cycles_supported
+        headers = HEADERS + (D2_HEADERS if data.d2 else ()) + ((*CYCLE_HEADERS, "VIM-1–3: примечание") if cycles else ())
+        self.model = RowsModel(headers, len(data.points), lambda i: _row(data.points[i], data.d2, cycles), digits=10)
         table = Card(f"Расчёты серии: {len(data.points)} значений q, на графике — {len(data.included)}",
                      right=label(f"{data.supports} · N = {data.N} · сетка {data.grid[0]} × {data.grid[1]}", "tag"))
         excluded = [p for p in data.points if not p.included]
@@ -183,6 +250,10 @@ class SeriesTab(QWidget):
                          + (f"; без значения — {missing} (состояние и причина в таблице)" if missing else "")
                          + ". Разность КК-ВИМ − D2 — не ошибка модели пластины. Время — одно исполнение каждого метода, "
                          "наблюдение, а не сравнение алгоритмов.")
+        if data.cycles_supported:
+            notes.append(f"{vim_cycles.OWNER_NOTE}. При каждом q значения VIM-k — из истории полушагов расчёта этой точки "
+                         "(s = 2k), не итоговое поле и не пересчёт по нагрузке; если расчёт точки не дошёл до s = 2k, точки "
+                         "на кривой VIM-k нет (причина в последнем столбце).")
         for n in notes:
             table.body.addWidget(label(n, "secondary", wrap=True))
         split = QSplitter(Qt.Orientation.Vertical)
