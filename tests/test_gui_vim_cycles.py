@@ -117,7 +117,7 @@ def test_run_converged_before_s_6_has_no_vim_3():
     drawn = [c.k for c in t.cycles if c.on_graph]
     assert drawn == list(range(1, o.s // 2 + 1))
     missing = t.cycles[2]
-    assert not missing.available and missing.w_m is None and f"полушаг s = 6 не выполнялся" in missing.reason
+    assert not missing.available and missing.w_m is None and "полушаг s = 6 не выполнялся" in missing.reason
     assert f"s = {o.s}" in missing.reason and "более позднее поле не подставляется" in missing.reason
 
 
