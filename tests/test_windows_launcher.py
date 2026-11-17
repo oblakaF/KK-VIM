@@ -7,7 +7,7 @@ source change, a failed build, a locked installation, user files kept) run only 
 build a copy of the sources whose path contains spaces under scratch\\ (ignored by git) and take a few minutes.
 """
 
-import inspect
+import ast
 import json
 import os
 import shutil
@@ -68,10 +68,13 @@ def test_there_is_one_build_path():
 
 
 def test_the_entry_point_is_the_full_gui():
-    from kkvim_gui import app
+    # static: importing kkvim_gui.app needs PySide6, which the standard CI environment (no GUI extras) does not install
+    text = (ROOT / "src" / "kkvim_gui" / "app.py").read_text(encoding="utf-8")
+    mains = [node for node in ast.parse(text).body if isinstance(node, ast.FunctionDef) and node.name == "main"]
+    assert len(mains) == 1
 
     assert 'kkvim-gui = "kkvim_gui.app:main"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    source = inspect.getsource(app.main)
+    source = ast.get_source_segment(text, mains[0])
     assert "GuiApplication(" in source and "preview" not in source
 
 
