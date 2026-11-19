@@ -66,13 +66,34 @@ def test_worker_evaluates_exactly_the_qualified_reference():
     assert out["D"] == plate.D
 
 
-def test_worker_reproduces_the_saved_square_reference_bitwise():
-    from kkvim_navier_worker import CONTRACT, compute
+def test_worker_evaluates_the_qualified_reference_for_the_saved_square_case():
+    """The saved square case is evaluated by the worker with the qualified reference at its own inputs and level.
 
-    saved = bm.load()["ssss"][0]["navier"]
-    out = compute({"contract": CONTRACT, "a": 1.0, "b": 1.0, "t": 0.01, "E": 2.1e11, "nu": 0.3, "q": [1000.0]})
-    p = out["points"][0]
-    assert (p["w_coef"], p["w_m"], p["error_bound_coef"]) == (saved["beta"], saved["w_centre_m"], saved["error_bound_beta"])
+    The series value depends on the BLAS summation order (OpenBLAS kernel of the CPU), so its last bits are not compared
+    with the frozen value of another platform (AGENTS.md, section 4; D-025). Exact here: the inputs and level of the saved
+    case, the worker against the same reference API in this process, the normalisation and the frozen data (SHA256).
+    """
+    from kkvim_navier_worker import CONTRACT, compute
+    from kkvim_reference.navier import M_R3, NavierRectangle
+
+    data = bm.load()  # BenchmarkDataError if the frozen payload differs from its recorded SHA256
+    inputs, case = data["inputs"], data["ssss"][0]
+    saved = case["navier"]
+    a, b = inputs["a"], case["b"]
+    assert (a, b, inputs["t"], inputs["E"], inputs["nu"], inputs["q"]) == (1.0, 1.0, 0.01, 2.1e11, 0.3, 1000.0)
+    assert saved["M"] == M_R3 == 2559
+
+    out = compute({"contract": CONTRACT, "a": a, "b": b, "t": inputs["t"], "E": inputs["E"], "nu": inputs["nu"],
+                   "q": [inputs["q"]]})
+    plate = NavierRectangle.from_material(a=a, b=b, q=inputs["q"], E=inputs["E"], thickness=inputs["t"], nu=inputs["nu"])
+    ref = plate.at_points([a / 2], [b / 2], M=M_R3, diagnostics=False)
+    assert out["state"] == "ok" and out["M"] == saved["M"] and (out["x"], out["y"]) == (a / 2, b / 2)
+    assert out["D"] == plate.D == inputs["D"]
+    [p] = out["points"]
+    assert p["q"] == inputs["q"]
+    assert (p["w_coef"], p["w_m"], p["error_bound_coef"]) == (float(ref.w_coef[0]), float(ref.w[0]), ref.w_error_bound_coef)
+    assert p["w_m"] == p["w_coef"] * ref.w_scale and ref.w_scale == inputs["q"] * a ** 4 / plate.D  # w = beta q a^4 / D
+    assert p["error_bound_coef"] == ref.w_tail_bound_coef + ref.rounding_w  # truncation plus rounding, in q a^4 / D
 
 
 @pytest.mark.parametrize("change, state", [(dict(b=0.39), "out_of_scope"), (dict(a=6.0), "out_of_scope"),
@@ -192,14 +213,42 @@ def test_cccc_never_uses_navier(navier_record):
     assert c.state == bm.AVAILABLE and {r.reference.kind for r in c.rows} == {"published", "D2", "FEM"}
 
 
-def test_saved_square_and_live_navier_give_the_same_numbers():
+def test_saved_square_and_live_navier_compare_the_same_run_with_their_own_references():
+    """Saved and live Navier rows of one run: each row uses its own reference and the same KK-VIM centre value.
+
+    The live series value and the frozen value may differ in the last bits (BLAS summation order, AGENTS.md section 4;
+    D-025), so they are not required to be equal; every other quantity is checked exactly.
+    """
     o = kkvim_adapter.execute(request(a=1.0, b=1.0, q=1000.0, n_x=16, n_y=16))
+    science = o.science_text
     job = navier_job.NavierJob(navier_job.worker_input(o.request, [1000.0]))
     while job.poll() is None:
         pass
-    saved, fresh = bm.compare(o), bm.compare(o, navier=navier_job.point_record(job.record, o.request))
-    assert (saved.rows[0].reference.beta, saved.rows[0].delta, saved.rows[0].rel_pct) == \
-        (fresh.rows[0].reference.beta, fresh.rows[0].delta, fresh.rows[0].rel_pct)
+    nav = navier_job.point_record(job.record, o.request)
+    saved, fresh = bm.compare(o), bm.compare(o, navier=nav)
+    frozen = bm.load()["ssss"][0]["navier"]
+    assert saved.state == fresh.state == bm.AVAILABLE and nav["state"] == "ok"
+    assert len(saved.rows) == len(fresh.rows) == 1
+    s, f = saved.rows[0], fresh.rows[0]
+    # provenance: the saved row is the frozen data, the live row the worker point for this run (M = 2559 at the centre)
+    assert s.reference.kind == "navier" and (s.reference.beta, s.reference.w_centre_m) == (frozen["beta"], frozen["w_centre_m"])
+    assert f.reference.kind == "navier_live" and (f.reference.beta, f.reference.w_centre_m) == (nav["w_coef"], nav["w_m"])
+    assert (nav["M"], nav["x"], nav["y"], nav["q"]) == (2559, 0.5, 0.5, 1000.0) and nav["D"] == o.D
+    # the same KK-VIM run: centre node value and beta = w_c D / (q a^4) in both comparisons
+    centre = bm.centre_node(o)
+    w_c = float(o.w[centre["i"], centre["j"]])
+    beta = w_c * o.D / (o.request.q * o.request.a ** 4)
+    assert saved.centre == fresh.centre == centre and saved.w_centre_m == fresh.w_centre_m == w_c
+    assert saved.beta == fresh.beta == s.beta_kkvim == f.beta_kkvim == beta
+    # signed differences and percentages from their own operands (denominator: the reference)
+    for row in (s, f):
+        assert row.delta == beta - row.reference.beta
+        assert row.rel_pct == (beta - row.reference.beta) / row.reference.beta * 100.0
+        assert row.delta_w_m == w_c - row.reference.w_centre_m
+    # availability and the unchanged scientific status of the run
+    for c in (saved, fresh):
+        assert any("не меняет научного статуса" in n for n in c.notes)
+    assert o.science_text == science
 
 
 def test_report_and_csv_reproduce_the_live_comparison(tmp_path, r3, navier_record):

@@ -213,7 +213,13 @@ def test_comparison_adds_the_executed_row_next_to_the_unchanged_saved_rows(squar
     live, stored = c.rows[0], c.rows[2]
     assert live.reference.beta == stored.reference.beta == 0.0012759787033572092
     assert live.reference.w_centre_m == d2["w_centre_m"]
-    assert live.delta_w_m == c.w_centre_m - d2["w_centre_m"] and live.beta_kkvim == c.beta == 0.0012741269462195456
+    # the KK-VIM value of this run, checked within the run (its last bits depend on the BLAS summation order: no frozen
+    # literal across platforms, AGENTS.md section 4; D-025)
+    w_c = float(outcome.w[c.centre["i"], c.centre["j"]])
+    assert c.w_centre_m == w_c and c.beta == w_c * outcome.D / (req.q * req.a ** 4)
+    assert live.delta_w_m == c.w_centre_m - d2["w_centre_m"] and live.beta_kkvim == c.beta
+    assert all(r.beta_kkvim == c.beta for r in c.rows)
+    assert live.delta == c.beta - live.reference.beta and live.rel_pct == live.delta / live.reference.beta * 100.0
     assert live.reference.title != stored.reference.title and "сохранённое" in stored.reference.title
     assert benchmarks.state_title(c) == benchmarks.MIXED_TITLE
     assert any("не является ошибкой континуальной модели" in n for n in c.notes)
