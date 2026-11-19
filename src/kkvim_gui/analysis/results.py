@@ -12,14 +12,23 @@ solver texts in tooltips and in «Технические подробности�
 its visible mark. Cross-sections are chosen by node index (slider and spin box) with the actual coordinate shown; the
 default is the centre line when it is a node. The half-step history shows the change of the field first and the full
 table behind «Подробная таблица».
+
+Inspection (GUI-OWNER-VIEW-02): a click on the colour map selects the nearest EXISTING grid node (no interpolation) and
+shows its indices, x, y and the stored w; the mark stays when the colour scale, the quantity or the figure language
+change. «Вид сбоку» draws the stored mid-surface deflection along a node row (x at y_j) or a node column (y at x_i)
+against the undeformed mid-surface w = 0, with w positive downward (MATH_SPEC.md 8.1). At ×1 both axes are in metres
+with equal scale (the physical shape); a larger factor multiplies only the drawn w and is stated on the axis and in the
+legend, the numbers shown are always the stored values. The nominal thickness h can be drawn as a labelled schematic
+around the undeformed mid-surface; deformed faces, strains or stresses through the thickness are not computed or drawn.
+Nothing here starts a calculation.
 """
 
 import math
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QRectF, Qt
-from PySide6.QtGui import QTransform
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QFont, QFontMetrics, QTransform
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -193,9 +202,13 @@ class Figure(QFrame):
 
 
 class FieldFigure(Figure):
-    """Static colour field of w (mm) or w̄ on the nodes of the result grid with a colour bar."""
+    """Static colour field of w (mm) or w̄ on the nodes of the result grid with a colour bar.
+
+    A left click on the map selects the nearest existing node (``nodeSelected(i, j)``); the view itself stays static
+    (GUI-D13)."""
 
     ISOLINES = 10  # contour levels evenly inside (min, max) of the shown quantity
+    nodeSelected = Signal(int, int)
 
     def __init__(self, session, outcome, compact=False, isolines=False, parent=None):
         super().__init__(session, outcome, "field.w.title", interactive=False, parent=parent)
@@ -215,7 +228,39 @@ class FieldFigure(Figure):
         if self.bar is not None:
             self.bar.setImageItem(self.image, insert_in=self.plot.getPlotItem())
         self.set_axes("axis.x", "axis.y")
+        self.selected = None  # (i, j) of the selected node
+        self.pick_outer = pg.ScatterPlotItem(size=16, pen=pg.mkPen("#000000", width=3), brush=None, symbol="o")
+        self.pick_inner = pg.ScatterPlotItem(size=16, pen=pg.mkPen("#ffffff", width=1.5), brush=None, symbol="o")
+        for item in (self.pick_outer, self.pick_inner):
+            item.setZValue(20)  # above the isolines; visible on every colour map
+            self.plot.addItem(item)
+        self.plot.scene().sigMouseClicked.connect(self._on_click)
         self.update_image()
+
+    def node_at(self, x, y):
+        """(i, j) of the existing node nearest to the point (x, y) in metres, or None outside the drawn plate."""
+        if not self.rect.contains(QPointF(x, y)):
+            return None
+        return int(np.argmin(np.abs(self.outcome.x - x))), int(np.argmin(np.abs(self.outcome.y - y)))
+
+    def _on_click(self, event):
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        box = self.plot.getViewBox()
+        if not box.sceneBoundingRect().contains(event.scenePos()):
+            return
+        point = box.mapSceneToView(event.scenePos())
+        node = self.node_at(point.x(), point.y())
+        if node is not None:
+            self.select_node(*node)
+            self.nodeSelected.emit(*node)
+
+    def select_node(self, i, j):
+        """Mark the node (i, j) at its own coordinates (x_i, y_j)."""
+        self.selected = (int(i), int(j))
+        x, y = [float(self.outcome.x[i])], [float(self.outcome.y[j])]
+        self.pick_outer.setData(x, y)
+        self.pick_inner.setData(x, y)
 
     def values(self):
         return self.outcome.w * MM if self.quantity == "w" else self.outcome.w_bar
@@ -574,16 +619,130 @@ class OverviewTab(QWidget):
                 self.comparison_body.addWidget(label(comparison.reason, "secondary", wrap=True))
 
 
+class SideFigure(Figure):
+    """Side view of the stored mid-surface deflection along a node row or column (GUI-OWNER-VIEW-02).
+
+    Profile: the nodes of the result grid and the stored w (no interpolation, nothing recomputed). y of the plot = factor
+    · w in metres, the axis inverted so that positive w (downward, MATH_SPEC.md 8.1) is drawn below w = 0. At factor 1
+    the aspect ratio is locked to 1: the physical shape."""
+
+    FACTORS = (1.0, 10.0, 100.0, 1000.0)
+
+    def __init__(self, session, outcome, i0, j0, parent=None):
+        super().__init__(session, outcome, "side.title.x", {"y": float(outcome.y[j0])}, interactive=True, parent=parent)
+        self.direction, self.i, self.j, self.factor, self.show_h = "x", int(i0), int(j0), 1.0, False
+        t = session.tokens
+        self.plot.invertY(True)  # w positive downward
+        self.legend = self.plot.addLegend(offset=(10, -10))
+        self.zero = self.plot.plot(pen=pg.mkPen(t["plot.axis"], width=1.5, style=Qt.PenStyle.DashLine))
+        self.upper = self.plot.plot(pen=pg.mkPen(t["status.warning"], width=1, style=Qt.PenStyle.DotLine))
+        self.lower = self.plot.plot(pen=pg.mkPen(t["status.warning"], width=1, style=Qt.PenStyle.DotLine))
+        self.profile = self.plot.plot(pen=pg.mkPen(t["accent"], width=2), symbol="o", symbolSize=4, symbolBrush=t["accent"])
+        self.max_point = pg.ScatterPlotItem(size=12, pen=pg.mkPen(t["status.error"], width=2), brush=None, symbol="o")
+        self.plot.addItem(self.max_point)
+        self.update_view()
+
+    def section(self):
+        """(name, coordinates, w in m) of the current node row or column, exactly the stored arrays."""
+        if self.direction == "x":
+            return "x", self.outcome.x, self.outcome.w[:, self.j]
+        return "y", self.outcome.y, self.outcome.w[self.i, :]
+
+    def maximum(self):
+        """(index, coordinate, w in m) of the node of the largest |w| in the section."""
+        _, coords, w = self.section()
+        k = int(np.argmax(np.abs(w)))
+        return k, float(coords[k]), float(w[k])
+
+    def set_section(self, direction=None, i=None, j=None):
+        self.direction = direction or self.direction
+        self.i = self.i if i is None else int(i)
+        self.j = self.j if j is None else int(j)
+        self.update_view()
+
+    def set_factor(self, factor):
+        self.factor = float(factor)
+        self.update_view()
+
+    def set_thickness(self, on):
+        self.show_h = bool(on)
+        self.update_view()
+
+    def update_view(self):
+        name, coords, w = self.section()
+        drawn = self.factor * w
+        lo, hi = float(coords[0]), float(coords[-1])
+        self.profile.setData(coords, drawn)
+        self.zero.setData([lo, hi], [0.0, 0.0])
+        half = self.outcome.request.t / 2
+        self.upper.setData([lo, hi], [-half, -half] if self.show_h else [])
+        self.lower.setData([lo, hi], [half, half] if self.show_h else [])
+        self.upper.setVisible(self.show_h)
+        self.lower.setVisible(self.show_h)
+        k, c, wk = self.maximum()
+        self.max_point.setData([c], [self.factor * wk])
+        self.plot.setAspectLocked(self.factor == 1.0, ratio=1.0)  # ×1: equal scale of both axes, the physical shape
+        self.retranslate()
+        self.plot.autoRange()
+
+    def retranslate(self, *_):
+        lang = self.session.figure_language
+        f = f"{self.factor:g}"
+        if self.direction == "x":
+            self._title_key, self._title_values = "side.title.x", {"y": float(self.outcome.y[self.j])}
+        else:
+            self._title_key, self._title_values = "side.title.y", {"x": float(self.outcome.x[self.i])}
+        self._axes = {"bottom": "axis.side.x" if self.direction == "x" else "axis.side.y"}
+        super().retranslate()
+        self.plot.setLabel("left", fig_text(lang, "axis.side.w", f=f))
+        if getattr(self, "legend", None) is None:
+            return
+        self.legend.clear()
+        self.legend.addItem(self.zero, fig_text(lang, "legend.side.undeformed"))
+        self.legend.addItem(self.profile, fig_text(lang, "legend.side.profile", f=f))
+        self.legend.addItem(self.max_point, fig_text(lang, "legend.side.max"))
+        if self.show_h:
+            self.legend.addItem(self.upper, fig_text(lang, "legend.side.thickness"))
+
+
+def fit_bold(control):
+    """Segment buttons are drawn in bold when selected: never narrower than the bold text (no clipped labels)."""
+    for button in control.buttons.values():
+        bold = QFont(button.font())
+        bold.setBold(True)
+        chrome = max(16, button.sizeHint().width() - button.fontMetrics().horizontalAdvance(button.text()))
+        button.setMinimumWidth(QFontMetrics(bold).horizontalAdvance(button.text()) + chrome)
+
+
+def node_text(outcome, i, j):
+    """Text of the stored values at node (i, j); diagnostic and research fields keep their mark."""
+    x, y, w = float(outcome.x[i]), float(outcome.y[j]), float(outcome.w[i, j])
+    head = ""
+    if outcome.is_error or outcome.diagnostic_only:
+        head = "ДИАГНОСТИКА (поле последнего выполненного полушага, не результат): "
+    elif outcome.mark:
+        head = f"{outcome.mark}: "
+    wbar = "" if outcome.w_bar is None else f"; w̄ = {fmt(float(outcome.w_bar[i, j]), 10)}"
+    return (f"{head}узел i = {i}, j = {j}: x = {x!r} m, y = {y!r} m; w = {w!r} m (= {fmt(w * MM, 7)} mm){wbar} "
+            "— значение решателя в узле, без интерполяции")
+
+
 class FieldsTab(QWidget):
-    """Colour field with isolines, or the axonometric view of the deformed surface with a labelled factor."""
+    """Colour field with isolines, the axonometric view of the deformed surface with a labelled factor, or the side view
+    of the mid-surface along a node line; a click on the map selects a node."""
 
     def __init__(self, session, outcome, model_rows, trailing=(), parent=None):
         super().__init__(parent)
         from kkvim_gui.analysis.surface import PRESETS, SurfaceFigure
 
+        self.outcome = outcome
         self.figure = FieldFigure(session, outcome, isolines=True)
         self.surface = SurfaceFigure(session, outcome)
-        self.view = SegmentedControl({"map": "Карта и изолинии", "surface": "3D-вид (цвет)"}, "map")
+        e = outcome.extremum()
+        c = centre_value(outcome)
+        i0, j0 = (c["i"], c["j"]) if c is not None else (e["i"], e["j"])  # the centre lines when they are nodes
+        self.side = SideFigure(session, outcome, i0, j0)
+        self.view = SegmentedControl({"map": "Карта и изолинии", "surface": "3D-вид (цвет)", "side": "Вид сбоку"}, "map")
         self.quantity = SegmentedControl({"w": "Прогиб w, mm", "w_bar": "Безразмерный w̄"}, "w")
         self.quantity.changed.connect(self.figure.set_quantity)
         self.cmap = QComboBox()
@@ -605,36 +764,120 @@ class FieldsTab(QWidget):
         self.factor.currentIndexChanged.connect(lambda i: self.surface.set_factor(self.factor.itemData(i)))
         self.map_controls = (self.quantity, self.isolines)
         self.surface_controls = (labelled("Масштаб прогиба", self.factor), self.mesh)
+        # side view: direction, the node line (the selectors of «Сечения»), the drawing factor and the thickness schematic
+        self.side_direction = SegmentedControl({"x": "Вдоль x", "y": "Вдоль y"}, "x")
+        self.side_direction.setToolTip("Вдоль x — строка узлов при выбранном y_j; вдоль y — столбец узлов при выбранном x_i")
+        self.side_at_y = NodeSelector("y", outcome.y, j0)
+        self.side_at_x = NodeSelector("x", outcome.x, i0)
+        self.side_factor = QComboBox()
+        for value in SideFigure.FACTORS:
+            self.side_factor.addItem("×1 — физический масштаб" if value == 1.0 else f"×{value:g} — только изображение", value)
+        self.side_factor.setToolTip("×1: обе оси в метрах в одном масштабе (истинная форма). Больший множитель увеличивает "
+                                    "только изображение прогиба; числа — значения решателя")
+        self.side_thickness = QCheckBox("Толщина h (схема)")
+        self.side_thickness.setToolTip("Номинальная толщина h вокруг исходной срединной поверхности — схема; деформированные "
+                                       "лицевые поверхности, деформации и напряжения по толщине не рассчитываются")
+        self.side_direction.changed.connect(self._side_direction)
+        self.side_at_y.spin.valueChanged.connect(lambda j: self.side.set_section(j=j))
+        self.side_at_x.spin.valueChanged.connect(lambda i: self.side.set_section(i=i))
+        self.side_factor.currentIndexChanged.connect(lambda k: self.side.set_factor(self.side_factor.itemData(k)))
+        self.side_thickness.toggled.connect(self.side.set_thickness)
+        for signal in (self.side_at_y.spin.valueChanged, self.side_at_x.spin.valueChanged,
+                       self.side_factor.currentIndexChanged, self.side_thickness.toggled):
+            signal.connect(self._show_side_info)  # after the figure: the text follows the drawn section
+        self.side_y_box = labelled("при", self.side_at_y)
+        self.side_x_box = labelled("при", self.side_at_x)
+        self.side_bar = QWidget()  # two rows: the node line; the drawing factor and the thickness schematic
+        side_lay = QVBoxLayout(self.side_bar)
+        side_lay.setContentsMargins(0, 0, 0, 0)
+        side_lay.setSpacing(0)
+        side_lay.addWidget(toolbar(self.side_direction, self.side_y_box, self.side_x_box))
+        side_lay.addWidget(toolbar(labelled("Масштаб", self.side_factor), self.side_thickness))
+        self.side_controls = (self.side_bar,)
         bar = toolbar(self.view, labelled("Шкала", self.cmap), *self.map_controls, *self.surface_controls,
                       trailing=trailing)
         self.stack = QStackedWidget()
         self.stack.addWidget(self.figure)
         self.stack.addWidget(self.surface)
+        self.stack.addWidget(self.side)
+        self.node_info = label("Щёлкните карту: будет выбран ближайший узел сетки (без интерполяции).", "secondary", wrap=True)
+        self.node_info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.side_info = label("", "secondary", wrap=True)
+        self.side_info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.figure.nodeSelected.connect(self.select_node)
         self.view.changed.connect(self.set_view)
+        self._side_direction("x")
         self.set_view("map")
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
         box = QVBoxLayout()
         box.setContentsMargins(16, 14, 16, 16)
-        box.addWidget(self.stack)
+        box.addWidget(self.side_bar)
+        box.addWidget(self.stack, 1)
+        box.addWidget(self.node_info)
+        box.addWidget(self.side_info)
         body.addLayout(box, 1)
-        body.addWidget(self._inspector(outcome, model_rows))
+        inspector = QScrollArea()  # a low window scrolls the panel instead of overlapping its lines
+        inspector.setWidgetResizable(True)
+        inspector.setFrameShape(QFrame.Shape.NoFrame)
+        inspector.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        panel = self._inspector(outcome, model_rows)
+        inspector.setWidget(panel)
+        inspector.setFixedWidth(panel.width() + 14)
+        body.addWidget(inspector)
         content = QWidget()
         content.setLayout(body)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(page(bar, content))
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        for control in (self.view, self.quantity, self.side_direction):  # after the style sheet: real padding known
+            fit_bold(control)
+
     def set_view(self, view):
-        surface = view == "surface"
-        self.stack.setCurrentWidget(self.surface if surface else self.figure)
+        surface, side = view == "surface", view == "side"
+        self.stack.setCurrentWidget(self.surface if surface else self.side if side else self.figure)
         for w in self.map_controls:
-            w.setVisible(not surface)
+            w.setVisible(view == "map")
         for w in self.surface_controls:
             w.setVisible(surface)
+        for w in self.side_controls:
+            w.setVisible(side)
+        self.cmap.parentWidget().setVisible(not side)
+        self.node_info.setVisible(view == "map")
+        self.side_info.setVisible(side)
         if self.view.current() != view:
             self.view.set_current(view)
+
+    def select_node(self, i, j):
+        """The node (i, j) chosen on the map: its stored values; the side view moves to its row and column."""
+        self.figure.select_node(i, j)
+        self.node_info.setText(node_text(self.outcome, i, j))
+        self.side_at_y.set_index(j)
+        self.side_at_x.set_index(i)
+
+    def _side_direction(self, direction):
+        self.side.set_section(direction=direction)
+        self.side_y_box.setVisible(direction == "x")
+        self.side_x_box.setVisible(direction == "y")
+        self._show_side_info()
+
+    def _show_side_info(self, *_):
+        o, side = self.outcome, self.side
+        name, coords, _ = side.section()
+        k, c, wk = side.maximum()
+        line = (f"вдоль x при y = {fmt(float(o.y[side.j]), 10)} m (j = {side.j})" if name == "x" else
+                f"вдоль y при x = {fmt(float(o.x[side.i]), 10)} m (i = {side.i})")
+        scale = ("×1: обе оси в метрах в одном масштабе — истинная форма" if side.factor == 1.0 else
+                 f"×{side.factor:g}: увеличен только рисунок прогиба; числа — значения решателя")
+        status = ("ДИАГНОСТИКА: поле последнего выполненного полушага, не результат. " if o.is_error or o.diagnostic_only
+                  else f"{o.mark}. " if o.mark else "")
+        self.side_info.setText(f"{status}Срединная поверхность {line}; {len(coords)} узлов; max |w| в сечении: "
+                               f"w = {fmt(wk * MM, 10)} mm в узле {'i' if name == 'x' else 'j'} = {k} "
+                               f"({name} = {fmt(c, 10)} m). w > 0 — вниз (MATH_SPEC 8.1); {scale}. Толщина h — только схема.")
 
     @staticmethod
     def _inspector(outcome, model_rows):

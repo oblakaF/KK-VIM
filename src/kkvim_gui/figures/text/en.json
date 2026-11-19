@@ -48,5 +48,14 @@
   "legend.cycle": "KK-VIM {label} (k = {k}, s = {s})",
   "legend.cycle.navier": "Navier (reference for this input)",
   "legend.cycle.d2": "FDM D2 (computed for this input)",
-  "legend.series.cycle": "KK-VIM {label} (k = {k}, s = {s}; a run at every q)"
+  "legend.series.cycle": "KK-VIM {label} (k = {k}, s = {s}; a run at every q)",
+  "side.title.x": "Side view: mid-surface along x at y = {y} m",
+  "side.title.y": "Side view: mid-surface along y at x = {x} m",
+  "axis.side.x": "x, m",
+  "axis.side.y": "y, m",
+  "axis.side.w": "w × {f}, m (positive downward)",
+  "legend.side.undeformed": "undeformed mid-surface (w = 0)",
+  "legend.side.profile": "mid-surface deflection at the nodes (× {f})",
+  "legend.side.thickness": "thickness h — schematic, not computed",
+  "legend.side.max": "max |w| in the section"
 }

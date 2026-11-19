@@ -48,5 +48,14 @@
   "legend.cycle": "КК-ВИМ {label} (k = {k}, s = {s})",
   "legend.cycle.navier": "Навье (эталон для этих данных)",
   "legend.cycle.d2": "МКР D2 (рассчитан для этих данных)",
-  "legend.series.cycle": "КК-ВИМ {label} (k = {k}, s = {s}; расчёт при каждом q)"
+  "legend.series.cycle": "КК-ВИМ {label} (k = {k}, s = {s}; расчёт при каждом q)",
+  "side.title.x": "Вид сбоку: срединная поверхность вдоль x при y = {y} m",
+  "side.title.y": "Вид сбоку: срединная поверхность вдоль y при x = {x} m",
+  "axis.side.x": "x, m",
+  "axis.side.y": "y, m",
+  "axis.side.w": "w × {f}, m (вниз — положительный)",
+  "legend.side.undeformed": "исходная срединная поверхность (w = 0)",
+  "legend.side.profile": "прогиб срединной поверхности в узлах (× {f})",
+  "legend.side.thickness": "толщина h — схема, не расчёт",
+  "legend.side.max": "max |w| в сечении"
 }
