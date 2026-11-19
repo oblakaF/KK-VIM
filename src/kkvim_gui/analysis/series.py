@@ -107,6 +107,29 @@ def home_range(xs, ys, pad=HOME_PAD):
     return span(xs), span(ys)
 
 
+class SelectionRing(pg.ScatterPlotItem):
+    """The ring of the selected point: drawn only, never a click target.
+
+    pyqtgraph's scene gives a click to the topmost item whose mouseClickEvent accepts it and does not look at
+    acceptedMouseButtons; a plain ScatterPlotItem accepts every click within its 18 px symbol and so took the clicks
+    meant for a neighbouring load 7–8 px away. This item ignores clicks and hover, so they reach the curve points.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self.setAcceptHoverEvents(False)
+
+    def mouseClickEvent(self, ev):
+        ev.ignore()
+
+    def mouseDragEvent(self, ev):
+        ev.ignore()
+
+    def hoverEvent(self, ev):
+        pass  # never claims the clicks of a hover
+
+
 class SeriesFigure(QFrame):
     """Interactive X–Y graph: KK-VIM points of the series and, for SSSS, the Navier reference."""
 
@@ -145,7 +168,7 @@ class SeriesFigure(QFrame):
                             for k in range(1, vim_cycles.K_MAX + 1)}
         self.shown = {"kkvim": True, "navier": True, "d2": True, **{k: True for k in self.cycle_items}}
         self.selected_point = None  # the selected series point record; kept while curves are shown or hidden
-        self.marker = pg.ScatterPlotItem(size=18, pen=pg.mkPen(t["text.primary"], width=2), brush=None, symbol="o")
+        self.marker = SelectionRing(size=18, pen=pg.mkPen(t["text.primary"], width=2), brush=None, symbol="o")
         self.marker.setZValue(10)
         self.plot.addItem(self.marker)
         for item in (self.kkvim, self.navier, self.d2, *self.cycle_items.values()):

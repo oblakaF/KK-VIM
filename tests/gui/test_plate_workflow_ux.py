@@ -462,8 +462,14 @@ def test_a_selected_point_opens_its_stored_run_without_a_new_calculation(main, q
     assert all(f"серия {series.series_id}, точка {k} из 3" in t for k, t in enumerate(texts, start=1))
 
 
-def test_a_mouse_click_on_a_graph_point_selects_and_opens_that_stored_run(main, qtbot):
-    """QA GUI-OWNER-UX-VIEW-QA-01: 8,1 kPa clicked after the 8 kPa row — ring, row, label and the opened run agree."""
+@pytest.mark.parametrize("size", [(1440, 900), (1920, 1080)])
+def test_a_mouse_click_on_a_graph_point_selects_and_opens_that_stored_run(main, qtbot, size):
+    """QA GUI-OWNER-UX-VIEW-QA-01 and the ring follow-up: neighbouring points clicked at the ORIGINAL scale.
+
+    The ring of the current selection is drawn and lies over the neighbour (7–8 px apart, unzoomed); a real mouse click
+    still reaches the stored point under the cursor: 8 kPa row → 8,1 → 8,2 → 8,1 → 16,1 kPa, then a point drawn only on the
+    other method curves. Ring, table row, label and the opened stored run are the clicked record; nothing is computed.
+    """
     from PySide6.QtCore import QPoint, QPointF, Qt
     from PySide6.QtTest import QTest
 
@@ -480,43 +486,52 @@ def test_a_mouse_click_on_a_graph_point_selects_and_opens_that_stored_run(main, 
     main.run_view.select(series.run_ids[0])
     window = gui.open_analysis()
     qtbot.addWidget(window)
-    window.resize(1440, 900)
+    window.resize(*size)
     window.show()
     qtbot.waitExposed(window)
+    qtbot.wait(50)
     tab, fig = window.series_tab, window.series_tab.figure
     box = fig.plot.getViewBox()
+    home = fig.view_range()  # the original view, never zoomed by this test
     points = tab.data.points
     assert [p.q for p in points[:3]] == [8000.0, 8100.0, 8200.0]
-    for row, target in ((0, points[1]), (1, points[3])):  # 8,1 kPa after the 8 kPa row; 16,1 kPa after 8,1 kPa
-        tab.view.selectRow(row)  # the table row chosen by the user first
-        assert tab.selected is points[row]
-        kx, ky = fig.curves()[:2]
-        k = next(i for i, p in enumerate(sorted(tab.data.included, key=lambda p: p.q)) if p is target)  # drawing order
-        x, y = kx[k], ky[k]
-        box.setRange(xRange=(x - 0.15, x + 0.15), yRange=(y - 0.05, y + 0.05), padding=0)  # neighbours apart
-        qtbot.wait(20)
+
+    def spot(target, key):
+        """(x, y) of the record on the curve key, from the plotted coordinates (not rebuilt from q)."""
+        xs, ys = fig._curve(key)
+        k = next(i for i, p in enumerate(fig.records(key)) if p is target)
+        return xs[k], ys[k]
+
+    def click(target, key="kkvim"):
+        assert len(fig.marker.data) == 1  # the ring of the previous selection is drawn
+        x, y = spot(target, key)
         pixel = fig.plot.mapFromScene(box.mapViewToScene(QPointF(x, y)))
         QTest.mouseClick(fig.plot.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
                          QPoint(int(pixel.x()), int(pixel.y())))
         p = tab.selected
-        assert p is target, (target.q, p.q)  # the clicked record, not the previously chosen row
-        assert fig.selected_point is p  # one record: the table, the label and the ring
-        assert tab.view.selectionModel().currentIndex().row() == points.index(p)
+        assert p is target, (target.q, p.q)  # the clicked record, not the ring's
+        assert fig.selected_point is p and tab.view.selectionModel().currentIndex().row() == points.index(p)
         assert fig.marker.data["x"].tolist() == [x] and f"расчёт № {p.run_id} " in tab.selected_label.text()
-    tab.view.selectRow(0)
-    box.setRange(xRange=(7.95, 8.25), yRange=(ky[1] - 0.05, ky[1] + 0.05), padding=0)
-    qtbot.wait(20)
-    pixel = fig.plot.mapFromScene(box.mapViewToScene(QPointF(kx[1], ky[1])))
-    QTest.mouseClick(fig.plot.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
-                     QPoint(int(pixel.x()), int(pixel.y())))
-    assert tab.selected.q == 8100.0 and "q = 8,1 kPa" in tab.selected_label.text()
-    tab.open_button.click()
-    opened = gui.analysis_windows[-1]
-    qtbot.addWidget(opened)
-    run = main.runs.get(series.run_ids[1])
-    assert opened.run is run and opened.outcome is run.outcome and run.request.q == 8100.0  # the stored run itself
-    assert opened.series_tab.selected.q == 8100.0
-    assert started == []  # no solver and no Navier process
+        tab.open_button.click()
+        opened = gui.analysis_windows[-1]
+        qtbot.addWidget(opened)
+        run = main.runs.get(p.run_id)
+        assert opened.run is run and opened.outcome is run.outcome and run.request.q == p.q  # the stored run itself
+        assert opened.series_tab.selected.q == p.q
+        opened.close()
+
+    tab.view.selectRow(0)  # 8 kPa chosen in the table: its ring is drawn next to 8,1 kPa
+    assert tab.selected is points[0] and fig.marker.data["x"].tolist() == [spot(points[0], "kkvim")[0]]
+    for target in (points[1], points[2], points[1], points[3]):  # 8 → 8,1 → 8,2 → 8,1 → 16,1 kPa
+        click(target)
+    assert main.runs.get(points[1].run_id).request.q == 8100.0
+    click(points[1])  # back to 8,1 kPa: the ring is on 8,1, the neighbour 8,2 is drawn on several method curves
+    tab.toggles["kkvim"].setChecked(False)  # the ring moves to the next visible curve that has 8,1 kPa
+    assert len(fig.marker.data) == 1
+    click(points[2], "navier")  # 8,2 kPa on the Navier curve
+    tab.toggles["kkvim"].setChecked(True)
+    assert fig.view_range() == home  # no zoom or pan was needed or made
+    assert started == []  # no solver, Navier or D2 process
 
 
 def test_a_point_stopped_by_the_half_step_limit_is_not_called_converged(main, qtbot):
