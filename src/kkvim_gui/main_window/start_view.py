@@ -1,7 +1,7 @@
 """Start state (GUI_DESIGN.md, 5.1; GUI-PLATE-WORKFLOW-UX-01).
 
-«Новый расчёт», a short truthful readiness line and what the program does, step by step. Opening or saving projects
-is not implemented and is not offered. The demonstration list of recent projects is shown only in the demonstration
+«Новый расчёт» (Ctrl+N), «Открыть проект…» (Ctrl+O: a saved project, P2.3; it opens the setup and never starts a
+calculation), a short truthful readiness line and what the program does, step by step. The demonstration list of recent projects is shown only in the demonstration
 mode (``--demo``, TEST DATA). The scientific status of a calculation is shown where the calculation is configured and
 displayed, not here.
 """
@@ -37,6 +37,7 @@ STEPS = (
 
 class StartView(QWidget):
     newRequested = Signal()
+    openRequested = Signal()
 
     def __init__(self, demo=False, parent=None):
         super().__init__(parent)
@@ -55,6 +56,11 @@ class StartView(QWidget):
         self.new_button.setToolTip("Новый расчёт (Ctrl+N)")
         self.new_button.clicked.connect(self.newRequested)
         actions.body.addWidget(self.new_button)
+        self.open_button = QPushButton("Открыть проект…")
+        self.open_button.setMinimumHeight(36)
+        self.open_button.setToolTip("Открыть сохранённый проект: параметры расчёта без результатов (Ctrl+O)")
+        self.open_button.clicked.connect(self.openRequested)
+        actions.body.addWidget(self.open_button)
         self.ready = StatusLabel("neutral" if demo else "success", "Демонстрационный режим" if demo else READY)
         actions.body.addWidget(self.ready)
         self.ready_text = label(DEMO_TEXT if demo else READY_TEXT, "secondary", wrap=True)

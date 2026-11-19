@@ -287,6 +287,8 @@ class SeriesDialog(QDialog):
 
 class SetupView(QWidget):
     runRequested = Signal()
+    saveRequested = Signal()  # «Сохранить проект» (Ctrl+S): the setup as a project .kkv, without results
+    saveAsRequested = Signal()  # «Сохранить как…» (Ctrl+Shift+S)
 
     def __init__(self, model=None, session=None, demo=False, n_selectable=None, parent=None):
         """n_selectable: values of N the user may choose (the functional preview passes PREVIEW_N = (1,));
@@ -631,6 +633,16 @@ class SetupView(QWidget):
         self.goto_error.setVisible(False)
         self.goto_error.clicked.connect(self.focus_first_error)
         bl.addWidget(self.goto_error)
+        self.save_button = QToolButton()
+        self.save_button.setText("Сохранить проект")
+        self.save_button.setToolTip("Сохранить параметры расчёта в файл проекта, без результатов (Ctrl+S)")
+        self.save_button.clicked.connect(self.saveRequested)
+        bl.addWidget(self.save_button)
+        self.save_as_button = QToolButton()
+        self.save_as_button.setText("Сохранить как…")
+        self.save_as_button.setToolTip("Сохранить параметры расчёта в новый файл проекта (Ctrl+Shift+S)")
+        self.save_as_button.clicked.connect(self.saveAsRequested)
+        bl.addWidget(self.save_as_button)
         self.run_button = QPushButton("▶  Выполнить расчёт")
         self.run_button.setProperty("variant", "primary")
         self.run_button.setToolTip("Выполнить расчёт (F5). Демонстрационный режим: TEST DATA" if demo else
@@ -968,6 +980,14 @@ class SetupView(QWidget):
             self.ssss_research.setFocus(Qt.FocusReason.OtherFocusReason)
             return self.ssss_research
         return None
+
+    def reset_checks(self):
+        """Forget the messages of the previous setup (after a project is opened or a new calculation is started): the
+        fields are checked again on editing or before the run, as for a fresh form."""
+        for key in list(self.shown_errors):
+            self._show_error(key, None)
+        self.solver_problems = []
+        self._update_status()
 
     def show_solver_problems(self, problems):
         """Input rejected by kkvim's own checks before a run: shown in the action bar, no run is started."""
