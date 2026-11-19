@@ -47,6 +47,16 @@ function Invoke-Checked([string]$what, [scriptblock]$command) {
     if ($LASTEXITCODE -ne 0) { throw "$what failed (exit code $LASTEXITCODE)" }
 }
 
+function Get-FileSha256([string]$path) {
+    # SHA256 of the file bytes via .NET, as Get-FileHash returns it (upper-case hex). Get-FileHash itself is a function of
+    # the script module Microsoft.PowerShell.Utility and is missing when that module cannot be loaded, e.g. when
+    # powershell.exe inherits the PSModulePath of PowerShell 7 (GitHub Windows runners). A read error stops the script.
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($path)
+    try { return ([BitConverter]::ToString($sha.ComputeHash($stream)) -replace "-", "") }
+    finally { $stream.Dispose(); $sha.Dispose() }
+}
+
 function Get-SourceFingerprint {
     $files = @()
     $files += Get-ChildItem -Path (Join-Path $root "src") -Recurse -File |
@@ -58,7 +68,7 @@ function Get-SourceFingerprint {
     $files += Get-Item -LiteralPath $PSCommandPath
     $lines = foreach ($file in $files) {
         $relative = $file.FullName.Substring($root.Length).TrimStart('\').Replace('\', '/')
-        "{0}`t{1}" -f $relative, (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash
+        "{0}`t{1}" -f $relative, (Get-FileSha256 $file.FullName)
     }
     $sorted = [string[]]$lines
     [Array]::Sort($sorted, [StringComparer]::Ordinal)
