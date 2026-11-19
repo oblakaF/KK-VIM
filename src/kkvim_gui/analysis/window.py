@@ -292,7 +292,7 @@ class AnalysisWindow(QMainWindow):
         from kkvim_gui.analysis.cycles_tab import TAB_TOOLTIP as CYCLES_TOOLTIP
         from kkvim_gui.analysis.cycles_tab import CyclesTab
 
-        self.cycles = CyclesTab(s, self._cycle_table())
+        self.cycles = CyclesTab(s, self._cycle_table(), display=self.display)
         self.tabs.addTab(self.cycles, CYCLES_TITLE)
         self.tabs.setTabToolTip(self.tabs.count() - 1, CYCLES_TOOLTIP)
         self.d2_tab = None
@@ -302,7 +302,7 @@ class AnalysisWindow(QMainWindow):
         if self.series is not None:
             from kkvim_gui.analysis.series import SeriesTab
 
-            self.series_tab = SeriesTab(s, self.series)
+            self.series_tab = SeriesTab(s, self.series, display=self.display)
             self.series_tab.runRequested.connect(self.runRequested)
             # a run of a completed series opens on «Нагрузка — прогиб» (first tab); a single run on «Результат»
             if self.series.status == "finished":
@@ -354,6 +354,14 @@ class AnalysisWindow(QMainWindow):
                 self._add_d2_tab()
         self.set_navier(navier)
 
+    @property
+    def display(self):
+        """The curves chosen in «Результаты и сравнение» for this run (its own setup snapshot; display only)."""
+        from kkvim_gui.model.setup_state import DISPLAY_ALL, display_of
+
+        snapshot = getattr(self.run, "snapshot", None)
+        return DISPLAY_ALL if snapshot is None else display_of(snapshot)
+
     def _cycle_table(self):
         from kkvim_gui.backend import vim_cycles
 
@@ -368,7 +376,7 @@ class AnalysisWindow(QMainWindow):
         index = self.tabs.indexOf(self.cycles)
         current = self.tabs.currentIndex()
         old = self.cycles
-        self.cycles = CyclesTab(self.session, self._cycle_table())
+        self.cycles = CyclesTab(self.session, self._cycle_table(), display=old.chosen())  # the user's visibility stays
         self.tabs.removeTab(index)
         self.tabs.insertTab(index, self.cycles, CYCLES_TITLE)
         self.tabs.setTabToolTip(index, CYCLES_TOOLTIP)

@@ -34,6 +34,12 @@ Independent method for comparison (GUI-MULTIMETHOD-CCCC-D2-01): ``with_d2`` — 
 (D2)» (the QA reference D2 of the same discrete problem, ``backend.d2_job``) for the same plate and grid, in its own
 process after the KK-VIM run (for a series: at every q). On by default; it applies to CCCC only: SSSS keeps the Navier
 reference and D2 (the clamped-plate scheme) is never offered for SSSS. It does not enter the RunRequest of the solver.
+
+Results and comparison (GUI-OWNER-COMPARISON-SELECT-01): ``display`` — the curves shown after the run (KK-VIM last
+half-step, VIM-1/2/3 = the completed full cycles k = 1, 2, 3, s = 2k of the same run (D-030), Navier, D2). It is a
+DISPLAY choice only: it never enters the RunRequest or the configuration, never starts or stops a computation, never
+changes a research choice and is not reset with N. ``display_options`` states before the run which curves the chosen
+route can give and why the others cannot (from the route's recorded history; nothing is promised by a checkbox).
 """
 
 from dataclasses import dataclass, field, replace
@@ -43,8 +49,9 @@ from kkvim_gui import placeholders
 from kkvim_gui.backend import units
 from kkvim_gui.backend.kkvim_adapter import DEFAULTS, N_AVAILABLE, dense_problem
 from kkvim_gui.backend.request import (CCCC_HALF_STEPS, CCCC_ROUTES, R4_MODES, R4_NORMATIVE, R4_RESEARCH_FIXED,
-                                      R4_RESEARCH_MODES, R4_RESEARCH_STOP, ROUTE_R3, ROUTE_R4, ROUTE_SSSS_N46, SUPPORTS, TRANSFORMS,
-                                      RunRequest, route_of)
+                                      R4_RESEARCH_MODES, R4_RESEARCH_STOP, ROUTE_CCCC_N1, ROUTE_R3, ROUTE_R4, ROUTE_SSSS_N46,
+                                      SUPPORTS, TRANSFORMS, RunRequest,
+                                      route_of)
 from kkvim_gui.model.numbers import parse_number
 
 POSITIVE = "Значение должно быть больше нуля."
@@ -90,6 +97,16 @@ R4_MODE_TEXT = {
     R4_NORMATIVE: "Нормативный D-047: только s = 1, далее NOT_QUALIFIED",
     R4_RESEARCH_STOP: "Исследовательский D-048: остановка по стабилизации поля",
     R4_RESEARCH_FIXED: "Исследовательский: фиксированное число полушагов (дополнение к D-048)",
+}
+DISPLAY_KEYS = ("kkvim", 1, 2, 3, "navier", "d2")  # the series / cycles tab curve keys (k = cycle)
+DISPLAY_ALL = frozenset(DISPLAY_KEYS)
+DISPLAY_TITLES = {
+    "kkvim": "КК-ВИМ: последний полушаг",
+    1: "ВИМ-1 — k=1, s=2",
+    2: "ВИМ-2 — k=2, s=4",
+    3: "ВИМ-3 — k=3, s=6",
+    "navier": "Навье — эталон для SSSS",
+    "d2": "МКР — двумерный (D2) — сравнение для CCCC",
 }
 RESEARCH_RULE_TEXT = {  # stopping of the research continuation; shown only while it is chosen
     R4_RESEARCH_STOP: "Остановка по стабилизации поля (D-048.3)",
@@ -243,6 +260,7 @@ class SetupState:
     cccc_half_steps: int = 1  # CCCC: the exact number of half-steps; s = 1 by default (no continuation)
     load_mode: str = "single"  # "single": one load q; "series": the loads of "q_series", one run each
     with_d2: bool = True  # CCCC: also «МКР — двумерный (D2)» for the same plate and grid (never for SSSS)
+    display: frozenset = DISPLAY_ALL  # curves shown after the run: a display choice only, never a computation
 
     def with_text(self, key, text):
         return replace(self, texts={**self.texts, key: text})
@@ -265,6 +283,10 @@ class SetupState:
             raise ValueError(f"with_d2 must be True or False, got {choices['with_d2']!r}")
         if "load_mode" in choices and choices["load_mode"] not in LOAD_MODES:
             raise ValueError(f"unknown load mode {choices['load_mode']!r}")
+        if "display" in choices:
+            choices["display"] = frozenset(choices["display"])
+            if not choices["display"] <= DISPLAY_ALL:
+                raise ValueError(f"unknown curves {sorted(map(str, choices['display'] - DISPLAY_ALL))}")
         changed = any(key in choices and choices[key] != getattr(self, key) for key in ("N", "supports"))
         if changed:  # no implicit research continuation after a change of N or of the supports (D-048.5, D-056.7)
             choices.setdefault("r4_mode", R4_NORMATIVE)
@@ -302,6 +324,73 @@ class SetupState:
         scope = self.scope
         skip = "q" if self.series else "q_series"
         return [key for key, spec in FIELDS.items() if ("all" in spec.scope or scope in spec.scope) and key != skip]
+
+
+@dataclass(frozen=True)
+class DisplayOption:
+    key: object  # a DISPLAY_KEYS item
+    title: str
+    possible: bool  # the chosen route and parameters can give this curve (before the run: possible, not computed)
+    text: str  # what decides it, or why it cannot be shown
+
+
+def display_of(state):
+    """The display choice stored with a run (``RunRecord.snapshot``); all curves for an older snapshot without it."""
+    return frozenset(getattr(state, "display", DISPLAY_ALL))
+
+
+def display_options(state):
+    """[DisplayOption] of DISPLAY_KEYS for the current form, before any run (Qt-free).
+
+    Cycles: VIM-k is the state s = 2k of THIS run, read after the run from its half-step history; only the routes that
+    record the centre value per half-step can give it (R3 for SSSS N = 1: w̄ at the centre; CCCC: α at the centre). The
+    centre (a/2, b/2) must be a grid node. The run may still end before s = 2k: the analysis window then states why.
+    """
+    route, N = state.route, state.N
+    nx, ny = validate_field("n_x", state.texts.get("n_x", "")), validate_field("n_y", state.texts.get("n_y", ""))
+    odd = (nx[1] is None and ny[1] is None and float(nx[0]).is_integer() and float(ny[0]).is_integer()
+           and (int(nx[0]) % 2 or int(ny[0]) % 2))
+    out = [DisplayOption("kkvim", DISPLAY_TITLES["kkvim"], True,
+                         "поле последнего выполненного полушага этого расчёта; статус — по решателю (CONVERGED — критерий "
+                         "остановки выполнен; остановка по пределу полушагов — не сходимость)")]
+
+    def cycle(k):
+        s = 2 * k
+        if route in (ROUTE_R4, ROUTE_SSSS_N46):
+            name = "R4 (N = 2–3)" if route == ROUTE_R4 else "исследования SSSS N = 4–6"
+            return False, (f"маршрут {name} записывает на каждом полушаге только max|w|, не прогиб в центре; "
+                           "VIM-1–3 не вычисляются и не подменяются итоговым полем")
+        if odd:
+            return False, "центр (a/2, b/2) не узел сетки (nₓ или nᵧ нечётно); значение не интерполируется"
+        if route == ROUTE_R3:
+            s_max, error = validate_field("s_max", state.texts.get("s_max", ""))
+            if error is None and s_max < s:
+                return False, f"s_max = {int(s_max)} < {s}"
+            return True, (f"w̄ в центре на полушаге s = {s} из истории R3, если расчёт выполнит s = {s} "
+                          "(критерий остановки может остановить его раньше)")
+        steps = state.cccc_half_steps
+        if route != ROUTE_CCCC_N1 and s > 2:
+            return False, f"маршрут CCCC, N = {N} допускает не более s = 2 (RN-5, RT-7); s = {s} не вычисляется"
+        if steps < s:
+            return False, f"выбрано полушагов s = {steps} < {s}"
+        guard = " после проверок RN-5 и RT-7 этого расчёта" if route != ROUTE_CCCC_N1 else ""
+        return True, f"α в центре на полушаге s = {s} из истории CCCC{guard}"
+
+    for k in (1, 2, 3):
+        out.append(DisplayOption(k, DISPLAY_TITLES[k], *cycle(k)))
+    if state.supports == "SSSS":
+        out.append(DisplayOption("navier", DISPLAY_TITLES["navier"], True,
+                                 "рассчитывается автоматически в отдельном процессе для каждого q; флажок — только показ"))
+        out.append(DisplayOption("d2", DISPLAY_TITLES["d2"], False,
+                                 "для SSSS: D2 — сравнение для CCCC; эталон SSSS — Навье"))
+    else:
+        out.append(DisplayOption("navier", DISPLAY_TITLES["navier"], False,
+                                 "решение Навье относится только к шарнирному опиранию SSSS"))
+        out.append(DisplayOption("d2", DISPLAY_TITLES["d2"], state.with_d2,
+                                 "будет рассчитан в отдельном процессе (флажок «МКР — двумерный (D2)» в «Граничные условия»)"
+                                 if state.with_d2 else
+                                 "не будет рассчитан: выключен флажок «МКР — двумерный (D2)» в «Граничные условия»"))
+    return out
 
 
 def validate(state):

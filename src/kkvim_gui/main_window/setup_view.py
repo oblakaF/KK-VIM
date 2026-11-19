@@ -57,9 +57,10 @@ from kkvim_gui.backend.kkvim_adapter import CAPABILITIES, DENSE_N_MAX, N_AVAILAB
 from kkvim_gui.backend.request import R4_NORMATIVE, R4_RESEARCH_MODES, R4_RESEARCH_STOP, TRANSFORMS
 from kkvim_gui.main_window.plate_scheme import PlateScheme
 from kkvim_gui.model.setup_model import SetupModel
-from kkvim_gui.model.setup_state import (FIELDS, N_VALUES, R4_MODE_TEXT, RESEARCH_RULE_TEXT, SERIES_MAX, SERIES_MIN,
-                                         cccc_half_steps_of, generate_series, parse_series, scope_of, series_preview,
-                                         series_texts, validate_field)
+from kkvim_gui.model.setup_state import (DISPLAY_ALL, DISPLAY_KEYS, DISPLAY_TITLES, FIELDS, N_VALUES, R4_MODE_TEXT,
+                                         RESEARCH_RULE_TEXT, SERIES_MAX, SERIES_MIN, cccc_half_steps_of, display_options,
+                                         generate_series, parse_series, scope_of, series_preview, series_texts,
+                                         validate_field)
 from kkvim_gui.session import Session
 from kkvim_gui.widgets.common import (
     Card,
@@ -168,6 +169,15 @@ LOCKED_TEXT = (
 # Layout thresholds in logical pixels of the page width.
 WIDE_MIN = 1100
 MEDIUM_MIN = 760
+
+
+RESULTS_TITLE = "Результаты и сравнение"
+RESULTS_NOTE = ("Какие кривые показать в окне анализа после расчёта. Это только показ: флажки не запускают и не отменяют "
+                "расчёты (КК-ВИМ, Навье, D2), не меняют статус и не включают исследовательский режим.")
+RESULTS_AFTER = ("После расчёта во вкладках «Циклы VIM-1–3» и «Нагрузка — прогиб» видно, что фактически рассчитано и "
+                 "сохранено, а чего нет — с причиной; видимость кривых там можно менять без пересчёта.")
+DISPLAY_ALL_TEXT = "Все доступные кривые"
+POSSIBLE_PREFIX, UNAVAILABLE_PREFIX = "○ возможно после расчёта — ", "✕ недоступно — "
 
 
 def _disable_items(combo, enabled_flags):
@@ -557,6 +567,27 @@ class SetupView(QWidget):
         summary.body.addLayout(self.summary_grid)
         summary.body.addStretch(1)
 
+        results = Card(RESULTS_TITLE, right=label("только показ", "tag"))
+        results.body.addWidget(label(RESULTS_NOTE, "secondary", wrap=True))
+        self.display_all = QCheckBox(DISPLAY_ALL_TEXT)
+        self.display_all.setToolTip("Отметить все кривые, которые выбранный маршрут может дать")
+        self.display_all.clicked.connect(self._on_display_all)
+        results.body.addWidget(self.display_all)
+        display_grid = QGridLayout()
+        display_grid.setHorizontalSpacing(12)
+        display_grid.setVerticalSpacing(4)
+        display_grid.setColumnStretch(1, 1)
+        self.display_boxes, self.display_status = {}, {}
+        for r, key in enumerate(DISPLAY_KEYS):
+            box = QCheckBox(DISPLAY_TITLES[key])
+            box.toggled.connect(lambda on, k=key: self._on_display(k, on))
+            status = label("", "secondary", wrap=True)
+            display_grid.addWidget(box, r, 0, Qt.AlignmentFlag.AlignTop)
+            display_grid.addWidget(status, r, 1)
+            self.display_boxes[key], self.display_status[key] = box, status
+        results.body.addLayout(display_grid)
+        results.body.addWidget(label(RESULTS_AFTER, "secondary", wrap=True))
+
         self.scheme = Card("Схема модели", right=label("схема условная", "tag"))
         # The scheme shows the current input (this model), never the run snapshot.
         self.plate = PlateScheme(self.session, self.model)
@@ -564,7 +595,7 @@ class SetupView(QWidget):
 
         self.cards = {
             "geometry": geometry, "material": material, "load": load,
-            "supports": supports, "method": method, "summary": summary, "scheme": self.scheme,
+            "supports": supports, "method": method, "results": results, "summary": summary, "scheme": self.scheme,
         }
         content = QWidget()
         self.grid = QGridLayout(content)
@@ -716,6 +747,7 @@ class SetupView(QWidget):
             self.d2.blockSignals(False)
         self.route_status.set_status(*ROUTE_STATUS[st.scope])
         self._show_load(st)
+        self._show_display(st)
         if self._n_supports != st.supports:  # the N items name the route of the selected supports
             self._n_supports = st.supports
             for i, n in enumerate(N_VALUES):
@@ -773,6 +805,38 @@ class SetupView(QWidget):
             self._update_status()
         if self._advanced_error():
             self.open_advanced()
+
+    def _show_display(self, st):
+        """«Результаты и сравнение»: the choice of the model and, for every curve, whether the route can give it."""
+        options = display_options(st)
+        possible = {o.key for o in options if o.possible}
+        for o in options:
+            box = self.display_boxes[o.key]
+            box.blockSignals(True)
+            box.setChecked(o.key in st.display and o.possible)  # a curve the route cannot give is never shown as chosen
+            box.blockSignals(False)
+            box.setEnabled(o.possible and not self.locked)
+            box.setToolTip(o.text)
+            self.display_status[o.key].setText((POSSIBLE_PREFIX if o.possible else UNAVAILABLE_PREFIX) + o.text)
+        chosen = possible & st.display
+        state = (Qt.CheckState.Checked if chosen == possible else
+                 Qt.CheckState.Unchecked if not chosen else Qt.CheckState.PartiallyChecked)
+        self.display_all.blockSignals(True)
+        self.display_all.setCheckState(state)
+        self.display_all.blockSignals(False)
+        self.display_all.setEnabled(not self.locked)
+
+    def _on_display(self, key, on):
+        display = self.model.state.display
+        self.model.set_choice(display=display | {key} if on else display - {key})
+
+    def _on_display_all(self, *_):
+        """All curves the route can give; a second click (all already chosen) clears the choice."""
+        st = self.model.state
+        possible = {o.key for o in display_options(st) if o.possible}
+        everything = possible <= st.display
+        self.model.set_choice(display=st.display - possible if everything else DISPLAY_ALL)
+        self._show_display(self.model.state)  # the model may be unchanged: the box state is restored from it
 
     def _show_load(self, st):
         series = st.series
@@ -854,6 +918,7 @@ class SetupView(QWidget):
                   self.cccc_half_steps, self.load_mode, self.d2, self.series_button):
             w.setEnabled(not locked)
         self.research_rule.setEnabled(not locked and self.model.state.research)
+        self._show_display(self.model.state)
         self._update_status()
 
     def _update_status(self):
@@ -954,7 +1019,7 @@ class SetupView(QWidget):
             grid.setRowStretch(r, 0)
         c = self.cards
         if mode == "narrow":
-            order = ("geometry", "material", "load", "supports", "method", "summary", "scheme")
+            order = ("geometry", "material", "load", "supports", "method", "results", "summary", "scheme")
             for r, key in enumerate(order):
                 grid.addWidget(c[key], r, 0)
             grid.setColumnStretch(0, 1)
@@ -965,20 +1030,21 @@ class SetupView(QWidget):
             grid.addWidget(c["load"], 1, 0)
             grid.addWidget(c["supports"], 1, 1)
             grid.addWidget(c["method"], 2, 0, 1, 2)
-            grid.addWidget(c["summary"], 3, 0, 1, 2)
+            grid.addWidget(c["results"], 3, 0, 1, 2)
+            grid.addWidget(c["summary"], 4, 0, 1, 2)
             grid.setColumnStretch(0, 3)
             grid.setColumnStretch(1, 3)
             if mode == "wide":
                 # top-aligned at the height for its width: the scheme neither stretches nor moves when the method card
                 # grows («Дополнительные параметры расчёта», «Технические подробности маршрута»)
-                grid.addWidget(c["scheme"], 0, 2, 4, 1, Qt.AlignmentFlag.AlignTop)
+                grid.addWidget(c["scheme"], 0, 2, 5, 1, Qt.AlignmentFlag.AlignTop)
                 grid.setColumnStretch(2, 4)
-                grid.setRowStretch(4, 1)
+                grid.setRowStretch(5, 1)
                 c["scheme"].setMinimumHeight(0)
             else:
-                grid.addWidget(c["scheme"], 4, 0, 1, 2)
+                grid.addWidget(c["scheme"], 5, 0, 1, 2)
                 c["scheme"].setMinimumHeight(360)
-                grid.setRowStretch(5, 1)
+                grid.setRowStretch(6, 1)
         self._layout_method_cells()
 
     def _layout_method_cells(self):

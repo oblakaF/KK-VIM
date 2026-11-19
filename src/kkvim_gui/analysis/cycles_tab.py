@@ -5,6 +5,9 @@ cycle k (s = 2k), Y the centre deflection in mm; the independent reference of th
 horizontal line. Every VIM state and the reference can be shown or hidden. The partial state s = 1 (k = 0) is a separate
 table row, never labelled VIM-1 and not drawn. States the run did not complete, or states of a run that did not end as
 requested, are in the table with the reason and are not drawn.
+
+``display`` (GUI-OWNER-COMPARISON-SELECT-01): the curves chosen in «Результаты и сравнение» before the run set the
+initial visibility only; what was actually computed and saved, and why the rest was not, is stated above the table.
 """
 
 import pyqtgraph as pg
@@ -115,26 +118,43 @@ class CycleFigure(QFrame):
         self.plot.enableAutoRange(axis="y")
 
 
+def availability_text(table):
+    """What this run actually computed and saved for VIM-1 … VIM-3 and its reference, and why the rest is missing."""
+    done = [f"{c.label} (s = {c.s})" for c in table.cycles if c.on_graph]
+    missing = [f"{c.label} — {c.reason}" for c in table.cycles if not c.on_graph]
+    parts = ["Рассчитано и сохранено в истории этого расчёта: " + (", ".join(done) if done else "ни одного полного цикла")]
+    if missing:
+        parts.append("Нет на графике: " + "; ".join(missing))
+    name = REF_KEYS.get(table.reference, "эталон")
+    parts.append(f"{name}: рассчитан" if table.ref_w_m is not None else f"{name}: нет — {table.reference_reason}")
+    return ". ".join(parts) + "."
+
+
 class CyclesTab(QWidget):
-    def __init__(self, session, table, trailing=(), parent=None):
+    def __init__(self, session, table, trailing=(), display=None, parent=None):
         super().__init__(parent)
         set_help_context(self, "iterations.overview")
         self.session, self.table = session, table
+        self.display = set(display) if display is not None else {1, 2, 3, "navier", "d2"}
+        self.ref_key = "navier" if table.reference == vim_cycles.NAVIER else "d2"
         self.figure = CycleFigure(session, table)
         self.toggles = {}
         for k in range(1, vim_cycles.K_MAX + 1):
             box = QCheckBox(vim_cycles.label(k))
-            box.setChecked(True)
+            box.setChecked(k in self.display)  # the choice made before the run; changed here without a calculation
+            self.figure.visible[k] = k in self.display
             box.setEnabled(table.cycles[k - 1].on_graph)
             box.setToolTip(table.cycles[k - 1].reason or vim_cycles.cycle_text(k))
-            box.toggled.connect(lambda shown, key=k: self.figure.set_visible(key, shown))
+            box.toggled.connect(lambda shown, key=k: self._toggle(key, key, shown))
             self.toggles[k] = box
         ref_name = REF_KEYS.get(table.reference, "эталон")
         self.toggles["ref"] = QCheckBox(ref_name)
-        self.toggles["ref"].setChecked(True)
+        self.toggles["ref"].setChecked(self.ref_key in self.display)
+        self.figure.visible["ref"] = self.ref_key in self.display
         self.toggles["ref"].setEnabled(table.ref_w_m is not None)
         self.toggles["ref"].setToolTip(table.reference_reason or vim_cycles.REFERENCE_TITLE.get(table.reference, ""))
-        self.toggles["ref"].toggled.connect(lambda shown: self.figure.set_visible("ref", shown))
+        self.toggles["ref"].toggled.connect(lambda shown: self._toggle("ref", self.ref_key, shown))
+        self.figure.redraw()
         bar = toolbar(label("Показать:", "fieldLabel"), *self.toggles.values(),
                       trailing=(*trailing, FigureLanguageSwitch(session)))
         states = (table.partial, *table.cycles)
@@ -161,6 +181,9 @@ class CyclesTab(QWidget):
             line.addWidget(label(k, "fieldLabel"))
             line.addWidget(label(str(v), wrap=True), 1)
             info.body.addLayout(line)
+        # what this run actually computed and saved (not the choice made before the run), beside how it stopped
+        self.availability = label(availability_text(table), wrap=True)
+        info.body.addWidget(self.availability)
         info.body.addStretch(1)
 
         card = Card(f"Полные циклы: {len(table.drawn)} из {vim_cycles.K_MAX} на графике",
@@ -191,3 +214,12 @@ class CyclesTab(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(page(bar, padded(box)))
+
+    def _toggle(self, figure_key, display_key, shown):
+        """Show or hide one curve: display only (the history and the reference are not touched)."""
+        (self.display.add if shown else self.display.discard)(display_key)
+        self.figure.set_visible(figure_key, shown)
+
+    def chosen(self):
+        """The current visibility as display keys (kept when the tab is rebuilt for a late reference)."""
+        return frozenset(self.display)

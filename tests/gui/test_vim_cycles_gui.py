@@ -17,7 +17,7 @@ pytest.importorskip("pytestqt")
 pytest.importorskip("pyqtgraph")
 
 import shiboken6  # noqa: E402
-from PySide6.QtCore import QCoreApplication, QEvent  # noqa: E402
+from PySide6.QtCore import QCoreApplication, QEvent, Qt  # noqa: E402
 
 from kkvim_gui.analysis.cycles_tab import TAB_TITLE, CyclesTab  # noqa: E402
 from kkvim_gui.analysis.series import SeriesFigure  # noqa: E402
@@ -180,3 +180,119 @@ def test_cycles_tab_states_an_unsupported_route(qapp):
     assert "max|w|" in texts and not tab.figure.drawn()[0]
     assert not any(tab.toggles[k].isEnabled() for k in (1, 2, 3))
     tab.deleteLater()
+
+
+# ---- «Результаты и сравнение» (GUI-OWNER-COMPARISON-SELECT-01) ---------------------------------------------------
+
+
+def counting(main):
+    """Every new solver or reference process from now on is recorded."""
+    started = []
+    process, navier = main.runs.process_factory, main.runs.navier_factory
+    main.runs.process_factory = lambda request: started.append(request) or process(request)
+    main.runs.navier_factory = lambda inputs: started.append(inputs) or navier(inputs)
+    return started
+
+
+def display_texts(view):
+    return {key: (box.isEnabled(), box.isChecked(), view.display_status[key].text())
+            for key, box in view.display_boxes.items()}
+
+
+def test_a_ssss_n1_choice_sets_the_cycles_tab_and_toggling_is_display_only(main, qtbot):
+    from kkvim_gui.model.setup_state import DISPLAY_ALL, to_request
+
+    view, m = main.setup_view, main.setup_model
+    for key, text in (("a", "2"), ("b", "1"), ("h", "10"), ("E", "210"), ("nu", "0,3"), ("q", "5"), ("n_x", "16"),
+                      ("n_y", "8")):
+        m.set_text(key, text)
+    assert m.state.display == DISPLAY_ALL  # default: every available curve
+    texts = display_texts(view)
+    assert all(texts[k][:2] == (True, True) and texts[k][2].startswith("○ возможно после расчёта") for k in
+               ("kkvim", 1, 2, 3, "navier"))
+    assert texts["d2"][:2] == (False, False) and texts["d2"][2].startswith("✕ недоступно")
+    assert view.display_all.checkState() == Qt.CheckState.Checked
+    request = to_request(m.state)
+    view.display_boxes[2].click()  # VIM-2 not shown
+    assert 2 not in m.state.display and view.display_all.checkState() == Qt.CheckState.PartiallyChecked
+    assert to_request(m.state) == request  # a display choice is never part of the computation
+    run = main._start_run()
+    finish(main, qtbot)
+    assert run.snapshot.display == DISPLAY_ALL - {2}
+    started = counting(main)
+    w = AnalysisWindow(main.session, main.run_rows(), run=run)
+    qtbot.addWidget(w)
+    tab, t = w.cycles, w.cycles.table
+    assert [c.on_graph for c in t.cycles] == [True, True, True]  # the run recorded s = 2, 4, 6
+    assert not tab.toggles[2].isChecked() and tab.toggles[1].isChecked() and tab.toggles["ref"].isChecked()
+    pts, ref = tab.figure.drawn()
+    assert sorted(pts) == [1, 3] and ref == run.navier["w_m"] * MM  # stored values, VIM-2 hidden only
+    assert "Рассчитано и сохранено в истории этого расчёта: VIM-1 (s = 2), VIM-2 (s = 4), VIM-3 (s = 6)" in \
+        tab.availability.text() and "Навье: рассчитан" in tab.availability.text()
+    tab.toggles[2].setChecked(True)
+    assert tab.figure.drawn()[0][2] == (2, t.cycles[1].w_m * MM)
+    tab.toggles["ref"].setChecked(False)
+    assert tab.figure.drawn()[1] is None and run.navier["state"] == "ok"  # hidden, not removed or recomputed
+    main.setup_model.set_choice(display=set())  # a later choice does not change this run's window
+    assert tab.toggles[2].isChecked() and run.snapshot.display == DISPLAY_ALL - {2}
+    assert started == []
+
+
+def test_b_ssss_n3_states_unavailable_cycles_and_never_turns_on_research(main, qtbot):
+    from kkvim_gui.model.setup_state import to_request
+
+    view, m = main.setup_view, main.setup_model
+    m.set_text("n_x", "16")
+    m.set_text("n_y", "8")
+    view.N.setCurrentIndex(2)  # N = 3
+    assert m.state.N == 3 and not m.state.research
+    texts = display_texts(view)
+    for k in (1, 2, 3):
+        enabled, checked, text = texts[k]
+        assert not enabled and not checked and text.startswith("✕ недоступно") and "max|w|" in text
+    assert texts["navier"][:2] == (True, True) and "автоматически" in texts["navier"][2]
+    assert texts["kkvim"][:2] == (True, True)
+    assert "NOT_QUALIFIED" in view.route_status.text()  # the scientific status of the route stays shown
+    before = (m.state.r4_mode, m.state.ssss_research, m.state.cccc_half_steps, to_request(m.state))
+    for _ in range(3):
+        view.display_all.click()
+    view.display_boxes["navier"].click()
+    view.display_boxes["navier"].click()
+    assert (m.state.r4_mode, m.state.ssss_research, m.state.cccc_half_steps, to_request(m.state)) == before
+    run = main._start_run()
+    finish(main, qtbot)
+    w = AnalysisWindow(main.session, main.run_rows(), run=run)
+    qtbot.addWidget(w)
+    tab = w.cycles
+    assert not tab.table.supported and not tab.figure.drawn()[0]
+    assert not any(tab.toggles[k].isEnabled() for k in (1, 2, 3))  # not presented as calculated
+    assert "ни одного полного цикла" in tab.availability.text() and "max|w|" in tab.availability.text()
+    assert tab.toggles["ref"].isEnabled() and "Навье: рассчитан" in tab.availability.text()
+
+
+def test_d_cccc_n3_navier_unavailable_d2_kept_and_no_cycle_beyond_s2(main, qtbot):
+    from kkvim_gui.model.setup_state import SetupState, display_options, to_request
+
+    view, m = main.setup_view, main.setup_model
+    m.set_choice(supports="CCCC", N=3)
+    texts = display_texts(view)
+    assert texts["navier"][:2] == (False, False) and "только к шарнирному опиранию SSSS" in texts["navier"][2]
+    assert texts["d2"][:2] == (True, True) and "будет рассчитан" in texts["d2"][2]
+    assert "s = 1 < 2" in texts[1][2] and not texts[1][0]  # s = 1 by default: VIM-1 cannot exist
+    assert all("не более s = 2" in texts[k][2] and not texts[k][0] for k in (2, 3))
+    view.display_boxes["d2"].click()  # display only: the D2 computation choice stays
+    assert m.state.with_d2 and "d2" not in m.state.display
+    view.d2.click()  # the existing computation option
+    assert not m.state.with_d2 and display_texts(view)["d2"][2].startswith("✕ недоступно — не будет рассчитан")
+    view.d2.click()
+    m.set_choice(cccc_half_steps=2)
+    assert display_texts(view)[1][0] and "RN-5 и RT-7" in display_texts(view)[1][2]
+    st = SetupState().with_choice(supports="CCCC", N=3).with_choice(cccc_half_steps=2).with_text("n_x", "16") \
+        .with_text("n_y", "8")
+    assert [o.possible for o in display_options(st)] == [True, True, False, False, False, True]
+    o = kkvim_adapter.execute(to_request(st))
+    tab = CyclesTab(Session(settings=None), vim_cycles.cycle_table(o), display={1, 2, 3, "d2"})
+    qtbot.addWidget(tab)
+    assert (o.s, [c.on_graph for c in tab.table.cycles]) == (2, [True, False, False])
+    assert sorted(tab.figure.drawn()[0]) == [1]  # VIM-2 and VIM-3 never drawn beyond the s = 2 limit
+    assert not tab.toggles[2].isEnabled() and "не более s = 2" in tab.availability.text()

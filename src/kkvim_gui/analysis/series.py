@@ -325,7 +325,7 @@ class SeriesFigure(QFrame):
 class SeriesTab(QWidget):
     runRequested = Signal(int)  # run_id of a stored point run to open (never a new calculation)
 
-    def __init__(self, session, data, trailing=(), parent=None):
+    def __init__(self, session, data, trailing=(), display=None, parent=None):
         super().__init__(parent)
         set_help_context(self, "results.series")
         self.session, self.data = session, data
@@ -347,10 +347,13 @@ class SeriesTab(QWidget):
         if data.d2:
             self.toggles["d2"] = QCheckBox("МКР D2")
         for key, box in self.toggles.items():
-            box.setChecked(True)
+            shown = display is None or key in display  # «Результаты и сравнение» of the run: the initial visibility only
+            box.setChecked(shown)
+            self.figure.shown[key] = shown
             box.toggled.connect(lambda shown, k=key: self.figure.set_shown(k, shown))
             if isinstance(key, int):
                 box.setToolTip(f"{vim_cycles.cycle_text(key)}: при каждом q — из истории полушагов расчёта этой точки")
+        self.figure.redraw()  # no view change: the initial view covers every curve, shown or not
         self.reset_button = QPushButton("Исходный вид")
         self.reset_button.setToolTip("Вернуть исходный масштаб: от q = 0 и w = 0, все точки всех кривых")
         self.reset_button.clicked.connect(self.figure.reset_view)
@@ -507,7 +510,7 @@ class SeriesWindow(QMainWindow):
     helpRequested = Signal()
     runRequested = Signal(int)
 
-    def __init__(self, session, data, parent=None):
+    def __init__(self, session, data, display=None, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowIcon(app_icon())
@@ -527,7 +530,7 @@ class SeriesWindow(QMainWindow):
         self.header.settingsClicked.connect(self.settingsRequested)
         self.header.helpClicked.connect(self.helpRequested)
         lay.addWidget(self.header)
-        self.tab = SeriesTab(session, data)
+        self.tab = SeriesTab(session, data, display=display)
         self.tab.runRequested.connect(self.runRequested)
         lay.addWidget(self.tab, 1)
         self.setCentralWidget(central)

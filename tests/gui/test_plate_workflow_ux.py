@@ -605,3 +605,63 @@ def test_setup_explains_grid_intervals_references_and_statuses(main):
     assert "PROVISIONAL / NOT_QUALIFIED" in sv.route_status.text() and "не ошибка решателя" in sv.route_status.text()
     m.set_choice(N=1)
     assert "Навье рассчитывается автоматически" in sv.ssss_independent.text()
+
+
+def test_c_series_curves_start_from_the_setup_choice_and_stay_display_only(main, qtbot):
+    """«Результаты и сравнение» before a series: the curves of every point start as chosen; afterwards only display."""
+    from kkvim_gui.model.setup_state import DISPLAY_ALL
+
+    view, m = main.setup_view, main.setup_model
+    plate(m)
+    m.set_choice(load_mode="series")
+    m.set_text("q_series", "1; 2,5; 5")
+    for k in (1, 3):
+        view.display_boxes[k].click()  # VIM-1 and VIM-3 not shown
+    series = main._start_series(m.state)
+    finish(main, qtbot)
+    assert series.snapshot.display == DISPLAY_ALL - {1, 3}
+    started = counting(main)
+    gui = GuiApplication.__new__(GuiApplication)
+    gui.session, gui.main_window, gui.analysis_windows = main.session, main, []
+    gui.help = type("H", (), {"install": lambda self, w: None, "open_search": lambda self: None})()
+    main.run_view.select(series.run_ids[1])
+    window = gui.open_analysis()
+    qtbot.addWidget(window)
+    tab, fig = window.series_tab, window.series_tab.figure
+    assert {k: box.isChecked() for k, box in tab.toggles.items()} == {"kkvim": True, 1: False, 2: True, 3: False,
+                                                                      "navier": True}
+    assert not fig.cycle_items[1].isVisible() and fig.cycle_items[2].isVisible() and fig.kkvim.isVisible()
+    assert not window.cycles.toggles[1].isChecked() and window.cycles.toggles[2].isChecked()
+    selected, home = tab.selected, fig.view_range()
+    assert selected.q == 2500.0 and fig.selected_point is selected  # this run's point (2,5 kPa, the 2nd of the list)
+    fig.plot.getViewBox().setRange(xRange=(2.0, 4.0), yRange=(0.4, 0.9), padding=0)
+    user = fig.view_range()
+    for k in (1, 3):
+        tab.toggles[k].setChecked(True)  # the curves are there: shown without a calculation
+        assert fig.cycle_items[k].isVisible() and fig.view_range() == user
+    assert tab.selected is selected and fig.selected_point is selected and user != home
+    m.set_choice(display=set())  # a later setup choice does not change an open window or the series' own choice
+    assert all(box.isChecked() for box in tab.toggles.values()) and series.snapshot.display == DISPLAY_ALL - {1, 3}
+    other = gui.open_series(series.series_id)  # the separate series window starts from the series' choice too
+    qtbot.addWidget(other)
+    assert not other.tab.toggles[1].isChecked() and other.tab.toggles[2].isChecked()
+    assert started == []
+
+
+@pytest.mark.parametrize("size", [(960, 540), (1280, 720), (1440, 900)])
+def test_e_results_section_is_visible_without_expanding_anything(main, qtbot, size):
+    view = main.setup_view
+    main.resize(*size)
+    main.show()
+    qtbot.waitExposed(main)
+    qtbot.wait(20)
+    card = view.cards["results"]
+    assert card.isVisible() and view.display_all.isVisible() and not view.details_toggle.isChecked()
+    assert not view.advanced_toggle.isChecked()
+    for key, box in view.display_boxes.items():
+        assert box.isVisible() and view.display_status[key].isVisible(), key
+        assert box.width() >= box.minimumSizeHint().width(), key  # the check box text is not cut
+    assert card.width() >= card.minimumSizeHint().width()
+    assert card.y() < view.cards["summary"].y()  # right after the method card, before the summary
+    route = view.route_status
+    assert route.height() <= 4 * route.fontMetrics().lineSpacing() + 24  # the status line is not enlarged

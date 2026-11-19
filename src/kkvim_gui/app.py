@@ -99,12 +99,14 @@ class GuiApplication:
         """The «Нагрузка — прогиб» window of a finished load series."""
         from kkvim_gui.analysis.series import SeriesWindow
         from kkvim_gui.model.series import series_data
+        from kkvim_gui.model.setup_state import display_of
 
         runs = self.main_window.runs
         series = runs.get_series(series_id)
         if series is None or series.active:
             return None
-        return self._show(SeriesWindow(self.session, series_data(series, runs)))
+        # the curves chosen for this series in «Результаты и сравнение» (its own snapshot): display only
+        return self._show(SeriesWindow(self.session, series_data(series, runs), display=display_of(series.snapshot)))
 
     def open_run(self, run_id):
         """The analysis window of a stored run of a series point («Открыть расчёт точки»): the run is selected in «Ход
