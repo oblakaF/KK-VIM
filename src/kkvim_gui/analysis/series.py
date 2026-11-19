@@ -110,7 +110,7 @@ def home_range(xs, ys, pad=HOME_PAD):
 class SeriesFigure(QFrame):
     """Interactive X–Y graph: KK-VIM points of the series and, for SSSS, the Navier reference."""
 
-    pointSelected = Signal(float)  # q in Pa of the point chosen on the graph
+    pointSelected = Signal(object)  # the series point record chosen on the graph (never rebuilt from a coordinate)
 
     def __init__(self, session, data, parent=None):
         super().__init__(parent)
@@ -144,7 +144,7 @@ class SeriesFigure(QFrame):
                                               symbol=CYCLE_SYMBOLS[k], symbolSize=9, symbolBrush=t[CYCLE_COLOURS[k]])
                             for k in range(1, vim_cycles.K_MAX + 1)}
         self.shown = {"kkvim": True, "navier": True, "d2": True, **{k: True for k in self.cycle_items}}
-        self.selected_q = None  # Pa; kept while curves are shown or hidden
+        self.selected_point = None  # the selected series point record; kept while curves are shown or hidden
         self.marker = pg.ScatterPlotItem(size=18, pen=pg.mkPen(t["text.primary"], width=2), brush=None, symbol="o")
         self.marker.setZValue(10)
         self.plot.addItem(self.marker)
@@ -198,50 +198,72 @@ class SeriesFigure(QFrame):
     def view_range(self):
         return tuple(tuple(r) for r in self.plot.getViewBox().viewRange())
 
-    def _clicked(self, item, points, *_):
-        if len(points):
-            self.select(points[0].pos().x() / KPA)
-            self.pointSelected.emit(self.selected_q)
+    @property
+    def selected_q(self):
+        """q in Pa of the selected record (None: nothing selected)."""
+        return None if self.selected_point is None else self.selected_point.q
 
-    def select(self, q):
-        """Select the point of load q (Pa) or nothing (None); the view does not move."""
-        self.selected_q = q
+    def _clicked(self, item, points, *_):
+        """The clicked spot carries its own series record (set in redraw): no q is rebuilt from the kPa coordinate."""
+        record = points[0].data() if len(points) else None
+        if record is not None:
+            self.select(record)
+            self.pointSelected.emit(record)
+
+    def select(self, point):
+        """Select the series point record (or nothing: None); the view does not move."""
+        self.selected_point = point
         self._draw_marker()
 
     def _draw_marker(self):
-        """A ring on the selected point of the first visible curve that has it (hidden curves are never selected)."""
-        q = self.selected_q
+        """A ring on the selected record on the first visible curve that has it (hidden curves are never selected)."""
+        point = self.selected_point
         candidates = []
-        if q is not None:
-            kx, ky, nx, ny = self.curves()
-            pairs = [("kkvim", kx, ky), *((k, *self.cycle_curve(k)) for k in self.cycle_items), ("navier", nx, ny),
-                     ("d2", *self.d2_curve())]
-            candidates = [(x, y) for key, xs, ys in pairs if self.shown[key] for x, y in zip(xs, ys) if x == q * KPA]
+        if point is not None:
+            for key in ("kkvim", *self.cycle_items, "navier", "d2"):
+                if self.shown[key]:
+                    xs, ys = self._curve(key)
+                    candidates += [(x, y) for p, x, y in zip(self.records(key), xs, ys) if p is point]
         self.marker.setData([c[0] for c in candidates[:1]], [c[1] for c in candidates[:1]])
+
+    def records(self, key):
+        """The series point records drawn on the curve key ("kkvim", "navier", "d2" or the cycle k), in drawing order."""
+        if key == "kkvim":
+            return sorted(self.data.included, key=lambda p: p.q)
+        if self.quantity != "centre":
+            return []  # the reference, D2 and the cycle states are evaluated at the centre only
+        if key == "navier":
+            pts = (p for p in self.data.points if p.navier_w_m is not None)
+        elif key == "d2":
+            pts = self.data.d2_included
+        else:
+            pts = self.data.cycle_included(key)
+        return sorted(pts, key=lambda p: p.q)
+
+    def _curve(self, key):
+        if key == "kkvim":
+            return self.curves()[:2]
+        if key == "navier":
+            return self.curves()[2:]
+        return self.d2_curve() if key == "d2" else self.cycle_curve(key)
 
     def cycle_curve(self, k):
         """(xs, ys) in kPa and mm of VIM-k: the points whose own run completed the cycle k (centre only)."""
-        if self.quantity != "centre":
-            return [], []  # the cycle states are recorded at the centre node only
-        pts = sorted(self.data.cycle_included(k), key=lambda p: p.q)
+        pts = self.records(k)
         return [p.q * KPA for p in pts], [p.cycle(k).w_m * MM for p in pts]
 
     def d2_curve(self):
         """(D2 xs, ys) in kPa and mm: the D2 points actually computed (centre only)."""
-        if self.quantity != "centre":
-            return [], []  # D2 is reported at the centre node only
-        pts = sorted(self.data.d2_included, key=lambda p: p.q)
+        pts = self.records("d2")
         return [p.q * KPA for p in pts], [p.d2_w_m * MM for p in pts]
 
     def curves(self):
         """(KK-VIM xs, ys, Navier xs, ys) in kPa and mm: the plotted coordinates."""
-        pts = sorted(self.data.included, key=lambda p: p.q)
+        pts = self.records("kkvim")
         key = "w_centre_m" if self.quantity == "centre" else "w_at_max_abs_m"
         kx = [p.q * KPA for p in pts]
         ky = [getattr(p, key) * MM for p in pts]
-        nav = sorted((p for p in self.data.points if p.navier_w_m is not None), key=lambda p: p.q)
-        if self.quantity != "centre":
-            nav = []  # the reference is evaluated at the centre only
+        nav = self.records("navier")
         return kx, ky, [p.q * KPA for p in nav], [p.navier_w_m * MM for p in nav]
 
     def redraw(self, *_):
@@ -255,22 +277,22 @@ class SeriesFigure(QFrame):
         if not self.shown["navier"]:
             nx, ny = [], []
         self.legend.clear()
-        self.kkvim.setData(kx, ky)
+        self.kkvim.setData(kx, ky, data=self.records("kkvim") if kx else [])  # each spot carries its record
         self.kkvim.setVisible(bool(kx))
         if kx:
             self.legend.addItem(self.kkvim, fig_text(lang, "legend.series.kkvim"))
         for k, item in self.cycle_items.items():
             cx, cy = self.cycle_curve(k) if self.shown[k] else ([], [])
-            item.setData(cx, cy)
+            item.setData(cx, cy, data=self.records(k) if cx else [])
             item.setVisible(bool(cx))
             if cx:
                 self.legend.addItem(item, fig_text(lang, "legend.series.cycle", label=vim_cycles.label(k), k=k, s=2 * k))
-        self.navier.setData(nx, ny)
+        self.navier.setData(nx, ny, data=self.records("navier") if nx else [])
         self.navier.setVisible(bool(nx))
         if nx:
             self.legend.addItem(self.navier, fig_text(lang, "legend.series.navier", M=self.data.navier.get("M")))
         dx, dy = self.d2_curve() if self.shown["d2"] else ([], [])
-        self.d2.setData(dx, dy)
+        self.d2.setData(dx, dy, data=self.records("d2") if dx else [])
         self.d2.setVisible(bool(dx))
         if dx:
             self.legend.addItem(self.d2, fig_text(lang, "legend.series.d2"))
@@ -342,7 +364,7 @@ class SeriesTab(QWidget):
         self.view.selectionModel().currentRowChanged.connect(lambda current, _prev: self._row_chosen(current.row()))
         self.view.doubleClicked.connect(lambda index: (self._row_chosen(index.row()), self.open_selected()))
         table.body.addWidget(self.view)
-        self.figure.pointSelected.connect(self.select_q)
+        self.figure.pointSelected.connect(self.select_point)
         self.selected = None
         self._show_selection()
         notes = [("Каждая точка КК-ВИМ — отдельный расчёт при своём q, без пересчёта по линейности."), ]
@@ -390,14 +412,22 @@ class SeriesTab(QWidget):
     def _row_chosen(self, row):
         if 0 <= row < len(self.data.points):
             self.selected = self.data.points[row]
-            self.figure.select(self.selected.q)
+            self.figure.select(self.selected)
             self._show_selection()
 
     def select_q(self, q):
-        """Select the point of load q (Pa) in the table and on the graph."""
+        """Select the point of the stored load q (Pa, exactly as stored in the run request) in the table and graph."""
         row = next((i for i, p in enumerate(self.data.points) if p.q == q), None)
-        if row is None:
-            return
+        if row is not None:
+            self._select_row(row)
+
+    def select_point(self, point):
+        """Select the series point record itself (a click on the graph): its row, label and ring."""
+        row = next((i for i, p in enumerate(self.data.points) if p is point), None)
+        if row is not None:
+            self._select_row(row)
+
+    def _select_row(self, row):
         index = self.model.index(row, 0)
         self.view.selectionModel().setCurrentIndex(
             index, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
