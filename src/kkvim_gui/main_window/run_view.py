@@ -225,12 +225,31 @@ class RunView(QWidget):
                 return r
         return None
 
+    @staticmethod
+    def load_text(run):
+        """«q = 2,5 kPa»: the load of this run as entered, with its unit (each point of a series has its own q)."""
+        if run.request is not None:
+            for key, text, unit in run.request.entered:
+                if key == "q":
+                    return f"q = {text.strip()} {unit}"
+        st = run.snapshot
+        if st.series:
+            return f"серия q: {st.texts['q_series'].strip()} {st.units['q']}"
+        return f"q = {st.texts['q'].strip()} {st.units['q']}"
+
+    def _point_text(self, run):
+        """« · серия 1, точка 2 из 5» for a run of a load series."""
+        series = None if run.series_id is None else self.runs.get_series(run.series_id)
+        if series is None or run.run_id not in series.run_ids:
+            return ""
+        return f" · серия {series.series_id}, точка {series.run_ids.index(run.run_id) + 1} из {len(series.requests)}"
+
     def _fill_row(self, row, run):
         elapsed = format_duration(self.runs.elapsed(run))
         values = (
             run.started.strftime("%d.%m.%Y %H:%M:%S"),
             run.method,
-            run.params_text(),
+            f"{self.load_text(run)}{self._point_text(run)} · {run.params_text()}",
             STATUS_TEXT[run.status],
             elapsed,
         )

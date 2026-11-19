@@ -25,7 +25,10 @@ A change of N or of the supports resets every research choice (normative R4, no 
 Load: one uniform load q, or a load series (``load_mode == "series"``): the field "q_series" holds several values of q
 in the unit chosen for q, separated by ";" or spaces ("," is the decimal comma). ``to_series_requests`` gives one
 RunRequest per value: the request of the same form with only the text of q replaced, so geometry, material, supports,
-N, grid and every method parameter are exactly those of a single run.
+N, grid and every method parameter are exactly those of a single run. ``generate_series`` (GUI-OWNER-UX-01) writes such
+a list from a start, an end and an increment: the values start + i·step are computed in decimal arithmetic (no
+accumulated binary rounding), the end must be reached exactly (it is never moved), and the number of values must be
+within SERIES_MIN…SERIES_MAX; the result is the ordinary text of "q_series", checked again by the same path.
 
 Independent method for comparison (GUI-MULTIMETHOD-CCCC-D2-01): ``with_d2`` — for CCCC, also compute «МКР — двумерный
 (D2)» (the QA reference D2 of the same discrete problem, ``backend.d2_job``) for the same plate and grid, in its own
@@ -34,6 +37,7 @@ reference and D2 (the clamped-plate scheme) is never offered for SSSS. It does n
 """
 
 from dataclasses import dataclass, field, replace
+from decimal import Decimal, InvalidOperation, localcontext
 
 from kkvim_gui import placeholders
 from kkvim_gui.backend import units
@@ -146,6 +150,65 @@ def parse_series(text):
     if len(set(values)) != len(values):
         return None, "Значения q серии не должны повторяться."
     return values, None
+
+
+def _decimal(text):
+    """(Decimal, error) of a number typed with "." or "," (the rules of parse_number; the value kept exactly)."""
+    parsed = parse_number(text)
+    if not parsed.ok:
+        return None, parsed.error
+    return Decimal(text.strip().replace("−", "-").replace(",", ".")), None
+
+
+def _decimal_text(value, comma):
+    """Plain decimal text without an exponent or trailing zeros: 2.50 -> "2,5" (comma) or "2.5"."""
+    text = format(value.normalize(), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    text = "0" if text in ("-0", "") else text
+    return text.replace(".", ",") if comma else text
+
+
+def generate_series(start, end, step):
+    """(texts, error): the loads start, start + step, …, end as texts of "q_series" (in the unit of q).
+
+    Decimal arithmetic: start + i·step exactly as typed, without accumulated binary rounding. Refused with a reason: a
+    zero increment, an increment pointing away from the end, an end that the increment does not reach exactly (the end
+    is never moved), a number of values outside SERIES_MIN…SERIES_MAX and values that coincide after conversion to
+    binary64. The texts use the decimal comma if any of the three entries did.
+    """
+    values = {}
+    for name, text in (("Начало", start), ("Конец", end), ("Шаг", step)):
+        value, error = _decimal(text)
+        if error:
+            return None, f"{name}: {error}"
+        values[name] = value
+    first, last, inc = values["Начало"], values["Конец"], values["Шаг"]
+    if inc == 0:
+        return None, "Шаг не может быть равен нулю."
+    if first == last:
+        return None, f"Начало и конец совпадают: в серии нужно от {SERIES_MIN} до {SERIES_MAX} разных значений q."
+    if (last - first) * inc < 0:
+        direction = "положительным" if last > first else "отрицательным"
+        return None, f"Шаг направлен от конца: при начале {'меньше' if last > first else 'больше'} конца шаг должен быть {direction}."
+    with localcontext() as ctx:
+        ctx.prec = 60
+        try:
+            count_minus_one, remainder = divmod(last - first, inc)
+        except InvalidOperation:
+            return None, f"Слишком много значений: от {SERIES_MIN} до {SERIES_MAX}."
+        count = int(count_minus_one) + 1
+        if remainder != 0:
+            below = first + count_minus_one * inc
+            return None, (f"Конец не достигается шагом: после {_decimal_text(below, False)} следующее значение "
+                          f"{_decimal_text(below + inc, False)}. Измените конец или шаг — конец не подгоняется.")
+        if not SERIES_MIN <= count <= SERIES_MAX:
+            return None, f"Получается {count} значений q; допускается от {SERIES_MIN} до {SERIES_MAX}. Измените шаг."
+        series = [first + i * inc for i in range(count)]
+    if len({float(v) for v in series}) != count:
+        return None, "Значения q совпадают после перевода в двоичное число: увеличьте шаг."
+    comma = any("," in text for text in (start, end, step))
+    return [_decimal_text(v, comma) for v in series], None
 
 
 def validate_field(key, text):

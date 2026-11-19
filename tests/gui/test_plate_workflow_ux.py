@@ -181,7 +181,8 @@ def test_series_runs_every_point_and_draws_the_graph(main, qtbot):
     assert main.run_view.series_button.isVisibleTo(main.run_view) and main.run_view.series_button.isEnabled()
     analysis = gui.open_analysis()
     qtbot.addWidget(analysis)
-    assert analysis.tabs.tabText(analysis.tabs.count() - 1) == "Нагрузка — прогиб"
+    # a run of a completed series opens on «Нагрузка — прогиб» (GUI-OWNER-UX-01)
+    assert analysis.tabs.tabText(0) == "Нагрузка — прогиб" and analysis.tabs.currentIndex() == 0
 
 
 def test_series_is_cancelled_by_stop_and_leaves_no_process(main, qtbot):
@@ -322,3 +323,213 @@ def test_new_widget_topics_exist_and_search_finds_them():
     assert "verification.navier" in [a.id for a in search("Навье")]
     assert "param.N" in [a.id for a in search("число членов")]
     assert "не число итераций" in get("param.N").summary
+
+
+# --- GUI-OWNER-UX-01: series generator, chart view, point runs, layout ------------------------------------------------
+
+def test_generator_gives_exact_decimal_loads_and_refuses_with_a_reason():
+    from kkvim_gui.model.setup_state import generate_series
+
+    texts, error = generate_series("0,1", "2", "0,1")
+    assert error is None and len(texts) == 20 and texts[2] == "0,3" and texts[-1] == "2"
+    assert [float(t.replace(",", ".")) for t in texts] == [round(0.1 * k, 1) for k in range(1, 21)]  # no stepping drift
+    assert generate_series("10", "1", "-1,5")[0] == ["10", "8,5", "7", "5,5", "4", "2,5", "1"]
+    assert generate_series("1e3", "5e3", "1e3")[0] == ["1000", "2000", "3000", "4000", "5000"]
+    assert generate_series("1.5", "4.5", "1.5")[0] == ["1.5", "3", "4.5"]  # decimal point kept
+    for args, words in ((("1", "10", "0"), "нулю"), (("1", "10", "-1"), "направлен"), (("1", "10", "4"), "не достигается"),
+                        (("0", "100", "1"), "101"), (("1", "1", "1"), "совпадают"), (("1", "x", "1"), "Конец"),
+                        (("1", "1.0000000000000000001", "0.00000000000000000005"), "двоичное")):
+        texts, error = generate_series(*args)
+        assert texts is None and words in error, (args, error)
+    assert "13" in generate_series("1", "10", "4")[1]  # the end is not moved: the next value is named
+
+
+def test_series_dialog_writes_the_list_and_the_requests_are_the_ordinary_ones(main, qtbot):
+    from kkvim_gui.main_window.setup_view import SeriesDialog
+    from kkvim_gui.model.setup_state import to_request, to_series_requests
+
+    sv, m = main.setup_view, main.setup_model
+    plate(m)
+    m.set_choice(load_mode="series")
+    assert sv.series_button.isVisibleTo(sv)
+    dialog = SeriesDialog(m, sv)
+    qtbot.addWidget(dialog)
+    ok = dialog.buttons.button(dialog.buttons.StandardButton.Ok)
+    dialog.start.setText("1")
+    dialog.end.setText("10")
+    dialog.step.setText("4")
+    assert not ok.isEnabled() and "не достигается" in dialog.error.text()
+    dialog.step.setText("0,5")
+    dialog.end.setText("3")
+    dialog.unit.setCurrentText("kPa")
+    assert ok.isEnabled() and "Будет выполнено расчётов: 5" in dialog.preview.text()
+    assert "1; 1,5; 2; 2,5; 3 kPa" in dialog.preview.text()
+    before = dict(m.state.texts)
+    dialog.accept()
+    assert m.state.texts["q_series"] == "1; 1,5; 2; 2,5; 3" and m.state.units["q"] == "kPa"
+    assert {k: v for k, v in m.state.texts.items() if k != "q_series"} == {k: v for k, v in before.items() if k != "q_series"}
+    requests = to_series_requests(m.state)
+    assert [r.q for r in requests] == [1000.0, 1500.0, 2000.0, 2500.0, 3000.0]
+    single = to_request(m.state.with_choice(load_mode="single").with_text("q", "2,5"))
+    assert requests[3] == single  # exactly the ordinary run of that q
+    assert "Будет выполнено расчётов: 5" in sv.series_preview.text()
+    m.set_text("q_series", "1; 2; 7")  # a manual, non-uniform list stays possible
+    assert [r.q for r in to_series_requests(m.state)] == [1000.0, 2000.0, 7000.0]
+
+
+@pytest.fixture
+def finished_series(main, qtbot):
+    m = main.setup_model
+    plate(m)
+    m.set_choice(load_mode="series")
+    m.set_text("q_series", "1; 5; 2,5")
+    series = main._start_series(m.state)
+    finish(main, qtbot)
+    return series
+
+
+def counting(main):
+    """Every new solver or reference process from now on is recorded (none may start)."""
+    started = []
+    process, navier = main.runs.process_factory, main.runs.navier_factory
+    main.runs.process_factory = lambda request: started.append(request) or process(request)
+    main.runs.navier_factory = lambda inputs: started.append(inputs) or navier(inputs)
+    return started
+
+
+def test_toggling_curves_language_and_theme_keep_the_view_and_the_selection(main, qtbot, finished_series):
+    from kkvim_gui.analysis.series import SeriesTab
+
+    started = counting(main)
+    tab = SeriesTab(main.session, series_data(finished_series, main.runs))
+    qtbot.addWidget(tab)
+    tab.resize(1200, 800)
+    fig = tab.figure
+    xs, ys = fig.all_points()
+    (x0, x1), (y0, y1) = fig.view_range()
+    assert x0 < 0 < max(xs) < x1 and y0 < 0 < max(ys) < y1  # the initial view contains zero and every point
+    fig.plot.getViewBox().setRange(xRange=(2.0, 4.0), yRange=(0.4, 0.9), padding=0)
+    user = fig.view_range()
+    tab.select_q(2500.0)
+    assert fig.marker.data["x"].tolist() == [2.5]
+    for key, box in tab.toggles.items():
+        box.setChecked(False)
+        assert fig.view_range() == user, key
+        box.setChecked(True)
+        assert fig.view_range() == user, key
+    tab.toggles["kkvim"].setChecked(False)
+    assert fig.marker.data["x"].tolist() == [2.5] and fig.selected_q == 2500.0  # on the next visible curve
+    for box in tab.toggles.values():
+        box.setChecked(False)
+    assert len(fig.marker.data) == 0 and fig.selected_q == 2500.0  # hidden curves are never marked; selection kept
+    for box in tab.toggles.values():
+        box.setChecked(True)
+    main.session.set_figure_language("ru" if main.session.figure_language == "en" else "en")
+    main.session.set_theme("dark", persist=False)
+    assert fig.view_range() == user and fig.selected_q == 2500.0
+    assert fig.curves()[0] == [1.0, 2.5, 5.0]  # every curve keeps its data
+    tab.reset_button.click()
+    assert fig.view_range() == (fig.home[0], fig.home[1]) != user
+    assert started == []  # nothing was computed
+
+
+def test_a_selected_point_opens_its_stored_run_without_a_new_calculation(main, qtbot, finished_series):
+    series = finished_series
+    started = counting(main)
+    gui = GuiApplication.__new__(GuiApplication)
+    gui.session, gui.main_window, gui.analysis_windows = main.session, main, []
+    gui.help = type("H", (), {"install": lambda self, w: None, "open_search": lambda self: None})()
+    main.run_view.select(series.run_ids[0])
+    first = gui.open_analysis()
+    qtbot.addWidget(first)
+    assert first.tabs.tabText(0) == "Нагрузка — прогиб" and first.tabs.currentWidget() is first.series_tab
+    assert first.series_tab.selected.q == 1000.0  # the point of the opened run
+    tab = first.series_tab
+    tab.select_q(2500.0)
+    assert "q = 2,5 kPa" in tab.selected_label.text() and tab.open_button.isEnabled()
+    tab.open_button.click()
+    opened = gui.analysis_windows[-1]
+    qtbot.addWidget(opened)
+    run = main.runs.get(series.run_ids[2])
+    assert opened is not first and run.request.q == 2500.0
+    assert opened.run is run and opened.outcome is run.outcome  # the stored outcome itself, not a new calculation
+    assert opened.series_tab.selected.q == 2500.0
+    assert opened.windowTitle().endswith(f"запуск {run.run_id} · {run.started:%d.%m.%Y %H:%M:%S}")
+    assert started == []
+    # the dispatcher shows the q of every row with its unit and the point of the series
+    texts = [main.run_view.table.item(r, 2).text() for r in range(main.run_view.table.rowCount())]
+    assert [t.split(" · ")[0] for t in texts] == ["q = 1 kPa", "q = 5 kPa", "q = 2,5 kPa"]
+    assert all(f"серия {series.series_id}, точка {k} из 3" in t for k, t in enumerate(texts, start=1))
+
+
+def test_a_point_stopped_by_the_half_step_limit_is_not_called_converged(main, qtbot):
+    from kkvim_gui.analysis.series import KKVIM_TOGGLE, SeriesTab
+
+    m = main.setup_model
+    plate(m)
+    m.set_text("s_max", "5")
+    m.set_choice(load_mode="series")
+    m.set_text("q_series", "1; 2")
+    series = main._start_series(m.state)
+    finish(main, qtbot)
+    data = series_data(series, main.runs)
+    assert [p.solver_status for p in data.points] == ["MAX_HALF_STEPS", "MAX_HALF_STEPS"] and not data.included
+    tab = SeriesTab(main.session, data)
+    qtbot.addWidget(tab)
+    assert [tab.model.data(tab.model.index(r, 2)) for r in range(2)] == ["MAX_HALF_STEPS", "MAX_HALF_STEPS"]
+    assert tab.toggles["kkvim"].text() == KKVIM_TOGGLE and "не сходимость" in tab.toggles["kkvim"].toolTip()
+    tab.select_q(1000.0)
+    assert "диагностическое, не принятый научный результат" in tab.selected_label.text()
+    assert "CONVERGED" not in tab.selected_label.text()
+
+
+@pytest.mark.parametrize("size", [(1440, 900), (1280, 720), (960, 540)])
+def test_scheme_keeps_a_to_b_and_does_not_move_when_sections_open(main, qtbot, size):
+    from PySide6.QtCore import QRectF
+    from PySide6.QtGui import QFont, QFontMetrics
+
+    sv, m = main.setup_view, main.setup_model
+
+    def plan():
+        return sv.plate.compute_layout(QRectF(sv.plate.rect()), sv.plate.data()).plan
+
+    main.resize(*size)
+    main.show()
+    qtbot.waitExposed(main)
+    m.set_choice(load_mode="series")
+    qtbot.wait(50)
+    for a, b in (("2", "1"), ("1", "3")):
+        m.set_text("a", a)
+        m.set_text("b", b)
+        qtbot.wait(50)
+        rect = plan()
+        assert abs(rect.width() / rect.height() - float(a) / float(b)) < 0.02  # true proportion a : b
+    before = (sv.scheme.geometry(), plan())
+    sv.advanced_toggle.setChecked(True)
+    sv.details_toggle.setChecked(True)
+    qtbot.wait(50)
+    if sv.mode == "wide":  # the right-hand scheme stays where it is
+        assert (sv.scheme.geometry(), plan()) == before
+    else:  # below the method card it moves down with it, but keeps its size and drawing
+        assert (sv.scheme.size(), plan()) == (before[0].size(), before[1])
+    for control in (sv.load_mode, sv.supports):  # «Серия нагрузок», «SSSS — шарнирное опирание» … are never cut
+        for button in control.buttons.values():
+            bold = QFont(button.font())
+            bold.setBold(True)
+            assert button.width() >= QFontMetrics(bold).horizontalAdvance(button.text()), button.text()
+    for card in sv.cards.values():  # no card is squeezed below its content (horizontal scrolling instead of clipping)
+        assert card.width() >= card.minimumSizeHint().width()
+    assert sv.run_button.isVisible() and not sv.run_button.visibleRegion().isEmpty()
+
+
+def test_setup_explains_grid_intervals_references_and_statuses(main):
+    sv, m = main.setup_view, main.setup_model
+    plate(m, "16", "8")
+    assert "интервалов" in sv.grid_note.text() and "17 × 9" in sv.grid_note.text()
+    assert "проверяет решатель" in sv.grid_note.text()
+    assert "МКЭ в программе не рассчитывается" in sv.fem_note.text()
+    assert "не являются принятым научным результатом" in sv.diagnostic_note.text()
+    m.set_choice(N=2)
+    assert "PROVISIONAL / NOT_QUALIFIED" in sv.route_status.text() and "не ошибка решателя" in sv.route_status.text()
+    m.set_choice(N=1)
+    assert "Навье рассчитывается автоматически" in sv.ssss_independent.text()

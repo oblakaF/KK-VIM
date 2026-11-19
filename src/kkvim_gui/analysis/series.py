@@ -13,14 +13,22 @@ VIM-1, VIM-2, VIM-3 (GUI-VIM-CYCLES-123-01) are three more curves: at every q th
 full cycles k = 1, 2, 3 of that point's own run, read from its stored half-step history (``backend.vim_cycles``); a point
 whose run did not complete s = 2k, or did not end as requested, has no point on that curve (reason in the table). Every
 curve can be shown or hidden.
+
+Interaction (GUI-OWNER-UX-01): showing or hiding a curve, the figure language and the theme change only what is drawn —
+the current view (pan, zoom) and the selected point stay; «Исходный вид» returns to the initial view, which contains
+q = 0 and w = 0 and every point of every curve (visible or not, GUI_DESIGN.md 16.1, 16.3). A point is selected by a
+click on a visible curve or by a row of the table; «Открыть расчёт точки» (or a double click on the row) opens the stored
+run of that q in its own analysis window — the solver is never called again, and the run keeps its status, field role,
+warnings and provenance. The final KK-VIM curve is the field of the last completed half-step of each point's own run.
 """
 
 from datetime import datetime
 from pathlib import Path
 
 import pyqtgraph as pg
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QItemSelectionModel, Qt, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QFileDialog,
     QFrame,
@@ -28,6 +36,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -52,6 +61,12 @@ CYCLE_HEADERS = tuple(h for k in range(1, vim_cycles.K_MAX + 1)
                                 f"{vim_cycles.label(k)}: Δw / w_эталона, %"))
 CYCLE_SYMBOLS = {1: "o", 2: "s", 3: "d"}
 CYCLE_COLOURS = {1: "accent", 2: "status.success", 3: "status.error"}
+KKVIM_TOGGLE = "КК-ВИМ: последний полушаг"
+KKVIM_TOOLTIP = ("Итог расчёта каждой точки — поле последнего выполненного полушага её расчёта (не отдельный метод). "
+                 "Как расчёт остановился, показывает столбец «Статус решателя»: CONVERGED — выполнен критерий остановки; "
+                 "остановка по пределу полушагов или другой статус — это не сходимость, и такая точка показана только "
+                 "в таблице с причиной")
+HOME_PAD = 0.06  # relative margin of the initial view
 
 
 def _cycle_cells(p):
@@ -83,8 +98,19 @@ def _base_row(p):
             p.rel_pct, p.reason or "")
 
 
+def home_range(xs, ys, pad=HOME_PAD):
+    """((x0, x1), (y0, y1)) of the initial view: every value and zero on both axes, with a relative margin."""
+    def span(values):
+        lo, hi = min([0.0, *values]), max([0.0, *values])
+        width = hi - lo or 1.0
+        return lo - pad * width, hi + pad * width
+    return span(xs), span(ys)
+
+
 class SeriesFigure(QFrame):
     """Interactive X–Y graph: KK-VIM points of the series and, for SSSS, the Navier reference."""
+
+    pointSelected = Signal(float)  # q in Pa of the point chosen on the graph
 
     def __init__(self, session, data, parent=None):
         super().__init__(parent)
@@ -118,10 +144,19 @@ class SeriesFigure(QFrame):
                                               symbol=CYCLE_SYMBOLS[k], symbolSize=9, symbolBrush=t[CYCLE_COLOURS[k]])
                             for k in range(1, vim_cycles.K_MAX + 1)}
         self.shown = {"kkvim": True, "navier": True, "d2": True, **{k: True for k in self.cycle_items}}
+        self.selected_q = None  # Pa; kept while curves are shown or hidden
+        self.marker = pg.ScatterPlotItem(size=18, pen=pg.mkPen(t["text.primary"], width=2), brush=None, symbol="o")
+        self.marker.setZValue(10)
+        self.plot.addItem(self.marker)
+        for item in (self.kkvim, self.navier, self.d2, *self.cycle_items.values()):
+            item.sigPointsClicked.connect(self._clicked)
+        self.plot.getViewBox().disableAutoRange()  # data changes never move the view; «Исходный вид» does
+        self.home = None
         self.restyle()
         session.themeChanged.connect(self.restyle)
         session.figureLanguageChanged.connect(self.redraw)
         self.redraw()
+        self.reset_view()
 
     def restyle(self, *_):
         t = self.session.tokens
@@ -130,15 +165,59 @@ class SeriesFigure(QFrame):
             axis = self.plot.getAxis(side)
             axis.setPen(t["plot.axis"])
             axis.setTextPen(t["plot.axis"])
+        self.marker.setPen(pg.mkPen(t["text.primary"], width=2))  # style only: the view and the selection stay
 
     def set_quantity(self, quantity):
+        """Another quantity has other values: drawn and shown from its own initial view."""
         self.quantity = quantity
         self.redraw()
+        self.reset_view()
 
     def set_shown(self, key, shown):
-        """Show or hide one curve: "kkvim", "navier", "d2" or the cycle k (1 … 3)."""
+        """Show or hide one curve: "kkvim", "navier", "d2" or the cycle k (1 … 3). The view and the selection stay."""
         self.shown[key] = bool(shown)
         self.redraw()
+
+    def all_points(self):
+        """(xs, ys) of every curve of the current quantity, visible or not (the initial view covers all of them)."""
+        kx, ky, nx, ny = self.curves()
+        xs, ys = [*kx, *nx], [*ky, *ny]
+        for k in self.cycle_items:
+            cx, cy = self.cycle_curve(k)
+            xs += cx
+            ys += cy
+        dx, dy = self.d2_curve()
+        return xs + dx, ys + dy
+
+    def reset_view(self):
+        """«Исходный вид»: q from 0, w from 0, and all points of all curves."""
+        self.home = home_range(*self.all_points())
+        (x0, x1), (y0, y1) = self.home
+        self.plot.getViewBox().setRange(xRange=(x0, x1), yRange=(y0, y1), padding=0)
+
+    def view_range(self):
+        return tuple(tuple(r) for r in self.plot.getViewBox().viewRange())
+
+    def _clicked(self, item, points, *_):
+        if len(points):
+            self.select(points[0].pos().x() / KPA)
+            self.pointSelected.emit(self.selected_q)
+
+    def select(self, q):
+        """Select the point of load q (Pa) or nothing (None); the view does not move."""
+        self.selected_q = q
+        self._draw_marker()
+
+    def _draw_marker(self):
+        """A ring on the selected point of the first visible curve that has it (hidden curves are never selected)."""
+        q = self.selected_q
+        candidates = []
+        if q is not None:
+            kx, ky, nx, ny = self.curves()
+            pairs = [("kkvim", kx, ky), *((k, *self.cycle_curve(k)) for k in self.cycle_items), ("navier", nx, ny),
+                     ("d2", *self.d2_curve())]
+            candidates = [(x, y) for key, xs, ys in pairs if self.shown[key] for x, y in zip(xs, ys) if x == q * KPA]
+        self.marker.setData([c[0] for c in candidates[:1]], [c[1] for c in candidates[:1]])
 
     def cycle_curve(self, k):
         """(xs, ys) in kPa and mm of VIM-k: the points whose own run completed the cycle k (centre only)."""
@@ -195,10 +274,12 @@ class SeriesFigure(QFrame):
         self.d2.setVisible(bool(dx))
         if dx:
             self.legend.addItem(self.d2, fig_text(lang, "legend.series.d2"))
-        self.plot.autoRange()
+        self._draw_marker()  # no autoRange: the user's view is kept (GUI-OWNER-UX-01)
 
 
 class SeriesTab(QWidget):
+    runRequested = Signal(int)  # run_id of a stored point run to open (never a new calculation)
+
     def __init__(self, session, data, trailing=(), parent=None):
         super().__init__(parent)
         set_help_context(self, "results.series")
@@ -212,7 +293,8 @@ class SeriesTab(QWidget):
                                     + ("; для D2 — его значения и время каждого метода в load_series.csv" if data.d2 else ""))
         self.save_button.clicked.connect(self._save_dialog)
         self.save_button.setEnabled(data.complete)
-        self.toggles = {"kkvim": QCheckBox("КК-ВИМ (итог)")}
+        self.toggles = {"kkvim": QCheckBox(KKVIM_TOGGLE)}
+        self.toggles["kkvim"].setToolTip(KKVIM_TOOLTIP)
         if data.cycles_supported:
             self.toggles.update({k: QCheckBox(vim_cycles.label(k)) for k in range(1, vim_cycles.K_MAX + 1)})
         if data.navier is not None:
@@ -224,8 +306,22 @@ class SeriesTab(QWidget):
             box.toggled.connect(lambda shown, k=key: self.figure.set_shown(k, shown))
             if isinstance(key, int):
                 box.setToolTip(f"{vim_cycles.cycle_text(key)}: при каждом q — из истории полушагов расчёта этой точки")
-        bar = toolbar(self.quantity, *self.toggles.values(),
-                      trailing=(*trailing, FigureLanguageSwitch(session), self.save_button))
+        self.reset_button = QPushButton("Исходный вид")
+        self.reset_button.setToolTip("Вернуть исходный масштаб: от q = 0 и w = 0, все точки всех кривых")
+        self.reset_button.clicked.connect(self.figure.reset_view)
+        self.open_button = QPushButton("Открыть расчёт точки")
+        self.open_button.setToolTip("Окно анализа сохранённого расчёта выбранного q (решатель не запускается); "
+                                    "также двойной щелчок по строке таблицы")
+        self.open_button.clicked.connect(self.open_selected)
+        # two rows: the quantity and the actions; the curves (nothing is cut on a narrow window)
+        top = toolbar(self.quantity, trailing=(*trailing, self.reset_button, FigureLanguageSwitch(session), self.save_button))
+        curves = toolbar(label("Кривые:", "fieldLabel"), *self.toggles.values())
+        bar = QWidget()
+        bar_lay = QVBoxLayout(bar)
+        bar_lay.setContentsMargins(0, 0, 0, 0)
+        bar_lay.setSpacing(0)
+        bar_lay.addWidget(top)
+        bar_lay.addWidget(curves)
         cycles = data.cycles_supported
         headers = HEADERS + (D2_HEADERS if data.d2 else ()) + ((*CYCLE_HEADERS, "VIM-1–3: примечание") if cycles else ())
         self.model = RowsModel(headers, len(data.points), lambda i: _row(data.points[i], data.d2, cycles), digits=10)
@@ -235,7 +331,20 @@ class SeriesTab(QWidget):
         if excluded:
             table.body.addWidget(Note(f"Не на графике: {len(excluded)} — причина в последнем столбце; значения не "
                                       "подставляются и не интерполируются.", "testdata"))
-        table.body.addWidget(table_view(self.model))
+        self.selected_label = label("Точка не выбрана: щёлкните точку на графике или строку таблицы.", "secondary", wrap=True)
+        pick = QHBoxLayout()
+        pick.addWidget(self.selected_label, 1)
+        pick.addWidget(self.open_button)
+        table.body.addLayout(pick)
+        self.view = table_view(self.model)
+        self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.view.selectionModel().currentRowChanged.connect(lambda current, _prev: self._row_chosen(current.row()))
+        self.view.doubleClicked.connect(lambda index: (self._row_chosen(index.row()), self.open_selected()))
+        table.body.addWidget(self.view)
+        self.figure.pointSelected.connect(self.select_q)
+        self.selected = None
+        self._show_selection()
         notes = [("Каждая точка КК-ВИМ — отдельный расчёт при своём q, без пересчёта по линейности."), ]
         if data.navier is not None:
             notes.append("Навье — независимый эталон, рассчитанный в отдельном процессе при каждом q (M = 2559); "
@@ -256,15 +365,64 @@ class SeriesTab(QWidget):
                          "на кривой VIM-k нет (причина в последнем столбце).")
         for n in notes:
             table.body.addWidget(label(n, "secondary", wrap=True))
+        self.figure.setMinimumHeight(300)
+        self.view.setMinimumHeight(150)  # several rows stay visible; a small window scrolls the page instead
         split = QSplitter(Qt.Orientation.Vertical)
         split.addWidget(self.figure)
         split.addWidget(table)
-        split.setSizes([420, 300])
+        split.setChildrenCollapsible(False)
+        split.setSizes([460, 420])
         box = QVBoxLayout()
         box.addWidget(split)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(padded(box))
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(page(bar, padded(box)))
+        lay.addWidget(page(bar, scroll))
+
+    @staticmethod
+    def openable(p):
+        """A point whose stored run has a field (a result, or a diagnostic field marked as such) can be opened."""
+        return p is not None and p.run_id is not None and p.field_role is not None
+
+    def _row_chosen(self, row):
+        if 0 <= row < len(self.data.points):
+            self.selected = self.data.points[row]
+            self.figure.select(self.selected.q)
+            self._show_selection()
+
+    def select_q(self, q):
+        """Select the point of load q (Pa) in the table and on the graph."""
+        row = next((i for i, p in enumerate(self.data.points) if p.q == q), None)
+        if row is None:
+            return
+        index = self.model.index(row, 0)
+        self.view.selectionModel().setCurrentIndex(
+            index, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
+        self._row_chosen(row)
+
+    def _show_selection(self):
+        p = self.selected
+        ok = self.openable(p)
+        self.open_button.setEnabled(ok)
+        if p is None:
+            return
+        role = ROLE_SHORT.get(p.field_role, p.field_role)
+        status = p.solver_status or RUN_STATUS_TEXT.get(p.run_status, p.run_status)
+        tail = "" if ok else " — сохранённого поля нет, открывать нечего"
+        if p.field_role == "diagnostic":
+            tail = " — поле только диагностическое, не принятый научный результат"
+        self.selected_label.setText(f"Выбрано: q = {fmt(p.q * KPA, 8)} kPa · расчёт № {p.run_id or '—'} · {status} · "
+                                    f"{role}{tail}")
+
+    def open_selected(self):
+        """Ask for the stored run of the selected point (the analysis window of that run; no new calculation)."""
+        if self.openable(self.selected):
+            self.runRequested.emit(self.selected.run_id)
+            return self.selected.run_id
+        return None
 
     def folder_name(self):
         return f"kkvim_series_{datetime.now():%Y%m%d-%H%M%S}_s{self.data.series_id:03d}"
@@ -294,6 +452,7 @@ class SeriesTab(QWidget):
 class SeriesWindow(QMainWindow):
     settingsRequested = Signal()
     helpRequested = Signal()
+    runRequested = Signal(int)
 
     def __init__(self, session, data, parent=None):
         super().__init__(parent)
@@ -316,6 +475,7 @@ class SeriesWindow(QMainWindow):
         self.header.helpClicked.connect(self.helpRequested)
         lay.addWidget(self.header)
         self.tab = SeriesTab(session, data)
+        self.tab.runRequested.connect(self.runRequested)
         lay.addWidget(self.tab, 1)
         self.setCentralWidget(central)
         self.statusBar().addWidget(label(f"●  Серия {data.series_id}: {len(data.points)} значений q, "

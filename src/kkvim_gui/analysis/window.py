@@ -152,6 +152,7 @@ MODEL_ROWS = (
 class AnalysisWindow(QMainWindow):
     settingsRequested = Signal()
     helpRequested = Signal()
+    runRequested = Signal(int)  # a stored run of the same series to open («Открыть расчёт точки»; no new calculation)
 
     def __init__(self, session, model_rows=None, run=None, series=None, parent=None):
         """model_rows: input parameters of the analysed run; run: a finished solver run (None: demonstration);
@@ -302,7 +303,13 @@ class AnalysisWindow(QMainWindow):
             from kkvim_gui.analysis.series import SeriesTab
 
             self.series_tab = SeriesTab(s, self.series)
-            self.tabs.addTab(self.series_tab, SERIES_TAB)
+            self.series_tab.runRequested.connect(self.runRequested)
+            # a run of a completed series opens on «Нагрузка — прогиб» (first tab); a single run on «Результат»
+            if self.series.status == "finished":
+                self.tabs.insertTab(0, self.series_tab, SERIES_TAB)
+                self.series_tab.select_q(outcome.request.q)  # the point of this run is selected
+            else:
+                self.tabs.addTab(self.series_tab, SERIES_TAB)
         self._navier_timer = None
         if any(r is not None and r.get("state") == "pending" for r in (self._navier, self._d2)):
             self._navier_timer = QTimer(self)

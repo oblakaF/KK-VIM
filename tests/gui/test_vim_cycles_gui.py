@@ -156,7 +156,8 @@ def test_series_has_three_cycle_curves_from_every_point(main, qtbot, tmp_path):
     run = main.runs.get(series.run_ids[1])
     w = AnalysisWindow(main.session, main.run_rows(), run=run, series=data)
     qtbot.addWidget(w)
-    assert [w.tabs.tabText(i) for i in range(w.tabs.count())][-2:] == [TAB_TITLE, "Нагрузка — прогиб"]
+    titles = [w.tabs.tabText(i) for i in range(w.tabs.count())]
+    assert titles[0] == "Нагрузка — прогиб" and titles[-1] == TAB_TITLE  # completed series first (GUI-OWNER-UX-01)
     assert set(w.series_tab.toggles) == {"kkvim", 1, 2, 3, "navier"}
     paths = w.save_package(tmp_path)
     manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))

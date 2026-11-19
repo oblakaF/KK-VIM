@@ -106,7 +106,18 @@ class GuiApplication:
             return None
         return self._show(SeriesWindow(self.session, series_data(series, runs)))
 
+    def open_run(self, run_id):
+        """The analysis window of a stored run of a series point («Открыть расчёт точки»): the run is selected in «Ход
+        расчёта» and opened as any finished run; nothing is computed again (GUI-OWNER-UX-01)."""
+        run = self.main_window.runs.get(run_id)
+        if run is None or not (run.has_results or run.has_diagnostic_field):
+            return None
+        self.main_window.run_view.select(run_id)
+        return self.open_analysis()
+
     def _show(self, window):
+        if hasattr(window, "runRequested"):
+            window.runRequested.connect(self.open_run)
         window.settingsRequested.connect(lambda: self.open_settings(window))
         window.helpRequested.connect(self.help.open_search)
         self.help.install(window)
