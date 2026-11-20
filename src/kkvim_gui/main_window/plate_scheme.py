@@ -24,7 +24,8 @@ SUPPORT_LEGEND = {
     "CCCC": "CCCC — жёсткая заделка всех четырёх краёв",
 }
 LOAD_LEGEND = "равномерно распределённая по всей площади"
-AXES_NOTE = "Оси и направление нагрузки не показаны: постановка КК-ВИМ ещё не утверждена."
+AXES_NOTE = ("Оси и направление нагрузки не показаны на схеме: в расчёте ось x идёт вдоль a, ось y — вдоль b, начало "
+             "координат — в углу пластины.")
 WAITING = "Схема ожидает исправления параметров:"
 SIDE_TITLE = "вид сбоку"
 NOT_TO_SCALE = "не в масштабе"
@@ -35,6 +36,7 @@ SUPPORT = 12.0      # room for support symbols around the plan
 SIDE_MIN_LEN = 120.0
 SIDE_T_MIN, SIDE_T_MAX = 6.0, 14.0
 COMB_H = 16.0
+PLAN_H_MIN, PLAN_H_MAX = 120.0, 360.0  # height of the plan view in the preferred scheme size (logical pixels)
 
 
 @dataclass
@@ -54,14 +56,31 @@ class PlateScheme(QWidget):
         self.model = model
         self.layout_info = None
         self.setMinimumSize(260, 260)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # The height follows the width and a : b (heightForWidth), not the height of the neighbouring cards: opening
+        # «Дополнительные параметры расчёта» must neither stretch nor move the scheme (GUI-OWNER-UX-01).
+        policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        policy.setHeightForWidth(True)
+        self.setSizePolicy(policy)
         self.setAccessibleName("Схема пластины")
         model.changed.connect(self._on_change)
         session.themeChanged.connect(self._on_change)
         self._on_change()
 
     def sizeHint(self):
-        return QSize(420, 420)
+        return QSize(420, self.heightForWidth(420))
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        """Height for a width: the plan in true proportion a : b (at most PLAN_H_MAX high) plus the dimension line, the
+        side view and the legend. Only the drawing size changes; the model values are never rescaled."""
+        d = self.data()
+        legend_h, side_h, dim_a_h, dim_b_w = self._chrome(d)
+        w_avail = max(10.0, width - 2 * (PAD + SUPPORT) - dim_b_w)
+        ratio = d.b_m / d.a_m if d.valid else 0.5
+        plan_h = min(max(w_avail * ratio, PLAN_H_MIN), PLAN_H_MAX)
+        return int(2 * PAD + 2 * SUPPORT + dim_a_h + side_h + legend_h + plan_h + 0.999)
 
     def data(self):
         return scheme_data(self.model.state)
@@ -73,6 +92,7 @@ class PlateScheme(QWidget):
         else:
             desc = f"{WAITING} {', '.join(d.waiting_for)}"
         self.setAccessibleDescription(desc)
+        self.updateGeometry()  # a : b may have changed: a new preferred height
         self.update()
 
     # Layout
@@ -82,13 +102,20 @@ class PlateScheme(QWidget):
         small.setPointSizeF(max(7.5, base.pointSizeF() * 0.9))
         return base, small
 
-    def compute_layout(self, rect, d):
+    def _chrome(self, d):
+        """(legend height, side view height, dimension a height, dimension b width) around the plan."""
         base, small = self._fonts()
         fm, fs = QFontMetricsF(base), QFontMetricsF(small)
         legend_h = 2 * fm.height() + fs.height() * 2 + 14
         side_h = COMB_H + SIDE_T_MAX + fs.height() + 14
         dim_a_h = fm.height() + 24  # dimension line, label and a gap before the side view
         dim_b_w = (fm.horizontalAdvance(d.b_label) + 22) if d.valid else 0.0
+        return legend_h, side_h, dim_a_h, dim_b_w
+
+    def compute_layout(self, rect, d):
+        base, _ = self._fonts()
+        fm = QFontMetricsF(base)
+        legend_h, side_h, dim_a_h, dim_b_w = self._chrome(d)
         x0 = rect.left() + PAD + SUPPORT
         y0 = rect.top() + PAD + SUPPORT
         w_avail = max(10.0, rect.width() - 2 * (PAD + SUPPORT) - dim_b_w)

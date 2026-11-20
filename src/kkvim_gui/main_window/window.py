@@ -13,6 +13,9 @@ Backend: the KK-VIM solver in a separate process (default) or, only with demo=Tr
 (`kkvim-gui --demo`), the demonstration backend marked TEST DATA. Before a solver run the input is
 checked by kkvim's own validation (``kkvim_adapter.check_request``); a rejected input is shown on the
 setup page and no run is started.
+
+A load series («Серия нагрузок») starts ``RunManager.start_series``: one ordinary solver run per load q, each checked by
+kkvim before the first one starts; «Нагрузка — прогиб…» in «Ход расчёта» opens its graph (``seriesRequested``).
 """
 
 from pathlib import Path
@@ -31,14 +34,14 @@ from PySide6.QtWidgets import (
 
 from kkvim_gui import placeholders, program_version
 from kkvim_gui.backend import export
-from kkvim_gui.backend.kkvim_adapter import check_request
+from kkvim_gui.backend.kkvim_adapter import AdapterInputError, check_request
 from kkvim_gui.backend.process import SolverProcess
 from kkvim_gui.main_window.run_view import RunView
 from kkvim_gui.main_window.setup_view import SetupView
 from kkvim_gui.main_window.start_view import StartView
 from kkvim_gui.model.runs import RunManager
 from kkvim_gui.model.setup_model import SetupModel
-from kkvim_gui.model.setup_state import summary_rows, to_request
+from kkvim_gui.model.setup_state import summary_rows, to_request, to_series_requests
 from kkvim_gui.widgets.common import fit_to_screen, label
 from kkvim_gui.widgets.header import AppHeader, HeaderNav, app_icon
 
@@ -65,6 +68,7 @@ STATUS_TEXT = {
 
 class MainWindow(QMainWindow):
     analysisRequested = Signal()
+    seriesRequested = Signal(int)
     settingsRequested = Signal()
     helpRequested = Signal()
 
@@ -112,6 +116,7 @@ class MainWindow(QMainWindow):
         self.run_view.stopRequested.connect(self._confirm_stop)
         self.run_view.analysisRequested.connect(self._open_analysis)
         self.run_view.exportRequested.connect(self._choose_export_folder)
+        self.run_view.seriesRequested.connect(self.seriesRequested)
         self.runs.activeChanged.connect(self._on_active_changed)
 
         bar = self.statusBar()
@@ -131,8 +136,8 @@ class MainWindow(QMainWindow):
             bar.addPermanentWidget(self.state_selector)
             for i, key in enumerate(STATES, start=1):
                 QShortcut(QKeySequence(f"Ctrl+{i}"), self, activated=lambda k=key: self.set_state(k))
-        backend = "демонстрационный (TEST DATA)" if demo else "решатель KK-VIM, отдельный процесс"
-        bar.addPermanentWidget(label(f"Бэкенд: {backend} · KK-VIM {program_version()}"))
+        backend = "демонстрационные данные (TEST DATA)" if demo else "решатель KK-VIM"
+        bar.addPermanentWidget(label(f"{backend} · версия {program_version()}"))
 
         QShortcut(QKeySequence("Ctrl+N"), self, activated=self._new_shortcut)
         QShortcut(QKeySequence("F5"), self, activated=self._run_shortcut)
@@ -159,14 +164,14 @@ class MainWindow(QMainWindow):
             self.header.set_project("")
         elif state == "setup":
             self.stack.setCurrentWidget(self.setup_view)
-            self.header.set_project(placeholders.PROJECT_NAME)
+            self.header.set_project(self._project_name())
         else:
             self.stack.setCurrentWidget(self.run_view)
-            self.header.set_project(placeholders.PROJECT_NAME)
+            self.header.set_project(self._project_name())
         self.nav.set_current(NAV_OF_STATE[state])
         self.nav.set_enabled("run", self.run_started, "" if self.run_started else "Расчёт ещё не запускался")
         self.status_label.setText(STATUS_TEXT["running"] if self.runs.active else STATUS_TEXT[state])
-        project = "" if state == "start" else f" — {placeholders.PROJECT_NAME}"
+        project = "" if state == "start" or not self._project_name() else f" — {self._project_name()}"
         self.setWindowTitle(f"КК-ВИМ{project}")
         if self.state_selector is not None:
             index = STATES.index(state)
@@ -174,6 +179,10 @@ class MainWindow(QMainWindow):
                 self.state_selector.blockSignals(True)
                 self.state_selector.setCurrentIndex(index)
                 self.state_selector.blockSignals(False)
+
+    def _project_name(self):
+        """Projects (.kkv) are not saved or opened: only the demonstration shows its example project name."""
+        return placeholders.PROJECT_NAME if self.demo else ""
 
     def help_context(self):
         """F1 topic of the current page; None on the start page (opens the search)."""
@@ -191,6 +200,8 @@ class MainWindow(QMainWindow):
         if self.runs.active is not None:
             return None
         snapshot = self.setup_model.state
+        if snapshot.series:
+            return self._start_series(snapshot)
         if self.demo:
             self.run_snapshot = snapshot
             run = self.runs.start_demo(snapshot)
@@ -198,8 +209,9 @@ class MainWindow(QMainWindow):
             return run
         request = to_request(snapshot)
         problems = check_request(request)
-        if self.preview and request.N not in PREVIEW_N:
-            problems.append(f"N = {request.N}: недоступно в функциональной предварительной версии; доступно N = 1 (R3)")
+        if self.preview and (request.N not in PREVIEW_N or request.supports != "SSSS"):
+            problems.append(f"{request.supports}, N = {request.N}: недоступно в функциональной предварительной версии; "
+                            "доступно SSSS, N = 1 (R3)")
         if problems:
             self.setup_view.show_solver_problems(problems)
             return None
@@ -207,6 +219,31 @@ class MainWindow(QMainWindow):
         run = self.runs.start(snapshot, request)
         self.set_state("running")
         return run
+
+    def _start_series(self, snapshot):
+        """A load series: every point is checked by kkvim first; a rejected point refuses the whole series."""
+        if self.demo:
+            self.setup_view.show_solver_problems(["Серия нагрузок выполняется только решателем KK-VIM, не в "
+                                                  "демонстрационном режиме."])
+            return None
+        requests = to_series_requests(snapshot)
+        problems = []
+        for k, request in enumerate(requests, start=1):
+            problems += [f"q = {request.q!r} Pa (точка {k}): {p}" for p in check_request(request)]
+        if self.preview and (snapshot.N not in PREVIEW_N or snapshot.supports != "SSSS"):
+            problems.append(f"{snapshot.supports}, N = {snapshot.N}: недоступно в функциональной предварительной версии; "
+                            "доступно SSSS, N = 1 (R3)")
+        if problems:
+            self.setup_view.show_solver_problems(problems)
+            return None
+        try:
+            series = self.runs.start_series(snapshot, requests)
+        except AdapterInputError as exc:
+            self.setup_view.show_solver_problems([str(exc)])
+            return None
+        self.run_snapshot = snapshot
+        self.set_state("running")
+        return series
 
     def _on_active_changed(self, active):
         """Lock the parameters while a run is active; unlock when it ends."""
@@ -237,7 +274,9 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"●  Расчёт и отчёт сохранены: {paths['report'].parent}")
 
     def save_package(self, run_id, folder):
-        """Export files, PNG figures (if the run has a field) and report.html of a run in a new subfolder."""
+        """Export files, PNG figures (if the run has a field) and report.html of a run in a new subfolder.
+
+        An existing package is never overwritten: a subfolder that already holds files is refused (FileExistsError)."""
         from kkvim_gui.backend import report
 
         run = self.runs.get(run_id)
@@ -253,7 +292,7 @@ class MainWindow(QMainWindow):
         return paths
 
     def export_run(self, run_id, folder):
-        """Write manifest.json, history.csv and field.csv of a run into a new subfolder of ``folder``."""
+        """Write manifest.json, history.csv and the field file of its role into a new subfolder of ``folder``."""
         run = self.runs.get(run_id)
         target = Path(folder) / f"kkvim_{run.started:%Y%m%d-%H%M%S}_run{run.run_id:03d}"
         paths = export.write_result(run.outcome, target, run.meta(self.runs.clock()), run.detailed)
@@ -278,10 +317,15 @@ class MainWindow(QMainWindow):
         return run if run is not None and (run.has_results or run.has_diagnostic_field) else None
 
     def _confirm_stop(self, run_id):
+        run = self.runs.get(run_id)
+        d2_running = run is not None and getattr(run, "_d2_job", None) is not None
         answer = QMessageBox.question(
             self,
             "Остановить расчёт",
-            "Остановить расчёт? Анализ прерванного расчёта недоступен.",
+            ("Остановить расчёт МКР D2? Результат КК-ВИМ этого запуска сохраняется; значение D2 не будет получено."
+             if d2_running else "Остановить расчёт? Анализ прерванного расчёта недоступен.")
+            + (" Следующие точки серии нагрузок не будут рассчитаны." if run is not None and run.series_id is not None
+               else ""),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )

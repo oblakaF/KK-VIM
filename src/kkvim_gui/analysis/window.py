@@ -7,12 +7,23 @@ figures carry the session-wide "Графики RU | EN" switch.
 - A solver run (``run`` with a ``RunOutcome``): every tab is drawn from the solver arrays and rows
   (``analysis.results``); «Экспорт ▾» writes JSON and CSV with units and statuses. The window keeps
   its run: later changes in the main window do not affect it.
+- «Сравнение с эталоном» (``analysis.comparison``): the run next to independent references — for SSSS the Navier
+  reference computed for its own inputs in a separate process (``RunRecord.navier``; while it is computed the tab says so
+  and is rebuilt when it arrives), for CCCC the saved references read as data (``backend.benchmarks``); for a
+  diagnostic field or inputs without a reference it states why, with no numbers.
+- «МКР D2» (``analysis.d2_tab``): only for a CCCC run with «МКР — двумерный (D2)» chosen: the D2 solution computed for
+  the run's own inputs in a separate process (``RunRecord.d2``), sections next to KK-VIM, node values and the timings of
+  both methods; when D2 did not run the tab states why. D2 is also a row of «Сравнение с эталоном».
+- «Циклы VIM-1–3» (``analysis.cycles_tab``, GUI-VIM-CYCLES-123-01): the centre deflection after the completed full
+  cycles k = 1, 2, 3 of this run (s = 2, 4, 6; owner's display labels, not methods and not N) from its stored half-step
+  history, next to the run's reference (Navier for SSSS, D2 for CCCC); rebuilt when a pending reference arrives.
+- «Нагрузка — прогиб» (``analysis.series``): only for a run of a finished load series.
 - Without a solver run (``--demo``): the layout with TEST DATA placeholders, never results.
 """
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -47,16 +58,23 @@ from kkvim_gui.widgets.common import (
 )
 from kkvim_gui.widgets.header import AppHeader, app_icon
 
-TABS = ("Обзор", "Поля", "Сечения", "Численные значения", "Сходимость", "Сравнение")
-SOLVER_TABS = ("Обзор", "Поля", "Сечения", "Численные значения", "История полушагов", "Энергия и диагностика",
-               "Сравнение")
+TABS = ("Результат", "Прогиб", "Сечения", "Значения в узлах", "Итерации", "Сравнение с эталоном")
+SOLVER_TABS = ("Результат", "Прогиб", "Сечения", "Значения в узлах", "Итерации", "Диагностика", "Сравнение с эталоном")
+SERIES_TAB = "Нагрузка — прогиб"
 SOLVER_TAB_HELP = ("results.overview", "results.overview", "results.overview", "results.overview",
                    "iterations.overview", "iterations.overview", "verification.overview")
 TAB_HELP = (
     "results.overview", "results.overview", "results.overview",
     "results.overview", "iterations.overview", "verification.overview",
 )
-COMPARISON_TOOLTIP = "Сравнение с эталонами — после появления независимых эталонов (G4)"
+COMPARISON_TOOLTIP = "Сравнение с эталонами — только для расчёта решателя, не для демонстрационных данных"
+COMPARISON_SOLVER_TOOLTIP = ("Текущий расчёт рядом с независимым эталоном: SSSS — решение Навье для этих входных данных; "
+                             "CCCC — сохранённые эталоны (опубликованное решение, D2, МКЭ). Знаковые разности без порога")
+SECTIONS_TOOLTIP = "Профили прогиба вдоль выбранных линий узлов сетки: w(x) при y = const и w(y) при x = const"
+TAB_TOOLTIPS = {"Прогиб": "Поле прогиба w(x, y): карта с изолиниями или цветной 3D-вид",
+                "Сечения": SECTIONS_TOOLTIP, "Значения в узлах": "Таблица w во всех узлах сетки результата",
+                "Итерации": "Как изменялся результат по полушагам s; подробная таблица — по кнопке",
+                "Диагностика": "Энергия Π_h по полушагам, невязка, параметры решателя и ограничения маршрута"}
 REPORT_TOOLTIP = (
     "Конструктор отчёта: выбор рисунков, полей и таблиц, PDF/PNG/SVG, XLSX, язык рисунков, "
     "папка отчёта с manifest.json — после появления графиков и таблиц (GUI_DESIGN.md, 18)"
@@ -134,11 +152,14 @@ MODEL_ROWS = (
 class AnalysisWindow(QMainWindow):
     settingsRequested = Signal()
     helpRequested = Signal()
+    runRequested = Signal(int)  # a stored run of the same series to open («Открыть расчёт точки»; no new calculation)
 
-    def __init__(self, session, model_rows=None, run=None, parent=None):
-        """model_rows: input parameters of the analysed run; run: a finished solver run (None: demonstration)."""
+    def __init__(self, session, model_rows=None, run=None, series=None, parent=None):
+        """model_rows: input parameters of the analysed run; run: a finished solver run (None: demonstration);
+        series: ``model.series.SeriesData`` of the finished load series of the run, if any."""
         super().__init__(parent)
         self.session = session
+        self.series = series
         self.model_rows = tuple(model_rows) if model_rows else MODEL_ROWS
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowIcon(app_icon())
@@ -215,14 +236,16 @@ class AnalysisWindow(QMainWindow):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
         self.header = AppHeader(self.session, "КК-ВИМ: анализ результатов",
-                                show_badge=bool(outcome.mark) or outcome.is_error)
-        if outcome.is_error:
+                                show_badge=bool(outcome.mark) or outcome.is_error or outcome.diagnostic_only)
+        if outcome.is_error or outcome.diagnostic_only:
+            cause = f"Решатель завершился ошибкой {outcome.status}" if outcome.is_error else                 f"Запрошенный расчёт не выполнен ({outcome.status})"
             self.header.set_badge("ДИАГНОСТИКА · расчёт не завершён", "ДИАГНОСТИКА",
-                                  f"Решатель завершился ошибкой {outcome.status}: поле последнего выполненного "
-                                  "полушага показано только для диагностики, это не результат")
+                                  f"{cause}: поле последнего выполненного полушага показано только для диагностики, "
+                                  "это не результат")
         elif outcome.mark:
-            self.header.set_badge(outcome.mark, "PROVISIONAL", "Исследовательский решатель R4 (D-047, D-048): "
-                                  "результаты не квалифицированы, не научная приёмка")
+            decisions = ", ".join(outcome.decisions)
+            self.header.set_badge(outcome.mark, "RESEARCH" if outcome.mark.startswith("RESEARCH_ONLY") else "PROVISIONAL",
+                                  f"Решатель {outcome.solver} ({decisions}): результаты не квалифицированы, не научная приёмка")
         self.header.set_project(title)
         self.header.settingsClicked.connect(self.settingsRequested)
         self.header.helpClicked.connect(self.helpRequested)
@@ -233,13 +256,10 @@ class AnalysisWindow(QMainWindow):
         strip_lay = QHBoxLayout(strip)
         strip_lay.setContentsMargins(16, 6, 16, 6)
         strip_lay.setSpacing(24)
-        (k1, t1), (k2, t2), (k3, t3) = results.statuses(outcome, run)
-        self.status_run, self.status_stop, self.status_accept = (StatusLabel(k1, t1), StatusLabel(k2, t2),
-                                                                 StatusLabel(k3, t3))
+        self.status_run, self.status_stop, self.status_accept = results.status_labels(outcome, run)
         for w in (self.status_run, self.status_stop, self.status_accept):
-            strip_lay.addWidget(w)
-        strip_lay.addStretch(1)
-        self.data_note = label(f"Данные: решатель KK-VIM {outcome.solver}" + (f" · {outcome.mark}" if outcome.mark else ""),
+            strip_lay.addWidget(w, 1)  # long statuses (diagnostics) wrap instead of being cut
+        self.data_note = label(f"Решатель KK-VIM {outcome.solver}" + (f" · {outcome.mark}" if outcome.mark else ""),
                                "secondary")
         strip_lay.addWidget(self.data_note)
         lay.addWidget(strip)
@@ -249,42 +269,144 @@ class AnalysisWindow(QMainWindow):
         self.tabs.setTabPosition(QTabWidget.TabPosition.North)
         self.tabs.setDocumentMode(True)
         s = self.session
-        self.overview = results.OverviewTab(s, outcome, run, self.model_rows, elapsed)
+        from kkvim_gui.analysis.comparison import ComparisonTab
+
+        self._navier = getattr(run, "navier", None)  # None: a run without a reference record
+        self._d2 = getattr(run, "d2", None)  # None: D2 not requested (SSSS, or CCCC without «МКР — двумерный (D2)»)
+        self.comparison = ComparisonTab(outcome, run, navier=self._navier, d2=self._d2)  # states itself when none applies
+        self.overview = results.OverviewTab(s, outcome, run, self.model_rows, elapsed, comparison=self.comparison.comparison)
         self.fields = results.FieldsTab(s, outcome, self.model_rows, trailing=self._trailing())
         self.sections = results.SectionsTab(s, outcome, trailing=self._trailing())
         self.values = results.ValuesTab(outcome, trailing=(self._export_button(),))
         self.history = results.HistoryTab(s, outcome, trailing=self._trailing())
         self.energy = results.EnergyTab(s, outcome, trailing=self._trailing())
         for widget, name in zip((self.overview, self.fields, self.sections, self.values, self.history, self.energy,
-                                 QWidget()), SOLVER_TABS, strict=True):
+                                 self.comparison), SOLVER_TABS, strict=True):
             self.tabs.addTab(widget, name)
-        self.tabs.setTabEnabled(6, False)
-        self.tabs.setTabToolTip(6, COMPARISON_TOOLTIP)
+            if name in TAB_TOOLTIPS:
+                self.tabs.setTabToolTip(self.tabs.count() - 1, TAB_TOOLTIPS[name])
+        self.tabs.setTabToolTip(6, COMPARISON_SOLVER_TOOLTIP)
         for i, topic in enumerate(SOLVER_TAB_HELP):
             set_help_context(self.tabs.widget(i), topic)
-        self.report_button = QPushButton("Собрать отчёт…")
-        self.report_button.setEnabled(False)
-        self.report_button.setToolTip(REPORT_TOOLTIP)
+        from kkvim_gui.analysis.cycles_tab import TAB_TITLE as CYCLES_TITLE
+        from kkvim_gui.analysis.cycles_tab import TAB_TOOLTIP as CYCLES_TOOLTIP
+        from kkvim_gui.analysis.cycles_tab import CyclesTab
+
+        self.cycles = CyclesTab(s, self._cycle_table(), display=self.display)
+        self.tabs.addTab(self.cycles, CYCLES_TITLE)
+        self.tabs.setTabToolTip(self.tabs.count() - 1, CYCLES_TOOLTIP)
+        self.d2_tab = None
+        if self._d2 is not None and self._d2.get("state") != "pending":
+            self._add_d2_tab()
+        self.series_tab = None
+        if self.series is not None:
+            from kkvim_gui.analysis.series import SeriesTab
+
+            self.series_tab = SeriesTab(s, self.series, display=self.display)
+            self.series_tab.runRequested.connect(self.runRequested)
+            # a run of a completed series opens on «Нагрузка — прогиб» (first tab); a single run on «Результат»
+            if self.series.status == "finished":
+                self.tabs.insertTab(0, self.series_tab, SERIES_TAB)
+                self.series_tab.select_q(outcome.request.q)  # the point of this run is selected
+            else:
+                self.tabs.addTab(self.series_tab, SERIES_TAB)
+        self._navier_timer = None
+        if any(r is not None and r.get("state") == "pending" for r in (self._navier, self._d2)):
+            self._navier_timer = QTimer(self)
+            self._navier_timer.setInterval(300)
+            self._navier_timer.timeout.connect(self._check_navier)
+            self._navier_timer.start()
+        self.report_button = None  # the report constructor (GUI-D18, P7) is not offered as a disabled button
         self.save_button = QPushButton("Сохранить расчёт и отчёт…")
-        self.save_button.setToolTip("Папка расчёта: manifest.json, history.csv, field.csv, рисунки PNG и "
-                                    "читаемый отчёт report.html")
+        self.save_button.setProperty("variant", "primary")
+        self.save_button.setToolTip("Папка расчёта: manifest.json, history.csv, field.csv, рисунки PNG, report.html и, "
+                                    "если есть сравнение с эталоном, comparison.csv")
         self.save_button.clicked.connect(self._save_package_dialog)
         corner = QWidget()
         corner_lay = QHBoxLayout(corner)
         corner_lay.setContentsMargins(0, 4, 16, 4)
         corner_lay.addWidget(self.save_button)
-        corner_lay.addWidget(self.report_button)
         self.tabs.setCornerWidget(corner, Qt.Corner.TopRightCorner)
         self.tabs.setCurrentIndex(0)
         lay.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
         mark = f" · {outcome.mark}" if outcome.mark else ""
-        if outcome.is_error:
-            self.statusBar().addWidget(label(f"●  ДИАГНОСТИКА: расчёт завершился ошибкой {outcome.status}; "
+        if outcome.is_error or outcome.diagnostic_only:
+            cause = "расчёт завершился ошибкой" if outcome.is_error else "запрошенный расчёт не выполнен,"
+            self.statusBar().addWidget(label(f"●  ДИАГНОСТИКА: {cause} {outcome.status}; "
                                              f"поле — последнего выполненного полушага, не результат{mark}"), 1)
         else:
             self.statusBar().addWidget(label(f"●  Результаты решателя KK-VIM загружены{mark}"), 1)
         fit_to_screen(self)
+
+    def _check_navier(self):
+        """A reference of the run (Navier for SSSS, D2 for CCCC) arrived after the window opened: rebuild the comparison."""
+        navier, d2 = getattr(self.run, "navier", None), getattr(self.run, "d2", None)
+        pending = [r for r in (navier, d2) if r is not None and r.get("state") == "pending"]
+        if navier is self._navier and d2 is self._d2:
+            return
+        if pending:
+            return
+        self._navier_timer.stop()
+        if d2 is not self._d2:
+            self._d2 = d2
+            if self.d2_tab is None and d2 is not None:
+                self._add_d2_tab()
+        self.set_navier(navier)
+
+    @property
+    def display(self):
+        """The curves chosen in «Результаты и сравнение» for this run (its own setup snapshot; display only)."""
+        from kkvim_gui.model.setup_state import DISPLAY_ALL, display_of
+
+        snapshot = getattr(self.run, "snapshot", None)
+        return DISPLAY_ALL if snapshot is None else display_of(snapshot)
+
+    def _cycle_table(self):
+        from kkvim_gui.backend import vim_cycles
+
+        return vim_cycles.cycle_table(self.outcome, navier=self._navier, d2=self._d2)
+
+    def _rebuild_cycles(self):
+        """The reference of the run arrived: the cycles tab is drawn again from the same history and the new reference."""
+        from kkvim_gui.analysis.cycles_tab import TAB_TITLE as CYCLES_TITLE
+        from kkvim_gui.analysis.cycles_tab import TAB_TOOLTIP as CYCLES_TOOLTIP
+        from kkvim_gui.analysis.cycles_tab import CyclesTab
+
+        index = self.tabs.indexOf(self.cycles)
+        current = self.tabs.currentIndex()
+        old = self.cycles
+        self.cycles = CyclesTab(self.session, self._cycle_table(), display=old.chosen())  # the user's visibility stays
+        self.tabs.removeTab(index)
+        self.tabs.insertTab(index, self.cycles, CYCLES_TITLE)
+        self.tabs.setTabToolTip(index, CYCLES_TOOLTIP)
+        self.tabs.setCurrentIndex(current)
+        old.deleteLater()
+
+    def _add_d2_tab(self):
+        from kkvim_gui.analysis.d2_tab import TAB_TITLE, TAB_TOOLTIP, D2Tab
+
+        self.d2_tab = D2Tab(self.session, self.outcome, self.run, trailing=(FigureLanguageSwitch(self.session),))
+        index = self.tabs.indexOf(self.comparison) + 1
+        self.tabs.insertTab(index, self.d2_tab, TAB_TITLE)
+        self.tabs.setTabToolTip(index, TAB_TOOLTIP)
+
+    def set_navier(self, navier):
+        from kkvim_gui.analysis.comparison import ComparisonTab
+
+        self._navier = navier
+        index = self.tabs.indexOf(self.comparison)
+        current = self.tabs.currentIndex()
+        old = self.comparison
+        self.comparison = ComparisonTab(self.outcome, self.run, navier=navier, d2=self._d2)
+        self.tabs.removeTab(index)
+        self.tabs.insertTab(index, self.comparison, SOLVER_TABS[6])
+        self.tabs.setTabToolTip(index, COMPARISON_SOLVER_TOOLTIP)
+        set_help_context(self.comparison, SOLVER_TAB_HELP[6])
+        self.tabs.setCurrentIndex(current)
+        old.deleteLater()
+        self.overview.set_comparison(self.comparison.comparison)
+        self._rebuild_cycles()
 
     def _trailing(self):
         return (FigureLanguageSwitch(self.session), self._export_button())
@@ -309,15 +431,21 @@ class AnalysisWindow(QMainWindow):
         return export.write_result(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed)
 
     def save_package(self, folder):
-        """Calculation package of this run (export files, PNG figures, report.html) in a new subfolder."""
+        """Calculation package of this run (export files, PNG figures, report.html and, when the "Сравнение" tab
+        shows a comparison, comparison.csv: the tab's own Comparison object) in a new subfolder."""
         from kkvim_gui.analysis import snapshots
         from kkvim_gui.backend import report
 
         factor = self.fields.surface.factor
         meta = self.run.meta(self.run._t0 + (self.run._elapsed_final or 0.0))
+        cycles = self.cycles.table
+        series = self.series if self.series is not None and self.series.complete else None
         return report.write_package(self.outcome, Path(folder) / self._base_name(), meta, self.run.detailed,
-                                    render=snapshots.renderer(self.session, self.outcome, factor),
-                                    view=snapshots.view_record(self.outcome, factor))
+                                    render=snapshots.renderer(self.session, self.outcome, factor, cycles=cycles,
+                                                              series=series),
+                                    view=snapshots.view_record(self.outcome, factor),
+                                    comparison=self.comparison.comparison, d2=self._d2,
+                                    timing=getattr(self.run, "timing", None), cycles=cycles, series=series)
 
     def _save_package_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Папка для расчёта и отчёта")
@@ -333,7 +461,11 @@ class AnalysisWindow(QMainWindow):
     def _export_all_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Папка для результатов")
         if folder:
-            paths = self.export_all(folder)
+            try:
+                paths = self.export_all(folder)
+            except OSError as exc:  # an existing package is never overwritten (export.new_folder)
+                QMessageBox.warning(self, "Сохранение не выполнено", f"Результаты не сохранены: {exc}")
+                return
             self.statusBar().showMessage(f"Сохранено: {paths['manifest'].parent}", 8000)
 
     def _export_history_dialog(self):
@@ -344,7 +476,8 @@ class AnalysisWindow(QMainWindow):
             self.statusBar().showMessage(f"Сохранено: {path}", 8000)
 
     def _export_field_dialog(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Поле прогиба", f"{self._base_name()}_field.csv", "CSV (*.csv)")
+        name = export.field_file_name(self.outcome)  # the name of its role: field / field_research / field_diagnostic
+        path, _ = QFileDialog.getSaveFileName(self, "Поле прогиба", f"{self._base_name()}_{name}", "CSV (*.csv)")
         if path:
             export.write_field_csv(self.outcome, path)
             self.statusBar().showMessage(f"Сохранено: {path}", 8000)

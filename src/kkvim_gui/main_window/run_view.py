@@ -9,7 +9,16 @@
   (in the details), and there are no per-iteration lines.
 No convergence plot here: scientific figures live in the analysis window. No remaining-time
 estimate. The demonstration backend is marked TEST DATA everywhere; every R4 result carries
-PROVISIONAL / NOT_QUALIFIED. The scientific status comes from the solver outcome, never from the GUI.
+PROVISIONAL / NOT_QUALIFIED and every research route (SSSS N = 4-6, CCCC) RESEARCH_ONLY / PROVISIONAL /
+NOT_QUALIFIED, with the limits of its route. The scientific status comes from the solver outcome (or, while
+the run is active, from the route of its request), never from N alone; a diagnostic field is never shown
+as a result.
+
+Load series: the runs of a series are ordinary rows of the dispatcher («серия N, точка k из n»); «Нагрузка — прогиб…»
+opens the graph of the selected run's series once it is no longer running; «Стоп» stops the point and cancels the
+rest of the series. SSSS runs show the state of their independent Navier reference (computed in its own process);
+CCCC runs with «МКР — двумерный (D2)» show the state of D2 (computed in its own process after KK-VIM; «Стоп» while D2 runs
+stops D2 only and keeps the KK-VIM result).
 """
 
 from PySide6.QtCore import Qt, Signal
@@ -28,7 +37,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from kkvim_gui.model.runs import STATUS_TEXT, format_duration
+from kkvim_gui.backend import d2_job, navier_job
+from kkvim_gui.backend.kkvim_adapter import LIMITATIONS, MARK, RESEARCH_MARK
+from kkvim_gui.backend.request import ROUTE_R3, ROUTE_R4
+from kkvim_gui.model.runs import SERIES_STATUS_TEXT, STATUS_TEXT, format_duration
 from kkvim_gui.model.setup_state import summary_rows
 from kkvim_gui.widgets.common import Card, Note, StatusLabel, label, set_help_context
 
@@ -44,6 +56,10 @@ RESULTS_SOLVER = (
     "полушагов, энергия и диагностика — по массивам решателя KK-VIM."
 )
 RESULTS_R4 = RESULTS_SOLVER + " Все величины R4 — PROVISIONAL / NOT_QUALIFIED."
+RESULTS_RESEARCH = RESULTS_SOLVER + f" Исследовательский расчёт: {RESEARCH_MARK}; не квалифицированный результат."
+DIAGNOSTIC_FIELD = ("Запрошенный расчёт не выполнен: поле последнего выполненного полушага доступно только как диагностика "
+                    "(field_diagnostic.csv), не как результат.")
+LIMITS_SHOWN = 3  # the first limits of the route in the run summary; all of them in the analysis and the report
 NO_FIELD = "Поле прогиба не получено. Протокол и диагностика доступны через «Сохранить результаты…»."
 
 
@@ -64,6 +80,7 @@ class RunView(QWidget):
     stopRequested = Signal(int)
     analysisRequested = Signal(int)
     exportRequested = Signal(int)
+    seriesRequested = Signal(int)
 
     def __init__(self, session, runs, parent=None):
         super().__init__(parent)
@@ -95,6 +112,7 @@ class RunView(QWidget):
 
         runs.runAdded.connect(self._on_added)
         runs.runChanged.connect(self._on_changed)
+        runs.seriesChanged.connect(lambda _id: self._show_selected())
         session.themeChanged.connect(self._on_theme)
         self._show_selected()
 
@@ -116,7 +134,10 @@ class RunView(QWidget):
         self.export_button = QPushButton("Сохранить результаты…")
         self.export_button.setToolTip("Исходные данные, статусы, история полушагов и поле: JSON и CSV с единицами")
         self.export_button.clicked.connect(lambda: self.exportRequested.emit(self.selected_id))
-        for b in (self.stop_button, self.export_button, self.analysis_button):
+        self.series_button = QPushButton("Нагрузка — прогиб…")
+        self.series_button.setToolTip("График и таблица серии нагрузок выбранного расчёта; сохранение load_series.csv")
+        self.series_button.clicked.connect(self._request_series)
+        for b in (self.stop_button, self.export_button, self.series_button, self.analysis_button):
             head.addWidget(b)
         card.body.addLayout(head)
         statuses = QHBoxLayout()
@@ -132,6 +153,9 @@ class RunView(QWidget):
         card.body.addWidget(self.summary_text)
         self.results_note = Note(RESULTS_TEXT, "testdata")
         card.body.addWidget(self.results_note)
+        self.limits_note = Note("", "testdata")  # the limits of a non-accepted route (the same texts as the report)
+        self.limits_note.setVisible(False)
+        card.body.addWidget(self.limits_note)
         return card
 
     def _details_card(self):
@@ -143,14 +167,18 @@ class RunView(QWidget):
         grid.setVerticalSpacing(5)
         grid.setColumnStretch(1, 1)
         self.details = {}
-        rows = ("Проект", "Метод", "Параметры", "Пластина", "Этап", "Счётчики", "Прошло времени", "Протокол")
+        rows = ("Метод", "Параметры", "Пластина", "Серия нагрузок", "Эталон Навье", "МКР D2", "Этап", "Счётчики",
+                "Прошло времени", "Протокол")
         for i, name in enumerate(rows):
             grid.addWidget(label(name, "fieldLabel"), i, 0, Qt.AlignmentFlag.AlignTop)
             value = label("", wrap=True)
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             grid.addWidget(value, i, 1)
             self.details[name] = value
-        self.counter_label = grid.itemAtPosition(5, 0).widget()
+        self.counter_label = grid.itemAtPosition(rows.index("Счётчики"), 0).widget()
+        self.series_label = grid.itemAtPosition(rows.index("Серия нагрузок"), 0).widget()
+        self.navier_label = grid.itemAtPosition(rows.index("Эталон Навье"), 0).widget()
+        self.d2_label = grid.itemAtPosition(rows.index("МКР D2"), 0).widget()
         card.body.addLayout(grid)
         card.body.addWidget(label("Важные сообщения", "cardTitle"))
         self.important = label("", wrap=True)
@@ -197,12 +225,31 @@ class RunView(QWidget):
                 return r
         return None
 
+    @staticmethod
+    def load_text(run):
+        """«q = 2,5 kPa»: the load of this run as entered, with its unit (each point of a series has its own q)."""
+        if run.request is not None:
+            for key, text, unit in run.request.entered:
+                if key == "q":
+                    return f"q = {text.strip()} {unit}"
+        st = run.snapshot
+        if st.series:
+            return f"серия q: {st.texts['q_series'].strip()} {st.units['q']}"
+        return f"q = {st.texts['q'].strip()} {st.units['q']}"
+
+    def _point_text(self, run):
+        """« · серия 1, точка 2 из 5» for a run of a load series."""
+        series = None if run.series_id is None else self.runs.get_series(run.series_id)
+        if series is None or run.run_id not in series.run_ids:
+            return ""
+        return f" · серия {series.series_id}, точка {series.run_ids.index(run.run_id) + 1} из {len(series.requests)}"
+
     def _fill_row(self, row, run):
         elapsed = format_duration(self.runs.elapsed(run))
         values = (
             run.started.strftime("%d.%m.%Y %H:%M:%S"),
             run.method,
-            run.params_text(),
+            f"{self.load_text(run)}{self._point_text(run)} · {run.params_text()}",
             STATUS_TEXT[run.status],
             elapsed,
         )
@@ -243,6 +290,35 @@ class RunView(QWidget):
     def selected(self):
         return self.runs.get(self.selected_id) if self.selected_id is not None else None
 
+    def selected_series(self):
+        run = self.selected()
+        return None if run is None or run.series_id is None else self.runs.get_series(run.series_id)
+
+    def _request_series(self):
+        series = self.selected_series()
+        if series is not None and not series.active:
+            self.seriesRequested.emit(series.series_id)
+
+    @staticmethod
+    def navier_text(run):
+        nav = run.navier
+        if nav is None:
+            return "не применяется (решение Навье — только для SSSS)" if run.request is not None and \
+                run.request.supports != "SSSS" else "—"
+        if nav["state"] == navier_job.OK:
+            return f"w в центре = {nav['w_m']!r} m (M = {nav['M']}, отдельный процесс)"
+        return navier_job.STATE_TEXT.get(nav["state"], nav["state"]) if nav["state"] == navier_job.PENDING else nav["reason"]
+
+    @staticmethod
+    def d2_text(run):
+        d2 = run.d2
+        if d2 is None:
+            return "не выбран" if run.request is not None and run.request.supports == "CCCC" else "—"
+        if d2["state"] == d2_job.OK:
+            centre = "нет узла в центре" if d2["w_centre_m"] is None else f"w в центре = {d2['w_centre_m']!r} m"
+            return f"{centre}; вызов solve {d2['timing'].get('solve_s', 0.0):.3f} с (отдельный процесс)"
+        return d2_job.STATE_TEXT[d2_job.PENDING] if d2["state"] == d2_job.PENDING else d2["reason"]
+
     def _show_selected(self):
         run = self.selected()
         has = run is not None
@@ -252,17 +328,28 @@ class RunView(QWidget):
         diagnostic = has and run.has_diagnostic_field
         self.analysis_button.setVisible(has and (run.status == "finished" or diagnostic))
         self.analysis_button.setEnabled(has and (run.has_results or diagnostic))
-        self.analysis_button.setText("Открыть диагностику (расчёт не завершён)" if diagnostic
+        self.analysis_button.setText("Открыть диагностику (запрошенный расчёт не выполнен)" if diagnostic
                                      else "Открыть анализ результатов")
         self.export_button.setVisible(has and run.outcome is not None)
+        series = self.selected_series() if has else None
+        self.series_button.setVisible(series is not None)
+        self.series_button.setEnabled(series is not None and not series.active)
         outcome = run.outcome if has else None
         if has and run.is_demo:
             self.results_note.text.setText(RESULTS_TEXT)
         elif outcome is not None:
             self.results_note.text.setText(
-                NO_FIELD if not outcome.has_field else RESULTS_R4 if outcome.mark else RESULTS_SOLVER)
-        self.results_note.setVisible(has and (run.has_results or (outcome is not None and not outcome.has_field)))
+                NO_FIELD if not outcome.has_field else DIAGNOSTIC_FIELD if outcome.diagnostic_only else
+                RESULTS_R4 if outcome.mark == MARK else RESULTS_RESEARCH if outcome.mark else RESULTS_SOLVER)
+        self.results_note.setVisible(has and (run.has_results or (outcome is not None and (not outcome.has_field
+                                                                                          or outcome.diagnostic_only))))
         self.details_tag.setText(self._tag(run) if has else "")
+        limits = self._limitations(run) if has else ()
+        shown = [f"• {t}" for t in limits[:LIMITS_SHOWN]]
+        if len(limits) > LIMITS_SHOWN:
+            shown.append(f"… ещё {len(limits) - LIMITS_SHOWN}: полный перечень — в окне анализа и в report.html")
+        self.limits_note.text.setText("Ограничения маршрута:\n" + "\n".join(shown))
+        self.limits_note.setVisible(bool(limits))
         if not has:
             self.summary_title.setText("Расчёты ещё не запускались")
             for v in self.details.values():
@@ -276,14 +363,29 @@ class RunView(QWidget):
         self.status_stop.set_status(*self._criterion(run))
         self.status_accept.set_status(*self._science(run))
         rows = dict(summary_rows(run.snapshot))
-        tail = " · TEST DATA" if run.is_demo else (" · PROVISIONAL / NOT_QUALIFIED" if run.snapshot.N != 1 else "")
+        mark = self._mark(run)
+        tail = " · TEST DATA" if run.is_demo else (f" · {mark}" if mark else "")
+        progress = ""
+        if series is not None:
+            point = series.run_ids.index(run.run_id) + 1
+            progress = (f" · серия {series.series_id}: точка {point} из {len(series.requests)} "
+                        f"({SERIES_STATUS_TEXT[series.status].lower()})")
         self.summary_text.setText(f"{run.method} · {run.params_text()} · {rows['Закрепление']} · "
-                                  f"{rows['Геометрия']}{tail}")
+                                  f"{rows['Геометрия']}{progress}{tail}")
         d = self.details
-        d["Проект"].setText(run.project)
         d["Метод"].setText(f"{run.method} · {run.snapshot.theory}")
         d["Параметры"].setText(f"{run.params_text()} (N — число членов)")
         d["Пластина"].setText(f"{rows['Геометрия']} · {rows['Закрепление']} · {rows['Нагрузка']}")
+        self.series_label.setVisible(series is not None)
+        d["Серия нагрузок"].setVisible(series is not None)
+        if series is not None:
+            d["Серия нагрузок"].setText(f"№ {series.series_id}: q = " + "; ".join(f"{q!r}" for q in series.loads)
+                                        + f" Pa — {SERIES_STATUS_TEXT[series.status].lower()}")
+        d["Эталон Навье"].setText(self.navier_text(run))
+        cccc = run.request is not None and run.request.supports == "CCCC"
+        self.d2_label.setVisible(cccc)
+        d["МКР D2"].setVisible(cccc)
+        d["МКР D2"].setText(self.d2_text(run))
         d["Этап"].setText(run.stage)
         self.counter_label.setVisible(run.iterative)
         d["Счётчики"].setVisible(run.iterative)
@@ -309,13 +411,32 @@ class RunView(QWidget):
         self.important.setText("<br>".join(lines))
         self._fill_journal(run.detailed)
 
+    @classmethod
+    def _limitations(cls, run):
+        """Limits of a research or PROVISIONAL route (none for R3 and the demonstration)."""
+        if run.is_demo or cls._mark(run) is None:
+            return ()
+        if run.outcome is not None:
+            return run.outcome.limitations
+        route = run.request.route if run.request is not None else run.snapshot.route
+        return LIMITATIONS.get(route, ())
+
     @staticmethod
-    def _tag(run):
+    def _mark(run):
+        """The status mark of the run: from its outcome, or from the route of its request while it runs."""
+        if run.outcome is not None:
+            return run.outcome.mark
+        route = run.request.route if run.request is not None else run.snapshot.route
+        return None if route == ROUTE_R3 else MARK if route == ROUTE_R4 else RESEARCH_MARK
+
+    @classmethod
+    def _tag(cls, run):
         if run.is_demo:
             return "TEST DATA"
-        if run.snapshot.N != 1:
-            return "PROVISIONAL / NOT_QUALIFIED"
-        return "KK-VIM"
+        mark = cls._mark(run)
+        if run.outcome is not None and run.outcome.diagnostic_only:
+            return f"ДИАГНОСТИКА · {mark}" if mark else "ДИАГНОСТИКА"
+        return mark or "KK-VIM"
 
     @staticmethod
     def _criterion(run):
@@ -335,12 +456,16 @@ class RunView(QWidget):
             kind = "warning"  # an R4 stabilization is PROVISIONAL, not a success of the method
         return kind, f"{outcome.stop_text} (s = {outcome.s}, k = {outcome.k})"
 
-    @staticmethod
-    def _science(run):
+    @classmethod
+    def _science(cls, run):
         if run.is_demo:
             return "neutral", "Научная приёмка: не проводилась"
-        if run.snapshot.N != 1:
+        mark = cls._mark(run)
+        if mark == MARK:
             return "warning", "Научный статус: PROVISIONAL / NOT_QUALIFIED (R4, D-047, D-048)"
+        if mark:
+            decisions = ", ".join(run.outcome.decisions) if run.outcome is not None else ""
+            return "warning", f"Научный статус: {mark}" + (f" ({decisions})" if decisions else "")
         return "neutral", "Научный статус: решатель R3 ACCEPTED (D-043); расчёт — не научная приёмка"
 
     def _fill_journal(self, rows):

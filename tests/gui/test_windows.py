@@ -174,7 +174,7 @@ def test_analysis_window_has_horizontal_tabs(qtbot, session):
     qtbot.addWidget(w)
     assert w.tabs.tabPosition() == QTabWidget.TabPosition.North
     assert [w.tabs.tabText(i) for i in range(w.tabs.count())] == list(TABS)
-    comparison = TABS.index("Сравнение")
+    comparison = TABS.index("Сравнение с эталоном")
     assert not w.tabs.isTabEnabled(comparison)
     assert all(w.tabs.isTabEnabled(i) for i in range(w.tabs.count()) if i != comparison)
 

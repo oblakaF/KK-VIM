@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Отчёт KK-VIM</title>
+<style>
+body{font-family:"Segoe UI",Arial,sans-serif;max-width:980px;margin:24px auto;padding:0 16px;color:#1B2B3A;
+background:#fff;line-height:1.45}
+h1{font-size:22px} h2{font-size:17px;margin-top:28px;border-bottom:1px solid #DCE3EA;padding-bottom:4px}
+table{border-collapse:collapse;width:100%;font-size:14px} th,td{border:1px solid #DCE3EA;padding:4px 8px;
+text-align:left;vertical-align:top} th{background:#F3F6F9;font-weight:600;width:32%}
+table.h th{width:auto} .banner{background:#FFF4E0;border:1px solid #E3AE52;padding:8px 12px}
+.x{color:#5F6E7C;font-family:Consolas,monospace;font-size:12px} figure{margin:12px 0}
+img{max-width:100%;border:1px solid #DCE3EA} figcaption{font-size:13px;color:#5F6E7C}
+</style></head><body>
+<h1>KK-VIM — отчёт расчёта (SSSS, N = 2)</h1>
+<div class="banner">PROVISIONAL / NOT_QUALIFIED<br>Функциональная предварительная версия интерфейса. Не официальный выпуск R7 и не научная приёмка отдельного расчёта.</div>
+<p>Отчёт создан 2026-11-12T05:00:55 · запуск — · kkvim-gui 0.0.0 ·
+python 3.14.8, kkvim 0.0.0, numpy 2.5.4, scipy 1.18.1</p>
+<h2>1. Исходные данные (как введены)</h2><table></table>
+<h2>2. Значения для решателя (СИ)</h2><table><tr><th>a</th><td>1.0 m</td></tr>
+<tr><th>b</th><td>1.0 m</td></tr>
+<tr><th>h (t)</th><td>0.01 m</td></tr>
+<tr><th>E</th><td>210000000000.0 Pa</td></tr>
+<tr><th>ν</th><td>0.3</td></tr>
+<tr><th>q</th><td>1000.0 Pa</td></tr>
+<tr><th>b/a</th><td>1</td></tr>
+<tr><th>D = Et³/(12(1−ν²)) (kkvim)</th><td>19230,8 N·m (19230.769230769234)</td></tr></table>
+<h2>3. Расчётная модель и метод</h2><table><tr><th>Теория</th><td>Кирхгоф–Ляв (линейная)</td></tr>
+<tr><th>Закрепление</th><td>SSSS</td></tr>
+<tr><th>Нагрузка</th><td>равномерная q</td></tr>
+<tr><th>Маршрут</th><td>ssss_r4</td></tr>
+<tr><th>Метод</th><td>КК-ВИМ, N = 2</td></tr>
+<tr><th>Решатель</th><td>R4: <code>kkvim.coupled_run.run_coupled</code></td></tr>
+<tr><th>Сетка</th><td>n_x = 16, n_y = 16 (17 × 17 узлов)</td></tr>
+<tr><th>Параметр N</th><td>2</td></tr>
+<tr><th>Параметр transform</th><td>fft</td></tr>
+<tr><th>Параметр half_steps</th><td>100</td></tr>
+<tr><th>Параметр research_mode</th><td>False</td></tr>
+<tr><th>Параметр stop_on_stabilization</th><td>None</td></tr>
+<tr><th>Параметр K_research</th><td>1000000</td></tr>
+<tr><th>Параметр eps_floor</th><td>None</td></tr>
+<tr><th>Параметр tol_inf</th><td>None</td></tr>
+<tr><th>Параметр tol_E</th><td>None</td></tr>
+<tr><th>Параметр s_min</th><td>None</td></tr>
+<tr><th>Параметр s_max</th><td>None</td></tr>
+<tr><th>Параметр eta_max</th><td>None</td></tr></table>
+<h2>4. Результаты</h2><table><tr><th>Максимальный |w| (по узлам)</th><td><b>0,21095 mm</b> = 0,00021095 m <span class=x>(0.00021095032213667422 m)</span></td></tr>
+<tr><th>Координаты узла</th><td>x = 0,5 m, y = 0,5 m (i = 8, j = 8)</td></tr>
+<tr><th>w̄ = wD/(qa⁴) в этом узле</th><td><b>0,00405674</b> <span class=x>(0.004056736964166813)</span></td></tr>
+<tr><th>w в центре (узел a/2, b/2)</th><td>0,21095 mm <span class=x>(0.00021095032213667422 m)</span></td></tr>
+<tr><th>w̄ в центре</th><td>0,00405674 <span class=x>(0.004056736964166813)</span></td></tr></table>
+<p class="x">В скобках — точные значения массивов решателя (repr), те же, что в manifest.json и field.csv.</p>
+
+<h2>5. Статус расчёта</h2><table><tr><th>Статус решателя</th><td><b>NOT_QUALIFIED</b></td></tr>
+<tr><th>Запрошенный расчёт выполнен</th><td>да</td></tr>
+<tr><th>Остановка</th><td>Нормативный режим D-047: после s = 1 — NOT_QUALIFIED, продолжение не квалифицировано</td></tr>
+<tr><th>Научный статус</th><td>PROVISIONAL / NOT_QUALIFIED: исследовательский решатель R4, N = 2–3 (D-047, D-048). Не научная приёмка, не сходимость к точному решению, не сертификация ранга N</td></tr>
+<tr><th>Полушаги, циклы</th><td>s = 1 из запрошенных 100, k = 0 (D-030)</td></tr>
+<tr><th>Роль поля</th><td>исследовательское поле (запрошенный расчёт выполнен); не квалифицированный результат</td></tr>
+<tr><th>Файл поля</th><td><code>field_research.csv</code></td></tr>
+<tr><th>Решения владельца</th><td>D-047, D-048, D-049.7</td></tr>
+<tr><th>Причина (решатель)</th><td>the QR criterion (c_d, c_rank, tau_set, delta_f) is NOT_QUALIFIED; continue only with research_mode=True</td></tr>
+<tr><th>Примечание</th><td>Все величины R4 — PROVISIONAL / NOT_QUALIFIED</td></tr>
+<tr><th>Примечание</th><td>Нормативный режим D-047: продолжение после s = 1 через QR не квалифицировано</td></tr></table>
+<h2>6. История полушагов</h2><table class="h"><tr><th>s</th><th>k</th><th>Множитель</th><th>ε^∞</th><th>ε^E</th><th>Π_h, N·m</th><th>Энергетический тест</th></tr>
+<tr><td>1</td><td>0</td><td>Y</td><td>—</td><td>—</td><td>-0,0439642</td><td>NOT_APPLICABLE</td></tr></table>
+<h2>7. Ограничения применимости</h2><ul><li>Реализация D-048 — ACCEPTED_LIMITED_ENGINEERING (D-049.7) в области D-047, D-048; результат — не сходимость (D-048.4, D-056.8). Каждый результат — PROVISIONAL / NOT_QUALIFIED.</li><li>NOT_QUALIFIED: c_d, c_rank, τ_set, c_DST, накопленная δ_f, константа QR, нормативный S-2, K_E; K_RESEARCH — временная защита (D-048.5, D-056.8).</li><li>При s → ∞ — не доказанная сходимость; единственность предела и независимость от старта не утверждаются (D-056.8; Q-020, Q-022, Q-025).</li><li>Линейная прямоугольная пластина Кирхгофа–Лява, однородный изотропный материал, SSSS, q = const, 0,2 ≤ b/a ≤ 5.</li><li>CCCC, другие закрепления и нагрузки, моменты и напряжения здесь не считаются.</li><li>Успешный запуск, стабилизация итераций и научная приёмка — разные статусы (AGENTS.md, разд. 4).</li><li>Теории Тимошенко и Редди в этой версии недоступны.</li><li>Результат — значения в узлах сетки n_x × n_y; максимальный |w| найден по узлам, а не между ними.</li><li>Моменты, напряжения и сравнение с эталонами в этой версии не выводятся.</li><li>Масштаб прогиба на 3D-виде увеличен только для изображения; все числа отчёта и файлов — без увеличения.</li></ul>
+<h2>8. Файлы расчёта</h2><ul><li><code>field_research.csv</code></li><li><code>history.csv</code></li><li><code>report.html</code></li></ul>
+</body></html>
