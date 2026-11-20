@@ -16,6 +16,14 @@ setup page and no run is started.
 
 A load series («Серия нагрузок») starts ``RunManager.start_series``: one ordinary solver run per load q, each checked by
 kkvim before the first one starts; «Нагрузка — прогиб…» in «Ход расчёта» opens its graph (``seriesRequested``).
+
+Project .kkv (P2.3; ``model.project_file``): «Сохранить проект» Ctrl+S, «Сохранить как…» Ctrl+Shift+S, «Открыть
+проект…» Ctrl+O, «Новый расчёт» Ctrl+N. A project holds the setup only (entered values and units, method, research
+and display choices), never results. Opening checks the whole file first: a defective file is refused with its reason
+and the current setup is kept. Opening or a new calculation replaces only the setup: no solver, Navier or D2 process
+is started, and the runs of the session keep their own snapshots. Unsaved changes (the setup differs from the one
+last saved or opened) are marked «●» in the header; before they are discarded the user chooses «Сохранить», «Не
+сохранять» or «Отмена». ``confirm_close`` (set by ``app.main``) asks the same when the window is closed.
 """
 
 from pathlib import Path
@@ -39,9 +47,10 @@ from kkvim_gui.backend.process import SolverProcess
 from kkvim_gui.main_window.run_view import RunView
 from kkvim_gui.main_window.setup_view import SetupView
 from kkvim_gui.main_window.start_view import StartView
+from kkvim_gui.model import project_file
 from kkvim_gui.model.runs import RunManager
 from kkvim_gui.model.setup_model import SetupModel
-from kkvim_gui.model.setup_state import summary_rows, to_request, to_series_requests
+from kkvim_gui.model.setup_state import SetupState, summary_rows, to_request, to_series_requests
 from kkvim_gui.widgets.common import fit_to_screen, label
 from kkvim_gui.widgets.header import AppHeader, HeaderNav, app_icon
 
@@ -64,6 +73,9 @@ STATUS_TEXT = {
     "running": "●  Выполняется расчёт",
     "finished": "●  Готово",
 }
+UNTITLED = "Без имени"
+PROJECT_FILTER = "Проект КК-ВИМ (*.kkv)"
+ACTIVE_RUN_TEXT = "Во время расчёта параметры не меняются: откройте проект или начните новый расчёт после его завершения."
 
 
 class MainWindow(QMainWindow):
@@ -87,6 +99,12 @@ class MainWindow(QMainWindow):
         self.setup_model = SetupModel(parent=self)
         # Snapshot of the setup taken when a run starts; "Ход расчёта" and the analysis show it.
         self.run_snapshot = self.setup_model.state
+        # Project .kkv: the file, its creation stamp and the setup as last saved or opened (unsaved changes: differs).
+        self.project_path = None
+        self.project_created = None
+        self.saved_state = self.setup_model.state
+        self.confirm_close = False  # app.main: ask before closing with unsaved changes (not in tests and smoke runs)
+        self.last_dir = None
 
         central = QWidget()
         central.setObjectName("Page")
@@ -111,8 +129,12 @@ class MainWindow(QMainWindow):
         lay.addWidget(self.stack, 1)
         self.setCentralWidget(central)
 
-        self.start_view.newRequested.connect(lambda: self.set_state("setup"))
+        self.start_view.newRequested.connect(self.new_project)
+        self.start_view.openRequested.connect(self.open_project)
         self.setup_view.runRequested.connect(self._start_run)
+        self.setup_view.saveRequested.connect(self.save_project)
+        self.setup_view.saveAsRequested.connect(self.save_project_as)
+        self.setup_model.changed.connect(self._show_project)
         self.run_view.stopRequested.connect(self._confirm_stop)
         self.run_view.analysisRequested.connect(self._open_analysis)
         self.run_view.exportRequested.connect(self._choose_export_folder)
@@ -140,6 +162,9 @@ class MainWindow(QMainWindow):
         bar.addPermanentWidget(label(f"{backend} · версия {program_version()}"))
 
         QShortcut(QKeySequence("Ctrl+N"), self, activated=self._new_shortcut)
+        QShortcut(QKeySequence("Ctrl+O"), self, activated=self.open_project)
+        QShortcut(QKeySequence("Ctrl+S"), self, activated=self.save_project)
+        QShortcut(QKeySequence("Ctrl+Shift+S"), self, activated=self.save_project_as)
         QShortcut(QKeySequence("F5"), self, activated=self._run_shortcut)
 
         fit_to_screen(self)
@@ -161,18 +186,14 @@ class MainWindow(QMainWindow):
         self.state = state
         if state == "start":
             self.stack.setCurrentWidget(self.start_view)
-            self.header.set_project("")
         elif state == "setup":
             self.stack.setCurrentWidget(self.setup_view)
-            self.header.set_project(self._project_name())
         else:
             self.stack.setCurrentWidget(self.run_view)
-            self.header.set_project(self._project_name())
         self.nav.set_current(NAV_OF_STATE[state])
         self.nav.set_enabled("run", self.run_started, "" if self.run_started else "Расчёт ещё не запускался")
         self.status_label.setText(STATUS_TEXT["running"] if self.runs.active else STATUS_TEXT[state])
-        project = "" if state == "start" or not self._project_name() else f" — {self._project_name()}"
-        self.setWindowTitle(f"КК-ВИМ{project}")
+        self._show_project()
         if self.state_selector is not None:
             index = STATES.index(state)
             if self.state_selector.currentIndex() != index:
@@ -181,15 +202,163 @@ class MainWindow(QMainWindow):
                 self.state_selector.blockSignals(False)
 
     def _project_name(self):
-        """Projects (.kkv) are not saved or opened: only the demonstration shows its example project name."""
-        return placeholders.PROJECT_NAME if self.demo else ""
+        """The file name of the project; «Без имени» before the first save (the demonstration: its example name)."""
+        if self.project_path is not None:
+            return self.project_path.name
+        return placeholders.PROJECT_NAME if self.demo else UNTITLED
+
+    @property
+    def modified(self):
+        """True if the setup differs from the one last saved or opened (or, for a new one, from the initial form)."""
+        return self.setup_model.state != self.saved_state
+
+    def _show_project(self):
+        """Project name and «●» (unsaved changes) in the header and the window title; on the start page only if a
+        project is open or the setup was changed."""
+        if self.state is None:
+            return
+        shown = self.state != "start" or self.project_path is not None or self.modified
+        name = self._project_name() if shown else ""
+        self.header.set_project(name, modified=bool(name) and self.modified)
+        self.setWindowTitle(f"КК-ВИМ — {name}{' ●' if self.modified else ''}" if name else "КК-ВИМ")
+
+    # --- project .kkv ---------------------------------------------------------------------------------------------
+
+    def ask_unsaved(self):
+        """«save», «discard» or «cancel» for unsaved changes (a dialog; replaced in tests)."""
+        box = QMessageBox(QMessageBox.Icon.Question, "Несохранённые изменения",
+                          f"Параметры проекта «{self._project_name()}» изменены и не сохранены. Сохранить их?",
+                          parent=self)
+        save = box.addButton("Сохранить", QMessageBox.ButtonRole.AcceptRole)
+        discard = box.addButton("Не сохранять", QMessageBox.ButtonRole.DestructiveRole)
+        cancel = box.addButton("Отмена", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(save)
+        box.setEscapeButton(cancel)
+        box.exec()
+        return {save: "save", discard: "discard"}.get(box.clickedButton(), "cancel")
+
+    def ask_open_path(self):
+        """Path of the project to open, or "" (the native file dialog; replaced in tests)."""
+        path, _ = QFileDialog.getOpenFileName(self, "Открыть проект", self.last_dir or "", PROJECT_FILTER)
+        return path
+
+    def ask_save_path(self, suggested):
+        """Path to save the project to, or "" (the native dialog asks before replacing a file; replaced in tests)."""
+        path, _ = QFileDialog.getSaveFileName(self, "Сохранить проект как", suggested, PROJECT_FILTER)
+        return path
+
+    def ask_replace(self, path):
+        """True to replace an existing file whose name got the extension .kkv here (the dialog did not ask)."""
+        answer = QMessageBox.question(self, "Сохранить проект как", f"Файл «{path.name}» уже существует. Заменить его?",
+                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                      QMessageBox.StandardButton.No)
+        return answer == QMessageBox.StandardButton.Yes
+
+    def show_project_error(self, title, text):
+        """A refused open or save: the status line and a message box (replaced in tests)."""
+        self.status_label.setText(f"●  {title}")
+        QMessageBox.warning(self, title, text)
+
+    def confirm_discard(self):
+        """True if the current setup may be replaced: no unsaved changes, saved now, or the user discards them."""
+        if not self.modified:
+            return True
+        answer = self.ask_unsaved()
+        if answer == "save":
+            return self.save_project()
+        return answer == "discard"
+
+    def _replace_setup(self, state, path, created):
+        """Show another setup; the runs and their snapshots are not touched and nothing is computed."""
+        self.setup_model.load(state)
+        self.project_path, self.project_created = path, created
+        self.saved_state = self.setup_model.state
+        self.setup_view.reset_checks()
+        self.set_state("setup")
+
+    def new_project(self):
+        """«Новый расчёт»: the initial form of the program, after the unsaved changes are saved or discarded."""
+        fresh = SetupState()
+        if self.project_path is None and self.setup_model.state == fresh:
+            self.set_state("setup")  # nothing to replace: the initial form is shown
+            return True
+        if self.runs.active is not None:
+            self.set_state("setup")
+            self.status_label.setText(f"●  {ACTIVE_RUN_TEXT}")
+            return False
+        if not self.confirm_discard():
+            return False
+        self._replace_setup(fresh, None, None)
+        return True
+
+    def open_project(self, path=None):
+        """«Открыть проект…»: the whole file is checked before the setup is replaced; nothing is computed."""
+        if self.runs.active is not None:
+            self.show_project_error("Проект не открыт", ACTIVE_RUN_TEXT)
+            return False
+        if not self.confirm_discard():
+            return False
+        path = path or self.ask_open_path()
+        if not path:
+            return False
+        path = Path(path)
+        self.last_dir = str(path.parent)
+        try:
+            project = project_file.read(path)
+        except project_file.ProjectError as exc:
+            self.show_project_error("Проект не открыт", f"{path}\n\n{exc}\n\nТекущие параметры не изменены.")
+            return False
+        st = project.state
+        if self.preview and (st.N not in PREVIEW_N or st.supports != "SSSS"):
+            self.show_project_error("Проект не открыт", f"{path}\n\n{st.supports}, N = {st.N}: недоступно в "
+                                    "функциональной предварительной версии; доступно SSSS, N = 1 (R3). Текущие параметры "
+                                    "не изменены.")
+            return False
+        self._replace_setup(st, path, project.created)
+        research = (" Исследовательский выбор восстановлен из файла (см. «Метод»)."
+                    if st.research or st.ssss_research or st.scope == "cccc" else "")
+        self.status_label.setText(f"●  Проект открыт: {path.name}. Расчёт не запускался.{research}")
+        return True
+
+    def save_project(self):
+        """«Сохранить проект»: to the open file, or «Сохранить как…» for a new one."""
+        if self.project_path is None:
+            return self.save_project_as()
+        return self._write_project(self.project_path, self.project_created)
+
+    def save_project_as(self):
+        suggested = str(self.project_path or Path(self.last_dir or "") / f"{UNTITLED}{project_file.SUFFIX}")
+        path = self.ask_save_path(suggested)
+        if not path:
+            return False
+        path = Path(path)
+        if path.suffix.lower() != project_file.SUFFIX:
+            path = path.with_name(path.name + project_file.SUFFIX)
+            if path.exists() and not self.ask_replace(path):
+                return False
+        self.last_dir = str(path.parent)
+        return self._write_project(path, self.project_created if path == self.project_path else None)
+
+    def _write_project(self, path, created):
+        state = self.setup_model.state
+        try:
+            project = project_file.write(path, state, created=created)
+        except (OSError, project_file.ProjectError) as exc:
+            reason = exc.strerror if isinstance(exc, OSError) and exc.strerror else str(exc)
+            self.show_project_error("Проект не сохранён", f"{path}\n\n{reason}\n\nПрежний файл проекта не изменён.")
+            return False
+        self.project_path, self.project_created = path, project.created
+        self.saved_state = state
+        self._show_project()
+        self.status_label.setText(f"●  Проект сохранён: {path.name} (параметры расчёта, без результатов)")
+        return True
 
     def help_context(self):
         """F1 topic of the current page; None on the start page (opens the search)."""
         return self.stack.currentWidget().property("helpContext") or None
 
     def _new_shortcut(self):
-        self.set_state("setup")
+        self.new_project()
 
     def _run_shortcut(self):
         if self.state == "setup":
@@ -300,6 +469,9 @@ class MainWindow(QMainWindow):
         return paths
 
     def closeEvent(self, event):
+        if self.confirm_close and not self.confirm_discard():
+            event.ignore()
+            return
         self.runs.shutdown()
         super().closeEvent(event)
 

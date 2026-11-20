@@ -554,6 +554,7 @@ def main(argv=None):
     protocol_dir = args.protocol_dir or default_protocol_dir()
     sys.excepthook = show_unexpected_error
     gui = GuiApplication(session, dev=args.dev, demo=args.demo, protocol_dir=None if args.demo else protocol_dir)
+    gui.main_window.confirm_close = not args.smoke_test  # unsaved project changes: ask before closing (P2.3)
     gui.main_window.set_state(args.state)
     gui.main_window.show()
     if args.analysis:
