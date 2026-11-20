@@ -20,20 +20,29 @@ q = 0 and w = 0 and every point of every curve (visible or not, GUI_DESIGN.md 16
 click on a visible curve or by a row of the table; «Открыть расчёт точки» (or a double click on the row) opens the stored
 run of that q in its own analysis window — the solver is never called again, and the run keeps its status, field role,
 warnings and provenance. The final KK-VIM curve is the field of the last completed half-step of each point's own run.
+
+«Показать исходные значения» (GUI_DESIGN.md 20.3, GUI-P5-SERIES-RAW-VALUES-01): a right click on a visible curve opens a
+read-only table of the stored records of that curve, in the order the loads were entered, in Pa and m at full precision,
+with the run, status, field role and mark of each point; several curves under the pointer are offered by name. The values
+are read from the series records themselves — never from the plotted coordinates, never interpolated (no Snap position),
+never recomputed; a hidden curve or a curve without points offers nothing. Opening and copying never start a calculation.
 """
 
 from datetime import datetime
 from pathlib import Path
 
 import pyqtgraph as pg
-from PySide6.QtCore import QItemSelectionModel, Qt, Signal
+from PySide6.QtCore import QItemSelectionModel, QPointF, Qt, Signal
+from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -67,6 +76,9 @@ KKVIM_TOOLTIP = ("Итог расчёта каждой точки — поле �
                  "остановка по пределу полушагов или другой статус — это не сходимость, и такая точка показана только "
                  "в таблице с причиной")
 HOME_PAD = 0.06  # relative margin of the initial view
+SHOW_VALUES = "Показать исходные значения"
+CURVE_HIT_PX = 8.0  # a right click this close (logical px) to a drawn segment or point is on the curve [инж.]
+CURVE_KEYS = ("kkvim", 1, 2, 3, "navier", "d2")  # order of the choice when several curves are under the pointer
 
 
 def _cycle_cells(p):
@@ -174,6 +186,12 @@ class SeriesFigure(QFrame):
         for item in (self.kkvim, self.navier, self.d2, *self.cycle_items.values()):
             item.sigPointsClicked.connect(self._clicked)
         self.plot.getViewBox().disableAutoRange()  # data changes never move the view; «Исходный вид» does
+        # A right click on a curve offers its stored values; elsewhere the plot keeps its own menu (this instance only).
+        view_box = self.plot.getViewBox()
+        self._plot_menu = view_box.raiseContextMenu
+        view_box.raiseContextMenu = self._raise_context_menu
+        self.values_menu = None  # the last menu offered on a curve (kept alive for its actions)
+        self.value_windows = []  # open «Исходные значения» windows
         self.home = None
         self.restyle()
         session.themeChanged.connect(self.restyle)
@@ -251,17 +269,80 @@ class SeriesFigure(QFrame):
 
     def records(self, key):
         """The series point records drawn on the curve key ("kkvim", "navier", "d2" or the cycle k), in drawing order."""
+        return sorted(self.source_records(key), key=lambda p: p.q)
+
+    def source_records(self, key):
+        """The same records in the stored order of the series (the order the loads were entered)."""
         if key == "kkvim":
-            return sorted(self.data.included, key=lambda p: p.q)
+            return self.data.included
         if self.quantity != "centre":
             return []  # the reference, D2 and the cycle states are evaluated at the centre only
         if key == "navier":
-            pts = (p for p in self.data.points if p.navier_w_m is not None)
-        elif key == "d2":
-            pts = self.data.d2_included
+            return [p for p in self.data.points if p.navier_w_m is not None]
+        if key == "d2":
+            return self.data.d2_included
+        return self.data.cycle_included(key)
+
+    def curve_name(self, key):
+        """The name of the curve key in the interface (as the curve switches, GUI_DESIGN.md 16.3)."""
+        if key == "kkvim":
+            return f"{KKVIM_TOGGLE} — {QUANTITIES[self.quantity].lower()}"
+        if key == "navier":
+            return f"Навье (эталон, M = {self.data.navier.get('M')})" if self.data.navier else "Навье"
+        if key == "d2":
+            return "МКР D2"
+        return vim_cycles.cycle_text(key)
+
+    def curves_at(self, scene_pos, radius=CURVE_HIT_PX):
+        """The visible curves drawn within ``radius`` logical px of the scene point, in the fixed order of CURVE_KEYS.
+
+        The distance is measured to the drawn polyline (the segments between neighbouring points, or the point alone);
+        a hidden curve or a curve without points is never under the pointer. Coinciding curves (VIM-k and the final
+        KK-VIM field of a run converged at s = 2k) are all offered, always in the same order.
+        """
+        view_box = self.plot.getViewBox()
+        hits = []
+        for key in CURVE_KEYS:
+            if not self.shown.get(key):
+                continue
+            xs, ys = self._curve(key)
+            if not xs:
+                continue
+            pts = [view_box.mapViewToScene(QPointF(x, y)) for x, y in zip(xs, ys)]
+            if min(_segment_distance(scene_pos, a, b) for a, b in zip(pts, pts[1:] or pts)) <= radius:
+                hits.append(key)
+        return hits
+
+    def _raise_context_menu(self, ev):
+        keys = self.curves_at(ev.scenePos())
+        if not keys:
+            return self._plot_menu(ev)
+        self.values_menu = self.curve_menu(keys)
+        self.values_menu.popup(ev.screenPos().toPoint())
+        return None
+
+    def curve_menu(self, keys):
+        """«Показать исходные значения» for one curve; for several curves under the pointer, the choice of the curve."""
+        menu = QMenu(self)
+        if len(keys) == 1:
+            action = menu.addAction(SHOW_VALUES)
+            action.setToolTip(self.curve_name(keys[0]))
+            action.triggered.connect(lambda _=False, k=keys[0]: self.show_values(k))
         else:
-            pts = self.data.cycle_included(key)
-        return sorted(pts, key=lambda p: p.q)
+            sub = menu.addMenu(SHOW_VALUES)
+            for key in keys:
+                sub.addAction(self.curve_name(key)).triggered.connect(lambda _=False, k=key: self.show_values(k))
+        return menu
+
+    def show_values(self, key):
+        """Open the read-only window of the stored values of the visible curve key (None: hidden or without points)."""
+        records = self.source_records(key)
+        if not self.shown.get(key) or not records:
+            return None
+        window = SourceValuesWindow(self.data, self.curve_name(key), records, value_columns(key, self.quantity), self)
+        self.value_windows = [w for w in self.value_windows if w.isVisible()] + [window]
+        window.show()
+        return window
 
     def _curve(self, key):
         if key == "kkvim":
@@ -320,6 +401,140 @@ class SeriesFigure(QFrame):
         if dx:
             self.legend.addItem(self.d2, fig_text(lang, "legend.series.d2"))
         self._draw_marker()  # no autoRange: the user's view is kept (GUI-OWNER-UX-01)
+
+
+def _segment_distance(p, a, b):
+    """Distance (scene px) from the point p to the segment a–b."""
+    dx, dy = b.x() - a.x(), b.y() - a.y()
+    length2 = dx * dx + dy * dy
+    t = 0.0 if length2 == 0 else max(0.0, min(1.0, ((p.x() - a.x()) * dx + (p.y() - a.y()) * dy) / length2))
+    return ((p.x() - a.x() - t * dx) ** 2 + (p.y() - a.y() - t * dy) ** 2) ** 0.5
+
+
+def _centre(p, key):
+    return None if not p.centre else p.centre.get(key)
+
+
+def value_columns(key, quantity):
+    """(header, record -> stored value) of the curve key: SI units, each value exactly as stored in the record."""
+    if key == "kkvim":
+        if quantity == "centre":
+            return (("w в центре КК-ВИМ, m", lambda p: p.w_centre_m), ("x узла центра, m", lambda p: _centre(p, "x")),
+                    ("y узла центра, m", lambda p: _centre(p, "y")))
+        return (("w в узле max|w| КК-ВИМ (знаковый), m", lambda p: p.w_at_max_abs_m),)
+    if key == "navier":
+        return (("w в центре Навье, m", lambda p: p.navier_w_m), ("Состояние Навье", lambda p: p.navier_state))
+    if key == "d2":
+        return (("w в центре МКР D2, m", lambda p: p.d2_w_m), ("Состояние D2", lambda p: p.d2_state))
+    return ((f"w в центре после {vim_cycles.label(key)}, m", lambda p: p.cycle(key).w_m),
+            ("Полушаг s", lambda p: p.cycle(key).s))
+
+
+SOURCE_COLUMNS = (("№ q (порядок ввода)", lambda p: p.index), ("Расчёт №", lambda p: p.run_id), ("q, Pa", lambda p: p.q))
+STATUS_COLUMNS = (("Статус решателя", lambda p: p.solver_status or RUN_STATUS_TEXT.get(p.run_status, p.run_status)),
+                  ("Роль поля", lambda p: ROLE_SHORT.get(p.field_role, p.field_role)),
+                  ("Отметка", lambda p: p.mark or ""), ("Научный статус", lambda p: p.scientific_status))
+
+
+def raw_text(value):
+    """A stored value for the clipboard: a float in its shortest round-trip form with a decimal point, None empty."""
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        return repr(value)
+    return str(value)
+
+
+class SourceValuesModel(RowsModel):
+    """The stored values shown with exactly the digits that are copied (shortest round-trip form, decimal comma)."""
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if role == Qt.ItemDataRole.DisplayRole and index.isValid():
+            value = self._row(index.row())[index.column()]
+            if isinstance(value, float):
+                return raw_text(value).replace(".", ",")
+        return super().data(index, role)
+
+
+class SourceValuesWindow(QDialog):
+    """«Исходные значения»: the stored records of one curve, read only (GUI_DESIGN.md 20.3; never a calculation)."""
+
+    def __init__(self, data, curve, records, columns, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.setWindowTitle(f"Исходные значения — {curve}")
+        self.curve, self.records = curve, tuple(records)
+        self.columns = (*SOURCE_COLUMNS, *columns, *STATUS_COLUMNS)
+        self.headers = tuple(h for h, _ in self.columns)
+        self.rows = tuple(tuple(get(p) for _, get in self.columns) for p in self.records)  # read once from the records
+        marks = sorted({p.mark for p in self.records if p.mark})
+        if any(p.field_role == "diagnostic" for p in self.records):
+            marks.append("DIAGNOSTIC")
+        self.marks = tuple(marks)
+        self.identity = (f"Серия {data.series_id} · {data.supports} · N = {data.N} · сетка {data.grid[0]} × {data.grid[1]}"
+                         f" · кривая: {curve}")
+        lay = QVBoxLayout(self)
+        lay.addWidget(label(self.identity, "figureTitle", wrap=True))
+        if self.marks:
+            lay.addWidget(Note("Отметки расчётов: " + " · ".join(self.marks) + ". Значения не являются квалифицированным "
+                               "научным результатом.", "testdata"))
+        missing = len(data.points) - len(self.records)
+        lay.addWidget(label(
+            f"Исходные значения: {len(self.records)} точек кривой в порядке ввода q, из записей расчётов, в единицах СИ "
+            "с полной точностью. Интерполированные значения Snap, координаты графика и пересчёты не включаются."
+            + (f" Без точки на этой кривой: {missing} значений q (не подставляются)." if missing else ""),
+            "secondary", wrap=True))
+        self.model = SourceValuesModel(self.headers, len(self.rows), lambda i: self.rows[i])
+        self.view = table_view(self.model)
+        self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        QShortcut(QKeySequence.StandardKey.Copy, self.view, self.copy_selection,
+                  context=Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        lay.addWidget(self.view, 1)
+        self.copy_selected_button = QPushButton("Копировать выделенное")
+        self.copy_selected_button.setToolTip("Выделенные ячейки с заголовками столбцов, через табуляцию (Ctrl+C)")
+        self.copy_selected_button.clicked.connect(self.copy_selection)
+        self.copy_all_button = QPushButton("Копировать всё")
+        self.copy_all_button.setToolTip("Вся таблица: строки происхождения «#», заголовки и значения через табуляцию")
+        self.copy_all_button.clicked.connect(self.copy_all)
+        close = QPushButton("Закрыть")
+        close.clicked.connect(self.close)
+        buttons = QHBoxLayout()
+        buttons.addWidget(self.copy_selected_button)
+        buttons.addWidget(self.copy_all_button)
+        buttons.addStretch(1)
+        buttons.addWidget(close)
+        lay.addLayout(buttons)
+        self.resize(980, 420)
+
+    def _lines(self, rows, columns, picked=None):
+        lines = [f"# {self.identity}"] + ([f"# {' · '.join(self.marks)}"] if self.marks else [])
+        lines.append("\t".join(self.headers[c] for c in columns))
+        lines += ["\t".join(raw_text(self.rows[r][c]) if picked is None or (r, c) in picked else "" for c in columns)
+                  for r in rows]
+        return "\n".join(lines) + "\n"
+
+    def text(self):
+        """The whole table: «#» lines of the curve and its marks, the headers, the stored values (tab-separated)."""
+        return self._lines(range(len(self.rows)), range(len(self.headers)))
+
+    def selected_text(self):
+        """The selected cells as a block of their rows and columns (unselected cells inside the block empty)."""
+        picked = {(i.row(), i.column()) for i in self.view.selectionModel().selectedIndexes()}
+        if not picked:
+            return ""
+        return self._lines(sorted({r for r, _ in picked}), sorted({c for _, c in picked}), picked)
+
+    def copy_selection(self):
+        text = self.selected_text()
+        if text:
+            QGuiApplication.clipboard().setText(text)
+        return text
+
+    def copy_all(self):
+        text = self.text()
+        QGuiApplication.clipboard().setText(text)
+        return text
 
 
 class SeriesTab(QWidget):
