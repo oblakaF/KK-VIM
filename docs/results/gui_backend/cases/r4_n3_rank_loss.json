@@ -1,0 +1,80 @@
+{
+ "schema": "kkvim-gui-backend-case/1",
+ "model": "R4",
+ "N": 3,
+ "purpose": "n_x = 4 < 2N = 6: STOPPED_RANK_LOSS_PROVEN without a field",
+ "input": {
+  "a": 1.0,
+  "b": 1.0,
+  "t": 0.01,
+  "E": 210000000000.0,
+  "nu": 0.3,
+  "q": 1000.0,
+  "n_x": 4,
+  "n_y": 24,
+  "mode": "research",
+  "transform": "fft",
+  "half_steps": 100
+ },
+ "units": "consistent units of the input (e.g. m, Pa); no conversion; w in units of length, w_bar = w D/(q a^4)",
+ "api_call": "kkvim.rectangle.validated_rectangle_input(a, b, t, E, nu, q, n_x, n_y) -> D; kkvim.coupled_run.run_coupled(a, b, D, q, n_x, n_y, N, transform='fft', half_steps=100, research_mode=True)",
+ "source": {
+  "python": "3.13.15",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "kkvim": "0.0.0",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "git_commit": "79b6d82bc524ca818a31a1bfb492059be1668ab7",
+  "git_dirty": false
+ },
+ "status": "STOPPED_RANK_LOSS_PROVEN",
+ "status_class": "STOPPED_RANK_LOSS",
+ "is_error": false,
+ "completed": false,
+ "scientific_status": "PROVISIONAL / NOT_QUALIFIED",
+ "mark": "PROVISIONAL / NOT_QUALIFIED",
+ "reason": "n_x = 4 < 2N = 6: rank W^1 < N is proven (ChV4-8, ChV4-9)",
+ "D": 19230.769230769234,
+ "D_formula": "kkvim.physical.bending_stiffness: E t^3 / (12 (1 - nu^2))",
+ "parameters": {
+  "a": 1.0,
+  "b": 1.0,
+  "D": 19230.769230769234,
+  "q": 1000.0,
+  "n_x": 4,
+  "n_y": 24,
+  "N": 3,
+  "transform": "fft",
+  "half_steps": 100,
+  "research_mode": true,
+  "K_research": 1000000,
+  "eps_floor": 1.1222602875903303e-13,
+  "tol_inf": 1e-10,
+  "tol_E": 1e-08,
+  "s_min": 3,
+  "s_max": 100,
+  "eta_max": 1e-12,
+  "stop_on_stabilization": true
+ },
+ "half_steps_done": 0,
+ "history": [],
+ "limitations": [
+  "R4 is IN_PROGRESS: every research result is PROVISIONAL / NOT_QUALIFIED (D-047, D-048); PROVISIONAL_FIELD_STABILIZED is a stabilization of the finite problem, not convergence to omega_0 and not a rank certificate; the normative mode stops after s = 1 with NOT_QUALIFIED",
+  "integration regression reference, not an independent scientific solution; the GUI itself is not verified"
+ ],
+ "converged": false,
+ "first_stabilization_s": null,
+ "energy_s2": {
+  "energy_s2_checked": false,
+  "energy_s2_mandatory": null,
+  "energy_s2_status": null,
+  "energy_s2_m": null,
+  "energy_s2_mandatory_unresolved": null,
+  "energy_s2_reason": null
+ },
+ "field_available": false,
+ "field": null,
+ "files": {
+  "json": "r4_n3_rank_loss.json"
+ }
+}
