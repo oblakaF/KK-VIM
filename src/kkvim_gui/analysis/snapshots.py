@@ -46,7 +46,9 @@ def renderer(session, outcome, factor=None, cycles=None, series=None):
             if isinstance(figure, SurfaceFigure):
                 figure.set_factor(figure.factor)  # range after the final size
             path = folder / f"{key.removesuffix('_png')}{suffix}.png"
-            if not figure.grab().save(str(path), "PNG"):
+            # the load series figure is saved without its Snap / projection controls and overlay (GUI_DESIGN.md 16.7)
+            image = figure.export_pixmap() if hasattr(figure, "export_pixmap") else figure.grab()
+            if not image.save(str(path), "PNG"):
                 raise OSError(f"figure not saved: {path}")
             figure.deleteLater()
             out[key] = path

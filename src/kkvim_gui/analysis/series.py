@@ -26,6 +26,11 @@ read-only table of the stored records of that curve, in the order the loads were
 with the run, status, field role and mark of each point; several curves under the pointer are offered by name. The values
 are read from the series records themselves — never from the plotted coordinates, never interpolated (no Snap position),
 never recomputed; a hidden curve or a curve without points offers nothing. Opening and copying never start a calculation.
+
+Snap, «Проекции» and the fixed point (GUI_DESIGN.md 16.4–16.5, GUI-P5-XY-INTERACTION-01; ``xy_interaction``): the
+measurement marker follows the drawn line of the active curve, chosen in a list of the drawn curves; between drawn nodes
+it is a graphical interpolation, never a solver value. The coordinate field under the plot shows the cursor, the marker
+and the fixation (16.2). None of it enters the table, «Исходные значения», the saved CSV files or the saved figure.
 """
 
 from datetime import datetime
@@ -52,6 +57,7 @@ from PySide6.QtWidgets import (
 )
 
 from kkvim_gui.analysis.results import MM, RowsModel, fmt, padded, page, table_view, toolbar
+from kkvim_gui.analysis.xy_interaction import XYInteraction
 from kkvim_gui.backend import series_export, vim_cycles
 from kkvim_gui.figures.text import fig_text
 from kkvim_gui.model.series import RUN_STATUS_TEXT
@@ -193,11 +199,41 @@ class SeriesFigure(QFrame):
         self.values_menu = None  # the last menu offered on a curve (kept alive for its actions)
         self.value_windows = []  # open «Исходные значения» windows
         self.home = None
+        # Snap, projections and the fixed point (16.4–16.5): an overlay of the drawn curves, data only read
+        self.interaction = XYInteraction(self.plot, self.drawn_curves, lambda: (("q", "kPa"), ("w", "mm")),
+                                         lambda: self.session.figure_language, lambda: self.session.tokens, self)
+        self.interaction.install_shortcut(self)
+        top.addWidget(self.interaction.controls)
+        self.readout = label("", "secondary")
+        self.readout.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        self.readout.setMinimumHeight(self.readout.fontMetrics().lineSpacing() * 3)
+        policy = self.readout.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)
+        self.readout.setSizePolicy(policy)
+        lay.addWidget(self.readout)
+        self.interaction.changed.connect(lambda: self.readout.setText(self.interaction.readout()))
         self.restyle()
         session.themeChanged.connect(self.restyle)
         session.figureLanguageChanged.connect(self.redraw)
         self.redraw()
         self.reset_view()
+        self.choose_default_active()
+
+    def drawn_curves(self):
+        """(key, interface name, plot item) of every curve in the fixed order of CURVE_KEYS (drawn or not)."""
+        items = {"kkvim": self.kkvim, "navier": self.navier, "d2": self.d2, **self.cycle_items}
+        return [(key, self.curve_name(key), items[key]) for key in CURVE_KEYS]
+
+    def choose_default_active(self):
+        """The first drawn curve is the active Snap curve when the graph is built (later only the user changes it)."""
+        drawn = self.interaction.drawn()
+        if self.interaction.active is None and drawn:
+            self.interaction.set_active(drawn[0][0])
+
+    def export_pixmap(self):
+        """The figure for a saved file: without the marker, projections, fixation, coordinate field and controls."""
+        with self.interaction.hidden(self.readout):
+            return self.grab()
 
     def restyle(self, *_):
         t = self.session.tokens
@@ -207,10 +243,12 @@ class SeriesFigure(QFrame):
             axis.setPen(t["plot.axis"])
             axis.setTextPen(t["plot.axis"])
         self.marker.setPen(pg.mkPen(t["text.primary"], width=2))  # style only: the view and the selection stay
+        self.interaction.restyle()
 
     def set_quantity(self, quantity):
-        """Another quantity has other values: drawn and shown from its own initial view."""
+        """Another quantity has other values: drawn and shown from its own initial view (a fixed point is removed)."""
         self.quantity = quantity
+        self.interaction.clear_fixed()
         self.redraw()
         self.reset_view()
 
@@ -401,6 +439,7 @@ class SeriesFigure(QFrame):
         if dx:
             self.legend.addItem(self.d2, fig_text(lang, "legend.series.d2"))
         self._draw_marker()  # no autoRange: the user's view is kept (GUI-OWNER-UX-01)
+        self.interaction.curves_changed()  # a hidden active curve stops Snap until another is chosen
 
 
 def _segment_distance(p, a, b):
@@ -569,6 +608,7 @@ class SeriesTab(QWidget):
             if isinstance(key, int):
                 box.setToolTip(f"{vim_cycles.cycle_text(key)}: при каждом q — из истории полушагов расчёта этой точки")
         self.figure.redraw()  # no view change: the initial view covers every curve, shown or not
+        self.figure.choose_default_active()  # the initial visibility is not a hiding by the user
         self.reset_button = QPushButton("Исходный вид")
         self.reset_button.setToolTip("Вернуть исходный масштаб: от q = 0 и w = 0, все точки всех кривых")
         self.reset_button.clicked.connect(self.figure.reset_view)
@@ -702,7 +742,7 @@ class SeriesTab(QWidget):
         """Save the series package into a new subfolder of ``folder``."""
         def render(target):
             path = Path(target) / "load_deflection.png"
-            if not self.figure.grab().save(str(path), "PNG"):
+            if not self.figure.export_pixmap().save(str(path), "PNG"):  # interaction overlay not exported (16.7)
                 raise OSError(f"figure not saved: {path}")
             return {"graph_png": path}
 
