@@ -117,6 +117,9 @@ def format_value(value, lang, digits=6):
 
 # ---------------------------------------------------------------- Qt part
 
+COMBO_CHARS = 18  # [инж.] width of the active-curve list in characters (the whole name: list and tooltip)
+
+
 @dataclass(frozen=True)
 class Measurement:
     """A measurement position in view coordinates: on the active curve (snap) or the cursor itself (snap None)."""
@@ -256,7 +259,10 @@ class XYInteraction(QObject):
         self.projection_button.toggled.connect(self.set_projections)
         self.combo = QComboBox()
         self.combo.setToolTip("Активная кривая Snap: только видимые кривые с точками")
-        self.combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        # a bounded width: the long curve names never widen the figure beyond a narrow window (QA 8.1); the open list
+        # and the tooltip show the whole name
+        self.combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.combo.setMinimumContentsLength(COMBO_CHARS)
         self.combo.activated.connect(lambda i: self.set_active(self.combo.itemData(i)))
         self.unfix_button = QPushButton("Снять фиксацию")
         self.unfix_button.setToolTip("Убрать зафиксированную точку (также Esc)")
@@ -287,6 +293,10 @@ class XYInteraction(QObject):
             self.combo.addItem(name, key)
         self.combo.setCurrentIndex(max(self.combo.findData(self.active), 0) if self.active is not None else 0)
         self.combo.blockSignals(False)
+        self.combo.setToolTip(f"Активная кривая Snap: {self.combo.currentText()}. Только видимые кривые с точками")
+        view = self.combo.view()  # whole names in the open list
+        names = [self.combo.itemText(i) for i in range(self.combo.count())]
+        view.setMinimumWidth(max(view.fontMetrics().horizontalAdvance(n) for n in names) + 2 * view.frameWidth() + 24)
         self.unfix_button.setEnabled(self.fixed is not None)
 
     # ------------------------------------------------------------ state
@@ -423,6 +433,14 @@ class XYInteraction(QObject):
         if m.snap is None:
             return f"курсор: {x_text}   {y_text}"
         return f"Snap · {m.name}: {m.snap.describe()} — {x_text}   {y_text} ({NOT_A_RESULT})"
+
+    def longest_readout(self):
+        """A coordinate field text at least as long as any shown now (the longest curve name and numbers): the space
+        kept for the field, so that its text never resizes the plot."""
+        names = [name for _key, name, _item in self.drawn()] or [NO_ACTIVE]
+        m = Measurement(-1.23456e-100, -1.23456e-100, None, max(names, key=len), SnapPoint(98, 0.5, None, 0.0))
+        x_text, y_text = self.coordinate_texts(m.x, m.y)
+        return "\n".join((f"Курсор: {x_text}   {y_text}", self.describe(m), "Фиксация: " + self.describe(m)))
 
     def readout(self):
         """The coordinate field under the plot (16.2): cursor, Snap and the fixation; empty outside the plot."""

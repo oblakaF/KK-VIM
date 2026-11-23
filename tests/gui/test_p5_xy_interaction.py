@@ -20,6 +20,7 @@ pytest.importorskip("pyqtgraph")
 from PySide6.QtCore import QPoint, QPointF, Qt  # noqa: E402
 from PySide6.QtGui import QCursor  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
+from PySide6.QtWidgets import QScrollArea  # noqa: E402
 
 from kkvim_gui.analysis import xy_interaction as xy  # noqa: E402
 from kkvim_gui.model.series import series_data  # noqa: E402
@@ -301,3 +302,44 @@ def test_a_curve_of_one_point_snaps_to_its_node_and_an_empty_curve_is_not_offere
     assert "node 1" in ia._label(ia.measurement) and "узел 1 —" in ia.readout()
     ia.move_to(node + QPointF(30, 0))
     assert ia.measurement is None and not ia.marker.isVisible()
+
+
+@pytest.mark.parametrize("width", [960, 1400])
+def test_the_coordinate_field_never_widens_the_figure(figure, qtbot, width):
+    """QA 8.1: at the minimum window width (960, GUI_DESIGN.md 19) the long Snap / fixation text is wrapped inside the
+    figure; showing or hiding it changes neither the plot size nor the window, and the whole text stays readable.
+
+    Before the correction the unwrapped field set the figure minimum: at 1400 the plot grew from 1340 to 2136 px and
+    a 960 window could not be kept (the active-curve list with its long names alone needed 930 px)."""
+    owner, series, tab, fig, started = figure
+    ia = fig.interaction
+    width = max(width, tab.minimumSizeHint().width())  # offscreen fonts: the tab toolbar may need a little more
+    tab.resize(width, 700)
+    qtbot.waitUntil(lambda: tab.width() == width)
+
+    def sizes():
+        QTest.qWait(20)
+        bars = [a for a in tab.findChildren(QScrollArea) if a.horizontalScrollBar().isVisible()]
+        return tab.width(), fig.minimumSizeHint().width(), fig.plot.width(), fig.plot.height(), bars
+
+    ia.move_to(None)
+    empty = sizes()
+    ia.set_snap(True)
+    ia.set_projections(True)
+    ia.move_to(offset(fig, "kkvim", 0, 0.4, 5))  # unfixed: the cursor and the Snap lines
+    assert "интерполяция" in fig.readout.text() and sizes() == empty
+    ia.fix()  # fixed: the cursor, the Snap and the fixation lines (the longest text)
+    ia.move_to(offset(fig, "kkvim", 1, 0.5, 5))
+    assert ia.fixed is not None and fig.readout.text().count("\n") == 2 and sizes() == empty
+    lines = fig.readout.text().split("\n")
+    assert fig.readout.height() >= fig.readout.heightForWidth(fig.readout.width())  # every wrapped line is shown
+    assert fig.readout.wordWrap() and fig.readout.toolTip() == fig.readout.text() and len(lines) == 3
+    ia.move_to(None)  # the Snap text disappears, the fixation stays
+    assert sizes() == empty
+    ia.clear_fixed()
+    assert fig.readout.text() == "" and sizes() == empty and fig.width() <= width
+    # the active-curve list is narrower than its longest name, which the open list and the tooltip show whole
+    longest = max(ia.combo.view().fontMetrics().horizontalAdvance(ia.combo.itemText(i)) for i in range(ia.combo.count()))
+    assert ia.combo.width() < longest < ia.combo.view().minimumWidth()
+    assert ia.combo.currentText() in ia.combo.toolTip()
+    assert series_data(series, owner.runs) == tab.data and started == []

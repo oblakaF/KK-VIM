@@ -51,6 +51,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -204,14 +205,20 @@ class SeriesFigure(QFrame):
                                          lambda: self.session.figure_language, lambda: self.session.tokens, self)
         self.interaction.install_shortcut(self)
         top.addWidget(self.interaction.controls)
+        # The coordinate field is wrapped to the figure width and keeps one height for that width (the longest text
+        # it can show), so the Snap and fixation lines never widen or shrink the plot in a narrow window (QA 8.1).
         self.readout = label("", "secondary")
         self.readout.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
-        self.readout.setMinimumHeight(self.readout.fontMetrics().lineSpacing() * 3)
-        policy = self.readout.sizePolicy()
+        self.readout.setWordWrap(True)
+        policy = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         policy.setRetainSizeWhenHidden(True)
         self.readout.setSizePolicy(policy)
+        self._readout_probe = label("", "secondary")  # never shown: measures the kept height
+        self._readout_probe.setWordWrap(True)
+        self._readout_probe.setParent(self)
+        self._readout_probe.hide()
         lay.addWidget(self.readout)
-        self.interaction.changed.connect(lambda: self.readout.setText(self.interaction.readout()))
+        self.interaction.changed.connect(self._show_readout)
         self.restyle()
         session.themeChanged.connect(self.restyle)
         session.figureLanguageChanged.connect(self.redraw)
@@ -229,6 +236,26 @@ class SeriesFigure(QFrame):
         drawn = self.interaction.drawn()
         if self.interaction.active is None and drawn:
             self.interaction.set_active(drawn[0][0])
+
+    def _show_readout(self):
+        text = self.interaction.readout()
+        self.readout.setText(text)
+        self.readout.setToolTip(text)
+        self._keep_readout_height()
+
+    def _keep_readout_height(self):
+        """The height of the longest field text at the field width (at least three lines); the same for every text."""
+        margins = self.layout().contentsMargins()
+        width = max(self.width() - margins.left() - margins.right(), 1)
+        self._readout_probe.setText(self.interaction.longest_readout())
+        lines = self.readout.fontMetrics().lineSpacing() * 3
+        height = max(lines, self._readout_probe.heightForWidth(width), self.readout.heightForWidth(width))
+        if self.readout.height() != height or self.readout.minimumHeight() != height:
+            self.readout.setFixedHeight(height)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._keep_readout_height()
 
     def export_pixmap(self):
         """The figure for a saved file: without the marker, projections, fixation, coordinate field and controls."""
@@ -444,6 +471,7 @@ class SeriesFigure(QFrame):
             self.legend.addItem(self.d2, fig_text(lang, "legend.series.d2"))
         self._draw_marker()  # no autoRange: the user's view is kept (GUI-OWNER-UX-01)
         self.interaction.curves_changed()  # a hidden active curve stops Snap until another is chosen
+        self._keep_readout_height()  # names and figure language of the shown curves
 
 
 def _segment_distance(p, a, b):
