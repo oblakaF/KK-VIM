@@ -264,7 +264,8 @@ def test_the_overlay_never_reaches_values_saved_files_or_a_solver(figure, qtbot,
     assert saved["load_series"].read_bytes() == clean_csv
     with_overlay = fig.export_pixmap().toImage()
     assert ia.fixed is not None and ia.marker.isVisible() and ia.controls.isVisible()  # the screen keeps them
-    assert fig.grab().toImage() != with_overlay  # on the screen the overlay is drawn
+    assert fig.grab().toImage() == with_overlay  # the report package grabs the figure: also without the overlay
+    assert fig.grab(fig.rect()).toImage() != with_overlay  # on the screen the overlay is drawn
     ia.clear_fixed()
     ia.set_snap(False)
     ia.set_projections(False)

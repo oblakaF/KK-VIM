@@ -233,7 +233,11 @@ class SeriesFigure(QFrame):
     def export_pixmap(self):
         """The figure for a saved file: without the marker, projections, fixation, coordinate field and controls."""
         with self.interaction.hidden(self.readout):
-            return self.grab()
+            return super().grab()
+
+    def grab(self, *args):
+        """A whole-figure grab is a saved figure (the report package grabs it too), so it has no overlay (16.7)."""
+        return super().grab(*args) if args else self.export_pixmap()
 
     def restyle(self, *_):
         t = self.session.tokens
