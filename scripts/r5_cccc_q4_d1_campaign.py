@@ -1461,8 +1461,27 @@ PROVENANCE_README = ("campaign_result.json, units/ and ledger.json carry the lab
 
 def block_d_rh(plan: list[dict]) -> dict:
     """Protocol 5 item 9: R-H on all the grids of block D: every executable row of block D, N = 1 (frozen rule) and (14, 6), N = 3 at s = 1
-    (the grid is named by the protocol; the frozen rule still says it was blocked before D-057.1: reported to the Reviewer)."""
+    (the grid is named by the protocol; the frozen rule still says it was blocked before D-057.1: reported to the Reviewer). These 25
+    research controls were approved by the owner as a selection only (D-059.7, O-1); the list is recorded by ``block_d_controls``."""
     return {r["key"]: ["SP-RH"] for r in plan if r["kind"] == "row" and r["block"] == "D" and r["executable"]}
+
+
+BLOCK_D_CONTROLS_APPROVED = 25  # D-059.7 (O-1): (9, 11), (11, 15), (14, 6) at N = 1, s = 1..8; (14, 6) at N = 3, s = 1
+
+
+def block_d_controls(plan: list[dict], frozen: dict) -> dict:
+    """The addendum record of the SP-RH block-D research controls (D-059.7, O-1), apart from the frozen block-A subset of D-058. The keys
+    are in plan order and hashed as the mandatory keys are (sha256 of ``canonical``). A record of the selection; it authorises nothing."""
+    keys = [r["key"] for r in plan if r["key"] in block_d_rh(plan)]
+    block_a = [x["key"] for x in frozen["d057"]["subsets"]["rows"] if "SP-RH" in x["paths"]]
+    return {"decision": "D-059.7 (O-1), owner approval of 2026-11-24",
+            "scope": "selection of research controls only; not an authorisation to execute them; D1_START = BLOCKED; N = 3 rows "
+                     "RESEARCH_ONLY / NOT_QUALIFIED; D-057.1 rank guards kept (no executable row of N >= 2 at s >= 2)",
+            "check": "SP-RH", "block": "D", "count": len(keys), "keys": keys,
+            "keys_sha256": hashlib.sha256(pf().canonical(keys)).hexdigest(),
+            "frozen_block_a_sp_rh": {"source": "d057.subsets of the D-058 frozen manifest (unchanged)", "count": len(block_a),
+                                     "keys_sha256": hashlib.sha256(pf().canonical(block_a)).hexdigest()},
+            "total_sp_rh": len(keys) + len(block_a)}
 
 
 def frozen_subsets(plan: list[dict], frozen: dict) -> dict:
@@ -1730,6 +1749,7 @@ def build_addendum(controls_results: Path, base_commit: str, surrogate_costs: Pa
         "tools": tools,
         "plan": {"counts": rd().plan_counts(plan), "accounting": plan_accounting(plan),
                  "mandatory_keys_sha256": frozen["mandatory_keys_sha256"]},
+        "sp_rh_block_d_controls": block_d_controls(plan, frozen),
         "platform": {**rd().platform_record(), "blas_threads_both_libraries": p.blas_threads_both()},
         "environment": p.environment_record(),
         "trust_assumptions": "The gate and the runtime checks read the local repository and the running interpreter. They detect accidents, "
@@ -1756,10 +1776,11 @@ def build_addendum(controls_results: Path, base_commit: str, surrogate_costs: Pa
         "accuracy_observations": {"BC-1, TS-1": "BR reference on every executed classified row; OBSERVATION"},
         "limitations": ["A, B, F of SP-LARGE and the CONTROL error: measured values only (no approved bound)",
                         "BC-1 / TS-1 outside SP-BR: reading of protocol 5.1 and D-057.3 item 1, to be confirmed by the Reviewer",
-                        "SP-RH on (14, 6), N = 3, s = 1: the protocol names the grid, the frozen rule predates D-057.1",
+                        "SP-RH on (14, 6), N = 3, s = 1: the protocol names the grid, the frozen rule predates D-057.1; selected as a "
+                        "research control by the owner (D-059.7, O-1), RESEARCH_ONLY / NOT_QUALIFIED",
                         "D-058.5 retained: B_E coverage partial (N-4, N-6); SP-OP measured on one probe; limited reviewer independence",
                         "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary",
-                        "memory limit per process (D-057.4); protocol 8 says RAM of the machine: tree sum recorded only (owner decision I3)",
+                        "memory limit per process (D-057.4); protocol 8 says RAM of the machine: tree sum recorded only (D-057.4 OD-7, protocol 13.4)",
                         "a real run needs the remote at start and before the verdict (git ls-remote); unreachable refuses or withholds the verdict",
                         "exceptions at the boundaries of OP-8, the replay and B_E: numerical = NUMERICAL_EXCEPTIONS (engineering choice); ValueError counts as a "
                         "failure of the tools there; the (ValueError, ArithmeticError) handlers inside the row computation keep their faults (protocol 4.1)",

@@ -41,7 +41,7 @@
   },
   "new": {
    "scripts/r5_cccc_q4_d1_campaign.py": {
-    "blob": "03e85466d7de1833319877365e097453eeba467c"
+    "blob": "3fc22a85d02bb76c74608d39e1eb94b376d3b291"
    }
   },
   "unchanged": {
@@ -250,6 +250,47 @@
    }
   },
   "mandatory_keys_sha256": "213e83726827fbef822f3b0044b13d0811344beaf07cccd209711587c1a601ef"
+ },
+ "sp_rh_block_d_controls": {
+  "decision": "D-059.7 (O-1), owner approval of 2026-11-24",
+  "scope": "selection of research controls only; not an authorisation to execute them; D1_START = BLOCKED; N = 3 rows RESEARCH_ONLY / NOT_QUALIFIED; D-057.1 rank guards kept (no executable row of N >= 2 at s >= 2)",
+  "check": "SP-RH",
+  "block": "D",
+  "count": 25,
+  "keys": [
+   "D1-D|1x1|9x11|N1|s1",
+   "D1-D|1x1|9x11|N1|s2",
+   "D1-D|1x1|9x11|N1|s3",
+   "D1-D|1x1|9x11|N1|s4",
+   "D1-D|1x1|9x11|N1|s5",
+   "D1-D|1x1|9x11|N1|s6",
+   "D1-D|1x1|9x11|N1|s7",
+   "D1-D|1x1|9x11|N1|s8",
+   "D1-D|1x1|11x15|N1|s1",
+   "D1-D|1x1|11x15|N1|s2",
+   "D1-D|1x1|11x15|N1|s3",
+   "D1-D|1x1|11x15|N1|s4",
+   "D1-D|1x1|11x15|N1|s5",
+   "D1-D|1x1|11x15|N1|s6",
+   "D1-D|1x1|11x15|N1|s7",
+   "D1-D|1x1|11x15|N1|s8",
+   "D1-D|1x1|14x6|N1|s1",
+   "D1-D|1x1|14x6|N1|s2",
+   "D1-D|1x1|14x6|N1|s3",
+   "D1-D|1x1|14x6|N1|s4",
+   "D1-D|1x1|14x6|N1|s5",
+   "D1-D|1x1|14x6|N1|s6",
+   "D1-D|1x1|14x6|N1|s7",
+   "D1-D|1x1|14x6|N1|s8",
+   "D1-D|1x1|14x6|N3|s1"
+  ],
+  "keys_sha256": "aadf59f8f242d3b23bfd2ca1e2caf38217759b57733b2e07eeaa8acde462b896",
+  "frozen_block_a_sp_rh": {
+   "source": "d057.subsets of the D-058 frozen manifest (unchanged)",
+   "count": 33,
+   "keys_sha256": "9dd30c60ed9665fb90627c3f97581b2eeed8a20b372c44bf90d1a944959ce246"
+  },
+  "total_sp_rh": 58
  },
  "platform": {
   "sys_platform": "win32",
@@ -693,10 +734,10 @@
  "limitations": [
   "A, B, F of SP-LARGE and the CONTROL error: measured values only (no approved bound)",
   "BC-1 / TS-1 outside SP-BR: reading of protocol 5.1 and D-057.3 item 1, to be confirmed by the Reviewer",
-  "SP-RH on (14, 6), N = 3, s = 1: the protocol names the grid, the frozen rule predates D-057.1",
+  "SP-RH on (14, 6), N = 3, s = 1: the protocol names the grid, the frozen rule predates D-057.1; selected as a research control by the owner (D-059.7, O-1), RESEARCH_ONLY / NOT_QUALIFIED",
   "D-058.5 retained: B_E coverage partial (N-4, N-6); SP-OP measured on one probe; limited reviewer independence",
   "the gate trusts the local git repository (refs/remotes/origin/main, HEAD); not a security boundary",
-  "memory limit per process (D-057.4); protocol 8 says RAM of the machine: tree sum recorded only (owner decision I3)",
+  "memory limit per process (D-057.4); protocol 8 says RAM of the machine: tree sum recorded only (D-057.4 OD-7, protocol 13.4)",
   "a real run needs the remote at start and before the verdict (git ls-remote); unreachable refuses or withholds the verdict",
   "exceptions at the boundaries of OP-8, the replay and B_E: numerical = NUMERICAL_EXCEPTIONS (engineering choice); ValueError counts as a failure of the tools there; the (ValueError, ArithmeticError) handlers inside the row computation keep their faults (protocol 4.1)",
   "process tree: job object on Windows; elsewhere a descendant is known only while its parent runs and is identified, so a process reparented before the first poll is not seen",

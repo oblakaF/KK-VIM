@@ -4,6 +4,7 @@ No D1 row is executed here: the gate is exercised on a throw-away git repository
 repository must refuse (PENDING_REFREEZE), and the runner is run only as a dry run on non-D1 grids (launch, watchdog, interruption,
 restart)."""
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -702,6 +703,37 @@ def test_addendum_is_pending_and_consistent(monkeypatch):
     assert g["authorized"] is False and g["state"] == pl.PENDING_REFREEZE
     with pytest.raises(pl.D1Refused, match="D1_START = BLOCKED"):
         pl.guard_config(pl.op8().TrajectoryConfig(**D1_CFG))
+
+
+O1_KEYS_SHA256 = "aadf59f8f242d3b23bfd2ca1e2caf38217759b57733b2e07eeaa8acde462b896"  # D-059.7 (O-1)
+
+
+def test_addendum_records_the_o1_block_d_controls_apart_from_the_frozen_block_a_subset():
+    """D-059.7 (O-1): exactly the 25 executable block-D rows carry SP-RH, recorded apart from the 33 frozen block-A checks; a selection
+    only, the frozen subsets, the 102 mandatory keys and the rank guard are unchanged."""
+    add = json.loads((ROOT / pl.CAMPAIGN_ADDENDUM).read_text(encoding="utf-8"))
+    plan, frozen = rd.row_plan(), c.frozen_manifest()
+    rec = add["sp_rh_block_d_controls"]
+    assert rec == c.block_d_controls(plan, frozen)  # the addendum is what the generator writes
+    want = ([f"D1-D|1x1|{g}|N1|s{s}" for g in ("9x11", "11x15", "14x6") for s in range(1, 9)] + ["D1-D|1x1|14x6|N3|s1"])
+    assert rec["keys"] == want and rec["count"] == len(want) == c.BLOCK_D_CONTROLS_APPROVED == 25
+    assert rec["keys_sha256"] == O1_KEYS_SHA256 == hashlib.sha256(pf.canonical(want)).hexdigest()
+    assert sorted(c.block_d_rh(plan)) == sorted(want)
+    assert "D-059.7" in rec["decision"] and "not an authorisation" in rec["scope"]
+    rows = {r["key"]: r for r in plan}
+    assert all(rows[k]["block"] == "D" and rows[k]["executable"] for k in want)
+    assert all(rows[k]["N"] == 1 or rows[k]["s"] == 1 for k in want)  # D-057.1: no executable N >= 2 at s >= 2
+    assert not [r["key"] for r in plan if r["kind"] == "row" and r["executable"] and r["N"] >= 2 and r["s"] >= 2]
+    block_a = [x["key"] for x in frozen["d057"]["subsets"]["rows"] if "SP-RH" in x["paths"]]
+    assert len(block_a) == rec["frozen_block_a_sp_rh"]["count"] == 33 and not set(block_a) & set(want)
+    assert rec["total_sp_rh"] == 58
+    sub = c.frozen_subsets(plan, frozen)  # frozen paths are kept; block D only adds SP-RH
+    assert all(set(x["paths"]) <= set(sub[x["key"]]) for x in frozen["d057"]["subsets"]["rows"])
+    assert sorted(k for k, v in sub.items() if "SP-RH" in v) == sorted([*block_a, *want])
+    assert add["plan"]["mandatory_keys_sha256"] == frozen["mandatory_keys_sha256"] and add["plan"]["counts"]["mandatory"] == 102
+    assert add["state"] == pl.PENDING_REFREEZE and add["d1_start"] == "BLOCKED"
+    assert not any("owner decision I3" in x for x in add["limitations"])
+    assert any("D-057.4 OD-7, protocol 13.4" in x for x in add["limitations"])
 
 
 def test_every_module_a_job_really_loads_is_recorded_by_the_addendum(dry_out):
