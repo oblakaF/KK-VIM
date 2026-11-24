@@ -837,7 +837,8 @@ def test_concurrent_processes_over_the_limit_together_are_recorded_not_stopped(t
     limit = 100 * 2**20
     mon = c.monitor_job(p, limit, 1e9, tmp_path / "none.jsonl")
     assert mon["violation"] is None and mon["max_process_peak_bytes"] < limit < mon["max_concurrent_working_set_bytes"]
-    assert mon["tree_measurement_over_limit"] is True and "owner decision I3" in mon["tree_measurement_note"]
+    assert mon["tree_measurement_over_limit"] is True and "(D-057.4 OD-7, protocol 13.4)" in mon["tree_measurement_note"]
+    assert "I3" not in mon["tree_measurement_note"]
 
 
 # --- process identity: pid and creation time --------------------------------------------------------------------------------------------------

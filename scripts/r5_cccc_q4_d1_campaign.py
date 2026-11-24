@@ -687,7 +687,7 @@ def monitor_job(proc, limit_bytes: int, factorization_limit_s: float, stage_log:
             "processes": by_pid, "max_process_peak_bytes": max(peaks.values(), default=None),
             "max_tree_sum_bytes": sum_peak, "max_concurrent_working_set_bytes": concurrent,
             "tree_measurement_over_limit": bool(limit_bytes > 0 and concurrent > limit_bytes),
-            "tree_measurement_note": "recorded only: D-057.4 states the limit per process (owner decision I3)",
+            "tree_measurement_note": "recorded only: D-057.4 states the limit per process (D-057.4 OD-7, protocol 13.4)",
             "memory_evidence": memory_evidence(max(peaks.values(), default=None), len(peaks), accounting, limit_bytes, poll_s),
             "limit_bytes": limit_bytes, "factorization_limit_s": factorization_limit_s,
             "factorization_stages": stages, "last_stage_by_process": {str(k): v for k, v in last_stage.items()}}
