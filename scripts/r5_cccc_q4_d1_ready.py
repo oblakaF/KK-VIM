@@ -818,8 +818,18 @@ def main(argv=None) -> int:
         except D1Blocked as exc:
             print(str(exc), file=sys.stderr)
             return 2
-        print(json.dumps({"state": res.get("state"), "verdict": (res.get("verdict") or {}).get("verdict")}, default=str))
-        return 0
+        except RuntimeError as exc:  # a refusal of the runner after the gate: the exit status of campaign.py run (EXIT_REFUSED)
+            cm = sys.modules.get("_d1_campaign")
+            if cm is None or not isinstance(exc, cm.CampaignRefused):
+                raise
+            print(f"refused: {exc}", file=sys.stderr)
+            return cm.EXIT_REFUSED
+        # R1-D: the exit status is the runner's own exit_code(doc) (campaign.py run); the document is neither re-evaluated nor completed here
+        code = _load(CAMPAIGN_TOOL, "_d1_campaign").exit_code(res)
+        print(json.dumps({"state": res.get("state"), "verdict": (res.get("verdict") or {}).get("verdict"),
+                          "second_path_coverage_complete": res.get("second_path_coverage_complete") is True,
+                          "second_path_coverage_gaps": res.get("second_path_coverage_gaps") or {}, "exit_code": code}, default=str))
+        return code
     pl().guard_out(a.out)
     doc = run_probes(a.names or list(PROBES), a.out, a.workers)
     with open(Path(a.out) / "resource_probes.json", "w", encoding="utf-8") as f:

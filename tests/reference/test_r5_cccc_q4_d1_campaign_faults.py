@@ -713,6 +713,73 @@ def test_exit_code_of_the_command_line_and_what_it_displays(doc, code, shown, mo
         assert line["second_path_coverage_gaps"] == {"SP-C": 2}
 
 
+_GAPS = {"SP-RH": {"not_established": ["k1"], "contradictions": [], "selected_without_a_row": ["k2", "k3"]}}
+
+
+@pytest.mark.parametrize("doc, code", [
+    ({"state": c.COMPLETED, "verdict": {"verdict": "PASS_CANDIDATE"}, "second_path_coverage_complete": False,
+      "second_path_coverage_gaps": _GAPS}, c.EXIT_COVERAGE_INCOMPLETE),
+    ({"state": c.STOPPED_TOOL_FAILURE, "verdict": {"verdict": rd.VERDICT_NOT_ISSUED}}, c.EXIT_NOT_COMPLETED),
+    ({"state": c.COMPLETED, "verdict": {"verdict": "PASS_CANDIDATE"}, "second_path_coverage_complete": True,
+      "second_path_coverage_gaps": {}}, c.EXIT_OK),
+    ({"state": c.COMPLETED, "verdict": {"verdict": "PASS_CANDIDATE"}}, c.EXIT_COVERAGE_INCOMPLETE),  # missing evidence: never success
+    ({"state": c.STOPPED_TOOL_FAILURE, "second_path_coverage_complete": True}, c.EXIT_NOT_COMPLETED),  # the state comes first
+    ({"state": "BLOCKED_BEFORE_THE_RUN", "verdict": {"verdict": "BLOCKED_CAMPAIGN"}}, c.EXIT_NOT_COMPLETED)])
+def test_r1d_both_entry_points_give_the_same_exit_status(doc, code, monkeypatch, capsys):
+    """R1-D: ready.py campaign returns campaign.py's exit_code(doc) for the same document and shows the coverage outcome; the document is
+    produced once and neither re-evaluated nor completed (stubbed runner: nothing is computed, the real gate is not opened)."""
+    calls = []
+    monkeypatch.setattr(rd, "campaign", lambda out: calls.append(out) or doc)
+    monkeypatch.setattr(rd, "verdict", lambda *a, **k: (_ for _ in ()).throw(AssertionError("the verdict was recalculated")))
+    monkeypatch.setattr(c, "run_campaign", lambda out: doc)
+    snapshot = json.dumps(doc, sort_keys=True)
+    rc_ready = rd.main(["campaign", "--out", "scratch/never"])
+    shown_ready = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    rc_camp = c.main(["run", "--out", "scratch/never"])
+    shown_camp = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert rc_ready == rc_camp == code == c.exit_code(doc) and len(calls) == 1
+    assert json.dumps(doc, sort_keys=True) == snapshot
+    assert shown_ready["exit_code"] == code
+    for k in ("state", "verdict", "second_path_coverage_complete"):
+        assert shown_ready[k] == shown_camp[k], k
+    assert shown_ready["verdict"] == (doc.get("verdict") or {}).get("verdict")
+    assert shown_ready["second_path_coverage_complete"] is (doc.get("second_path_coverage_complete") is True)
+    assert shown_ready["second_path_coverage_gaps"] == (doc.get("second_path_coverage_gaps") or {})
+    assert {k: sum(map(len, v.values())) for k, v in shown_ready["second_path_coverage_gaps"].items()} == shown_camp["second_path_coverage_gaps"]
+
+
+def test_r1d_a_refusal_of_the_runner_is_exit_refused_on_both_entry_points(monkeypatch, capsys):
+    cm = rd._load(rd.CAMPAIGN_TOOL, "_d1_campaign")
+
+    def refuse(out):
+        raise cm.CampaignRefused("stub platform defect")
+    monkeypatch.setattr(rd, "campaign", refuse)
+    monkeypatch.setattr(c, "run_campaign", lambda out: (_ for _ in ()).throw(c.CampaignRefused("stub platform defect")))
+    assert rd.main(["campaign", "--out", "scratch/never"]) == c.main(["run", "--out", "scratch/never"]) == c.EXIT_REFUSED
+    err = capsys.readouterr().err
+    assert err.count("refused: stub platform defect") == 2
+    monkeypatch.setattr(rd, "campaign", lambda out: (_ for _ in ()).throw(RuntimeError("other")))
+    with pytest.raises(RuntimeError, match="other"):  # any other failure is neither a refusal nor a result
+        rd.main(["campaign", "--out", "scratch/never"])
+
+
+@pytest.mark.parametrize("signal", [None, "D-059:" + "0" * 40])
+def test_r1d_the_gate_still_refuses_before_the_runner_is_loaded(signal, monkeypatch, capsys):
+    """The real gate (no owner act): both entry points refuse with 2; ready.py loads no campaign module; nothing is written."""
+    if signal:
+        monkeypatch.setenv(pl.CAMPAIGN_AUTH_ENV, signal)
+    real = rd._load
+    monkeypatch.setattr(rd, "_load", lambda rel, name: (_ for _ in ()).throw(AssertionError("runner loaded"))
+                        if rel == rd.CAMPAIGN_TOOL else real(rel, name))
+    assert rd.main(["campaign", "--out", "scratch/never"]) == 2
+    assert "D1_START = BLOCKED" in capsys.readouterr().err
+    assert c.main(["run", "--out", "scratch/never"]) == c.EXIT_REFUSED
+    assert "D1_START = BLOCKED" in capsys.readouterr().err
+    with pytest.raises(pl.D1Refused, match="D1_START = BLOCKED"):  # a child command validates the gate in its own process
+        pl.guard_config(pl.op8().TrajectoryConfig(1.0, 14, 1.0, 6, 3, s_max=1))
+    assert not (ROOT / "scratch" / "never").exists()
+
+
 def test_only_complete_coverage_is_the_ordinary_success():
     assert {c.EXIT_OK, c.EXIT_REFUSED, c.EXIT_NOT_COMPLETED, c.EXIT_COVERAGE_INCOMPLETE} == {0, 2, 3, 4}
 
