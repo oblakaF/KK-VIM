@@ -1,0 +1,17 @@
+R_C1 {'history.csv': True, 'factors.csv': True, 'field_research.csv': True} ['/program/argv[22]', '/program/command', '/provenance/git_commit', '/provenance/git_diagnostic', '/provenance/git_worktree_modified']
+R_C2 {'history.csv': True, 'factors.csv': True, 'field_research.csv': True} ['/program/argv[22]', '/program/command', '/provenance/git_commit', '/provenance/git_diagnostic', '/provenance/git_worktree_modified']
+R_C3 {'history.csv': True, 'factors.csv': True, 'field_research.csv': True} ['/program/argv[22]', '/program/command', '/provenance/git_commit', '/provenance/git_diagnostic', '/provenance/git_worktree_modified']
+R_C4 {'history.csv': True, 'factors.csv': True, 'field_research.csv': True} ['/program/argv[22]', '/program/command', '/provenance/git_commit', '/provenance/git_diagnostic', '/provenance/git_worktree_modified']
+R_C5 {'history.csv': True, 'factors.csv': True, 'field_research.csv': True} ['/program/argv[22]', '/program/command', '/provenance/git_commit', '/provenance/git_diagnostic', '/provenance/git_worktree_modified']
+R_C6 {'history.csv': True, 'factors.csv': True, 'field_research.csv': True} ['/program/argv[22]', '/program/command', '/provenance/git_commit', '/provenance/git_diagnostic', '/provenance/git_worktree_modified']
+R_C7 {'history.csv': True, 'factors.csv': True, 'field_research.csv': True} ['/program/argv[22]', '/program/command', '/provenance/git_commit', '/provenance/git_diagnostic', '/provenance/git_worktree_modified']
+B_pos ALL_OK B_rel=2.883e-11 crit=1.918e-09 kup=6.26e+04 kh=1.17e+04 dRel=4.53e-15 D2rel=2.97e-06 13s
+B_neg ALL_OK B_rel=2.883e-11 crit=1.918e-09 kup=6.26e+04 kh=1.17e+04 dRel=4.53e-15 D2rel=2.97e-06 13s
+D_N4_neg ALL_OK B_rel=9.973e-12 crit=9.500e-09 kup=3.45e+05 kh=1.87e+04 dRel=8.17e-16 D2rel=7.21e-06 6s
+D_N5_neg ALL_OK B_rel=2.530e-13 crit=3.032e-10 kup=1.44e+04 kh=2.03e+03 dRel=6.20e-16 D2rel=2.40e-08 7s
+C_pos True STOPPED_RANK_GUARD_UNCERTIFIED {'certified': False, 'verdict': 'RN5_UNRESOLVED', 'reason': 'σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано'} True None
+C_neg True STOPPED_RANK_GUARD_UNCERTIFIED {'certified': False, 'verdict': 'RN5_UNRESOLVED', 'reason': 'σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано'} True None
+sign B_neg B_pos True 15 0 224 ['F'] ['/input/q/value', '/program/argv[14]', '/program/argv[22]', '/program/command']
+sign D_N4_neg R_C1 True 6 0 256 ['F'] ['/input/q/value', '/program/argv[14]', '/program/argv[22]', '/program/command']
+sign D_N5_neg R_C7 True 10 0 132 ['F'] ['/input/q/value', '/program/argv[14]', '/program/argv[22]', '/program/command']
+sign C_neg C_pos True 0 0 180 ['F'] ['/input/q/value', '/program/argv[14]', '/program/argv[22]', '/program/command']

@@ -77,7 +77,7 @@ def test_defaults_come_from_kkvim():
     assert kkvim_adapter.DEFAULTS["tol_inf"] == rr.TOL_INF and kkvim_adapter.DEFAULTS["tol_E"] == rr.TOL_E
     assert kkvim_adapter.DEFAULTS["s_min"] == rr.S_MIN and kkvim_adapter.DEFAULTS["s_max"] == rr.S_MAX
     assert kkvim_adapter.R4_FIXED["s_max"] == cr.S_MAX and kkvim_adapter.R4_FIXED["eta_max"] == cr.ETA_MAX
-    assert kkvim_adapter.N_AVAILABLE == (1, 2, 3) and kkvim_adapter.MARK == cr.MARK
+    assert kkvim_adapter.N_AVAILABLE == (1, 2, 3, 4, 5, 6) and kkvim_adapter.MARK == cr.MARK  # every N has a route (P1)
 
 
 # --- input checks ----------------------------------------------------------------------------------------

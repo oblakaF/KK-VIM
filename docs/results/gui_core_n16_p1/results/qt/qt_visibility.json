@@ -1,0 +1,16 @@
+{
+ "R3": {
+  "status": "CONVERGED",
+  "badge_text": "TEST DATA",
+  "badge_visible": false,
+  "limits_note_visible": false,
+  "run_tag": "KK-VIM"
+ },
+ "CCCC_N1_s2": {
+  "status": "COMPLETED_FIXED_HALF_STEPS",
+  "badge_text": "RESEARCH",
+  "badge_visible": true,
+  "limits_note_visible": true,
+  "run_tag": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+ }
+}

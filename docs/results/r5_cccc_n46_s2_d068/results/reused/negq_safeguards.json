@@ -1,0 +1,995 @@
+{
+ "api": {
+  "A0_success": {
+   "-1000": {
+    "ok": true,
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7",
+     "solve_bc"
+    ],
+    "field_from": "s2",
+    "completed": 2,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "COMPLETED_FIXED_HALF_STEPS",
+     "done": true,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": false,
+     "V_none": false,
+     "eta_none": false,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": true,
+     "reason": null
+    },
+    "field_sum": -10.416195275149871,
+    "rt7_reason": null
+   },
+   "1000": {
+    "ok": true,
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7",
+     "solve_bc"
+    ],
+    "field_from": "s2",
+    "completed": 2,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "COMPLETED_FIXED_HALF_STEPS",
+     "done": true,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": false,
+     "V_none": false,
+     "eta_none": false,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": true,
+     "reason": null
+    },
+    "field_sum": 10.416195275149871,
+    "rt7_reason": null
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A1_dependence": {
+   "-1000": {
+    "ok": true,
+    "status": "STOP_BEFORE_QR_S1",
+    "calls": [
+     "qr",
+     "solve_bc"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "STOP_BEFORE_QR_S1",
+     "done": false,
+     "qr_executed": false,
+     "G_none": true,
+     "R_none": true,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": null,
+     "rt7": null,
+     "reason": "точный ранг решённого набора V 2 < N = 3 (D-049.5, п. 2)"
+    },
+    "field_sum": -10.197494544950299,
+    "rt7_reason": null
+   },
+   "1000": {
+    "ok": true,
+    "status": "STOP_BEFORE_QR_S1",
+    "calls": [
+     "qr",
+     "solve_bc"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "STOP_BEFORE_QR_S1",
+     "done": false,
+     "qr_executed": false,
+     "G_none": true,
+     "R_none": true,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": null,
+     "rt7": null,
+     "reason": "точный ранг решённого набора V 2 < N = 3 (D-049.5, п. 2)"
+    },
+    "field_sum": 10.197494544950299,
+    "rt7_reason": null
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A2_rn5_refusal": {
+   "-1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": false,
+     "G_none": true,
+     "R_none": true,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_UNRESOLVED",
+     "rt7": null,
+     "reason": "RN-5 не выполнен (RN5_UNRESOLVED: QA injected refusal); QR решённого набора не выполняется. N не понижается, регуляризации нет (D-065, 7 C)"
+    },
+    "field_sum": -10.197494544950299,
+    "rt7_reason": null
+   },
+   "1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": false,
+     "G_none": true,
+     "R_none": true,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_UNRESOLVED",
+     "rt7": null,
+     "reason": "RN-5 не выполнен (RN5_UNRESOLVED: QA injected refusal); QR решённого набора не выполняется. N не понижается, регуляризации нет (D-065, 7 C)"
+    },
+    "field_sum": 10.197494544950299,
+    "rt7_reason": null
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A3_grid_nx33": {
+   "-1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": false,
+     "G_none": true,
+     "R_none": true,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": null,
+     "rt7": null,
+     "reason": "N = 3, s = 2: сетка 33 × 9 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2)"
+    },
+    "field_sum": -32.56085966986231,
+    "rt7_reason": null
+   },
+   "1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": false,
+     "G_none": true,
+     "R_none": true,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": null,
+     "rt7": null,
+     "reason": "N = 3, s = 2: сетка 33 × 9 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2)"
+    },
+    "field_sum": 32.56085966986231,
+    "rt7_reason": null
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A3_grid_ny33": {
+   "-1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": false,
+     "G_none": true,
+     "R_none": true,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": null,
+     "rt7": null,
+     "reason": "N = 3, s = 2: сетка 10 × 33 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2)"
+    },
+    "field_sum": -34.09185036260209,
+    "rt7_reason": null
+   },
+   "1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": false,
+     "G_none": true,
+     "R_none": true,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": null,
+     "rt7": null,
+     "reason": "N = 3, s = 2: сетка 10 × 33 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2)"
+    },
+    "field_sum": 34.09185036260209,
+    "rt7_reason": null
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A4_rt7_refusal": {
+   "-1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": false,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": false,
+     "reason": "RT-7 не выполнен после QR (QA injected RT-7 refusal); G2 не используется (D-065, 7 E)"
+    },
+    "field_sum": -10.197494544950299,
+    "rt7_reason": "QA injected RT-7 refusal"
+   },
+   "1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": false,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": false,
+     "reason": "RT-7 не выполнен после QR (QA injected RT-7 refusal); G2 не используется (D-065, 7 E)"
+    },
+    "field_sum": 10.197494544950299,
+    "rt7_reason": "QA injected RT-7 refusal"
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A5_rn5_float_eps": {
+   "-1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": false,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": false,
+     "reason": "RT-7 не выполнен после QR (R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1); G2 не используется (D-065, 7 E)"
+    },
+    "field_sum": -10.197494544950299,
+    "rt7_reason": "R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1"
+   },
+   "1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": false,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": false,
+     "reason": "RT-7 не выполнен после QR (R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1); G2 не используется (D-065, 7 E)"
+    },
+    "field_sum": 10.197494544950299,
+    "rt7_reason": "R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1"
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A5_rn5_missing_eps": {
+   "-1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": false,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": false,
+     "reason": "RT-7 не выполнен после QR (R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1); G2 не используется (D-065, 7 E)"
+    },
+    "field_sum": -10.197494544950299,
+    "rt7_reason": "R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1"
+   },
+   "1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": false,
+    "s2": {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "done": false,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": true,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": false,
+     "reason": "RT-7 не выполнен после QR (R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1); G2 не используется (D-065, 7 E)"
+    },
+    "field_sum": 10.197494544950299,
+    "rt7_reason": "R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1"
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A6_nonfinite_s2": {
+   "-1000": {
+    "ok": true,
+    "status": "ERROR_NONFINITE",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7",
+     "solve_bc"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": false,
+    "s2": {
+     "s": 2,
+     "status": "ERROR_NONFINITE",
+     "done": false,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": false,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": true,
+     "reason": "V не конечно"
+    },
+    "field_sum": -10.197494544950299,
+    "rt7_reason": null
+   },
+   "1000": {
+    "ok": true,
+    "status": "ERROR_NONFINITE",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7",
+     "solve_bc"
+    ],
+    "field_from": "s1",
+    "completed": 1,
+    "rejected_G2_used": false,
+    "s2": {
+     "s": 2,
+     "status": "ERROR_NONFINITE",
+     "done": false,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": false,
+     "V_none": true,
+     "eta_none": true,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": true,
+     "reason": "V не конечно"
+    },
+    "field_sum": 10.197494544950299,
+    "rt7_reason": null
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  },
+  "A7_hs3": {
+   "-1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7",
+     "solve_bc"
+    ],
+    "field_from": "s2",
+    "completed": 2,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "HALF_STEP_DONE",
+     "done": true,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": false,
+     "V_none": false,
+     "eta_none": false,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": true,
+     "reason": null
+    },
+    "field_sum": -10.416195275149871,
+    "rt7_reason": null
+   },
+   "1000": {
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "calls": [
+     "qr",
+     "solve_bc",
+     "rn5",
+     "qr",
+     "rt7",
+     "solve_bc"
+    ],
+    "field_from": "s2",
+    "completed": 2,
+    "rejected_G2_used": null,
+    "s2": {
+     "s": 2,
+     "status": "HALF_STEP_DONE",
+     "done": true,
+     "qr_executed": true,
+     "G_none": false,
+     "R_none": false,
+     "A_none": false,
+     "V_none": false,
+     "eta_none": false,
+     "rn5": "RN5_CERTIFIED",
+     "rt7": true,
+     "reason": null
+    },
+    "field_sum": 10.416195275149871,
+    "rt7_reason": null
+   },
+   "same_outcome_both_signs": true,
+   "field_odd": true
+  }
+ },
+ "cli": {
+  "C0_success": {
+   "-1000": {
+    "exit": 0,
+    "files": [
+     "factors.csv",
+     "field_research.csv",
+     "history.csv",
+     "result.json"
+    ],
+    "ok": true,
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "header": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "field": null,
+    "diag_text": false,
+    "forbidden": []
+   },
+   "1000": {
+    "exit": 0,
+    "files": [
+     "factors.csv",
+     "field_research.csv",
+     "history.csv",
+     "result.json"
+    ],
+    "ok": true,
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "header": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "field": null,
+    "diag_text": false,
+    "forbidden": []
+   },
+   "equal_shape": true,
+   "cols_equal_or_negated": [
+    "equal",
+    "equal",
+    "equal",
+    "equal",
+    "negated",
+    "equal"
+   ]
+  },
+  "C1_grid33": {
+   "-1000": {
+    "exit": 6,
+    "files": [
+     "factors.csv",
+     "field_diagnostic.csv",
+     "history.csv",
+     "result.json"
+    ],
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "header": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "field": null,
+    "diag_text": true,
+    "forbidden": []
+   },
+   "1000": {
+    "exit": 6,
+    "files": [
+     "factors.csv",
+     "field_diagnostic.csv",
+     "history.csv",
+     "result.json"
+    ],
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "header": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "field": null,
+    "diag_text": true,
+    "forbidden": []
+   },
+   "equal_shape": true,
+   "cols_equal_or_negated": [
+    "equal",
+    "equal",
+    "equal",
+    "equal",
+    "negated",
+    "equal"
+   ]
+  },
+  "C2_rt7_refusal": {
+   "-1000": {
+    "exit": 6,
+    "files": [
+     "factors.csv",
+     "field_diagnostic.csv",
+     "history.csv",
+     "result.json"
+    ],
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "header": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "field": null,
+    "diag_text": true,
+    "forbidden": []
+   },
+   "1000": {
+    "exit": 6,
+    "files": [
+     "factors.csv",
+     "field_diagnostic.csv",
+     "history.csv",
+     "result.json"
+    ],
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "header": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "field": null,
+    "diag_text": true,
+    "forbidden": []
+   },
+   "equal_shape": true,
+   "cols_equal_or_negated": [
+    "equal",
+    "equal",
+    "equal",
+    "equal",
+    "negated",
+    "equal"
+   ]
+  },
+  "C3_rn5_refusal": {
+   "-1000": {
+    "exit": 6,
+    "files": [
+     "factors.csv",
+     "field_diagnostic.csv",
+     "history.csv",
+     "result.json"
+    ],
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "header": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "field": null,
+    "diag_text": true,
+    "forbidden": []
+   },
+   "1000": {
+    "exit": 6,
+    "files": [
+     "factors.csv",
+     "field_diagnostic.csv",
+     "history.csv",
+     "result.json"
+    ],
+    "ok": true,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "header": [
+     "i",
+     "j",
+     "x [m]",
+     "y [m]",
+     "w [m]",
+     "w_bar [1]"
+    ],
+    "field": null,
+    "diag_text": true,
+    "forbidden": []
+   },
+   "equal_shape": true,
+   "cols_equal_or_negated": [
+    "equal",
+    "equal",
+    "equal",
+    "equal",
+    "negated",
+    "equal"
+   ]
+  }
+ },
+ "signed_zeros": {
+  "hotfix_N2_G1_q+1": {
+   "s2_R": {
+    "count": 1,
+    "all_zero_values": true,
+    "where": "strict lower triangle"
+   },
+   "field": {
+    "count": 38,
+    "all_zero_values": true,
+    "where": "boundary"
+   },
+   "wbar": {
+    "count": 38,
+    "all_zero_values": true,
+    "where": "boundary"
+   }
+  },
+  "hotfix_N2_G1_q+1000": {
+   "s2_R": {
+    "count": 1,
+    "all_zero_values": true,
+    "where": "strict lower triangle"
+   },
+   "field": {
+    "count": 38,
+    "all_zero_values": true,
+    "where": "boundary"
+   },
+   "wbar": {
+    "count": 38,
+    "all_zero_values": true,
+    "where": "boundary"
+   }
+  },
+  "hotfix_N2_G2_q+1": {
+   "s2_R": {
+    "count": 1,
+    "all_zero_values": true,
+    "where": "strict lower triangle"
+   },
+   "field": {
+    "count": 30,
+    "all_zero_values": true,
+    "where": "boundary"
+   },
+   "wbar": {
+    "count": 30,
+    "all_zero_values": true,
+    "where": "boundary"
+   }
+  },
+  "hotfix_N2_G2_q+1000": {
+   "s2_R": {
+    "count": 1,
+    "all_zero_values": true,
+    "where": "strict lower triangle"
+   },
+   "field": {
+    "count": 30,
+    "all_zero_values": true,
+    "where": "boundary"
+   },
+   "wbar": {
+    "count": 30,
+    "all_zero_values": true,
+    "where": "boundary"
+   }
+  },
+  "hotfix_N3_G1_q+1": {
+   "s2_R": {
+    "count": 3,
+    "all_zero_values": true,
+    "where": "strict lower triangle"
+   },
+   "field": {
+    "count": 38,
+    "all_zero_values": true,
+    "where": "boundary"
+   },
+   "wbar": {
+    "count": 38,
+    "all_zero_values": true,
+    "where": "boundary"
+   }
+  },
+  "hotfix_N3_G1_q+1000": {
+   "s2_R": {
+    "count": 3,
+    "all_zero_values": true,
+    "where": "strict lower triangle"
+   },
+   "field": {
+    "count": 38,
+    "all_zero_values": true,
+    "where": "boundary"
+   },
+   "wbar": {
+    "count": 38,
+    "all_zero_values": true,
+    "where": "boundary"
+   }
+  },
+  "hotfix_N3_G2_q+1": {
+   "s2_R": {
+    "count": 3,
+    "all_zero_values": true,
+    "where": "strict lower triangle"
+   },
+   "field": {
+    "count": 30,
+    "all_zero_values": true,
+    "where": "boundary"
+   },
+   "wbar": {
+    "count": 30,
+    "all_zero_values": true,
+    "where": "boundary"
+   }
+  },
+  "hotfix_N3_G2_q+1000": {
+   "s2_R": {
+    "count": 3,
+    "all_zero_values": true,
+    "where": "strict lower triangle"
+   },
+   "field": {
+    "count": 30,
+    "all_zero_values": true,
+    "where": "boundary"
+   },
+   "wbar": {
+    "count": 30,
+    "all_zero_values": true,
+    "where": "boundary"
+   }
+  }
+ },
+ "summary": {
+  "api_all_ok": true,
+  "cli_all_ok": true,
+  "signed_zero_only": true,
+  "script_sha256": "fe9b33e7cc326da9bf73e2092049a0c47d22e635f1282a47a3b30d2948cbb68a",
+  "inject_sha256": "0e555084b77bac80d5374f9a93bd0ecd1fb41994d62c7c7444de0c9a06d661ae"
+ }
+}

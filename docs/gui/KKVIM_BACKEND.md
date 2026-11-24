@@ -12,7 +12,7 @@
 | `kkvim_gui/backend/units.py` | Точные десятичные приставки СИ: `mm`, `cm`, `kPa`, `MPa`, `GPa` |
 | `kkvim_gui/backend/outcome.py` | `RunOutcome` — неизменяемая копия результата; массивы только для чтения |
 | `kkvim_gui/backend/process.py` | Расчёт в отдельном процессе (`multiprocessing`, spawn). «Стоп» завершает процесс |
-| `kkvim_gui/backend/export.py` | `manifest.json`, `history.csv`, `field.csv` |
+| `kkvim_gui/backend/export.py` | `manifest.json` (схема 2; `read_manifest` читает и схему 1), `history.csv`, файл поля по его роли |
 | `kkvim_gui/analysis/results.py` | Вкладки окна анализа по массивам решателя (pyqtgraph) |
 
 Пакет `backend/` не зависит от Qt. Вычислительный процесс импортирует только его.
@@ -23,12 +23,21 @@
 |---|---|---|
 | 1 | `rectangle_run.run_rectangle_physical`, `rectangle_run.halfstep_report` | решатель R3 ACCEPTED (D-043); отдельный расчёт — не научная приёмка |
 | 2–3 | `rectangle.validated_rectangle_input` (проверки R3 и D), затем `coupled_run.run_coupled` | всегда **PROVISIONAL / NOT_QUALIFIED** (D-047, D-048) |
+| SSSS 4–6 | только при явном выборе исследования: `research_ssss.domain_refusal`, `research_ssss.run_research` (ячейка исследования), вывод в метрах — `cli_ssss._field_arrays` (тот же путь, что `run-ssss --research-only`) | **RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED** (D-056.7, D-060) |
+| CCCC 1 | `cccc_n1.run_cccc_n1_physical`, s = 1…8 | **RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED** (D-061) |
+| CCCC 2–3 | `cccc_n23.run_cccc_n23_physical`, s = 1 или 2; s = 2 — защиты RN-5 и RT-7 самого решателя, сетки до 32 | **RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED** (D-063, D-065) |
+| CCCC 4–6 | `cccc_n46.run_cccc_n46_physical`, s = 1 или 2; s = 2 — защиты RN-5 и RT-7 самого решателя, сетки до 32 | **RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED** (D-067, D-068) |
+
+Маршрут задаёт `request.route_of(supports, N)` (GUI-CORE-N16-P1). Для CCCC N ≥ 2 форма предлагает только s = 1 и 2 (s ≥ 3 не исполняется);
+s = 2 на сетке больше 32 передаётся решателю, и его собственная защита останавливает расчёт до RN-5 и QR. GUI не выполняет RN-5, RT-7 и
+QR сам и не разрешает их заранее.
 
 **Порядок проверки ввода** (`check_request`):
 - сначала собственная проверка библиотеки `validated_rectangle_input`, поэтому E < 0 и t < 0 отклоняются и для N = 2–3, хотя D > 0;
 - затем ограничения области, которые GUI не пропускает:
-  - только SSSS: CCCC не реализован;
-  - N = 1–3;
+  - известный маршрут (SSSS или CCCC, N = 1–6);
+  - SSSS N = 4–6 — только с явным выбором исследования и в области `research_ssss.domain_refusal`;
+  - CCCC — число полушагов маршрута (N = 1: 1…8; N ≥ 2: 1 или 2) и область `domain_refusal` решателя;
   - `dense` только при max(n_x, n_y) ≤ 40 (D-048.6): проверяются обе размерности, в том числе прямоугольные сетки
     (40×40 — допустимо; 40×41, 41×40, 40×160 — отказ).
 
@@ -66,6 +75,13 @@ tol_∞, tol_E, s_min, s_max и строгий режим NUMERICAL_SPEC.md 11.2
   - его можно открыть только кнопкой «Открыть диагностику (расчёт не завершён)»;
   - окно, рисунки и экспорт помечаются «ДИАГНОСТИКА · расчёт не завершён».
 - **Без поля.** Расчёт без поля (STOPPED_RANK_LOSS_PROVEN, ERROR_INPUT) анализ поля не открывает; протокол и экспорт доступны.
+- **Роль поля** (`RunOutcome.field_role`, одно правило `kkvim_adapter.field_role`):
+  - `accepted` — R3 с CONVERGED → `field.csv`;
+  - `research` — расчёт другого маршрута, завершённый как запрошено (R4: стабилизация, заданное число полушагов, конец
+    нормативного режима; SSSS N = 4–6: RESEARCH_LIMIT_REACHED; CCCC: COMPLETED_FIXED_HALF_STEPS) → `field_research.csv`;
+  - `diagnostic` — любой другой статус с полем последнего выполненного полушага (защитная остановка, остановка по правилу,
+    ошибка) → `field_diagnostic.csv`; открывается только как диагностика;
+  - нет поля — нет файла поля.
 
 ## 4. Экспорт и протокол
 
@@ -75,8 +91,10 @@ tol_∞, tol_E, s_min, s_max и строгий режим NUMERICAL_SPEC.md 11.2
 
 На Windows это `%LOCALAPPDATA%\KK-VIM\kkvim-gui\runs`; путь меняется параметром `--protocol-dir`.
 
-**Экспорт.** «Сохранить результаты…» в «Ходе расчёта» и «Экспорт ▾» в окне анализа записывают `manifest.json`, `history.csv` и `field.csv`
-(узлы i, j, x [m], y [m], w [m], w_bar [1]).
+**Экспорт.** «Сохранить результаты…» в «Ходе расчёта» и «Экспорт ▾» в окне анализа записывают `manifest.json`, `history.csv` и файл
+поля его роли (узлы i, j, x [m], y [m], w [m], w_bar [1]) в новую папку; папка с файлами не перезаписывается. Манифест (схема 2)
+содержит исходный статус и причину решателя, научный статус, выполнен ли запрошенный расчёт, роль и имя файла поля, выполненное и
+запрошенное s, модель, N, закрепление, маршрут, решения и ограничения маршрута.
 
 **Единицы:**
 - в JSON каждое размерное значение записано как `{"value", "unit"}`;
@@ -111,12 +129,13 @@ uv run --extra gui kkvim-gui --protocol-dir D:\kkvim_runs
 | `tests/test_gui_qa_control_cases.py` | Путь формы GUI против 16 контрольных случаев QA (`qa/gui-backend-acceptance`, `1d6af27`) по правилам `cases.json → comparison`. Эталоны читаются из `docs/results/gui_backend` или из `KKVIM_QA_GUI_CASES`; без них тест пропускается. Скрипт QA бэкендом не является |
 | `tests/gui/test_solver_gui.py` | Окно → процесс → статусы → окно анализа (поле, сечения, значения, история, энергия) → экспорт; диагностика ошибок; демо только по `--demo` |
 | `tests/test_gui_independence.py` | `kkvim` импортирует только адаптер; backend без Qt |
+| `tests/test_gui_routes_n16.py` | Маршруты SSSS/CCCC N = 1–6: вызываемый решатель, побитовое равенство с прямым вызовом, роль поля, файлы, манифест, отчёт, защиты RN-5 и границы сетки s = 2, q < 0, отказ до расчёта, чтение схемы 1 |
+| `tests/gui/test_gui_n16_workflow.py` | Форма → отдельный процесс → «Ход расчёта» → окно анализа → пакет для CCCC и SSSS N = 4–6; защитная остановка только как диагностика; без перезаписи |
 
 ## 7. Ограничения
 
 **Не реализовано:**
-- CCCC;
-- N = 4–6;
+- CCCC при s ≥ 3 и SSSS N = 4–6 вне исследованной области (их решатели этого не выполняют);
 - моменты и напряжения;
 - сравнение с эталонами (вкладка «Сравнение» неактивна);
 - проекты `.kkv`;

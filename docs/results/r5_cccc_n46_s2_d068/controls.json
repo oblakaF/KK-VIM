@@ -1,0 +1,626 @@
+{
+ "task": "R5-CCCC-N46-S2-D068-FINAL",
+ "status_label": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+ "shas": {
+  "main": "d78962a073224b0edde4903222c65a93d09c86bd",
+  "main_before_hotfix": "0551141bc67c1e1b12c0cd7eba2028d89e56607b",
+  "d068": "754dcfe1141ca3bb04812839ce0e7db69f67f057",
+  "hotfix": "ab116b94b07420e3bc13c9211cf9292cd6bcbb36",
+  "combined_tree_not_commit": "b0a64f1c17947b12a55c420282241301f978ea29"
+ },
+ "criterion": {
+  "X1": "B_rel=||rho||/(lambda_low*||X_hat||) <= 2*kappa_up*n*u; lambda_low, kappa_up certified (exact Gershgorin, proved lower bound); fixed before comparison in the D-068 QA (task: error bound fixed before comparison)"
+ },
+ "reused_D068_QA_754dcfe": [
+  {
+   "case": "C1",
+   "N": 4,
+   "nx": 32,
+   "ny": 32,
+   "b": 1.0,
+   "B_rel": 9.972858489988277e-12,
+   "criterion": 9.499704450072085e-09,
+   "all_checks": true
+  },
+  {
+   "case": "C2",
+   "N": 5,
+   "nx": 32,
+   "ny": 32,
+   "b": 1.0,
+   "B_rel": 1.4044306419460804e-11,
+   "criterion": 1.1874630562590103e-08,
+   "all_checks": true
+  },
+  {
+   "case": "C3",
+   "N": 6,
+   "nx": 32,
+   "ny": 32,
+   "b": 1.0,
+   "B_rel": 1.1713084535176763e-11,
+   "criterion": 1.4249556675108141e-08,
+   "all_checks": true
+  },
+  {
+   "case": "C4",
+   "N": 4,
+   "nx": 9,
+   "ny": 9,
+   "b": 1.0,
+   "B_rel": 7.185806684474724e-14,
+   "criterion": 1.562977661831953e-11,
+   "all_checks": true
+  },
+  {
+   "case": "C5",
+   "N": 5,
+   "nx": 11,
+   "ny": 11,
+   "b": 1.0,
+   "B_rel": 5.387836514426052e-14,
+   "criterion": 5.4130934952997984e-11,
+   "all_checks": true
+  },
+  {
+   "case": "C6",
+   "N": 6,
+   "nx": 13,
+   "ny": 13,
+   "b": 1.0,
+   "B_rel": 1.5294031503097735e-13,
+   "criterion": 1.5147079502102424e-10,
+   "all_checks": true
+  },
+  {
+   "case": "C7",
+   "N": 5,
+   "nx": 20,
+   "ny": 13,
+   "b": 0.6,
+   "B_rel": 2.5295263660086584e-13,
+   "criterion": 3.0324897159679584e-10,
+   "all_checks": true
+  }
+ ],
+ "reruns_on_combined_source_bitwise": {
+  "R_C1": {
+   "history.csv": true,
+   "factors.csv": true,
+   "field_research.csv": true
+  },
+  "R_C2": {
+   "history.csv": true,
+   "factors.csv": true,
+   "field_research.csv": true
+  },
+  "R_C3": {
+   "history.csv": true,
+   "factors.csv": true,
+   "field_research.csv": true
+  },
+  "R_C4": {
+   "history.csv": true,
+   "factors.csv": true,
+   "field_research.csv": true
+  },
+  "R_C5": {
+   "history.csv": true,
+   "factors.csv": true,
+   "field_research.csv": true
+  },
+  "R_C6": {
+   "history.csv": true,
+   "factors.csv": true,
+   "field_research.csv": true
+  },
+  "R_C7": {
+   "history.csv": true,
+   "factors.csv": true,
+   "field_research.csv": true
+  }
+ },
+ "reruns_result_json_diff_paths": {
+  "R_C1": [
+   "/program/argv[22]",
+   "/program/command",
+   "/provenance/git_commit",
+   "/provenance/git_diagnostic",
+   "/provenance/git_worktree_modified"
+  ],
+  "R_C2": [
+   "/program/argv[22]",
+   "/program/command",
+   "/provenance/git_commit",
+   "/provenance/git_diagnostic",
+   "/provenance/git_worktree_modified"
+  ],
+  "R_C3": [
+   "/program/argv[22]",
+   "/program/command",
+   "/provenance/git_commit",
+   "/provenance/git_diagnostic",
+   "/provenance/git_worktree_modified"
+  ],
+  "R_C4": [
+   "/program/argv[22]",
+   "/program/command",
+   "/provenance/git_commit",
+   "/provenance/git_diagnostic",
+   "/provenance/git_worktree_modified"
+  ],
+  "R_C5": [
+   "/program/argv[22]",
+   "/program/command",
+   "/provenance/git_commit",
+   "/provenance/git_diagnostic",
+   "/provenance/git_worktree_modified"
+  ],
+  "R_C6": [
+   "/program/argv[22]",
+   "/program/command",
+   "/provenance/git_commit",
+   "/provenance/git_diagnostic",
+   "/provenance/git_worktree_modified"
+  ],
+  "R_C7": [
+   "/program/argv[22]",
+   "/program/command",
+   "/provenance/git_commit",
+   "/provenance/git_diagnostic",
+   "/provenance/git_worktree_modified"
+  ]
+ },
+ "new_s2": {
+  "B_pos": {
+   "N": 6,
+   "a": 1.0,
+   "b": 5.0,
+   "grid": [
+    24,
+    32
+   ],
+   "q": 1000.0,
+   "all_checks": true,
+   "failed": [],
+   "X": {
+    "n": 138,
+    "rho_prod": 1.549411415081114e-11,
+    "rho_ref": 5.353666657030975e-13,
+    "lambda_low_K_certified": 622.6356057075573,
+    "lambda_up_K_certified": 38977499.299840026,
+    "kappa_up_certified": 62600.81971307497,
+    "kappa_heuristic_eigvalsh": 11668.25104513145,
+    "lambda_min_heuristic": 3249.4536321102914,
+    "abs_bound_X_prod": 2.4884722313950827e-14,
+    "B_rel": 2.8825602288782038e-11,
+    "criterion_2kappa_n_u": 1.9182240508018524e-09,
+    "abs_bound_X_ref": 8.59839464360076e-16,
+    "rel_bound_X_ref": 9.960083186440778e-13,
+    "float_solve_rel_diff": 1.5292661302546182e-12,
+    "delta_abs_field": 6.2341624917916505e-19,
+    "delta_rel_field": 4.531294254298009e-15,
+    "w_ref_max": 0.00013758017338817585,
+    "certified_field_err_prod_vs_exact": 4.4387962367193675e-14,
+    "certified_field_err_ref_vs_exact": 1.533729912765811e-15
+   },
+   "rt7": {
+    "tau": 2.235108094523255e-19,
+    "t_qa": 0.0057728218918113375,
+    "t_run": 0.006842347154446012,
+    "tau_run": 2.235108094523255e-19
+   },
+   "rn5_mine_margin": 173.22550716807757,
+   "rn5_run_margin": 146.14867930958766,
+   "energy": {
+    "Pi1": -0.15759077221416787,
+    "Pi2": -0.1579515163558667,
+    "Pic": -0.15759077221416787,
+    "P_hat1": -0.15759077221416795,
+    "P_hat2": -0.15795151635586674,
+    "rel_P_hat2": 1.757221219269289e-16,
+    "rel_P_hat1": 5.283731126954959e-16,
+    "Pi2_minus_Pi1": -0.00036074414169885385,
+    "solve_gap": 2.4136538971328582e-23
+   },
+   "D2_full_2d": {
+    "delta_abs_prod_vs_D2": 4.0869010511424865e-10,
+    "delta_rel_prod_vs_D2": 2.97055719530495e-06,
+    "delta_rel_s1_vs_D2": 0.0019325454284306075,
+    "D2_own_error_estimate_e_D2": 1.2966084041857301e-20,
+    "D2_residual_max": 4.267468477792136e-14,
+    "Pi_w2_minus_Pi_u": 1.2147795359394644e-11,
+    "half_energy_norm_sq": 1.2147795359399793e-11,
+    "residual_term": -5.1490020798040566e-24,
+    "identity_exact": true,
+    "energy_rel_gap": 7.690838074065237e-11
+   }
+  },
+  "B_neg": {
+   "N": 6,
+   "a": 1.0,
+   "b": 5.0,
+   "grid": [
+    24,
+    32
+   ],
+   "q": -1000.0,
+   "all_checks": true,
+   "failed": [],
+   "X": {
+    "n": 138,
+    "rho_prod": 1.549411415081114e-11,
+    "rho_ref": 5.353666657030975e-13,
+    "lambda_low_K_certified": 622.6356057075573,
+    "lambda_up_K_certified": 38977499.299840026,
+    "kappa_up_certified": 62600.81971307497,
+    "kappa_heuristic_eigvalsh": 11668.25104513145,
+    "lambda_min_heuristic": 3249.4536321102914,
+    "abs_bound_X_prod": 2.4884722313950827e-14,
+    "B_rel": 2.8825602288782038e-11,
+    "criterion_2kappa_n_u": 1.9182240508018524e-09,
+    "abs_bound_X_ref": 8.59839464360076e-16,
+    "rel_bound_X_ref": 9.960083186440778e-13,
+    "float_solve_rel_diff": 1.5292661302546182e-12,
+    "delta_abs_field": 6.2341624917916505e-19,
+    "delta_rel_field": 4.531294254298009e-15,
+    "w_ref_max": 0.00013758017338817585,
+    "certified_field_err_prod_vs_exact": 4.4387962367193675e-14,
+    "certified_field_err_ref_vs_exact": 1.533729912765811e-15
+   },
+   "rt7": {
+    "tau": 2.235108094523255e-19,
+    "t_qa": 0.0057728218918113375,
+    "t_run": 0.006842347154446012,
+    "tau_run": 2.235108094523255e-19
+   },
+   "rn5_mine_margin": 173.22550716807757,
+   "rn5_run_margin": 146.14867930958766,
+   "energy": {
+    "Pi1": -0.15759077221416787,
+    "Pi2": -0.1579515163558667,
+    "Pic": -0.15759077221416787,
+    "P_hat1": -0.15759077221416795,
+    "P_hat2": -0.15795151635586674,
+    "rel_P_hat2": 1.757221219269289e-16,
+    "rel_P_hat1": 5.283731126954959e-16,
+    "Pi2_minus_Pi1": -0.00036074414169885385,
+    "solve_gap": 2.4136538971328582e-23
+   },
+   "D2_full_2d": {
+    "delta_abs_prod_vs_D2": 4.0869010511424865e-10,
+    "delta_rel_prod_vs_D2": 2.97055719530495e-06,
+    "delta_rel_s1_vs_D2": 0.0019325454284306075,
+    "D2_own_error_estimate_e_D2": 1.2966084041857301e-20,
+    "D2_residual_max": 4.267468477792136e-14,
+    "Pi_w2_minus_Pi_u": 1.2147795359394644e-11,
+    "half_energy_norm_sq": 1.2147795359399793e-11,
+    "residual_term": -5.1490020798040566e-24,
+    "identity_exact": true,
+    "energy_rel_gap": 7.690838074065237e-11
+   }
+  },
+  "D_N4_neg": {
+   "N": 4,
+   "a": 1.0,
+   "b": 1.0,
+   "grid": [
+    32,
+    32
+   ],
+   "q": -1000.0,
+   "all_checks": true,
+   "failed": [],
+   "X": {
+    "n": 124,
+    "rho_prod": 9.978669245568866e-12,
+    "rho_ref": 2.543170788715761e-12,
+    "lambda_low_K_certified": 6224.173386440338,
+    "lambda_up_K_certified": 2147483648.0000005,
+    "kappa_up_certified": 345023.10823769745,
+    "kappa_heuristic_eigvalsh": 18741.299953555226,
+    "lambda_min_heuristic": 41052.43495333119,
+    "abs_bound_X_prod": 1.603211965031032e-15,
+    "B_rel": 9.972858489988277e-12,
+    "criterion_2kappa_n_u": 9.499704450072085e-09,
+    "abs_bound_X_ref": 4.0859574931768146e-16,
+    "rel_bound_X_ref": 2.541689855387954e-12,
+    "float_solve_rel_diff": 3.8009446233783277e-13,
+    "delta_abs_field": 5.421010862427522e-20,
+    "delta_rel_field": 8.170210339393432e-16,
+    "w_ref_max": 6.635093390790213e-05,
+    "certified_field_err_prod_vs_exact": 4.2849127477297135e-15,
+    "certified_field_err_ref_vs_exact": 1.0920484208696678e-15
+   },
+   "rt7": {
+    "tau": 2.0576225304577002e-25,
+    "t_qa": 6.562475768364144e-07,
+    "t_run": 1.4609715344248148e-07,
+    "tau_run": 2.0576225304577002e-25
+   },
+   "rn5_mine_margin": 1523815.150405156,
+   "rn5_run_margin": 6844760.328569307,
+   "energy": {
+    "Pi1": -0.010201765631131558,
+    "Pi2": -0.010260330710104834,
+    "Pic": -0.010201765631131558,
+    "P_hat1": -0.010201765631131565,
+    "P_hat2": -0.010260330710104829,
+    "rel_P_hat2": 5.072127375782459e-16,
+    "rel_P_hat1": 6.801659785961561e-16,
+    "Pi2_minus_Pi1": -5.856507897327699e-05,
+    "solve_gap": 1.5022087148421715e-25
+   },
+   "D2_full_2d": {
+    "delta_abs_prod_vs_D2": 4.786868594196623e-10,
+    "delta_rel_prod_vs_D2": 7.214475055955634e-06,
+    "delta_rel_s1_vs_D2": 0.006351712687156079,
+    "D2_own_error_estimate_e_D2": 6.213046039172302e-21,
+    "D2_residual_max": 2.6328963576816024e-13,
+    "Pi_w2_minus_Pi_u": 5.806400820909028e-10,
+    "half_energy_norm_sq": 5.806400820909156e-10,
+    "residual_term": -1.2854758976151021e-23,
+    "identity_exact": true,
+    "energy_rel_gap": 5.6590773303261185e-08
+   }
+  },
+  "D_N5_neg": {
+   "N": 5,
+   "a": 1.0,
+   "b": 0.6,
+   "grid": [
+    20,
+    13
+   ],
+   "q": -1000.0,
+   "all_checks": true,
+   "failed": [],
+   "X": {
+    "n": 95,
+    "rho_prod": 1.1955379988297187e-13,
+    "rho_ref": 2.4690085043558372e-14,
+    "lambda_low_K_certified": 18228.89117217554,
+    "lambda_up_K_certified": 262056995.88477394,
+    "kappa_up_certified": 14375.915320882272,
+    "kappa_heuristic_eigvalsh": 2030.1598232046315,
+    "lambda_min_heuristic": 106958.21665984513,
+    "abs_bound_X_prod": 6.558478996542477e-18,
+    "B_rel": 2.5295263660086584e-13,
+    "criterion_2kappa_n_u": 3.0324897159679584e-10,
+    "abs_bound_X_ref": 1.3544479919461671e-18,
+    "rel_bound_X_ref": 5.223942790426717e-14,
+    "float_solve_rel_diff": 5.341499026053809e-15,
+    "delta_abs_field": 1.0164395367051604e-20,
+    "delta_rel_field": 6.199910367768536e-16,
+    "w_ref_max": 1.6394423086974335e-05,
+    "certified_field_err_prod_vs_exact": 2.1584466525420183e-17,
+    "certified_field_err_ref_vs_exact": 4.4557146384013995e-18
+   },
+   "rt7": {
+    "tau": 1.4294934041016157e-22,
+    "t_qa": 5.129367870157567e-06,
+    "t_run": 8.068641050941825e-07,
+    "tau_run": 1.4294934041016157e-22
+   },
+   "rn5_mine_margin": 194955.7967596661,
+   "rn5_run_margin": 1239366.076253043,
+   "energy": {
+    "Pi1": -0.0016554681269231935,
+    "Pi2": -0.0016661747964124265,
+    "Pic": -0.0016554681269231937,
+    "P_hat1": -0.0016554681269231929,
+    "P_hat2": -0.0016661747964124265,
+    "rel_P_hat2": 0.0,
+    "rel_P_hat1": 3.92953082521947e-16,
+    "Pi2_minus_Pi1": -1.0706669489232846e-05,
+    "solve_gap": 1.7398470831863467e-29
+   },
+   "D2_full_2d": {
+    "delta_abs_prod_vs_D2": 3.929042607621813e-13,
+    "delta_rel_prod_vs_D2": 2.3965726582083625e-08,
+    "delta_rel_s1_vs_D2": 0.013576700507189251,
+    "D2_own_error_estimate_e_D2": 1.4149355018350935e-21,
+    "D2_residual_max": 4.976442934142411e-15,
+    "Pi_w2_minus_Pi_u": 2.980321630213272e-16,
+    "half_energy_norm_sq": 2.9803216300288398e-16,
+    "residual_term": 1.8443220044178413e-26,
+    "identity_exact": true,
+    "energy_rel_gap": 1.788720869280886e-13
+   }
+  }
+ },
+ "stops": {
+  "C_pos": {
+   "ok": true,
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "completed": 1,
+   "rn5_run": {
+    "certified": false,
+    "verdict": "RN5_UNRESOLVED",
+    "reason": "σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано"
+   },
+   "qr_executed": false,
+   "s2_factor_roles": [],
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "history_rows": [
+    [
+     "1",
+     "HALF_STEP_DONE"
+    ],
+    [
+     "2",
+     "STOPPED_RANK_GUARD_UNCERTIFIED"
+    ]
+   ],
+   "diagnostic_eq_G1V1T": true,
+   "diag_header": true,
+   "rn5_run_values": {
+    "lambda_low": 9392406.971917948,
+    "norm_dK": 4.3293121671700255e-07,
+    "eps": 8.93483016824665e-18,
+    "sigma_low": 0.0
+   },
+   "rn5_mine_certified": true,
+   "rn5_mine_margin": 1.0283734049136786,
+   "rn5_mine_eps": 2.367260205406294e-16,
+   "rn5_mine_sigma_low": 2.434427437750324e-16
+  },
+  "C_neg": {
+   "ok": true,
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "completed": 1,
+   "rn5_run": {
+    "certified": false,
+    "verdict": "RN5_UNRESOLVED",
+    "reason": "σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано"
+   },
+   "qr_executed": false,
+   "s2_factor_roles": [],
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "history_rows": [
+    [
+     "1",
+     "HALF_STEP_DONE"
+    ],
+    [
+     "2",
+     "STOPPED_RANK_GUARD_UNCERTIFIED"
+    ]
+   ],
+   "diagnostic_eq_G1V1T": true,
+   "diag_header": true,
+   "rn5_run_values": {
+    "lambda_low": 9392406.971917948,
+    "norm_dK": 4.3293121671700255e-07,
+    "eps": 8.93483016824665e-18,
+    "sigma_low": 0.0
+   },
+   "rn5_mine_certified": true,
+   "rn5_mine_margin": 1.0283734049136786,
+   "rn5_mine_eps": 2.367260205406294e-16,
+   "rn5_mine_sigma_low": 2.434427437750324e-16
+  }
+ },
+ "sign_pairs": {
+  "B_neg": {
+   "factors_ok": true,
+   "factor_bad": [],
+   "factor_signed_zeros": 15,
+   "field_file": "field_research.csv",
+   "field_bad": 0,
+   "field_signed_zeros": 224,
+   "history_diff_cols": [
+    "F"
+   ],
+   "result_json_diff_paths": [
+    "/input/q/value",
+    "/program/argv[14]",
+    "/program/argv[22]",
+    "/program/command"
+   ]
+  },
+  "D_N4_neg": {
+   "factors_ok": true,
+   "factor_bad": [],
+   "factor_signed_zeros": 6,
+   "field_file": "field_research.csv",
+   "field_bad": 0,
+   "field_signed_zeros": 256,
+   "history_diff_cols": [
+    "F"
+   ],
+   "result_json_diff_paths": [
+    "/input/q/value",
+    "/program/argv[14]",
+    "/program/argv[22]",
+    "/program/command"
+   ]
+  },
+  "D_N5_neg": {
+   "factors_ok": true,
+   "factor_bad": [],
+   "factor_signed_zeros": 10,
+   "field_file": "field_research.csv",
+   "field_bad": 0,
+   "field_signed_zeros": 132,
+   "history_diff_cols": [
+    "F"
+   ],
+   "result_json_diff_paths": [
+    "/input/q/value",
+    "/program/argv[14]",
+    "/program/argv[22]",
+    "/program/command"
+   ]
+  },
+  "C_neg": {
+   "factors_ok": true,
+   "factor_bad": [],
+   "factor_signed_zeros": 0,
+   "field_file": "field_diagnostic.csv",
+   "field_bad": 0,
+   "field_signed_zeros": 180,
+   "history_diff_cols": [
+    "F"
+   ],
+   "result_json_diff_paths": [
+    "/input/q/value",
+    "/program/argv[14]",
+    "/program/argv[22]",
+    "/program/command"
+   ]
+  }
+ },
+ "n23_negative_q_QA_summary": {
+  "K1": true,
+  "K2_K3_K5_cases": true,
+  "K4_pairs": true,
+  "K6_parent_positive": true,
+  "parent_negative_reproduces_defect": true,
+  "K7": true,
+  "no_kkvim": true,
+  "seconds": 27.788215400185436,
+  "script_sha256": "215edcbb224572f7d58fdbcc7b5110168720467648ddc32f1dcfa153443c3872"
+ },
+ "safeguards_reused_D068_QA": {
+  "A0 baseline order: QR(T), s1 solve, RN-5, QR(V), RT-7 immediately, s2 solve": true,
+  "A1 proven dependence stops before QR (no RN-5, no 2nd QR)": true,
+  "A2 RN-5 refusal stops before QR": true,
+  "A3a grid 33x33: > 32 stops before RN-5 and QR, s1 diagnostic": true,
+  "A3b grid 9x33: > 32 stops before RN-5 and QR, s1 diagnostic": true,
+  "A3c grid 33x9: > 32 stops before RN-5 and QR, s1 diagnostic": true,
+  "A4 RT-7 refusal after QR, before s2 assembly/solve; G2 not used": true,
+  "A5a RN-5 certified but eps/sigma missing: RT-7 R7-2 refuses, no s2": true,
+  "A5b RN-5 eps/sigma as float (malformed): RT-7 R7-2 refuses, no s2": true,
+  "A5c RN-5 record empty: no continuation (exception, no QR of V, no s2)": true,
+  "A6a C-3+ premise failure at s2 -> UNRESOLVED_C3PLUS_PREMISE, s2 not completed": true,
+  "A6b nonfinite s2 solution -> ERROR_NONFINITE, s2 not completed": true,
+  "A6c factorization failure at s2 (real Cholesky on -A) -> PROTECTIVE_STOP_FACTORIZATION, s2 not completed": true,
+  "A7 half_steps=3: stop before the QR of s3; s2 diagnostic": true,
+  "A7 half_steps=8: stop before the QR of s3; s2 diagnostic": true,
+  "C0 CLI s2 success: exit 0, field_research.csv": true,
+  "C1 dependence: exit 6, diagnostic field of the last completed half-step only": true,
+  "C2 RN-5 refusal: exit 6, diagnostic field of the last completed half-step only": true,
+  "C3 grid 33: exit 6, diagnostic field of the last completed half-step only": true,
+  "C4 RT-7 refusal: exit 6, diagnostic field of the last completed half-step only": true,
+  "C5 half_steps 3: exit 6, diagnostic field of the last completed half-step only": true,
+  "T1 stop run with --overwrite replaces the set: no stale field_research.csv": true,
+  "T2 outside domain N=7 keeps earlier files": true,
+  "T3 existing results without --overwrite: refused, unchanged": true,
+  "T4 Ctrl+C (KeyboardInterrupt) exit 130, unchanged": true,
+  "T5 ERROR_NONFINITE at s2 keeps earlier files": true,
+  "T6 success with --overwrite after a stop: field_research.csv, no diagnostic": true,
+  "interfaces_parent_vs_commit": null
+ },
+ "kkvim_imported_by_check": false
+}

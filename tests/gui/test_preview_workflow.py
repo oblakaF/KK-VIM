@@ -91,6 +91,7 @@ def run_case(qtbot, window, texts):
     run = window.runs.active
     assert run is not None, window.setup_view.check_text.text()
     qtbot.waitUntil(lambda: window.runs.active is None, timeout=120_000)
+    qtbot.waitUntil(lambda: not window.runs.references_pending, timeout=120_000)  # the Navier reference process (SSSS)
     return run
 
 
@@ -141,7 +142,7 @@ def test_report_and_package_without_figures_hold_the_outcome_values(tmp_path):
                          s_max=kkvim_adapter.DEFAULTS["s_max"])
     o = kkvim_adapter.execute(request)
     paths = report.write_package(o, tmp_path / "pkg", {"run_id": 1})
-    assert set(paths) == {"manifest", "history", "field", "report"}
+    assert set(paths) == {"manifest", "history", "field", "comparison", "report"}  # the benchmark square (Navier)
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))
     e, c = o.extremum(), report.centre_node(o)
     assert c is not None and (c["i"], c["j"]) == (12, 12) and c["w"] == float(o.w[12, 12])
@@ -161,13 +162,11 @@ def test_preview_offers_only_kirchhoff_love_ssss_and_n1(preview):
     model = view.N.model()
     enabled = [n for i, n in enumerate(N_VALUES) if model.item(i).isEnabled()]
     assert enabled == list(PREVIEW_N) == [1]
-    for n in (2, 3):
+    for n in (2, 3, 4, 5, 6):
         assert "недоступно" in view.N.itemText(N_VALUES.index(n))
-    for n in (4, 5, 6):
-        assert "не реализовано" in view.N.itemText(N_VALUES.index(n))
     theories = view.theory.model()
     assert theories.item(0).isEnabled() and not any(theories.item(i).isEnabled() for i in (1, 2))
-    assert "не реализовано" in view.supports.buttons["CCCC"].text()
+    assert "недоступно" in view.supports.buttons["CCCC"].text() and not view.supports.buttons["CCCC"].isEnabled()
     assert view.preview_note is not None
     assert any("N = 1" in t and "недоступные" in t for t in label_texts(view.preview_note))
     assert not preview.header.badge.isHidden() and "ПРЕДВАРИТЕЛЬНАЯ" in preview.header.badge.text()
@@ -179,11 +178,13 @@ def test_preview_refuses_n2_and_cccc_even_if_set_programmatically(preview):
     assert preview._start_run() is None and preview.runs.active is None and not preview.runs.runs
     assert any("недоступно" in t for t in label_texts(view))
     view.N.setCurrentIndex(0)
-    view.supports.set_current("CCCC")
-    assert not view.try_run() and not preview.runs.runs
+    view.supports.set_current("CCCC")  # not possible with the mouse: the button is disabled in the preview
+    view.try_run()
+    assert not preview.runs.runs and any("недоступно" in t for t in label_texts(view))
 
 
-def test_full_application_entry_is_the_preview():
+def test_the_preview_window_is_restricted_to_n1():
+    """``preview=True`` remains the restricted window (SSSS, N = 1); the application entry runs every route (P1)."""
     args, _ = parse_args(["--smoke-test", "x"])
     assert args.smoke_test == "x"
     gui = GuiApplication(Session(settings=None), preview=True)
@@ -233,10 +234,10 @@ def test_workflow_matches_the_accepted_solver_and_saves_what_is_shown(qtbot, pre
     fields.factor.setCurrentIndex(fields.factor.findData(1.0))
     assert fields.surface.factor == 1.0 and "истинный" in fields.surface.scale_note.text()
     fields.factor.setCurrentIndex(fields.factor.findData(1e3))
-    u, v = fields.surface.mesh.getData()
-    pu, pv = surface.surface_polylines(o.x, o.y, o.w, 1e3)
-    assert np.allclose(u[~np.isnan(u)], pu[~np.isnan(pu)], rtol=0, atol=1e-12) and np.array_equal(
-        np.isnan(v), np.isnan(pv))
+    cells = surface.surface_cells(o.x, o.y, o.w, 1e3)  # the drawn surface: projected node cells of the stored field
+    drawn = fields.surface.surface.cells
+    assert len(drawn) == len(cells) and all(np.array_equal(u, cu) and np.array_equal(v, cv)
+                                            for (u, v, _), (cu, cv, _) in zip(drawn, cells, strict=True))
     e = o.extremum()
     assert np.sign(e["w"]) == np.sign(si["q"])
     assert f"{e['i']}, j = {e['j']}" in " ".join(label_texts(window.fields))
@@ -244,7 +245,13 @@ def test_workflow_matches_the_accepted_solver_and_saves_what_is_shown(qtbot, pre
     w_before = o.w.copy()
     paths = window.save_package(tmp_path / "saved")
     assert np.array_equal(o.w, w_before)  # the drawing factor never touches the values
-    assert set(paths) == {"manifest", "history", "field", "field_png", "surface_png", "report"}
+    files = {"manifest", "history", "field", "field_png", "surface_png", "report",
+             "vim_cycles", "vim_cycles_png"}  # SSSS N = 1: VIM-1 … VIM-3 of the run (GUI-VIM-CYCLES-123-01)
+    c = window.comparison.comparison
+    if c.has_numbers:  # SSSS: the Navier reference of these inputs; the tab's comparison is saved as well
+        files.add("comparison")
+    assert set(paths) == files and c.live and c.has_numbers == ("comparison" in paths)
+    assert c.rows[0].reference.w_centre_m == run.navier["w_m"] and np.sign(c.rows[0].reference.w_centre_m) == np.sign(si["q"])
     for key in ("field_png", "surface_png"):
         assert paths[key].stat().st_size > 10_000 and paths[key].read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))

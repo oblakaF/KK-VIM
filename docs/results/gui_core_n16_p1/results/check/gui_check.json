@@ -1,0 +1,2107 @@
+{
+ "cases": {
+  "S1_R3_converged": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "CONVERGED"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "accepted"
+    },
+    "status_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_vs_cli": true,
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "accepted"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 7,
+      "requested": null
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field.csv",
+      "field.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      7,
+      7
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P",
+       "Q",
+       "delta_P",
+       "direction",
+       "energy_status",
+       "eps_E",
+       "eps_L2",
+       "eps_inf",
+       "eta",
+       "k",
+       "refined",
+       "s",
+       "satisfied",
+       "tau",
+       "theta",
+       "w_bar_centre"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true
+   },
+   "outcome": {
+    "status": "CONVERGED",
+    "reason": "",
+    "s": 7,
+    "s_requested": null,
+    "field_role": "accepted",
+    "field_file": "field.csv",
+    "mark": null,
+    "requested_completed": true,
+    "route": "ssss_r3",
+    "solver": "R3",
+    "diagnostic_only": false,
+    "stop_kind": "met",
+    "D": 19230.769230769234
+   },
+   "cli_exit": 0
+  },
+  "S2_R3_max_half_steps": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "MAX_HALF_STEPS"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "diagnostic"
+    },
+    "status_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_vs_cli": true,
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_diagnostic.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "diagnostic"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_diagnostic.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 2,
+      "requested": null
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "report_diagnostic_banner": true,
+    "field_header_diagnostic": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_diagnostic.csv",
+      "field_diagnostic.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P",
+       "Q",
+       "delta_P",
+       "direction",
+       "energy_status",
+       "eps_E",
+       "eps_L2",
+       "eps_inf",
+       "eta",
+       "k",
+       "refined",
+       "s",
+       "satisfied",
+       "tau",
+       "theta",
+       "w_bar_centre"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true
+   },
+   "outcome": {
+    "status": "MAX_HALF_STEPS",
+    "reason": "",
+    "s": 2,
+    "s_requested": null,
+    "field_role": "diagnostic",
+    "field_file": "field_diagnostic.csv",
+    "mark": null,
+    "requested_completed": false,
+    "route": "ssss_r3",
+    "solver": "R3",
+    "diagnostic_only": true,
+    "stop_kind": "not_met",
+    "D": 19230.769230769234
+   },
+   "cli_exit": 1
+  },
+  "S3_R4_N2_research": {
+   "checks": {
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "status_vs_cli": {
+     "ok": true,
+     "detail": [
+      "PROVISIONAL_FIELD_STABILIZED",
+      "PROVISIONAL_FIELD_STABILIZED"
+     ]
+    },
+    "s_vs_cli": {
+     "ok": true,
+     "detail": 10
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 10,
+      "requested": 100
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "field_research.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": false,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      10,
+      10
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P",
+       "Q",
+       "delta_P",
+       "direction",
+       "energy_status",
+       "eps_E",
+       "eps_inf",
+       "eta_initial",
+       "k",
+       "kappa_rep",
+       "m_s",
+       "mark",
+       "qr_done",
+       "qr_field_error",
+       "refined",
+       "rho_N",
+       "s",
+       "stabilization_ok",
+       "stop_reason",
+       "tau",
+       "w_max"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true
+   },
+   "outcome": {
+    "status": "PROVISIONAL_FIELD_STABILIZED",
+    "reason": "field stabilization of the finite problem at s=10 (D-048.3, D-048.4); not convergence to omega_0 and not a rank certificate",
+    "s": 10,
+    "s_requested": 100,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "ssss_r4",
+    "solver": "R4",
+    "diagnostic_only": false,
+    "stop_kind": "met",
+    "D": 19230.769230769234
+   },
+   "cli_exit": 0
+  },
+  "S4_R4_N3_fixed4": {
+   "checks": {
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "status_vs_cli": {
+     "ok": true,
+     "detail": [
+      "RESEARCH_LIMIT_REACHED",
+      "RESEARCH_LIMIT_REACHED"
+     ]
+    },
+    "s_vs_cli": {
+     "ok": true,
+     "detail": 4
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 4,
+      "requested": 4
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "field_research.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": false,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      4,
+      4
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P",
+       "Q",
+       "delta_P",
+       "direction",
+       "energy_status",
+       "eps_E",
+       "eps_inf",
+       "eta_initial",
+       "k",
+       "kappa_rep",
+       "m_s",
+       "mark",
+       "qr_done",
+       "qr_field_error",
+       "refined",
+       "rho_N",
+       "s",
+       "stabilization_ok",
+       "stop_reason",
+       "tau",
+       "w_max"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true
+   },
+   "outcome": {
+    "status": "RESEARCH_LIMIT_REACHED",
+    "reason": "4 half-steps done; this is not convergence",
+    "s": 4,
+    "s_requested": 4,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "ssss_r4",
+    "solver": "R4",
+    "diagnostic_only": false,
+    "stop_kind": "not_met",
+    "D": 19230.769230769234
+   },
+   "cli_exit": 0
+  },
+  "S5_R4_N2_normative": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "NOT_QUALIFIED"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 1
+    },
+    "status_vs_direct": {
+     "ok": true,
+     "detail": "NOT_QUALIFIED"
+    },
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 1,
+      "requested": 100
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "second_export_refused_unchanged": true
+   },
+   "outcome": {
+    "status": "NOT_QUALIFIED",
+    "reason": "the QR criterion (c_d, c_rank, tau_set, delta_f) is NOT_QUALIFIED; continue only with research_mode=True",
+    "s": 1,
+    "s_requested": 100,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "ssss_r4",
+    "solver": "R4",
+    "diagnostic_only": false,
+    "stop_kind": "none",
+    "D": 19230.769230769234
+   }
+  },
+  "S6_SSSS_N4_research": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "RESEARCH_LIMIT_REACHED"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 2
+    },
+    "mark_research": {
+     "ok": true,
+     "detail": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    },
+    "status_vs_cli": {
+     "ok": true,
+     "detail": [
+      "RESEARCH_LIMIT_REACHED",
+      "RESEARCH_LIMIT_REACHED"
+     ]
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 2,
+      "requested": 2
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "field_research.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": false,
+     "detail": {
+      "columns": [
+       "P",
+       "Q",
+       "delta_P",
+       "direction",
+       "energy_status",
+       "eps_E",
+       "eps_inf",
+       "eta_initial",
+       "k",
+       "kappa_rep",
+       "m_s",
+       "mark",
+       "qr_done",
+       "qr_field_error",
+       "refined",
+       "rho_N",
+       "s",
+       "stabilization_ok",
+       "stop_reason",
+       "tau",
+       "w_max"
+      ],
+      "diffs": [
+       [
+        "w_max",
+        0,
+        "0.004061894554288518",
+        "0.00021121851682300287"
+       ],
+       [
+        "w_max",
+        1,
+        "0.004062064488760484",
+        "0.00021122735341554515"
+       ]
+      ]
+     }
+    },
+    "second_export_refused_unchanged": true
+   },
+   "outcome": {
+    "status": "RESEARCH_LIMIT_REACHED",
+    "reason": "2 half-steps done; this is not convergence",
+    "s": 2,
+    "s_requested": 2,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "ssss_n46",
+    "solver": "SSSS-RESEARCH",
+    "diagnostic_only": false,
+    "stop_kind": "none",
+    "D": 19230.769230769234
+   },
+   "cli_exit": 0
+  },
+  "C1_CCCC_N1_s3": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "COMPLETED_FIXED_HALF_STEPS"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 3
+    },
+    "mark_research": {
+     "ok": true,
+     "detail": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    },
+    "never_accepted": true,
+    "status_reason_s_vs_direct": true,
+    "D_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_reason_s_vs_cli": {
+     "ok": true,
+     "detail": [
+      "COMPLETED_FIXED_HALF_STEPS",
+      3
+     ]
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 3,
+      "requested": 3
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "field_research.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      3,
+      3
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "alpha_centre",
+       "cond_S",
+       "delta_P_hat",
+       "direction",
+       "eta",
+       "field_change_inf",
+       "k",
+       "premises_status",
+       "reason",
+       "s",
+       "sigma",
+       "status"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true
+   },
+   "outcome": {
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "reason": "",
+    "s": 3,
+    "s_requested": 3,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "cccc_n1",
+    "solver": "CCCC-N1",
+    "diagnostic_only": false,
+    "stop_kind": "none",
+    "D": 19230.769230769234
+   },
+   "direct_steps": [
+    {
+     "s": 1,
+     "status": "HALF_STEP_DONE",
+     "qr_executed": null,
+     "rn5": null
+    },
+    {
+     "s": 2,
+     "status": "HALF_STEP_DONE",
+     "qr_executed": null,
+     "rn5": null
+    },
+    {
+     "s": 3,
+     "status": "COMPLETED_FIXED_HALF_STEPS",
+     "qr_executed": null,
+     "rn5": null
+    }
+   ],
+   "cli_exit": 0
+  },
+  "C2_CCCC_N2_s2": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "COMPLETED_FIXED_HALF_STEPS"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 2
+    },
+    "mark_research": {
+     "ok": true,
+     "detail": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    },
+    "never_accepted": true,
+    "status_reason_s_vs_direct": true,
+    "D_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_reason_s_vs_cli": {
+     "ok": true,
+     "detail": [
+      "COMPLETED_FIXED_HALF_STEPS",
+      2
+     ]
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 2,
+      "requested": 2
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "field_research.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true
+   },
+   "outcome": {
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "reason": "",
+    "s": 2,
+    "s_requested": 2,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "cccc_n23",
+    "solver": "CCCC-N23",
+    "diagnostic_only": false,
+    "stop_kind": "none",
+    "D": 19230.769230769234
+   },
+   "direct_steps": [
+    {
+     "s": 1,
+     "status": "HALF_STEP_DONE",
+     "qr_executed": true,
+     "rn5": null
+    },
+    {
+     "s": 2,
+     "status": "COMPLETED_FIXED_HALF_STEPS",
+     "qr_executed": true,
+     "rn5": null
+    }
+   ],
+   "cli_exit": 0
+  },
+  "C3_CCCC_N4_32_s2": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "COMPLETED_FIXED_HALF_STEPS"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 2
+    },
+    "mark_research": {
+     "ok": true,
+     "detail": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    },
+    "never_accepted": true,
+    "status_reason_s_vs_direct": true,
+    "D_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_reason_s_vs_cli": {
+     "ok": true,
+     "detail": [
+      "COMPLETED_FIXED_HALF_STEPS",
+      2
+     ]
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 2,
+      "requested": 2
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "field_research.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true,
+    "field_bitwise_vs_D068_QA_run_R_C1": true
+   },
+   "outcome": {
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "reason": "",
+    "s": 2,
+    "s_requested": 2,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "cccc_n46",
+    "solver": "CCCC-N46",
+    "diagnostic_only": false,
+    "stop_kind": "none",
+    "D": 19230.769230769234
+   },
+   "direct_steps": [
+    {
+     "s": 1,
+     "status": "HALF_STEP_DONE",
+     "qr_executed": true,
+     "rn5": null
+    },
+    {
+     "s": 2,
+     "status": "COMPLETED_FIXED_HALF_STEPS",
+     "qr_executed": true,
+     "rn5": null
+    }
+   ],
+   "cli_exit": 0
+  },
+  "C4_CCCC_N5_b06_s2_pos": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "COMPLETED_FIXED_HALF_STEPS"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 2
+    },
+    "mark_research": {
+     "ok": true,
+     "detail": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    },
+    "never_accepted": true,
+    "status_reason_s_vs_direct": true,
+    "D_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_reason_s_vs_cli": {
+     "ok": true,
+     "detail": [
+      "COMPLETED_FIXED_HALF_STEPS",
+      2
+     ]
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 2,
+      "requested": 2
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "field_research.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true,
+    "field_bitwise_vs_D068_QA_run_R_C7": true
+   },
+   "outcome": {
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "reason": "",
+    "s": 2,
+    "s_requested": 2,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "cccc_n46",
+    "solver": "CCCC-N46",
+    "diagnostic_only": false,
+    "stop_kind": "none",
+    "D": 19230.769230769234
+   },
+   "direct_steps": [
+    {
+     "s": 1,
+     "status": "HALF_STEP_DONE",
+     "qr_executed": true,
+     "rn5": null
+    },
+    {
+     "s": 2,
+     "status": "COMPLETED_FIXED_HALF_STEPS",
+     "qr_executed": true,
+     "rn5": null
+    }
+   ],
+   "cli_exit": 0
+  },
+  "C5_CCCC_N5_b06_s2_neg": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "COMPLETED_FIXED_HALF_STEPS"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 2
+    },
+    "mark_research": {
+     "ok": true,
+     "detail": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    },
+    "never_accepted": true,
+    "status_reason_s_vs_direct": true,
+    "D_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_reason_s_vs_cli": {
+     "ok": true,
+     "detail": [
+      "COMPLETED_FIXED_HALF_STEPS",
+      2
+     ]
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "research"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_research.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 2,
+      "requested": 2
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_research.csv",
+      "field_research.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true,
+    "w_neg_equals_minus_w_pos": true,
+    "w_bar_neg_equals_w_bar_pos": true,
+    "deflection_sign_follows_q": true,
+    "published_D068_control_inputs": true,
+    "published_D068_control_all_checks_true": true,
+    "D_equals_published_D068": {
+     "ok": true,
+     "detail": [
+      19230.769230769234,
+      19230.769230769234
+     ]
+    },
+    "field_bitwise_vs_D068_QA_run_D_N5_neg": true
+   },
+   "outcome": {
+    "status": "COMPLETED_FIXED_HALF_STEPS",
+    "reason": "",
+    "s": 2,
+    "s_requested": 2,
+    "field_role": "research",
+    "field_file": "field_research.csv",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": true,
+    "route": "cccc_n46",
+    "solver": "CCCC-N46",
+    "diagnostic_only": false,
+    "stop_kind": "none",
+    "D": 19230.769230769234
+   },
+   "direct_steps": [
+    {
+     "s": 1,
+     "status": "HALF_STEP_DONE",
+     "qr_executed": true,
+     "rn5": null
+    },
+    {
+     "s": 2,
+     "status": "COMPLETED_FIXED_HALF_STEPS",
+     "qr_executed": true,
+     "rn5": null
+    }
+   ],
+   "cli_exit": 0
+  },
+  "C6_CCCC_N6_a5_32x13_s2": {
+   "checks": {
+    "status": {
+     "ok": true,
+     "detail": "STOPPED_RANK_GUARD_UNCERTIFIED"
+    },
+    "field_role": {
+     "ok": true,
+     "detail": "diagnostic"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 1
+    },
+    "mark_research": {
+     "ok": true,
+     "detail": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    },
+    "never_accepted": true,
+    "status_reason_s_vs_direct": true,
+    "D_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_reason_s_vs_cli": {
+     "ok": true,
+     "detail": [
+      "STOPPED_RANK_GUARD_UNCERTIFIED",
+      1
+     ]
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_diagnostic.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "diagnostic"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_diagnostic.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 1,
+      "requested": 2
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "report_diagnostic_banner": true,
+    "field_header_diagnostic": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_diagnostic.csv",
+      "field_diagnostic.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true,
+    "field_bitwise_vs_D068_QA_run_C_pos": true,
+    "rn5_refused": {
+     "ok": true,
+     "detail": "RN-5 не выполнен (RN5_UNRESOLVED: σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано); QR решённого набора не выполняется. N не понижается, регуляризации нет (D-065, 7 C) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+    },
+    "no_qr_at_s2": {
+     "ok": true,
+     "detail": [
+      false
+     ]
+    },
+    "history_has_no_completed_s2": true,
+    "field_is_s1_G_VT": true,
+    "cli_exit_6": true
+   },
+   "outcome": {
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "reason": "RN-5 не выполнен (RN5_UNRESOLVED: σ_N(ŵ_w) не больше ε: неравенство Вейля не доказано); QR решённого набора не выполняется. N не понижается, регуляризации нет (D-065, 7 C) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]",
+    "s": 1,
+    "s_requested": 2,
+    "field_role": "diagnostic",
+    "field_file": "field_diagnostic.csv",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": false,
+    "route": "cccc_n46",
+    "solver": "CCCC-N46",
+    "diagnostic_only": true,
+    "stop_kind": "not_met",
+    "D": 19230.769230769234
+   },
+   "direct_steps": [
+    {
+     "s": 1,
+     "status": "HALF_STEP_DONE",
+     "qr_executed": true,
+     "rn5": null
+    },
+    {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "qr_executed": false,
+     "rn5": null
+    }
+   ],
+   "cli_exit": 6
+  },
+  "C7_CCCC_N4_33x9_s2": {
+   "checks": {
+    "field_role": {
+     "ok": true,
+     "detail": "diagnostic"
+    },
+    "s_completed": {
+     "ok": true,
+     "detail": 1
+    },
+    "mark_research": {
+     "ok": true,
+     "detail": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+    },
+    "never_accepted": true,
+    "status_reason_s_vs_direct": true,
+    "D_vs_direct": true,
+    "w_bitwise_vs_direct": true,
+    "w_bar_bitwise_vs_direct": true,
+    "status_reason_s_vs_cli": {
+     "ok": true,
+     "detail": [
+      "STOPPED_RANK_GUARD_UNCERTIFIED",
+      1
+     ]
+    },
+    "export_files": {
+     "ok": true,
+     "detail": [
+      "field_diagnostic.csv",
+      "history.csv",
+      "manifest.json",
+      "report.html"
+     ]
+    },
+    "manifest_schema_2": true,
+    "manifest_field_role": {
+     "ok": true,
+     "detail": "diagnostic"
+    },
+    "manifest_field_file": {
+     "ok": true,
+     "detail": "field_diagnostic.csv"
+    },
+    "manifest_solver_status": true,
+    "manifest_scientific": true,
+    "manifest_half_steps": {
+     "ok": true,
+     "detail": {
+      "completed": 1,
+      "requested": 2
+     }
+    },
+    "manifest_requested_completed": true,
+    "manifest_model_route": true,
+    "manifest_provenance": true,
+    "no_CONVERGED_unless_R3": true,
+    "accepted_role_only_R3_CONVERGED": true,
+    "read_manifest_v2": true,
+    "report_agrees": true,
+    "report_diagnostic_banner": true,
+    "field_header_diagnostic": true,
+    "exported_w_equals_solver_bitwise": true,
+    "field_file_name_as_cli": {
+     "ok": true,
+     "detail": [
+      "field_diagnostic.csv",
+      "field_diagnostic.csv"
+     ]
+    },
+    "field_csv_data_bitwise_vs_cli": true,
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    },
+    "second_export_refused_unchanged": true,
+    "stop_before_rn5_qr": {
+     "ok": true,
+     "detail": [
+      null
+     ]
+    },
+    "status_protective": {
+     "ok": true,
+     "detail": [
+      "STOPPED_RANK_GUARD_UNCERTIFIED",
+      "not_met"
+     ]
+    },
+    "grid_note": true,
+    "cli_exit_6": true
+   },
+   "outcome": {
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "reason": "N = 4, s = 2: сетка 33 × 9 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]",
+    "s": 1,
+    "s_requested": 2,
+    "field_role": "diagnostic",
+    "field_file": "field_diagnostic.csv",
+    "mark": "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED",
+    "requested_completed": false,
+    "route": "cccc_n46",
+    "solver": "CCCC-N46",
+    "diagnostic_only": true,
+    "stop_kind": "not_met",
+    "D": 19230.769230769234
+   },
+   "direct_steps": [
+    {
+     "s": 1,
+     "status": "HALF_STEP_DONE",
+     "qr_executed": true,
+     "rn5": null
+    },
+    {
+     "s": 2,
+     "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+     "qr_executed": false,
+     "rn5": null
+    }
+   ],
+   "cli_exit": 6
+  },
+  "C5_CCCC_N5_b06_s2_neg__vs_D068_D_N5_neg": {
+   "checks": {
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    }
+   }
+  },
+  "C4_CCCC_N5_b06_s2_pos__vs_D068_R_C7": {
+   "checks": {
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    }
+   }
+  },
+  "C3_CCCC_N4_32_s2__vs_D068_R_C1": {
+   "checks": {
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    }
+   }
+  },
+  "C6_CCCC_N6_a5_32x13_s2__vs_D068_C_pos": {
+   "checks": {
+    "history_rows_equal": {
+     "ok": true,
+     "detail": [
+      2,
+      2
+     ]
+    },
+    "history_common_columns_text_equal": {
+     "ok": true,
+     "detail": {
+      "columns": [
+       "P_hat",
+       "P_hat_previous_QR",
+       "V_exact_rank",
+       "alpha_centre",
+       "cond_S",
+       "direction",
+       "eta",
+       "field_preservation",
+       "k",
+       "kappa_rep",
+       "premises_status",
+       "qr_executed",
+       "reason",
+       "rho_N",
+       "rn5_margin",
+       "rn5_verdict",
+       "rt7_passed",
+       "rt7_sin_theta_upper",
+       "rt7_t",
+       "rt7_tau",
+       "s",
+       "status"
+      ],
+      "diffs": []
+     }
+    }
+   }
+  }
+ },
+ "refusals": {
+  "SSSS_N5_without_research_choice": {
+   "ok": true,
+   "problems": [
+    "SSSS, N = 5: только исследование (RESEARCH_ONLY, D-056.7); расчёт выполняется лишь при явном выборе исследовательского режима N = 4–6"
+   ],
+   "process": "input"
+  },
+  "SSSS_N4_grid_outside_study": {
+   "ok": true,
+   "problems": [
+    "Вне исследованной области N = 4–6 (NOT_EXECUTED_OUTSIDE_DOMAIN): the grid 32 x 32 at r = 1 was not computed by the study of N = 4-6: n_x = n_y in (40, 80, 160, 320, 640, 1280)"
+   ],
+   "process": "input"
+  },
+  "SSSS_N6_s41_outside_study": {
+   "ok": true,
+   "problems": [
+    "Вне исследованной области N = 4–6 (NOT_EXECUTED_OUTSIDE_DOMAIN): half_steps = 41 > 40: the study of N = 4-6 computed s <= 40"
+   ],
+   "process": "input"
+  },
+  "SSSS_N4_ratio_outside_study": {
+   "ok": true,
+   "problems": [
+    "Вне исследованной области N = 4–6 (NOT_EXECUTED_OUTSIDE_DOMAIN): b/a = 1.1 is not one of the ten r of the study of N = 4-6: 1/5, 1/3, 1/2, 2/3, 1, 7/5, 3/2, 2, 3, 5"
+   ],
+   "process": "input"
+  },
+  "CCCC_N2_s3": {
+   "ok": true,
+   "problems": [
+    "CCCC, N = 2: число полушагов 3 недоступно; допустимо 1…2; s ≥ 3 не исполняется (D-065, D-068)"
+   ],
+   "process": "input"
+  },
+  "CCCC_N3_s3": {
+   "ok": true,
+   "problems": [
+    "CCCC, N = 3: число полушагов 3 недоступно; допустимо 1…2; s ≥ 3 не исполняется (D-065, D-068)"
+   ],
+   "process": "input"
+  },
+  "CCCC_N4_s3": {
+   "ok": true,
+   "problems": [
+    "CCCC, N = 4: число полушагов 3 недоступно; допустимо 1…2; s ≥ 3 не исполняется (D-065, D-068)"
+   ],
+   "process": "input"
+  },
+  "CCCC_N5_s3": {
+   "ok": true,
+   "problems": [
+    "CCCC, N = 5: число полушагов 3 недоступно; допустимо 1…2; s ≥ 3 не исполняется (D-065, D-068)"
+   ],
+   "process": "input"
+  },
+  "CCCC_N6_s3": {
+   "ok": true,
+   "problems": [
+    "CCCC, N = 6: число полушагов 3 недоступно; допустимо 1…2; s ≥ 3 не исполняется (D-065, D-068)"
+   ],
+   "process": "input"
+  },
+  "CCCC_N1_s9": {
+   "ok": true,
+   "problems": [
+    "CCCC, N = 1: число полушагов 9 недоступно; допустимо 1…8"
+   ],
+   "process": "input"
+  },
+  "CCCC_N4_grid_below_2N+1": {
+   "ok": true,
+   "problems": [
+    "Вне области решателя CCCC (NOT_EXECUTED_OUTSIDE_DOMAIN): n_x должно быть от 9 (2N + 1 при N = 4) до 1280, получено 8"
+   ],
+   "process": "input"
+  },
+  "CCCC_N2_q0": {
+   "ok": true,
+   "problems": [
+    "Ввод отклонён решателем (ERROR_INPUT): q must be nonzero"
+   ],
+   "process": "input"
+  },
+  "N7_no_route": {
+   "ok": true,
+   "problems": [
+    "N = 7: нет решателя; доступны N = 1–6"
+   ],
+   "process": "input"
+  },
+  "supports_SCSC_unknown": {
+   "ok": true,
+   "problems": [
+    "Закрепление SCSC: неизвестно; доступны SSSS, CCCC"
+   ],
+   "process": "input"
+  }
+ },
+ "setup_state": {
+  "N4_default_research_off": true,
+  "N4_research_on_then_N5_reset": true,
+  "research_reset_on_supports_change": true,
+  "cccc_s2_reset_on_N_change": true,
+  "r4_research_reset_on_N_change": true,
+  "cccc_s3_not_offered": true,
+  "cccc_request_from_form": true
+ },
+ "schema1": {
+  "r3_converged": {
+   "ok": true,
+   "read": {
+    "schema_version": 1,
+    "legacy": true,
+    "data_origin": "solver",
+    "marks": [],
+    "supports": "SSSS",
+    "N": 1,
+    "solver_status": "CONVERGED",
+    "solver_reason": "",
+    "scientific": {
+     "kind": "success",
+     "text": "Решатель R3 — ACCEPTED (D-043): SSSS, q = const, N = 1, 0,2 ≤ b/a ≤ 5. Отдельный расчёт научной приёмкой не является"
+    },
+    "mark": null,
+    "requested_run_completed": null,
+    "field_role": "accepted",
+    "field_file": "field.csv",
+    "s_completed": 7,
+    "s_requested": null
+   }
+  },
+  "r3_max_half_steps": {
+   "ok": true,
+   "read": {
+    "schema_version": 1,
+    "legacy": true,
+    "data_origin": "solver",
+    "marks": [],
+    "supports": "SSSS",
+    "N": 1,
+    "solver_status": "MAX_HALF_STEPS",
+    "solver_reason": "",
+    "scientific": {
+     "kind": "neutral",
+     "text": "Решатель R3 — ACCEPTED (D-043): SSSS, q = const, N = 1, 0,2 ≤ b/a ≤ 5. Отдельный расчёт научной приёмкой не является"
+    },
+    "mark": null,
+    "requested_run_completed": null,
+    "field_role": "diagnostic",
+    "field_file": "field.csv",
+    "s_completed": 2,
+    "s_requested": null
+   }
+  },
+  "r4_normative": {
+   "ok": true,
+   "read": {
+    "schema_version": 1,
+    "legacy": true,
+    "data_origin": "solver",
+    "marks": [
+     "PROVISIONAL / NOT_QUALIFIED"
+    ],
+    "supports": "SSSS",
+    "N": 2,
+    "solver_status": "NOT_QUALIFIED",
+    "solver_reason": "the QR criterion (c_d, c_rank, tau_set, delta_f) is NOT_QUALIFIED; continue only with research_mode=True",
+    "scientific": {
+     "kind": "warning",
+     "text": "PROVISIONAL / NOT_QUALIFIED: исследовательский решатель R4, N = 2–3 (D-047, D-048). Не научная приёмка, не сходимость к точному решению, не сертификация ранга N"
+    },
+    "mark": "PROVISIONAL / NOT_QUALIFIED",
+    "requested_run_completed": null,
+    "field_role": "research",
+    "field_file": "field.csv",
+    "s_completed": 1,
+    "s_requested": null
+   }
+  },
+  "r4_research": {
+   "ok": true,
+   "read": {
+    "schema_version": 1,
+    "legacy": true,
+    "data_origin": "solver",
+    "marks": [
+     "PROVISIONAL / NOT_QUALIFIED"
+    ],
+    "supports": "SSSS",
+    "N": 2,
+    "solver_status": "PROVISIONAL_FIELD_STABILIZED",
+    "solver_reason": "field stabilization of the finite problem at s=10 (D-048.3, D-048.4); not convergence to omega_0 and not a rank certificate",
+    "scientific": {
+     "kind": "warning",
+     "text": "PROVISIONAL / NOT_QUALIFIED: исследовательский решатель R4, N = 2–3 (D-047, D-048). Не научная приёмка, не сходимость к точному решению, не сертификация ранга N"
+    },
+    "mark": "PROVISIONAL / NOT_QUALIFIED",
+    "requested_run_completed": null,
+    "field_role": "research",
+    "field_file": "field.csv",
+    "s_completed": 10,
+    "s_requested": null
+   }
+  },
+  "schema3_refused": true
+ },
+ "notes": [
+  "S5: R4 normative (D-047) ends after s = 1 with NOT_QUALIFIED; the GUI treats it as the requested end (field_research.csv, PROVISIONAL / NOT_QUALIFIED). run-ssss has no normative mode, so no CLI reference."
+ ],
+ "scope_probe": {
+  "CCCC_N1_b/a=6": {
+   "gui_check_request": [
+    "Ввод отклонён решателем (ERROR_INPUT): sides a=1.0, b=6.0 are outside 0.2 <= b/a <= 5 (D-038)",
+    "Вне области решателя CCCC (NOT_EXECUTED_OUTSIDE_DOMAIN): вне диапазона 0,2 ≤ b/a ≤ 5: sides a=1.0, b=6.0 are outside 0.2 <= b/a <= 5 (D-038)"
+   ],
+   "solver_domain_refusal": "вне диапазона 0,2 ≤ b/a ≤ 5: sides a=1.0, b=6.0 are outside 0.2 <= b/a <= 5 (D-038)"
+  },
+  "CCCC_N1_grid_700x8": {
+   "gui_check_request": [],
+   "solver_domain_refusal": null
+  }
+ },
+ "demo": {
+  "files": [
+   "field_research_TEST-DATA.csv",
+   "history_TEST-DATA.csv",
+   "manifest_TEST-DATA.json",
+   "report_TEST-DATA.html"
+  ],
+  "marks": [
+   "TEST DATA",
+   "RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED"
+  ],
+  "ok": true
+ },
+ "failures": [
+  "S3_R4_N2_research: field_csv_data_bitwise_vs_cli ",
+  "S4_R4_N3_fixed4: field_csv_data_bitwise_vs_cli ",
+  "S6_SSSS_N4_research: history_common_columns_text_equal {'columns': ['P', 'Q', 'delta_P', 'direction', 'energy_status', 'eps_E', 'eps_inf', 'eta_initial', 'k', 'kappa_rep', 'm_s', 'mark', 'qr_done', 'qr_field_error', 'refined', 'rho_N', 's', 'stabilization_ok', 'stop_reason', 'tau', 'w_max'], 'diffs': [('w_max', 0, '0.004061894554288518', '0.00021121851682300287'), ('w_max', 1, '0.004062064488760484', '0.00021122735341554515')]}"
+ ],
+ "verdict_checks": "FAIL"
+}

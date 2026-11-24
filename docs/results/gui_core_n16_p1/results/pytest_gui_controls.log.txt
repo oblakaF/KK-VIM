@@ -1,0 +1,35 @@
+......................................................................ss [ 13%]
+sssssssss............................................................... [ 26%]
+........................................................................ [ 39%]
+........................................................................ [ 52%]
+........................................................................ [ 65%]
+........................................................................ [ 79%]
+.............................................................
+r3_negative_q: CONVERGED, s = 7, max relative difference to QA 0.000e+00
+.
+r3_rect_a2b: CONVERGED, s = 8, max relative difference to QA 0.000e+00
+.
+r3_rect_b2a: CONVERGED, s = 7, max relative difference to QA 0.000e+00
+.
+r3_rect_r5_unequal: CONVERGED, s = 7, max relative difference to QA 0.000e+00
+.
+r3_square: CONVERGED, s = 7, max relative difference to QA 0.000e+00
+..
+r4_n2_dense: PROVISIONAL_FIELD_STABILIZED, s = 10, max relative difference to QA 0.000e+00
+.
+r4_n2_normative: NOT_QUALIFIED, s = 1, max relative difference to QA 0.000e+00
+.
+r4_n2_normative_one: HALF_STEP_LIMIT_REACHED, s = 1, max relative difference to QA 0.000e+00
+.
+r4_n2_research: PROVISIONAL_FIELD_STABILIZED, s = 10, max relative difference to QA 0.000e+00
+.. [ 92%]
+
+r4_n3_research_fixed: RESEARCH_LIMIT_REACHED, s = 12, max relative difference to QA 0.000e+00
+.
+r4_n3_research_rect: PROVISIONAL_FIELD_STABILIZED, s = 11, max relative difference to QA 0.000e+00
+.........................................                               [100%]
+=========================== short test summary info ===========================
+SKIPPED [6] tests\gui\test_backend_acceptance_independent.py:429: history values: bitwise only in the source environment of the control data
+SKIPPED [5] tests\gui\test_backend_acceptance_independent.py:447: history values: bitwise only in the source environment of the control data
+535 passed, 11 skipped in 472.68s (0:07:52)
+exit=0

@@ -1,0 +1,15 @@
+== d48c10e changed .py (ruff 0.14.0 --isolated, default rules)
+src\kkvim_gui\model\runs.py:39:39: F401 [*] `kkvim_gui.backend.process.CRASH` imported but unused
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
+== 306e85a same files
+src\kkvim_gui\main_window\setup_view.py:42:93: F401 [*] `kkvim_gui.model.setup_state.UNSUPPORTED` imported but unused
+src\kkvim_gui\model\runs.py:28:39: F401 [*] `kkvim_gui.backend.process.CRASH` imported but unused
+Found 2 errors.
+[*] 2 fixable with the `--fix` option.
+== git diff --check 306e85a d48c10e
+OK
+== uv lock --check
+Resolved 14 packages in 0.71ms
+== hook self-test
+pre-commit self-test: ALL PASSED

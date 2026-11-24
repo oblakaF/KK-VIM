@@ -1,4 +1,5 @@
-"""Session model of the setup page: one SetupState shared by the main window's sections."""
+"""Session model of the setup page: one SetupState shared by the main window's sections (saved and opened as a
+project .kkv by ``project_file``)."""
 
 from PySide6.QtCore import QObject, Signal
 
@@ -29,6 +30,14 @@ class SetupModel(QObject):
 
     def set_choice(self, **choices):
         self._set(self._state.with_choice(**choices))
+
+    def load(self, state):
+        """Replace the whole setup by a complete, already checked state (an opened project, «Новый расчёт»).
+
+        The state is taken as it is: no choice is reset or derived here (``project_file`` checked its rules)."""
+        if not isinstance(state, SetupState):
+            raise TypeError(f"SetupState expected, got {type(state).__name__}")
+        self._set(state)
 
     def errors(self):
         return validate(self._state)

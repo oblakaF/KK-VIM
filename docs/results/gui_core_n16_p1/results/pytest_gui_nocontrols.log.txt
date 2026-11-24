@@ -1,0 +1,14 @@
+......................................................................ss [ 13%]
+sssssssss............................................................... [ 27%]
+........................................................................ [ 41%]
+........................................................................ [ 55%]
+........................................................................ [ 69%]
+........................................................................ [ 83%]
+........................................................................ [ 97%]
+.............                                                            [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_gui_qa_control_cases.py:37: QA control cases not found in <QA_WORKTREE>\docs\results\gui_backend (set KKVIM_QA_GUI_CASES)
+SKIPPED [6] tests\gui\test_backend_acceptance_independent.py:429: history values: bitwise only in the source environment of the control data
+SKIPPED [5] tests\gui\test_backend_acceptance_independent.py:447: history values: bitwise only in the source environment of the control data
+506 passed, 12 skipped in 475.23s (0:07:55)
+exit=0

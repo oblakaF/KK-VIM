@@ -1,0 +1,29 @@
+GUI-CORE-N16-P1-QA — reproduction (from the root of any clone that has d48c10e, 306e85a and 1d6af27; no private path needed)
+
+git checkout --detach d48c10e713d4ec4700331782bd583bd63b6f75da
+uv lock --check
+uv sync --locked --extra gui --group gui-test
+mkdir -p scratch/gui_n16 && cp <package>/scripts/*.py scratch/gui_n16/
+# historical controls (immutable revision) and the base source for schema-1 manifests
+mkdir -p scratch/gui_n16/controls scratch/gui_n16/base306
+git -c core.autocrlf=false archive 1d6af27e3a4e3434080e074d0d21c848f2261362 docs/results/gui_backend | tar -x -C scratch/gui_n16/controls
+git -c core.autocrlf=false archive 306e85ace3008deac869663245591b36880185e7 src | tar -x -C scratch/gui_n16/base306
+python -I scratch/gui_n16/gen_schema1.py scratch/gui_n16/schema1
+# tests
+export QT_QPA_PLATFORM=offscreen
+python -m pytest -q -rs -p no:cacheprovider tests/test_gui_routes_n16.py tests/gui/test_gui_n16_workflow.py
+python -m pytest -q -rs -p no:cacheprovider tests/gui tests/test_gui_*.py
+KKVIM_QA_GUI_CASES=$PWD/scratch/gui_n16/controls/docs/results/gui_backend KKVIM_QA_CONTROL_DIR=$PWD/scratch/gui_n16/controls/docs/results/gui_backend \
+  python -m pytest -q -rs -p no:cacheprovider tests/gui tests/test_gui_*.py
+python -m pytest -q -p no:cacheprovider tests/kkvim/test_cli_cccc_n46.py tests/kkvim/test_cccc_n46.py
+# independent functional checks, real Qt, smoke
+python -X utf8 scratch/gui_n16/run_gui_check.py          # writes scratch/gui_n16/check/gui_check.json
+python -X utf8 scratch/gui_n16/qt_smoke.py scratch/gui_n16/qt
+python -X utf8 scratch/gui_n16/qt_visibility.py scratch/gui_n16/qt
+python -X utf8 -m kkvim_gui --smoke-test scratch/gui_n16/smoke --protocol-dir scratch/gui_n16/smoke_protocols
+# static
+git diff --check 306e85a d48c10e ; uvx ruff@0.14.0 check --isolated <changed .py files> ; sh .githooks/test-pre-commit.sh
+
+Note: the D-068 bitwise comparison in gui_check.py reads docs/results/r5_cccc_n46_s2_d068 (in main) and, if present, the D-068 QA run
+files scratch/d068_final/runs (QA scratch of R5-CCCC-N46-S2-D068-FINAL; reproducible by its run_cases.sh). Without them those items are
+reported as notes, not as passes.

@@ -1,0 +1,9 @@
+OS: Windows-10-10.0.19045-SP0
+Python 3.14.8
+numpy 2.5.4 scipy 1.18.1
+PySide6-Essentials 6.12.0 pyqtgraph 0.14.0
+pytest 9.1.1 pytest-qt 4.5.0
+git version 2.55.0.windows.3
+uv 0.13.0 (4ecd0eff2 2026-10-09 x86_64-pc-windows-msvc)
+QT_QPA_PLATFORM=offscreen
+QA worktree HEAD d48c10e713d4ec4700331782bd583bd63b6f75da (detached), tracked changes: 0

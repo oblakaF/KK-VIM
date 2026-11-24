@@ -1,0 +1,46 @@
+{
+ "task": "GUI-CORE-N16-P1-QA",
+ "goals": ["G3.3", "G3.4", "G4", "G5"],
+ "stage": "R5-V / Q4; GUI engineering package P1",
+ "verdict": "QA_PASS_GUI_CORE_N16_P1_LIMITED",
+ "next": "READY_FOR_INTEGRATOR",
+ "scientific_status": "unchanged; GUI PASS is not a scientific acceptance; P-4 ASSUMED; R5/Q4 IN_PROGRESS; D1_START BLOCKED",
+ "revisions": {
+  "base_main": "306e85ace3008deac869663245591b36880185e7",
+  "builder_commit": "d48c10e713d4ec4700331782bd583bd63b6f75da",
+  "builder_parent": "306e85ace3008deac869663245591b36880185e7",
+  "builder_branch": "builder/gui-core-n16-p1 (local only)",
+  "historical_gui_controls": "1d6af27e3a4e3434080e074d0d21c848f2261362:docs/results/gui_backend (50/50 blobs verified)",
+  "d068_reference_tree": "b0a64f1c17947b12a55c420282241301f978ea29 (src/kkvim identical to d48c10e except 2 text-only edits)"
+ },
+ "reuse": {
+  "reused": ["Builder scientific-core regression (451 passed)", "D-068 final QA control (docs/results/r5_cccc_n46_s2_d068, scratch/d068_final/runs)",
+             "historical GUI backend QA control data and comparison rules of 1d6af27 (no tolerance changed)"],
+  "new": ["gui_check.py: 13 routes GUI child process vs CLI vs direct call, export/manifest/report/no-overwrite, refusals, form state, schema 1, demo",
+          "qt_smoke.py / qt_visibility.py: real Qt windows offscreen", "official --smoke-test", "focused n46 core tests (LIMITS text changed)"]
+ },
+ "criteria": {
+  "same_environment": "bitwise equality of status, reason, s, D, field w, w_bar, history text, field file name (no new tolerance)",
+  "historical_controls": "cases.json -> comparison of 1d6af27, unchanged",
+  "export": "role -> file: accepted field.csv / research field_research.csv / diagnostic field_diagnostic.csv / none"
+ },
+ "results": {
+  "changed_tests": "34 passed",
+  "gui_tests_without_controls": "506 passed, 12 skipped",
+  "gui_tests_with_controls": "535 passed, 11 skipped (env: control data from Python 3.13.15, here 3.14.8)",
+  "core_n46_focused": "193 passed",
+  "gui_check": "all route/export/refusal/schema/demo checks PASS except the observations below (explained, non-blocking)",
+  "qt_smoke": "PASS (offscreen)",
+  "official_smoke_test": "exit 0, CONVERGED",
+  "git_diff_check": "OK", "uv_lock_check": "OK", "hook_self_test": "ALL PASSED", "ruff_new_violations": 0
+ },
+ "observations": {
+  "N1": "R4 w_bar = w*D/(q*a^4) computed by the GUI since 306e85a (not in the P1 diff); <= 1 ulp from CLI w/w_scale; w bitwise equal",
+  "N2": "SSSS N=4-6 history w_max in cell units (labelled 'max|w_bar| (cell)', [1]); CLI history.csv w_max in m",
+  "N3": "R4 normative NOT_QUALIFIED end classified research (field_research.csv); report shows 's = 1 of requested 100'",
+  "N4": "RN-5 conservative refusal in C6 (D-068 QA); GUI shows the solver decision",
+  "N5": "ruff F401 CRASH in runs.py pre-existing",
+  "N6": "partial package on a figure rendering failure not tested"
+ },
+ "blockers": []
+}

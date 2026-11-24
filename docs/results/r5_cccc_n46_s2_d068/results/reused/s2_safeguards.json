@@ -1,0 +1,569 @@
+{
+ "A0 baseline order: QR(T), s1 solve, RN-5, QR(V), RT-7 immediately, s2 solve": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7",
+    "solve_given2",
+    "solve_bc2"
+   ],
+   "status": "COMPLETED_FIXED_HALF_STEPS"
+  }
+ },
+ "A1 proven dependence stops before QR (no RN-5, no 2nd QR)": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1"
+   ],
+   "status": "STOP_BEFORE_QR_S1",
+   "step2": {
+    "s": 2,
+    "status": "STOP_BEFORE_QR_S1",
+    "done": false,
+    "qr_executed": false,
+    "G_none": true,
+    "A_none": true,
+    "V_none": true,
+    "rn5": null,
+    "rt7": null,
+    "reason": "точный ранг решённого набора V 3 < N = 4 (D-049.5, п. 2) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+   }
+  }
+ },
+ "A2 RN-5 refusal stops before QR": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5"
+   ],
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "reason": "RN-5 не выполнен (RN5_UNRESOLVED: QA injected refusal); QR решённого набора не выполняется. N не понижается, регуляризации нет (D-065, 7 C) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A3a grid 33x33: > 32 stops before RN-5 and QR, s1 diagnostic": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1"
+   ],
+   "reason": "N = 4, s = 2: сетка 33 × 33 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A3b grid 9x33: > 32 stops before RN-5 and QR, s1 diagnostic": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1"
+   ],
+   "reason": "N = 4, s = 2: сетка 9 × 33 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A3c grid 33x9: > 32 stops before RN-5 and QR, s1 diagnostic": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1"
+   ],
+   "reason": "N = 4, s = 2: сетка 33 × 9 вне области D-065.5 (n_x, n_y ≤ 32); сертификат не строится, QR не выполняется (D-057.1, п. 2) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A4 RT-7 refusal after QR, before s2 assembly/solve; G2 not used": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7"
+   ],
+   "step2": {
+    "s": 2,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "done": false,
+    "qr_executed": true,
+    "G_none": false,
+    "A_none": true,
+    "V_none": true,
+    "rn5": "RN5_CERTIFIED",
+    "rt7": false,
+    "reason": "RT-7 не выполнен после QR (QA injected RT-7 refusal); G2 не используется (D-065, 7 E) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+   }
+  }
+ },
+ "A5a RN-5 certified but eps/sigma missing: RT-7 R7-2 refuses, no s2": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7"
+   ],
+   "reason": "RT-7 не выполнен после QR (R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1); G2 не используется (D-065, 7 E) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A5b RN-5 eps/sigma as float (malformed): RT-7 R7-2 refuses, no s2": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7"
+   ],
+   "reason": "RT-7 не выполнен после QR (R7-2: RN-5 не выполнен на этом расчёте или не 0 ≤ t < 1); G2 не используется (D-065, 7 E) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A5c RN-5 record empty: no continuation (exception, no QR of V, no s2)": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5"
+   ],
+   "exception": "KeyError: 'certified'"
+  }
+ },
+ "A6a C-3+ premise failure at s2 -> UNRESOLVED_C3PLUS_PREMISE, s2 not completed": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7",
+    "solve_given2"
+   ],
+   "status": "UNRESOLVED_C3PLUS_PREMISE",
+   "reason": "QA injected: P-2 at s = 2 [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A6b nonfinite s2 solution -> ERROR_NONFINITE, s2 not completed": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7",
+    "solve_given2",
+    "solve_bc2"
+   ],
+   "status": "ERROR_NONFINITE",
+   "reason": "V не конечно [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A6c factorization failure at s2 (real Cholesky on -A) -> PROTECTIVE_STOP_FACTORIZATION, s2 not completed": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7",
+    "solve_given2",
+    "solve_bc2"
+   ],
+   "status": "PROTECTIVE_STOP_FACTORIZATION",
+   "reason": "Холецкий DM или A: Matrix is not positive definite [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+  }
+ },
+ "A7 half_steps=3: stop before the QR of s3; s2 diagnostic": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7",
+    "solve_given2",
+    "solve_bc2"
+   ],
+   "step3": {
+    "s": 3,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "done": false,
+    "qr_executed": false,
+    "G_none": true,
+    "A_none": true,
+    "V_none": true,
+    "rn5": null,
+    "rt7": null,
+    "reason": "N = 4, s = 3: защитная остановка до QR решённого набора X; полушаги s ≥ 3 не разрешены (D-065). N не понижается, регуляризации и рангового допуска нет. [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+   }
+  }
+ },
+ "A7 half_steps=8: stop before the QR of s3; s2 diagnostic": {
+  "pass": true,
+  "detail": {
+   "events": [
+    "qr",
+    "solve_given1",
+    "solve_bc1",
+    "rn5",
+    "qr",
+    "rt7",
+    "solve_given2",
+    "solve_bc2"
+   ],
+   "step3": {
+    "s": 3,
+    "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+    "done": false,
+    "qr_executed": false,
+    "G_none": true,
+    "A_none": true,
+    "V_none": true,
+    "rn5": null,
+    "rt7": null,
+    "reason": "N = 4, s = 3: защитная остановка до QR решённого набора X; полушаги s ≥ 3 не разрешены (D-065). N не понижается, регуляризации и рангового допуска нет. [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]"
+   }
+  }
+ },
+ "C0 CLI s2 success: exit 0, field_research.csv": {
+  "pass": true,
+  "detail": [
+   "factors.csv",
+   "field_research.csv",
+   "history.csv",
+   "result.json"
+  ]
+ },
+ "C1 dependence: exit 6, diagnostic field of the last completed half-step only": {
+  "pass": true,
+  "detail": {
+   "exit": 6,
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "status": "STOP_BEFORE_QR_S1",
+   "completed": 1,
+   "field_comment": "# DIAGNOSTIC: статус STOP_BEFORE_QR_S1; поле полушага s = 1. Не результат расчёта. RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED; поле полушага s = 1, N = 4.",
+   "field_half_step": 1
+  }
+ },
+ "C2 RN-5 refusal: exit 6, diagnostic field of the last completed half-step only": {
+  "pass": true,
+  "detail": {
+   "exit": 6,
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "completed": 1,
+   "field_comment": "# DIAGNOSTIC: статус STOPPED_RANK_GUARD_UNCERTIFIED; поле полушага s = 1. Не результат расчёта. RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED; поле полушага s = 1, N = 4.",
+   "field_half_step": 1
+  }
+ },
+ "C3 grid 33: exit 6, diagnostic field of the last completed half-step only": {
+  "pass": true,
+  "detail": {
+   "exit": 6,
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "completed": 1,
+   "field_comment": "# DIAGNOSTIC: статус STOPPED_RANK_GUARD_UNCERTIFIED; поле полушага s = 1. Не результат расчёта. RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED; поле полушага s = 1, N = 4.",
+   "field_half_step": 1
+  }
+ },
+ "C4 RT-7 refusal: exit 6, diagnostic field of the last completed half-step only": {
+  "pass": true,
+  "detail": {
+   "exit": 6,
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "completed": 1,
+   "field_comment": "# DIAGNOSTIC: статус STOPPED_RANK_GUARD_UNCERTIFIED; поле полушага s = 1. Не результат расчёта. RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED; поле полушага s = 1, N = 4.",
+   "field_half_step": 1,
+   "h2_done": false,
+   "h2_qr": true,
+   "h2_rt7": false,
+   "h2_reason": "RT-7 не выполнен после QR (QA injected RT-7 refusal); G2 не используется (D-065, 7 E) [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]",
+   "s2_roles_in_factors": [
+    "G",
+    "R",
+    "companion"
+   ],
+   "factors_comment": "# RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED; F — вектор: j = 1.",
+   "factors_note": "матрицы полушагов s = 1 и s = 2 поэлементно; значения через repr; при s = 2 G — это G2, V — это X",
+   "history_row2_status": "STOPPED_RANK_GUARD_UNCERTIFIED"
+  }
+ },
+ "C5 half_steps 3: exit 6, diagnostic field of the last completed half-step only": {
+  "pass": true,
+  "detail": {
+   "exit": 6,
+   "files": [
+    "factors.csv",
+    "field_diagnostic.csv",
+    "history.csv",
+    "result.json"
+   ],
+   "status": "STOPPED_RANK_GUARD_UNCERTIFIED",
+   "completed": 2,
+   "field_comment": "# DIAGNOSTIC: статус STOPPED_RANK_GUARD_UNCERTIFIED; поле полушага s = 2. Не результат расчёта. RESEARCH_ONLY / PROVISIONAL / NOT_QUALIFIED; поле полушага s = 2, N = 4.",
+   "field_half_step": 2
+  }
+ },
+ "T1 stop run with --overwrite replaces the set: no stale field_research.csv": {
+  "pass": true,
+  "detail": [
+   "factors.csv",
+   "field_diagnostic.csv",
+   "history.csv",
+   "result.json"
+  ]
+ },
+ "T2 outside domain N=7 keeps earlier files": {
+  "pass": true,
+  "detail": {
+   "exit": 2,
+   "unchanged": true,
+   "stderr": "Значений решения нет.\nПричина: N должно быть 4, 5 или 6, получено 7; N = 1 — команда run-cccc-n1, N = 2, 3 — run-cccc-n23\nПрежние файлы результатов в <QA_WORKTREE>\\scratch\\d068_s2\\cli\\trans не изменены: result.json, history.csv, field_diagnostic.csv, factors.csv.\n"
+  }
+ },
+ "T3 existing results without --overwrite: refused, unchanged": {
+  "pass": true,
+  "detail": {
+   "exit": 2,
+   "unchanged": true,
+   "stderr": "Расчёт не выполнен: в <QA_WORKTREE>\\scratch\\d068_s2\\cli\\trans уже есть файлы результатов: result.json, history.csv, field_diagnostic.csv, factors.csv. Укажите другую папку или --overwrite\n"
+  }
+ },
+ "T4 Ctrl+C (KeyboardInterrupt) exit 130, unchanged": {
+  "pass": true,
+  "detail": {
+   "exit": 130,
+   "unchanged": true,
+   "stderr": "Расчёт прерван пользователем; результаты этого расчёта не сохранены.\nПрежние файлы результатов в <QA_WORKTREE>\\scratch\\d068_s2\\cli\\trans не изменены: result.json, history.csv, field_diagnostic.csv, factors.csv.\n"
+  }
+ },
+ "T5 ERROR_NONFINITE at s2 keeps earlier files": {
+  "pass": true,
+  "detail": {
+   "exit": 3,
+   "unchanged": true,
+   "stderr": "я этого полушага нет.\nПричина: V не конечно [N = 4–6: исполнение s ≥ 2 разрешено D-068 (последовательность D-065, 7 C–G)]\nПрежние файлы результатов в <QA_WORKTREE>\\scratch\\d068_s2\\cli\\trans не изменены: result.json, history.csv, field_diagnostic.csv, factors.csv.\n"
+  }
+ },
+ "T6 success with --overwrite after a stop: field_research.csv, no diagnostic": {
+  "pass": true,
+  "detail": [
+   "factors.csv",
+   "field_research.csv",
+   "history.csv",
+   "result.json"
+  ]
+ },
+ "interfaces_parent_vs_commit": {
+  "n1_hs3": {
+   "exit": [
+    0,
+    0
+   ],
+   "same_file_set": true,
+   "bitwise": {
+    "factors.csv": true,
+    "field_research.csv": true,
+    "history.csv": true
+   },
+   "result_json_diff_keys": [],
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": true
+  },
+  "n23_N3_hs2": {
+   "exit": [
+    0,
+    0
+   ],
+   "same_file_set": true,
+   "bitwise": {
+    "factors.csv": true,
+    "field_research.csv": true,
+    "history.csv": true
+   },
+   "result_json_diff_keys": [],
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": true
+  },
+  "n23_N2_hs3": {
+   "exit": [
+    6,
+    6
+   ],
+   "same_file_set": true,
+   "bitwise": {
+    "factors.csv": true,
+    "field_diagnostic.csv": true,
+    "history.csv": true
+   },
+   "result_json_diff_keys": [],
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": false
+  },
+  "ssss_N2": {
+   "exit": [
+    0,
+    0
+   ],
+   "same_file_set": true,
+   "bitwise": {
+    "field_research.csv": true,
+    "history.csv": true
+   },
+   "result_json_diff_keys": [],
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": true
+  },
+  "ssss_N1": {
+   "exit": [
+    0,
+    0
+   ],
+   "same_file_set": true,
+   "bitwise": {
+    "field.csv": true,
+    "history.csv": true
+   },
+   "result_json_diff_keys": [],
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": true
+  },
+  "n46_hs1_C4": {
+   "exit": [
+    0,
+    0
+   ],
+   "same_file_set": true,
+   "bitwise": {
+    "factors.csv": true,
+    "field_research.csv": true,
+    "history.csv": false
+   },
+   "result_json_diff_keys": [
+    "factors",
+    "fixed_half_steps_only",
+    "half_steps_executable",
+    "history",
+    "limits",
+    "model",
+    "numerical_policy",
+    "rank",
+    "rank_guard_rule",
+    "schema",
+    "status_note"
+   ],
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": true
+  },
+  "n46_hs1_40": {
+   "exit": [
+    0,
+    0
+   ],
+   "same_file_set": true,
+   "bitwise": {
+    "factors.csv": true,
+    "field_research.csv": true,
+    "history.csv": false
+   },
+   "result_json_diff_keys": [
+    "factors",
+    "fixed_half_steps_only",
+    "half_steps_executable",
+    "history",
+    "limits",
+    "model",
+    "numerical_policy",
+    "rank",
+    "rank_guard_rule",
+    "schema",
+    "status_note"
+   ],
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": true
+  },
+  "n23_refuse_N4": {
+   "exit": [
+    2,
+    2
+   ],
+   "same_file_set": true,
+   "bitwise": {},
+   "result_json_diff_keys": [
+    "reason"
+   ],
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": false
+  },
+  "ssss_bc_CCCC": {
+   "exit": [
+    2,
+    2
+   ],
+   "same_file_set": true,
+   "bitwise": {},
+   "result_json_diff_keys": null,
+   "parent_module": "<QA_WORKTREE>\\scratch\\d068_s2\\parent_src\\src\\kkvim\\__init__.py",
+   "commit_module": "<QA_WORKTREE>\\src\\kkvim\\__init__.py",
+   "stderr_equal": false
+  }
+ }
+}

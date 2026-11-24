@@ -9,8 +9,9 @@ File `articles/<topic id>.md`:
     summary: One or two sentences: the tooltip text and the lead of the article.
     keywords: comma, separated, words
     related: param.geometry.b, param.geometry.h
-    sources: semicolon; separated; references
-    status: stub
+    sources: semicolon; separated; project basis (developer metadata, not shown)
+    citations: entries separated by "|"; scientific literature shown as «Источники и цитирование»
+    status: draft
     ---
     Markdown body
 
@@ -61,6 +62,7 @@ class Article:
     keywords: tuple = ()
     related: tuple = ()
     sources: tuple = ()
+    citations: tuple = ()
 
 
 def _split(value, sep):
@@ -104,6 +106,7 @@ def parse_article(text, name="<text>"):
         keywords=_split(meta.get("keywords", ""), ","),
         related=_split(meta.get("related", ""), ","),
         sources=_split(meta.get("sources", ""), ";"),
+        citations=_split(meta.get("citations", ""), "|"),
     )
 
 
