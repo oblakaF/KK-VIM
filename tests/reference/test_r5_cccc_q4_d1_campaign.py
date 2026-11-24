@@ -462,11 +462,19 @@ def test_stale_local_main_and_an_unreachable_remote_are_defects(gate_repo, tmp_p
     _git(repo, "remote", "add", "origin", str(bare))
     _git(repo, "push", "-q", str(bare), "HEAD:refs/heads/main")
     assert pl.remote_main_defects(repo) == []
+    initial = _git(repo, "rev-parse", "--verify", pl.INTEGRATION_REF)
     (repo / "note.txt").write_text("x", encoding="utf-8")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "later")
-    _git(repo, "push", "-q", str(bare), "HEAD:refs/heads/main")  # by its path: the local ref of origin stays behind
-    assert any("stale" in x for x in pl.remote_main_defects(repo))  # the local ref was not updated
+    _git(repo, "push", "-q", str(bare), "HEAD:refs/heads/main")  # the remote main moves on
+    # Some Git versions (e.g. 2.56) update the tracking ref opportunistically when the pushed URL is the one of origin: the stale
+    # local ref is constructed explicitly, in this temporary repository only.
+    _git(repo, "update-ref", pl.INTEGRATION_REF, initial)
+    remote = _git(repo, "ls-remote", "origin", "refs/heads/main").split()[0]
+    local = _git(repo, "rev-parse", "--verify", pl.INTEGRATION_REF)
+    assert local == initial and remote == _git(repo, "rev-parse", "HEAD") and remote != local
+    bad = pl.remote_main_defects(repo)
+    assert any("stale" in x for x in bad), bad  # the local ref is behind the remote
 
 
 def test_gate_requires_the_campaign_tools_in_the_addendum(gate_repo):

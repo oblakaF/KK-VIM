@@ -161,6 +161,22 @@ def _authorised_real_run(monkeypatch):
     def no_unit(*a, **k):
         raise AssertionError("a unit of the campaign was started")
     monkeypatch.setattr(c, "run_unit", no_unit)
+    _frozen_inputs_granted(monkeypatch)
+
+
+def _frozen_inputs_granted(monkeypatch):
+    """Test-only isolation of an unrelated pre-run prerequisite. The s = 1 input hashes and the start archive are frozen on the recorded
+    platform and depend on numpy.sin (OD-12): regenerated on another platform they differ bitwise and block every run before the controls
+    under test are reached. The regenerated values are replaced by the entries of the real frozen manifest read HERE, before a test alters
+    its own copy: the comparison in ``prerun_checks`` still runs, so a mismatch injected into the frozen manifest is still found. The real
+    validation, the controls parser, the classification and the state selection are not touched."""
+    want = [dict(x) for x in c.frozen_manifest()["d057"]["input_hashes_s1"]]
+    monkeypatch.setattr(rd, "input_hashes", lambda plan: [dict(x) for x in want])
+    monkeypatch.setattr(rd, "verify_archive", lambda arch: [])
+
+
+def _diag(doc: dict) -> str:
+    return f"state={doc.get('state')!r}; prerun={json.dumps(doc.get('prerun'), default=str)[:3000]}; reasons={doc.get('reasons')!r}"
 
 
 def test_control_v_fail_of_a_real_child_reaches_blocked_campaign(monkeypatch, tmp_path, dry_out):
@@ -186,9 +202,10 @@ def test_control_v_fail_of_a_real_child_reaches_blocked_campaign(monkeypatch, tm
     monkeypatch.setattr(c, "_controls_command", lambda cdir: [sys.executable, str(script), str(cdir)])
     _authorised_real_run(monkeypatch)
     doc = c.run_campaign(dry_out)
-    assert doc["prerun"]["controls_returncode"] == 1 and doc["prerun"]["controls_state"] == c.CONTROLS_VALID
-    assert doc["prerun"]["control_v_fail"] is True and doc["state"] == "BLOCKED_BEFORE_THE_RUN"
-    assert doc["verdict"]["verdict"] == "BLOCKED_CAMPAIGN" and "FAIL of the positive control V (protocol 6)" in doc["verdict"]["classifier"]["block_reasons"]
+    assert doc["prerun"]["input_hash_mismatch"] == [], _diag(doc)  # the positive control V alone blocks the campaign
+    assert doc["prerun"]["controls_returncode"] == 1 and doc["prerun"]["controls_state"] == c.CONTROLS_VALID, _diag(doc)
+    assert doc["prerun"]["control_v_fail"] is True and doc["state"] == "BLOCKED_BEFORE_THE_RUN", _diag(doc)
+    assert doc["verdict"]["verdict"] == "BLOCKED_CAMPAIGN" and "FAIL of the positive control V (protocol 6)" in doc["verdict"]["classifier"]["block_reasons"], _diag(doc)
     assert not (dry_out / "units").exists()
 
 
@@ -197,7 +214,7 @@ def test_unreadable_control_never_proceeds_and_repair_runs_it_again(mode, rc, mo
     _fake_command(monkeypatch, tmp_path, real_controls, mode, rc)
     _authorised_real_run(monkeypatch)
     doc = c.run_campaign(dry_out)
-    assert doc["state"].startswith("NOT_STARTED_CONTROLS_INVALID") and doc["verdict"]["verdict"] == rd.VERDICT_NOT_ISSUED and doc["reasons"]
+    assert doc["state"].startswith("NOT_STARTED_CONTROLS_INVALID") and doc["verdict"]["verdict"] == rd.VERDICT_NOT_ISSUED and doc["reasons"], _diag(doc)
     assert not (dry_out / "units").exists()
     _fake_command(monkeypatch, tmp_path, real_controls, "pass", 0)  # after the repair: not reused, read again; the run goes on to its first unit
     with pytest.raises(AssertionError, match="a unit of the campaign was started"):
@@ -208,7 +225,8 @@ def test_v_empty_does_not_start_and_is_not_a_fail_of_v(monkeypatch, tmp_path, dr
     _fake_command(monkeypatch, tmp_path, real_controls, "v_empty", 1)
     _authorised_real_run(monkeypatch)
     doc = c.run_campaign(dry_out)
-    assert doc["state"].startswith("NOT_STARTED_CONTROLS_MISMATCH") and "verdict" not in doc
+    assert doc["state"].startswith("NOT_STARTED_CONTROLS_MISMATCH") and "verdict" not in doc, _diag(doc)
+    assert doc["prerun"]["control_v_fail"] is False and doc["prerun"]["input_hash_mismatch"] == [], _diag(doc)
 
 
 def test_mismatched_input_hashes_reach_blocked_campaign(monkeypatch, tmp_path, dry_out, real_controls):
@@ -219,8 +237,9 @@ def test_mismatched_input_hashes_reach_blocked_campaign(monkeypatch, tmp_path, d
     monkeypatch.setattr(c, "frozen_manifest", lambda: frozen)
     monkeypatch.setattr(c, "plan_defects", lambda *a: [])
     doc = c.run_campaign(dry_out)
-    assert doc["state"] == "BLOCKED_BEFORE_THE_RUN" and doc["verdict"]["verdict"] == "BLOCKED_CAMPAIGN"
-    assert any("input hash mismatch" in x for x in doc["verdict"]["classifier"]["block_reasons"])
+    assert doc["prerun"]["input_hash_mismatch"] and doc["prerun"]["control_v_fail"] is False, _diag(doc)  # only the injected mismatch
+    assert doc["state"] == "BLOCKED_BEFORE_THE_RUN" and doc["verdict"]["verdict"] == "BLOCKED_CAMPAIGN", _diag(doc)
+    assert any("input hash mismatch" in x for x in doc["verdict"]["classifier"]["block_reasons"]), _diag(doc)
 
 
 def test_a_pr48_harness_that_crashes_is_a_tool_defect(monkeypatch, tmp_path, real_controls):
