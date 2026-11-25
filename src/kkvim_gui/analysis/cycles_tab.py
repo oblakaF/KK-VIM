@@ -75,7 +75,59 @@ class CycleFigure(QFrame):
         self.restyle()
         session.themeChanged.connect(self.restyle)
         session.figureLanguageChanged.connect(self.redraw)
+        self.tools = None
         self.redraw()
+        self._attach_tools()
+
+    COLUMNS = (("k", ""), ("s", ""), ("w_centre", "m"))
+
+    def _attach_tools(self):
+        """Chart tools (16, 20): the VIM-k points and the reference line of the same records as the table."""
+        from kkvim_gui.analysis.plot_tools import ChartInfo, ChartTools, Curve, default_style
+        from kkvim_gui.figures import publication as pub
+
+        table = self.table
+
+        def state_rows(k):
+            c = table.cycles[k - 1]
+            return [(c.k, c.s, c.w_m)] if c.on_graph else []
+
+        def ref_rows():
+            return [(None, None, table.ref_w_m)] if table.ref_w_m is not None and table.drawn else []
+
+        ref_name = "Навье" if table.reference == vim_cycles.NAVIER else "МКР D2"
+        ref_key = "legend.cycle.navier" if table.reference == vim_cycles.NAVIER else "legend.cycle.d2"
+        curves = [Curve(k, self.points[k], vim_cycles.label(k),
+                        lambda lang, k=k: fig_text(lang, "legend.cycle", label=vim_cycles.label(k), k=k, s=2 * k),
+                        lambda k=k: state_rows(k), replace_width(default_style(k - 1, "solid", SYMBOLS[k])))
+                  for k in range(1, vim_cycles.K_MAX + 1)]
+        curves.append(Curve("ref", self.reference, ref_name, lambda lang: fig_text(lang, ref_key), ref_rows,
+                            default_style(0, marker=None, reference=True)))
+        curves.append(Curve("connector", self.connector, "", lambda lang: "", None,
+                            pub.CurveStyle("#666666", 0.6, "dot", None), listed=False))
+        info = ChartInfo(
+            "vim_cycles", lambda lang: (fig_text(lang, "cycles.title"), fig_text(lang, "axis.cycle_k"),
+                                        fig_text(lang, "axis.w_centre")),
+            lambda: (("k", ""), ("w", "mm")), self.COLUMNS,
+            marks=lambda lang: (table.mark,) if table.mark else (), test_data=False,
+            identity=f"{table.solver} · N = {table.N} · q = {table.q!r} Pa",
+            meta={"solver": table.solver, "solver_status": table.solver_status},
+            x_ticks=lambda lang: tuple((k, f"{vim_cycles.label(k)} (s = {2 * k})") for k in range(1, vim_cycles.K_MAX + 1)),
+            ranges=lambda: ((0.5, vim_cycles.K_MAX + 0.5), None))
+        self.tools = ChartTools(self.session, self, self.plot, self.title, info, lambda: curves,
+                                shown_hook=self.set_visible, is_shown=lambda key: self.visible.get(key, False),
+                                home=self.go_home)
+
+    def go_home(self):
+        self.plot.setXRange(0.5, vim_cycles.K_MAX + 0.5)
+        self.plot.enableAutoRange(axis="y")
+
+    def grab(self, *args):
+        """A whole-figure grab is a saved figure (the calculation package): no chart tools, no interaction (16.7)."""
+        if args or self.tools is None:
+            return super().grab(*args)
+        with self.tools.interaction.hidden(self.tools.toolbar, *([self.tools.readout] if self.tools.readout else [])):
+            return super().grab()
 
     def restyle(self, *_):
         t = self.session.tokens
@@ -88,6 +140,8 @@ class CycleFigure(QFrame):
     def set_visible(self, key, shown):
         self.visible[key] = bool(shown)
         self.redraw()
+        if self.tools is not None:
+            self.tools.interaction.curves_changed()
 
     def drawn(self):
         """{k: (k, w in mm)} of the VIM states on the graph (the same records as the table) and the reference in mm."""
@@ -116,6 +170,13 @@ class CycleFigure(QFrame):
             self.legend.addItem(self.reference, fig_text(lang, key))
         self.plot.setXRange(0.5, vim_cycles.K_MAX + 0.5)
         self.plot.enableAutoRange(axis="y")
+
+
+def replace_width(style):
+    """A VIM-k state is a single point: a marker without a line in the file too."""
+    from dataclasses import replace
+
+    return replace(style, width=0.0, marker_size=4.5)
 
 
 def availability_text(table):
@@ -147,6 +208,7 @@ class CyclesTab(QWidget):
             box.setToolTip(table.cycles[k - 1].reason or vim_cycles.cycle_text(k))
             box.toggled.connect(lambda shown, key=k: self._toggle(key, key, shown))
             self.toggles[k] = box
+        # «Линии ▾» of the chart tools and these switches are one state: the menu sets the switch, which redraws
         ref_name = REF_KEYS.get(table.reference, "эталон")
         self.toggles["ref"] = QCheckBox(ref_name)
         self.toggles["ref"].setChecked(self.ref_key in self.display)
@@ -154,6 +216,7 @@ class CyclesTab(QWidget):
         self.toggles["ref"].setEnabled(table.ref_w_m is not None)
         self.toggles["ref"].setToolTip(table.reference_reason or vim_cycles.REFERENCE_TITLE.get(table.reference, ""))
         self.toggles["ref"].toggled.connect(lambda shown: self._toggle("ref", self.ref_key, shown))
+        self.figure.tools._shown_hook = lambda key, on: self.toggles[key].setChecked(on)
         self.figure.redraw()
         bar = toolbar(label("Показать:", "fieldLabel"), *self.toggles.values(),
                       trailing=(*trailing, FigureLanguageSwitch(session)))

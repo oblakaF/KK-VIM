@@ -198,7 +198,23 @@ class Figure(QFrame):
             axis = self.plot.getAxis(side)
             axis.setPen(t["plot.axis"])
             axis.setTextPen(t["plot.axis"])
+            axis.setTickPen(pg.mkPen(t["plot.axis"]))
         self.plot.showGrid(x=True, y=True, alpha=0.25)
+
+    def texts(self, lang):
+        """(title, x label, y label) in the figure language ``lang`` (publication export, P6)."""
+        return (fig_text(lang, self._title_key, **self._title_values),
+                *(fig_text(lang, self._axes[side]) if side in self._axes else "" for side in ("bottom", "left")))
+
+    def attach_tools(self, figure_id, curves, columns, axes, **info):
+        """The chart tools of 16 and 20 on this X–Y figure (``analysis.plot_tools``)."""
+        from kkvim_gui.analysis.plot_tools import ChartInfo, ChartTools, figure_marks, outcome_identity, outcome_meta
+
+        o = self.outcome
+        self.tools = ChartTools(self.session, self, self.plot, self.title, ChartInfo(
+            figure_id, self.texts, axes, columns, lambda lang: figure_marks(o, lang), o.is_demo, outcome_identity(o),
+            outcome_meta(o), **info), curves)
+        return self.tools
 
 
 class FieldFigure(Figure):
@@ -221,8 +237,9 @@ class FieldFigure(Figure):
         hx, hy = x[1] - x[0], y[1] - y[0]
         # every image pixel is centred on its node (axis 0 = x, axis 1 = y: column-major, as the solver array)
         self.rect = QRectF(x[0] - hx / 2, y[0] - hy / 2, x[-1] - x[0] + hx, y[-1] - y[0] + hy)
-        # isolines are traced through the node values: node (i, j) is drawn at (x_i, y_j)
-        self.node_transform = QTransform.fromTranslate(float(x[0]), float(y[0])).scale(float(hx), float(hy))
+        # isolines are traced through the node values: node (i, j) is drawn at (x_i, y_j). pyqtgraph's isocurve puts the
+        # value of index (i, j) at (i + 0.5, j + 0.5) (pixel centres), hence the half-cell shift back
+        self.node_transform = QTransform.fromTranslate(float(x[0] - hx / 2), float(y[0] - hy / 2)).scale(float(hx), float(hy))
         self.plot.setAspectLocked(True)
         self.bar = None if compact else pg.ColorBarItem(interactive=False, width=14)
         if self.bar is not None:
@@ -366,6 +383,16 @@ def padded(layout):
     layout.setSpacing(12)
     w.setLayout(layout)
     return w
+
+
+def scrolled(widget):
+    """The content of a tab in a vertical scroll area: a low window scrolls instead of squeezing figures (19.2)."""
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QFrame.Shape.NoFrame)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    scroll.setWidget(widget)
+    return scroll
 
 
 FIELD_ROLE_TEXT = {
@@ -805,6 +832,9 @@ class FieldsTab(QWidget):
         self.side_info = label("", "secondary", wrap=True)
         self.side_info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.figure.nodeSelected.connect(self.select_node)
+        from kkvim_gui.analysis.plot_tools import FieldPublisher
+
+        self.publisher = FieldPublisher(session, self.figure)  # «Рисунок для публикации…» of the colour map (P6)
         self.view.changed.connect(self.set_view)
         self._side_direction("x")
         self.set_view("map")
@@ -970,24 +1000,54 @@ class SectionsTab(QWidget):
         self.at_x.spin.valueChanged.connect(lambda _: self.update_y())
         self.update_x()
         self.update_y()
+        self.tools_x = self._tools(self.fig_x, self.curve_x, "x")
+        self.tools_y = self._tools(self.fig_y, self.curve_y, "y")
         bar = toolbar(labelled("w(x) при", self.at_y), labelled("w(y) при", self.at_x), trailing=trailing)
         bar.setToolTip(self.TOOLTIP)
         row = QHBoxLayout()
         row.addWidget(self.fig_x)
         row.addWidget(self.fig_y)
+        from kkvim_gui.analysis.plot_tools import FIGURE_MIN_HEIGHT
+
+        for fig in (self.fig_x, self.fig_y):
+            fig.setMinimumHeight(FIGURE_MIN_HEIGHT)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(page(bar, padded(row)))
+        lay.addWidget(page(bar, scrolled(padded(row))))
+
+    COLUMNS = (("i", ""), ("j", ""), ("x", "m"), ("y", "m"), ("w", "m"))
+
+    def section_rows(self, direction):
+        """The stored nodes of the drawn section (indices, x, y in m, w in m): exactly the solver array."""
+        o = self.outcome
+        if direction == "x":
+            j = self.at_y.index()
+            return [(i, j, float(o.x[i]), float(o.y[j]), float(o.w[i, j])) for i in range(len(o.x))]
+        i = self.at_x.index()
+        return [(i, j, float(o.x[i]), float(o.y[j]), float(o.w[i, j])) for j in range(len(o.y))]
+
+    def _tools(self, fig, curve, direction):
+        from kkvim_gui.analysis.plot_tools import Curve, default_style
+
+        n = self.outcome.request.N
+        curves = [Curve("kkvim", curve, f"КК-ВИМ, N = {n}", lambda lang: fig_text(lang, "legend.kkvim", N=n),
+                        lambda: self.section_rows(direction), default_style(0, "solid", "o"))]
+        return fig.attach_tools(f"section_{direction}", lambda: curves, self.COLUMNS,
+                                lambda: ((direction, "m"), ("w", "mm")))
 
     def update_x(self):
         j = self.at_y.index()
         self.curve_x.setData(self.outcome.x, self.outcome.w[:, j] * MM)
         self.fig_x.set_title("section.x.title", y=float(self.outcome.y[j]))
+        if getattr(self.fig_x, "tools", None) is not None:
+            self.fig_x.tools.rehome()
 
     def update_y(self):
         i = self.at_x.index()
         self.curve_y.setData(self.outcome.y, self.outcome.w[i, :] * MM)
         self.fig_y.set_title("section.y.title", x=float(self.outcome.x[i]))
+        if getattr(self.fig_y, "tools", None) is not None:
+            self.fig_y.tools.rehome()
 
 
 class ValuesTab(QWidget):
@@ -1057,6 +1117,7 @@ class HistoryTab(QWidget):
             self.curves[key] = plot.plot(xs, ys, pen=pg.mkPen(colour, width=2), symbol=symbol, symbolSize=6,
                                          symbolBrush=colour, name=fig_text(lang, f"legend.{key}"))
         params = dict(outcome.parameters)
+        self.tolerances = []
         for key, style, at in (("tol_inf", Qt.PenStyle.DashLine, 0.04), ("tol_E", Qt.PenStyle.DotLine, 0.14)):
             value = params.get(key)
             if value:
@@ -1065,6 +1126,8 @@ class HistoryTab(QWidget):
                                        label=fig_text(lang, f"legend.{key}"),
                                        labelOpts={"position": at, "color": t["text.secondary"]})
                 plot.addItem(line)
+                self.tolerances.append((key, float(value), "dash" if style == Qt.PenStyle.DashLine else "dot"))
+        self._attach_tools(outcome)
         headers = [c.title + (f", {c.unit}" if c.unit else "") for c in outcome.columns]
         keys = [c.key for c in outcome.columns]
         self.model = RowsModel(headers, len(outcome.history), lambda r: tuple(outcome.history[r].get(k) for k in keys))
@@ -1078,11 +1141,35 @@ class HistoryTab(QWidget):
         split.addWidget(self.figure)
         split.addWidget(intro)
         split.setSizes([360, 220])
+        split.setChildrenCollapsible(False)
+        from kkvim_gui.analysis.plot_tools import FIGURE_MIN_HEIGHT
+
+        self.figure.setMinimumHeight(FIGURE_MIN_HEIGHT)
         box = QVBoxLayout()
         box.addWidget(split)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(page(toolbar(trailing=trailing), padded(box)))
+        lay.addWidget(page(toolbar(trailing=trailing), scrolled(padded(box))))
+
+    def _attach_tools(self, outcome):
+        from kkvim_gui.analysis.plot_tools import Curve, default_style
+        from kkvim_gui.figures import publication as pub
+
+        def rows(key):
+            return [(row.get("s"), row.get(key)) for row in outcome.history if row.get(key) is not None]
+
+        marker = {"eps_inf": "o", "eps_E": "t"}
+        curves = [Curve(key, item, {"eps_inf": "ε^∞", "eps_E": "ε^E"}[key],
+                        lambda lang, k=key: fig_text(lang, f"legend.{k}"), lambda k=key: rows(k),
+                        default_style(i, "solid", marker[key]))
+                  for i, (key, item) in enumerate(self.curves.items())]
+
+        def ref_lines(lang):
+            return tuple(pub.RefLine(v, fig_text(lang, f"legend.{k}"), pub.CurveStyle(pub.BLACK, 0.75, dash, None))
+                         for k, v, dash in self.tolerances)
+
+        self.tools = self.figure.attach_tools("history", lambda: curves, (("s", ""), ("value", "1")),
+                                              lambda: (("s", ""), ("ε", "")), ref_lines=ref_lines)
 
 
 class EnergyTab(QWidget):
@@ -1101,6 +1188,14 @@ class EnergyTab(QWidget):
         self.curve = self.figure.plot.plot([p[0] for p in pairs], [p[1] for p in pairs],
                                            pen=pg.mkPen(colour, width=2), symbol="o", symbolSize=6,
                                            symbolBrush=colour)
+        from kkvim_gui.analysis.plot_tools import Curve, default_style
+
+        key = energy.key if energy is not None else "P"
+        unit = energy.unit if energy is not None else "N·m"
+        curves = [Curve(key, self.curve, "Π_h", lambda lang: "Π_h", lambda: [(a, b) for a, b in pairs],
+                        default_style(0, "solid", "o"))]
+        self.tools = self.figure.attach_tools("energy", lambda: curves, (("s", ""), ("Pi_h", unit)),
+                                              lambda: (("s", ""), ("Π_h", unit)))
         diag = Card("Диагностика невязки и остановки", right=label(outcome.mark or "KK-VIM", "tag"))
         last = outcome.history[-1] if outcome.history else {}
         rows = [("Статус решателя", outcome.status), ("Остановка", outcome.stop_text)]
@@ -1131,6 +1226,9 @@ class EnergyTab(QWidget):
         row = QHBoxLayout()
         row.addWidget(self.figure, 3)
         row.addWidget(diag, 2)
+        from kkvim_gui.analysis.plot_tools import FIGURE_MIN_HEIGHT
+
+        self.figure.setMinimumHeight(FIGURE_MIN_HEIGHT)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(page(toolbar(trailing=trailing), padded(row)))
+        lay.addWidget(page(toolbar(trailing=trailing), scrolled(padded(row))))

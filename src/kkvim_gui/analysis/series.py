@@ -225,6 +225,70 @@ class SeriesFigure(QFrame):
         self.redraw()
         self.reset_view()
         self.choose_default_active()
+        self._attach_tools()
+
+    def _attach_tools(self):
+        """Lines, style, enlarging, publication and CSV (16.3, 16.6–16.7, 20.2, 20.4) next to the verified Snap of PR #77:
+        the interaction, the right-click values window and the curve switches of the tab are kept as they are."""
+        from kkvim_gui.analysis.plot_tools import ChartInfo, ChartTools, Curve, default_style
+
+        items = {"kkvim": self.kkvim, "navier": self.navier, "d2": self.d2, **self.cycle_items}
+        legend = {"kkvim": lambda lang: fig_text(lang, "legend.series.kkvim"),
+                  "navier": lambda lang: fig_text(lang, "legend.series.navier", M=(self.data.navier or {}).get("M")),
+                  "d2": lambda lang: fig_text(lang, "legend.series.d2")}
+        styles = {"kkvim": default_style(0, "solid", "o"), "navier": default_style(1, "dash", "t", reference=True),
+                  "d2": default_style(1, "dash", "s")}
+
+        def rows(key):
+            get = value_columns(key, self.quantity)[0][1]
+            return [(p.q, get(p), p.run_id) for p in self.source_records(key)]
+
+        def cycle_legend(k):
+            return lambda lang: fig_text(lang, "legend.series.cycle", label=vim_cycles.label(k), k=k, s=2 * k)
+
+        curves = []
+        for key in CURVE_KEYS:
+            if isinstance(key, int):
+                lg, st = cycle_legend(key), default_style(1 + key, "dot", CYCLE_SYMBOLS[key])
+            else:
+                lg, st = legend[key], styles[key]
+            curves.append(Curve(key, items[key], "", lg, lambda k=key: rows(k), st))
+
+        def described():
+            for c in curves:
+                c.name = self.curve_name(c.key)
+            return curves
+
+        marks = sorted({p.mark for p in self.data.points if p.mark})
+        info = ChartInfo(
+            "load_series", lambda lang: (fig_text(lang, "series.title"), fig_text(lang, "axis.q"),
+                                         fig_text(lang, "axis.w_centre" if self.quantity == "centre" else "axis.w_maxabs")),
+            lambda: (("q", "kPa"), ("w", "mm")), (("q", "Pa"), ("w", "m"), ("run_id", "")),
+            marks=lambda lang: tuple(marks), test_data=False,
+            identity=f"Серия {self.data.series_id} · {self.data.supports} · N = {self.data.N} · сетка {self.data.grid[0]} × "
+                     f"{self.data.grid[1]}",
+            meta={"series_id": self.data.series_id, "quantity": self.quantity},
+            ranges=lambda: home_range(*self._visible_points()))
+        self.tools = ChartTools(self.session, self, self.plot, self.title, info, described, interaction=self.interaction,
+                                readout=False, shown_hook=self._tool_shown, is_shown=lambda k: self.shown.get(k, False),
+                                home=self.reset_view, context_menu=False, values_hook=self.show_values)
+        self.tool_switches = None  # the tab's curve switches, kept in step with «Линии ▾»
+
+    def _tool_shown(self, key, on):
+        box = (self.tool_switches or {}).get(key)
+        if box is not None:
+            box.setChecked(on)  # the switch redraws through set_shown
+        else:
+            self.set_shown(key, on)
+
+    def _visible_points(self):
+        xs, ys = [], []
+        for key in CURVE_KEYS:
+            if self.shown.get(key):
+                cx, cy = self._curve(key)
+                xs += cx
+                ys += cy
+        return xs, ys
 
     def drawn_curves(self):
         """(key, interface name, plot item) of every curve in the fixed order of CURVE_KEYS (drawn or not)."""
@@ -259,7 +323,8 @@ class SeriesFigure(QFrame):
 
     def export_pixmap(self):
         """The figure for a saved file: without the marker, projections, fixation, coordinate field and controls."""
-        with self.interaction.hidden(self.readout):
+        toolbar = getattr(getattr(self, "tools", None), "toolbar", None)
+        with self.interaction.hidden(self.readout, *([toolbar] if toolbar is not None else [])):
             return super().grab()
 
     def grab(self, *args):
@@ -639,6 +704,7 @@ class SeriesTab(QWidget):
             box.toggled.connect(lambda shown, k=key: self.figure.set_shown(k, shown))
             if isinstance(key, int):
                 box.setToolTip(f"{vim_cycles.cycle_text(key)}: при каждом q — из истории полушагов расчёта этой точки")
+        self.figure.tool_switches = self.toggles
         self.figure.redraw()  # no view change: the initial view covers every curve, shown or not
         self.figure.choose_default_active()  # the initial visibility is not a hiding by the user
         self.reset_button = QPushButton("Исходный вид")
