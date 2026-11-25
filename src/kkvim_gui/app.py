@@ -398,6 +398,7 @@ class SmokeTest:
             help_window.show_topic("verification.d2")
             self._shot(help_window, "screen_help_d2.png")
         paths = window.save_package(self.folder)
+        self._publication_and_report(window)
         e = o.extremum()
         manifest = json.loads(Path(paths["manifest"]).read_text(encoding="utf-8"))
         self.report.update(N=o.request.N, supports=o.request.supports, grid=[o.request.n_x, o.request.n_y], s=o.s,
@@ -424,7 +425,30 @@ class SmokeTest:
                   and manifest["statuses"]["field_role"] == o.field_role
                   and self.case.get("expect_d2", (run.d2 or {}).get("state")) == (run.d2 or {}).get("state")
                   and not self.report["processes_left"])
+        ok = ok and self.report.get("report_source_unchanged") is True  # the report only read the run (18.4 R5)
         self._finish(0 if ok else 1, "ok" if ok else "unexpected status or field role")
+
+    def _publication_and_report(self, window):
+        """P6–P7 of the installed application: a publication figure of the sections (PNG 300 dpi, SVG, PDF) and the
+        report folder with every available component (``analysis.report_dialog``), recorded in smoke.json."""
+        from kkvim_gui.analysis import report_dialog
+        from kkvim_gui.figures import publication
+
+        tools = window.sections.tools_x
+        figures = self.folder / "publication"
+        figures.mkdir(exist_ok=True)
+        saved = []
+        for fmt in publication.FORMATS:
+            name = publication.file_name(window.export_base(), "section_x", "en", window.outcome.is_demo, fmt)
+            saved.append(publication.save(tools.spec("en"), figures / name, fmt, 300).name)
+        chosen = {c.id for c in report_dialog.components(window) if c.available}
+        result = report_dialog.build_report(window, self.folder, chosen, "en", formats=("png", "svg", "pdf"))
+        manifest = json.loads(result["manifest"].read_text(encoding="utf-8"))
+        self.report["publication_files"] = saved
+        self.report["report_folder"] = str(result["folder"])
+        self.report["report_files"] = [f["path"] for f in manifest["files"]]
+        self.report["report_unavailable"] = manifest["report"]["unavailable"]
+        self.report["report_source_unchanged"] = manifest["source_data"]["unchanged"]
 
     def _cycles(self, window):
         """Open «Циклы VIM-1–3» as a user would: screenshots with every state and with VIM-2 hidden, the shown table."""
