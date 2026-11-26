@@ -430,7 +430,8 @@ class ChartTools(QObject):
 
     def _fill_figure_menu(self, menu):
         menu.clear()
-        menu.addAction("Рисунок для публикации…", self.open_publication_dialog).setShortcut(QKeySequence("Ctrl+E"))
+        # no shortcut here: Ctrl+E is the one window shortcut of AnalysisWindow (it acts on the graph used last)
+        menu.addAction("Рисунок для публикации…", self.open_publication_dialog)
         menu.addAction("Копировать рисунок", self.copy_figure)
         menu.addAction("Данные графика, CSV…", self._csv_dialog)
         values = menu.addMenu(SHOW_VALUES)
