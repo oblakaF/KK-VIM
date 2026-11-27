@@ -239,14 +239,41 @@ def write_result(outcome: RunOutcome, folder, run_meta=None, log=(), include_fie
     folder = new_folder(folder)
     suffix = "_TEST-DATA" if outcome.is_demo else ""
     paths = {"history": write_history_csv(outcome, folder / f"history{suffix}.csv")}
+    moments = {"available": False, "reason": "поле не выгружается" if outcome.has_field else "поля нет"}
     if include_field and outcome.has_field:
         paths["field"] = write_field_csv(outcome, folder / field_file_name(outcome))
+        moments = write_moments(outcome, folder, paths)
     files = {name: path.name for name, path in paths.items()}
     manifest_path = folder / f"manifest{suffix}.json"
-    manifest_path.write_text(json.dumps(manifest(outcome, run_meta, log, files), ensure_ascii=False, indent=2),
-                             encoding="utf-8")
+    document = manifest(outcome, run_meta, log, files)
+    document["moments"] = moments
+    manifest_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
     paths["manifest"] = manifest_path
     return paths
+
+
+def write_moments(outcome: RunOutcome, folder, paths: dict) -> dict:
+    """R6: moments_research.csv or moments_diagnostic.csv and moments.json (the CLI text of kkvim.cli_moments) in
+    ``folder``; ``paths`` gets "moments" and "moments_json". Returns the manifest block (status, files, or the reason)."""
+    from kkvim_gui.backend import kkvim_adapter
+
+    try:
+        files = kkvim_adapter.moment_files(outcome)
+    except kkvim_adapter.MomentsUnavailable as exc:
+        return {"available": False, "reason": str(exc)}
+    folder = Path(folder)
+    suffix = "_TEST-DATA" if outcome.is_demo else ""
+    stem = files["csv_name"][:-4]
+    csv_path = folder / f"{stem}{suffix}.csv"
+    csv_text = ("# TEST DATA" + chr(10) if outcome.is_demo else "") + files["csv"]
+    csv_path.write_text(csv_text, encoding="utf-8", newline="")
+    doc = dict(files["json"], file=csv_path.name, data_origin=outcome.origin)
+    json_path = folder / f"moments{suffix}.json"
+    json_path.write_text(json.dumps(doc, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
+    paths["moments"], paths["moments_json"] = csv_path, json_path
+    return {"available": True, "status": doc["status"], "role": doc["role"], "file": csv_path.name,
+            "document": json_path.name, "conventions": doc["conventions"],
+            "note": "R6 research postprocessing; the status of the displacement result is not transferred"}
 
 
 def _legacy_role(data: dict) -> str | None:

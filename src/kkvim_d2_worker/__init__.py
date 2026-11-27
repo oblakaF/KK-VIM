@@ -167,6 +167,10 @@ def main() -> int:
         request = json.loads(sys.stdin.read())
     except ValueError as exc:
         request = {"contract": None, "error": str(exc)}
-    sys.stdout.write(json.dumps(compute(request, t_entry), ensure_ascii=True))  # ASCII: independent of the code page
+    from kkvim_d2_worker import moments  # R6: the moment contract of this worker (kkvim_reference only)
+
+    r6 = isinstance(request, dict) and request.get("contract") == moments.CONTRACT
+    answer = moments.compute(request) if r6 else compute(request, t_entry)
+    sys.stdout.write(json.dumps(answer, ensure_ascii=True))  # ASCII: independent of the code page
     sys.stdout.flush()
     return 0
