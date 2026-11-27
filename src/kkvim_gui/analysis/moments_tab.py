@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QPushButton,
     QScrollArea,
@@ -241,18 +240,13 @@ class MomentsTab(QWidget):
         self.compare_view = table_view(RowsModel(("Величина", "Место", "КК-ВИМ, N", "Эталон, N", "Разность, N", "Отн."), 0,
                                                  lambda r: ()))
         self.compare_view.setMinimumHeight(180)
-        grid = QGridLayout()  # field | section along x; section along y | the comparison with the reference
-        grid.addWidget(self.field, 0, 0)
-        grid.addWidget(self.sec_x, 0, 1)
-        grid.addWidget(self.sec_y, 1, 0)
-        compare = QVBoxLayout()
-        compare.addWidget(self.ref_info)
-        compare.addWidget(self.compare_view, 1)
-        grid.addLayout(compare, 1, 1)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
+        # one column (field, section along x, section along y, the comparison): a narrow window scrolls vertically and
+        # never cuts a figure (the scroll area has no horizontal bar, 19.2)
+        column = QVBoxLayout()
+        for widget in (self.field, self.sec_x, self.sec_y, self.ref_info, self.compare_view):
+            column.addWidget(widget)
         left = QWidget()
-        left.setLayout(grid)
+        left.setLayout(column)
         panel = QScrollArea()
         panel.setWidgetResizable(True)
         panel.setFrameShape(QFrame.Shape.NoFrame)
@@ -261,7 +255,7 @@ class MomentsTab(QWidget):
         inner_lay.addWidget(self.info)
         inner_lay.addStretch(1)
         panel.setWidget(inner)
-        panel.setFixedWidth(360)
+        panel.setFixedWidth(330)
         row = QHBoxLayout()  # the figures scroll on a low window; the panel keeps its own scroll bar beside them
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(scrolled(left), 1)
