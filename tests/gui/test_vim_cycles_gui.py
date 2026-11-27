@@ -91,7 +91,7 @@ def test_cycles_tab_of_a_real_run_draws_the_table_records(main, qtbot):
     w = AnalysisWindow(main.session, main.run_rows(), run=run)
     qtbot.addWidget(w)
     titles = [w.tabs.tabText(i) for i in range(w.tabs.count())]
-    assert titles == [*SOLVER_TABS, TAB_TITLE]
+    assert titles == [*SOLVER_TABS, TAB_TITLE, "Моменты и напряжения"]  # R6 tab after the cycles
     tab = w.cycles
     t = tab.table
     assert t == vim_cycles.cycle_table(run.outcome, navier=run.navier)
@@ -157,7 +157,7 @@ def test_series_has_three_cycle_curves_from_every_point(main, qtbot, tmp_path):
     w = AnalysisWindow(main.session, main.run_rows(), run=run, series=data)
     qtbot.addWidget(w)
     titles = [w.tabs.tabText(i) for i in range(w.tabs.count())]
-    assert titles[0] == "Нагрузка — прогиб" and titles[-1] == TAB_TITLE  # completed series first (GUI-OWNER-UX-01)
+    assert titles[0] == "Нагрузка — прогиб" and titles[-2:] == [TAB_TITLE, "Моменты и напряжения"]  # series first
     assert set(w.series_tab.toggles) == {"kkvim", 1, 2, 3, "navier"}
     paths = w.save_package(tmp_path)
     manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))

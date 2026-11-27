@@ -142,7 +142,8 @@ def test_report_and_package_without_figures_hold_the_outcome_values(tmp_path):
                          s_max=kkvim_adapter.DEFAULTS["s_max"])
     o = kkvim_adapter.execute(request)
     paths = report.write_package(o, tmp_path / "pkg", {"run_id": 1})
-    assert set(paths) == {"manifest", "history", "field", "comparison", "report"}  # the benchmark square (Navier)
+    assert set(paths) == {"manifest", "history", "field", "moments", "moments_json", "comparison",  # + R6 moments
+                          "report"}  # the benchmark square (Navier)
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))
     e, c = o.extremum(), report.centre_node(o)
     assert c is not None and (c["i"], c["j"]) == (12, 12) and c["w"] == float(o.w[12, 12])
@@ -245,7 +246,7 @@ def test_workflow_matches_the_accepted_solver_and_saves_what_is_shown(qtbot, pre
     w_before = o.w.copy()
     paths = window.save_package(tmp_path / "saved")
     assert np.array_equal(o.w, w_before)  # the drawing factor never touches the values
-    files = {"manifest", "history", "field", "field_png", "surface_png", "report",
+    files = {"manifest", "history", "field", "moments", "moments_json", "field_png", "surface_png", "report",
              "vim_cycles", "vim_cycles_png"}  # SSSS N = 1: VIM-1 … VIM-3 of the run (GUI-VIM-CYCLES-123-01)
     c = window.comparison.comparison
     if c.has_numbers:  # SSSS: the Navier reference of these inputs; the tab's comparison is saved as well

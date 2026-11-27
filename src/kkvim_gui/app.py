@@ -77,6 +77,7 @@ class GuiApplication:
         self.main_window = MainWindow(session, dev=dev, demo=demo, protocol_dir=protocol_dir, preview=preview)
         self.main_window.analysisRequested.connect(self.open_analysis)
         self.main_window.seriesRequested.connect(self.open_series)
+        self.main_window.savedRunRequested.connect(self.open_saved)
         self.main_window.settingsRequested.connect(lambda: self.open_settings(self.main_window))
         self.main_window.helpRequested.connect(self.help.open_search)
         self.help.install(self.main_window)
@@ -94,6 +95,25 @@ class GuiApplication:
         run = self.main_window.analysis_run()
         window = AnalysisWindow(self.session, self.main_window.run_rows(), run=run, series=self.series_of(run))
         return self._show(window)
+
+    def open_saved(self, folder=None):
+        """«Открыть сохранённый расчёт…»: the analysis window of a saved result folder (GUI package or CLI folder); the
+        values are read from the files and never recomputed (``backend.saved_run``)."""
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+        from kkvim_gui.backend import saved_run
+
+        if folder is None:
+            folder = QFileDialog.getExistingDirectory(self.main_window, "Папка сохранённого расчёта")
+            if not folder:
+                return None
+        try:
+            outcome = saved_run.load(folder)
+        except (saved_run.SavedRunError, OSError, KeyError, ValueError) as exc:
+            QMessageBox.warning(self.main_window, "Расчёт не открыт", f"Папка не открыта как сохранённый расчёт: {exc}")
+            return None
+        record = saved_run.saved_record(outcome, folder)
+        return self._show(AnalysisWindow(self.session, saved_run.summary_rows(outcome), run=record))
 
     def open_series(self, series_id):
         """The «Нагрузка — прогиб» window of a finished load series."""
@@ -397,6 +417,7 @@ class SmokeTest:
             self.report["help_search_stop_shown_highlighted"] = [help_window.current_topic, help_window.highlighted_topic()]
             help_window.show_topic("verification.d2")
             self._shot(help_window, "screen_help_d2.png")
+        self._moments(window)
         paths = window.save_package(self.folder)
         self._publication_and_report(window)
         e = o.extremum()
@@ -426,7 +447,46 @@ class SmokeTest:
                   and self.case.get("expect_d2", (run.d2 or {}).get("state")) == (run.d2 or {}).get("state")
                   and not self.report["processes_left"])
         ok = ok and self.report.get("report_source_unchanged") is True  # the report only read the run (18.4 R5)
+        moments = self.report.get("moments", {})
+        ok = ok and moments.get("available") is True and moments.get("reference_state") == "ok"  # R6 research
         self._finish(0 if ok else 1, "ok" if ok else "unexpected status or field role")
+
+    def _moments(self, window):
+        """R6 of the installed application: «Моменты и напряжения» (M_x, M_xy, sigma_x bottom), the moment reference in
+        its own process (Navier and Levy for SSSS; D2 and Ritz for CCCC), screenshots and the values in smoke.json."""
+        import time as _time
+
+        tab = window.moments
+        window.tabs.setCurrentWidget(tab)
+        QApplication.processEvents()
+        record = {"available": not tab.unavailable_reason, "reason": tab.unavailable_reason}
+        if tab.unavailable_reason:
+            self.report["moments"] = record
+            return
+        values = {}
+        for key, surface in (("Mx", "bottom"), ("Mxy", "bottom"), ("sigma_x", "bottom")):
+            tab.quantity.setCurrentIndex(tab.quantity.findData(key))
+            tab.surface.setCurrentIndex(tab.surface.findData(surface))
+            QApplication.processEvents()
+            window.grab().save(str(self.folder / f"screen_moments_{key}.png"))
+            values[key] = tab.data.summary(key, surface)
+        values["My"] = tab.data.summary("My")
+        t0 = _time.monotonic()
+        tab.start_reference()
+        while tab.job is not None and _time.monotonic() - t0 < 300:
+            QApplication.processEvents()
+            _time.sleep(0.05)
+        tab.quantity.setCurrentIndex(tab.quantity.findData("Mx"))
+        QApplication.processEvents()
+        window.grab().save(str(self.folder / "screen_moments_reference.png"))
+        ref = tab.record or {}
+        record.update(status=tab.data.texts["status"], field_role=window.outcome.field_role,
+                      diagnostic=tab.data.diagnostic, summary=values, reference_state=ref.get("state"),
+                      reference_reason=ref.get("reason"), references=list(tab.refs),
+                      reference_s=round(_time.monotonic() - t0, 3),
+                      comparison=[list(r) for r in tab.comparison_rows()][:40],
+                      rounding_model_N=tab.data.moments.rounding_model)
+        self.report["moments"] = record
 
     def _publication_and_report(self, window):
         """P6–P7 of the installed application: a publication figure of the sections (PNG 300 dpi, SVG, PDF) and the

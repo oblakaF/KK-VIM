@@ -41,6 +41,12 @@ FIGURE_TITLES = {
     "d2_section_x": "КК-ВИМ и МКР D2: сечение при y_j",
     "d2_section_y": "КК-ВИМ и МКР D2: сечение при x_i",
     "load_series": "Нагрузка — прогиб",
+    "moments_Mx": "R6: изгибающий момент M_x(x, y) (RESEARCH / NOT_QUALIFIED)",
+    "moments_My": "R6: изгибающий момент M_y(x, y) (RESEARCH / NOT_QUALIFIED)",
+    "moments_Mxy": "R6: крутящий момент M_xy(x, y), соглашение L-107 (RESEARCH / NOT_QUALIFIED)",
+    "moments_sigma_x": "R6: напряжение σ_x на нижней поверхности z = +t/2 (RESEARCH / NOT_QUALIFIED)",
+    "moments_section_x": "R6: сечение выбранной величины при y_j (вкладка «Моменты и напряжения»)",
+    "moments_section_y": "R6: сечение выбранной величины при x_i (вкладка «Моменты и напряжения»)",
 }
 TABLE_TITLES = {
     "field_table": "Значения во всех узлах (поле решателя)",
@@ -49,6 +55,8 @@ TABLE_TITLES = {
     "vim_cycles_table": "Циклы VIM-1–3 (таблица)",
     "d2_field_table": "Поле МКР D2 во всех узлах",
     "chart_data": "Данные графиков (исходные значения видимых кривых)",
+    "moments_table": "R6: моменты и напряжения во всех узлах и сводка (moments_*.csv, moments.json)",
+    "moments_comparison_table": "R6: сравнение моментов с независимым эталоном (наблюдения, без порогов)",
 }
 
 
@@ -92,7 +100,31 @@ def components(window):
     out.append(Component("load_series", "figure", FIGURE_TITLES["load_series"],
                          window.series_tab.figure.tools if ok else None, ok,
                          "" if ok else "расчёт не входит в завершённую серию нагрузок"))
+    mt = getattr(window, "moments", None)
+    m_ok = mt is not None and not mt.unavailable_reason
+    m_reason = "" if m_ok else (mt.unavailable_reason if mt is not None else "вкладки моментов нет")
+    for key, surface in (("Mx", "bottom"), ("My", "bottom"), ("Mxy", "bottom"), ("sigma_x", "bottom")):
+        out.append(Component(f"moments_{key}", "figure", FIGURE_TITLES[f"moments_{key}"],
+                             mt.spec_source(key, surface) if m_ok else None, m_ok, m_reason))
+    for key, attr in (("moments_section_x", "tools_x"), ("moments_section_y", "tools_y")):
+        tools = getattr(mt, attr, None) if m_ok else None
+        ok = tools is not None and _has_points(tools)
+        out.append(Component(key, "figure", FIGURE_TITLES[key], tools, ok, "" if ok else (m_reason or "нет значений")))
     comparison = window.comparison.comparison
+    m_ref = m_ok and bool(mt.refs)
+    if m_ref:
+        ref_reason = ""
+    elif not m_ok:
+        ref_reason = m_reason
+    elif mt.record:
+        ref_reason = f"эталон моментов недоступен: {mt.record.get('reason') or mt.record.get('state')}"
+    else:
+        ref_reason = "эталон моментов не запрошен (кнопка «Сравнить с эталоном моментов»)"
+    out += [
+        Component("moments_table", "table", TABLE_TITLES["moments_table"], mt if m_ok else None, m_ok, m_reason),
+        Component("moments_comparison_table", "table", TABLE_TITLES["moments_comparison_table"], mt if m_ref else None,
+                  m_ref, ref_reason),
+    ]
     out += [
         Component("field_table", "table", TABLE_TITLES["field_table"], None, o.has_field, "поле не получено"),
         Component("history_table", "table", TABLE_TITLES["history_table"], None, bool(o.history), "истории нет"),
@@ -161,6 +193,35 @@ def plan(window, chosen, lang, formats=("png",), dpi=300, pdf=True, raw=True, wi
     table("d2_field_table", lambda f: [(package.write_d2_field_csv(o, by_id["d2_field_table"].source,
                                                                    Path(f) / "tables" / f"d2_field{suffix}.csv"), "csv",
                                         None)])
+    def moments_files(f):
+        import json
+
+        from kkvim_gui.backend import kkvim_adapter
+
+        files = kkvim_adapter.moment_files(o)
+        stem = files["csv_name"][:-4]
+        path = Path(f) / "tables" / f"{stem}{suffix}.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(("# TEST DATA" + chr(10) if test_data else "") + files["csv"], encoding="utf-8", newline="")
+        doc = Path(f) / "tables" / f"moments{suffix}.json"
+        doc.write_text(json.dumps(dict(files["json"], file=path.name, data_origin=o.origin), ensure_ascii=False,
+                                  indent=2, allow_nan=False), encoding="utf-8")
+        return [(path, "csv", None), (doc, "json", None)]
+
+    table("moments_table", moments_files)
+
+    def moments_comparison(f):
+        tab = by_id["moments_comparison_table"].source
+        path = Path(f) / "tables" / f"moments_comparison{suffix}.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        note = (f"# R6 moments: {tab.data.texts['status']}; reference {tab.ref_choice.currentText()}; "
+                "differences are observations (no threshold, no PASS/FAIL)")
+        export._write_csv(path, export._header_lines(o) + [note],
+                          ["quantity", "place", "kkvim [N]", "reference [N]", "difference [N]", "relative [1]"],
+                          tab.comparison_rows())
+        return [(path, "csv", None)]
+
+    table("moments_comparison_table", moments_comparison)
     if "chart_data" in chosen:
         def chart_data(f):
             out = []
@@ -268,18 +329,56 @@ def write_pdf(window, path, lang, figures, items, meta):
         n += 1
         doc.figure(c.source.spec(lang), f"Рис. {n}. {c.title}. Язык рисунка: {lang.upper()}; только видимые кривые; "
                                         "значения — сохранённые значения расчёта, без интерполяции.")
-    doc.heading("8. История полушагов", 1)
+    _moments_section(doc, window, o)
+    doc.heading("9. История полушагов", 1)
     keys = [col for col in o.columns if col.kind == "number"][:7]
     doc.table([f"{col.key}" + (f", {col.unit}" if col.unit else "") for col in keys],
               [[fmt(row.get(col.key), 6) for col in keys] for row in o.history])
-    doc.heading("9. Ограничения и примечания", 1)
+    doc.heading("10. Ограничения и примечания", 1)
     for text in (*o.limitations, *o.notes, *package.LIMITATIONS):
         doc.paragraph(f"• {text}", 7.5)
-    doc.heading("10. Состав папки отчёта", 1)
+    doc.heading("11. Состав папки отчёта", 1)
     doc.paragraph("manifest.json — входные данные, версии, статусы, происхождение и SHA256 каждого файла. "
                   + "; ".join(i.title for i in items if i.available and i.kind != "pdf"), 7.5)
     doc.close()
     return path
+
+
+def _num(value):
+    return "—" if value is None else repr(value)
+
+
+def _moments_section(doc, window, o):
+    """Section 8 of the PDF: the R6 moments and stresses (status, conventions, summary, comparison, limitations)."""
+    mt = getattr(window, "moments", None)
+    doc.heading("8. Моменты и напряжения (R6, исследование)", 1)
+    if mt is None or mt.unavailable_reason:
+        doc.paragraph(f"Недоступно: {mt.unavailable_reason if mt is not None else 'вкладки нет'}. Ничего не подставляется.")
+        return
+    from kkvim_gui.analysis.moments_tab import summary_rows
+    from kkvim_gui.backend import moments_view as mv
+
+    texts = mt.data.texts
+    text = f"Статус: {texts['status']}. Статус прогиба ({o.status}) на моменты и напряжения не переносится."
+    if o.diagnostic_only:
+        text += " ДИАГНОСТИКА: моменты поля последнего выполненного полушага, не результат."
+    doc.paragraph(text, 8, "#8A1C1C")
+    doc.key_values([("Соглашения", texts["conventions"]), ("Граничная кривизна CCCC", texts["cc_edge_rule"]),
+                    ("Модель округления", f"{mt.data.moments.rounding_model!r} N (модель, не граница)"),
+                    ("Не вычисляется", "; ".join(mv.NOT_COMPUTED))])
+    doc.table(("Величина", "Ед. СИ", "Центр", "Max", "Узел max", "Min", "Узел min"),
+              [(r[0], r[1], _num(r[2]), _num(r[3]), r[4], _num(r[5]), r[6]) for r in summary_rows(mt)])
+    if mt.refs:
+        rows = [r for r in mt.comparison_rows() if r[0] in ("Mx", "My", "Mxy")]
+        refs = " ".join(f"{ref['title']}: {ref['status']}." for ref in mt.refs.values())
+        doc.paragraph(f"Сравнение с эталоном «{mt.ref_choice.currentText()}»: разности — наблюдения, без порога и без "
+                      f"PASS/FAIL. {refs}", 7.5, "#555555")
+        doc.table(("Величина", "Место", "КК-ВИМ, N", "Эталон, N", "Разность, N", "Отн."),
+                  [(r[0], r[1], _num(r[2]), _num(r[3]), _num(r[4]), _num(r[5])) for r in rows])
+    else:
+        doc.paragraph("Эталон моментов для этого отчёта не запрашивался.", 7.5, "#555555")
+    for line in mv.LIMITATIONS_RU:
+        doc.paragraph(f"• {line}", 7.5)
 
 
 # ------------------------------------------------------------------------------------------------ dialog

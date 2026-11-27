@@ -301,6 +301,14 @@ class AnalysisWindow(QMainWindow):
         self.cycles = CyclesTab(s, self._cycle_table(), display=self.display)
         self.tabs.addTab(self.cycles, CYCLES_TITLE)
         self.tabs.setTabToolTip(self.tabs.count() - 1, CYCLES_TOOLTIP)
+        from kkvim_gui.analysis.moments_tab import TAB_TITLE as MOMENTS_TITLE
+        from kkvim_gui.analysis.moments_tab import TAB_TOOLTIP as MOMENTS_TOOLTIP
+        from kkvim_gui.analysis.moments_tab import MomentsTab
+
+        # R6 research: moments and stresses of the field (states why when there is none)
+        self.moments = MomentsTab(s, outcome, trailing=self._trailing())
+        self.tabs.addTab(self.moments, MOMENTS_TITLE)
+        self.tabs.setTabToolTip(self.tabs.count() - 1, MOMENTS_TOOLTIP)
         self.d2_tab = None
         if self._d2 is not None and self._d2.get("state") != "pending":
             self._add_d2_tab()

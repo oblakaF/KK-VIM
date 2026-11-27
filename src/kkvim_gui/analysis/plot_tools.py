@@ -999,11 +999,11 @@ class PublicationDialog(QDialog):
 class FieldPublisher(QObject):
     """Publication export of the static colour field (no X–Y tools: GUI-D13)."""
 
-    def __init__(self, session, figure, identity="", parent=None):
+    def __init__(self, session, figure, identity="", parent=None, figure_id="field"):
         super().__init__(parent or figure)
         self.session, self.figure = session, figure
         outcome = figure.outcome
-        self.info = ChartInfo("field", None, None, test_data=outcome.is_demo, identity=identity)
+        self.info = ChartInfo(figure_id, None, None, test_data=outcome.is_demo, identity=identity)
 
     def base_name(self):
         window = self.figure.window()
@@ -1016,15 +1016,19 @@ class FieldPublisher(QObject):
         lang = lang or self.session.figure_language
         f, o = self.figure, self.figure.outcome
         wq = f.quantity == "w"
+        own = getattr(f, "field_texts", None)  # a figure of another quantity (R6) names its own title and colour bar
+        title, colorbar = own(lang) if own is not None else (
+            fig_text(lang, "field.w.title" if wq else "field.wbar.title"), fig_text(lang, "colorbar.w" if wq else "colorbar.wbar"))
+        extra = getattr(f, "extra_marks", None)
+        meta = {"figure": self.info.figure_id, "run": self.base_name(), "solver": o.solver, "data_origin": o.origin,
+                "values": "stored solver field on the result nodes; colour scale only"}
+        meta.update(getattr(f, "extra_meta", dict)())
         return pub.FieldSpec(
-            title=fig_text(lang, "field.w.title" if wq else "field.wbar.title"),
-            x_label=fig_text(lang, "axis.x"), y_label=fig_text(lang, "axis.y"),
-            colorbar_label=fig_text(lang, "colorbar.w" if wq else "colorbar.wbar"),
+            title=title, x_label=fig_text(lang, "axis.x"), y_label=fig_text(lang, "axis.y"), colorbar_label=colorbar,
             x=tuple(float(v) for v in o.x), y=tuple(float(v) for v in o.y), values=f.values().copy(),
-            cmap=f.cmap_name, isolines=f.ISOLINES if f.show_isolines else 0, marks=figure_marks(o, lang),
-            test_data=o.is_demo, lang=lang,
-            meta={"figure": "field", "run": self.base_name(), "solver": o.solver, "data_origin": o.origin,
-                  "values": "stored solver field on the result nodes; colour scale only"})
+            cmap=f.cmap_name, isolines=f.ISOLINES if f.show_isolines else 0,
+            marks=tuple(figure_marks(o, lang)) + (tuple(extra(lang)) if extra is not None else ()),
+            test_data=o.is_demo, lang=lang, meta=meta)
 
     def copy_figure(self, lang=None):
         data = pub.mime_data(self.spec(lang))

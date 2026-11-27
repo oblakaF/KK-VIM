@@ -199,7 +199,8 @@ def test_r4_from_the_form_to_figures_history_and_export(qtbot, gui, tmp_path):
     with qtbot.waitSignal(w.analysisRequested):
         rv.analysis_button.click()
     a = gui.analysis_windows[-1]
-    assert a.outcome is o and [a.tabs.tabText(i) for i in range(a.tabs.count())] == [*SOLVER_TABS, "Циклы VIM-1–3"]
+    assert a.outcome is o and [a.tabs.tabText(i) for i in range(a.tabs.count())] == [*SOLVER_TABS, "Циклы VIM-1–3",
+        "Моменты и напряжения"]  # R6 tab
     assert a.tabs.isTabEnabled(SOLVER_TABS.index("Сравнение с эталоном"))
     c = a.comparison.comparison  # SSSS N = 2: the Navier reference of these inputs as reference data only
     assert c.state == "available" and c.live and any("справочные данные" in n for n in c.notes)
@@ -226,7 +227,8 @@ def test_r4_from_the_form_to_figures_history_and_export(qtbot, gui, tmp_path):
     paths = a.export_all(tmp_path / "export")
     data = json.loads(paths["manifest"].read_text(encoding="utf-8"))
     assert data["statuses"]["solver_status"] == o.status and data["marks"] == [MARK]
-    assert sorted(p.name for p in paths["manifest"].parent.iterdir()) == ["field_research.csv", "history.csv", "manifest.json"]
+    assert sorted(p.name for p in paths["manifest"].parent.iterdir()) == ["field_research.csv", "history.csv", "manifest.json",
+                                                                       "moments.json", "moments_research.csv"]  # R6
     assert data["statuses"]["field_role"] == "research" and data["statuses"]["field_file"] == "field_research.csv"
     for theme in ("dark", "light"):
         gui.session.set_theme(theme, persist=False)
