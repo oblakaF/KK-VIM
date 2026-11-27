@@ -159,6 +159,7 @@ class MomentsTab(QWidget):
         self.session, self.outcome = session, outcome
         self.data = mv.MomentsData.of(outcome) if outcome.has_field else None
         self.job, self.record, self.refs = None, None, {}
+        self.reference_refusal = mv.reference_refusal(outcome)  # R6-1: None when a moment reference may be compared
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         if self.data is None or not self.data.available:
@@ -236,6 +237,10 @@ class MomentsTab(QWidget):
         self.info.setTextFormat(Qt.TextFormat.RichText)
         self.info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.ref_info = label("Эталон моментов не запрошен.", "secondary", wrap=True)
+        if self.reference_refusal is not None:  # R6-1: a diagnostic field is never compared (as in «Сравнение»)
+            self.compare_button.setEnabled(False)
+            self.compare_button.setToolTip(self.reference_refusal)
+            self.ref_info.setText(f"{self.reference_refusal}<br>EN: {mv.reference_refusal(o, 'en')}")
         self.compare_model = None
         self.compare_view = table_view(RowsModel(("Величина", "Место", "КК-ВИМ, N", "Эталон, N", "Разность, N", "Отн."), 0,
                                                  lambda r: ()))
@@ -396,6 +401,9 @@ class MomentsTab(QWidget):
     def start_reference(self):
         if self.job is not None:
             return
+        if self.reference_refusal is not None:  # R6-1: refused also when called directly (not only a disabled button)
+            self.ref_info.setText(f"{self.reference_refusal}<br>EN: {mv.reference_refusal(self.outcome, 'en')}")
+            return
         if mv.reference_kind(self.outcome) is None:
             self.ref_info.setText("Для этого закрепления эталона моментов нет.")
             return
@@ -412,6 +420,12 @@ class MomentsTab(QWidget):
         self.set_reference(record)
 
     def set_reference(self, record):
+        if self.reference_refusal is not None:  # R6-1: a late or foreign answer is dropped, nothing is kept or shown
+            self.job, self.record, self.refs = None, None, {}
+            self.ref_choice.clear()
+            self.ref_choice.setEnabled(False)
+            self.update_view()
+            return
         self.record = record
         self.refs = mv.reference_fields(record)
         self.ref_choice.blockSignals(True)
@@ -432,6 +446,8 @@ class MomentsTab(QWidget):
 
     def comparison_rows(self):
         """Rows of the comparison table for the chosen reference (node fields) and the Navier/Levy points."""
+        if self.reference_refusal is not None:  # R6-1
+            return []
         name = self.ref_choice.currentData() if self.refs else None
         rows = []
         if name is not None:

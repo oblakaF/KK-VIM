@@ -144,6 +144,36 @@ def reference_kind(outcome) -> str | None:
     return {"SSSS": "navier", "CCCC": "d2"}.get(outcome.request.supports)
 
 
+# R6-1: the moments of a field that is not compared in the main comparison (``benchmarks.compare``: a diagnostic field,
+# an error, a run that did not end as requested, demonstration data or no field) are never compared with a moment
+# reference either. The rule is applied at the execution boundary (MomentsRefJob), at the comparison (compare), in the
+# tab (action, late answers) and in the report (component, CSV, PDF section); the diagnostic moments stay available.
+REFERENCE_DIAGNOSTIC_RU = "Сравнение не выполняется: поле диагностическое"  # = benchmarks.STATE_TITLE[DIAGNOSTIC]
+REFERENCE_DIAGNOSTIC_EN = "No comparison: the field is diagnostic"
+REFERENCE_NO_RUN_RU = "Сравнение не выполняется: нет поля решателя КК-ВИМ"
+REFERENCE_NO_RUN_EN = "No comparison: no KK-VIM solver field"
+
+
+class ReferenceRefused(Exception):
+    """A moment reference was requested for a field that is not compared (``reference_refusal``)."""
+
+
+def reference_refusal(outcome, lang="ru") -> str | None:
+    """Why the moments of ``outcome`` are not compared with a moment reference, or None when they may be.
+
+    The same rule as ``benchmarks.compare`` (the main comparison of the analysis window).
+    """
+    if outcome is None or outcome.is_demo or not outcome.has_field:
+        return REFERENCE_NO_RUN_RU if lang == "ru" else REFERENCE_NO_RUN_EN
+    if outcome.diagnostic_only or outcome.is_error or not outcome.requested_completed:
+        if lang == "ru":
+            return (f"{REFERENCE_DIAGNOSTIC_RU} (расчёт не завершён так, как запрошено: {outcome.status}); моменты и "
+                    "напряжения показаны как диагностика, с эталонами не сравниваются.")
+        return (f"{REFERENCE_DIAGNOSTIC_EN} (the run did not end as requested: {outcome.status}); its moments and "
+                "stresses are shown as diagnostics and are not compared with a reference.")
+    return None
+
+
 def reference_request(outcome) -> dict:
     r = outcome.request
     base = {"a": r.a, "b": r.b, "t": r.t, "E": r.E, "nu": r.nu, "q": r.q, "n_x": r.n_x, "n_y": r.n_y}
@@ -161,6 +191,9 @@ class MomentsRefJob:
     """One moment reference in its own process; ``poll`` never blocks; the answer is checked against the request."""
 
     def __init__(self, outcome, command=None, clock=time.monotonic, timeout=TIMEOUT):
+        refusal = reference_refusal(outcome)
+        if refusal is not None:  # R6-1: no reference process for a field that is not compared
+            raise ReferenceRefused(refusal)
         self.inputs = reference_request(outcome)
         self.clock, self.timeout, self.t0 = clock, timeout, clock()
         self.record = None
@@ -257,6 +290,9 @@ def named_nodes(outcome) -> list:
 
 def compare(data: MomentsData, ref: dict) -> list:
     """Rows (quantity, place, KK-VIM, reference, difference) and norms; differences only - observations."""
+    refusal = reference_refusal(data.outcome)
+    if refusal is not None:  # R6-1
+        raise ReferenceRefused(refusal)
     rows = []
     o = data.outcome
     nx, ny = len(o.x) - 1, len(o.y) - 1

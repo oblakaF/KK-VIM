@@ -111,11 +111,14 @@ def components(window):
         ok = tools is not None and _has_points(tools)
         out.append(Component(key, "figure", FIGURE_TITLES[key], tools, ok, "" if ok else (m_reason or "нет значений")))
     comparison = window.comparison.comparison
-    m_ref = m_ok and bool(mt.refs)
+    refusal = mt.reference_refusal if m_ok else None  # R6-1: a diagnostic field has no moment comparison
+    m_ref = m_ok and refusal is None and bool(mt.refs)
     if m_ref:
         ref_reason = ""
     elif not m_ok:
         ref_reason = m_reason
+    elif refusal is not None:
+        ref_reason = refusal
     elif mt.record:
         ref_reason = f"эталон моментов недоступен: {mt.record.get('reason') or mt.record.get('state')}"
     else:
@@ -211,7 +214,11 @@ def plan(window, chosen, lang, formats=("png",), dpi=300, pdf=True, raw=True, wi
     table("moments_table", moments_files)
 
     def moments_comparison(f):
+        from kkvim_gui.backend import moments_view as mv
+
         tab = by_id["moments_comparison_table"].source
+        if tab.reference_refusal is not None:  # R6-1: never written for a diagnostic field (export boundary)
+            raise mv.ReferenceRefused(tab.reference_refusal)
         path = Path(f) / "tables" / f"moments_comparison{suffix}.csv"
         path.parent.mkdir(parents=True, exist_ok=True)
         note = (f"# R6 moments: {tab.data.texts['status']}; reference {tab.ref_choice.currentText()}; "
@@ -368,7 +375,9 @@ def _moments_section(doc, window, o):
                     ("Не вычисляется", "; ".join(mv.NOT_COMPUTED))])
     doc.table(("Величина", "Ед. СИ", "Центр", "Max", "Узел max", "Min", "Узел min"),
               [(r[0], r[1], _num(r[2]), _num(r[3]), r[4], _num(r[5]), r[6]) for r in summary_rows(mt)])
-    if mt.refs:
+    if mt.reference_refusal is not None:  # R6-1: no comparison section of a diagnostic field
+        doc.paragraph(f"Сравнение с эталоном моментов: {mt.reference_refusal}", 7.5, "#8A1C1C")
+    elif mt.refs:
         rows = [r for r in mt.comparison_rows() if r[0] in ("Mx", "My", "Mxy")]
         refs = " ".join(f"{ref['title']}: {ref['status']}." for ref in mt.refs.values())
         doc.paragraph(f"Сравнение с эталоном «{mt.ref_choice.currentText()}»: разности — наблюдения, без порога и без "

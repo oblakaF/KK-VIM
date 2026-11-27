@@ -448,7 +448,15 @@ class SmokeTest:
                   and not self.report["processes_left"])
         ok = ok and self.report.get("report_source_unchanged") is True  # the report only read the run (18.4 R5)
         moments = self.report.get("moments", {})
-        ok = ok and moments.get("available") is True and moments.get("reference_state") == "ok"  # R6 research
+        ok = ok and moments.get("available") is True  # R6 research: the moments of every field with a solver field
+        not_compared = o.diagnostic_only or o.is_error or not o.requested_completed  # R6-1: as the main comparison
+        comparison_files = [f for f in self.report.get("report_files", []) if "moments_comparison" in f]
+        if not_compared:  # the diagnostic moments are shown; their reference comparison is unavailable on every path
+            ok = ok and bool(moments.get("reference_refused")) and moments.get("reference_state") is None \
+                and not moments.get("button_enabled") and not moments.get("references") \
+                and not moments.get("comparison") and not comparison_files
+        else:
+            ok = ok and moments.get("reference_state") == "ok" and bool(comparison_files)
         self._finish(0 if ok else 1, "ok" if ok else "unexpected status or field role")
 
     def _moments(self, window):
@@ -471,8 +479,9 @@ class SmokeTest:
             window.grab().save(str(self.folder / f"screen_moments_{key}.png"))
             values[key] = tab.data.summary(key, surface)
         values["My"] = tab.data.summary("My")
+        record["button_enabled"] = tab.compare_button.isEnabled()
         t0 = _time.monotonic()
-        tab.start_reference()
+        tab.start_reference()  # called directly also for a diagnostic field: it must refuse (R6-1)
         while tab.job is not None and _time.monotonic() - t0 < 300:
             QApplication.processEvents()
             _time.sleep(0.05)
@@ -483,6 +492,7 @@ class SmokeTest:
         record.update(status=tab.data.texts["status"], field_role=window.outcome.field_role,
                       diagnostic=tab.data.diagnostic, summary=values, reference_state=ref.get("state"),
                       reference_reason=ref.get("reason"), references=list(tab.refs),
+                      reference_refused=tab.reference_refusal, reference_info=tab.ref_info.text(),
                       reference_s=round(_time.monotonic() - t0, 3),
                       comparison=[list(r) for r in tab.comparison_rows()][:40],
                       rounding_model_N=tab.data.moments.rounding_model)
