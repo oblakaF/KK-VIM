@@ -47,7 +47,9 @@ SCHEMA = "kkvim.cli.r3/1"
 RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC = "result.json", "history.csv", "field.csv", "field_diagnostic.csv"
 FIELD_RESEARCH = "field_research.csv"  # run-ssss, N >= 2: a research field, never an accepted solution
 FACTORS = "factors.csv"  # run-cccc-n1: the factors of every half-step
-OUTPUTS = (RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC, FIELD_RESEARCH, FACTORS)
+# R6 (cli_moments): moment files belong to the run of the folder; a new run with --overwrite removes stale ones
+MOMENT_FILES = ("moments.json", "moments_research.csv", "moments_diagnostic.csv")
+OUTPUTS = (RESULT, HISTORY, FIELD, FIELD_DIAGNOSTIC, FIELD_RESEARCH, FACTORS) + MOMENT_FILES
 CALLS = ("kkvim.rectangle_run.run_rectangle_physical", "kkvim.rectangle_run.halfstep_report")
 
 # exit codes
@@ -170,6 +172,13 @@ def build_parser() -> argparse.ArgumentParser:
     cli_cccc_n23.add_parser(commands)
     from kkvim import cli_cccc_n46  # imports this module
     cli_cccc_n46.add_parser(commands)
+    from kkvim import cli_moments  # R6 research postprocessing (imports kkvim.moments only)
+    cli_moments.add_parser(commands)
+    for name, sub in commands.choices.items():
+        if name != "moments":
+            sub.add_argument("--moments", action="store_true",
+                             help="R6: после сохранения вычислить моменты и напряжения поля (moments_*.csv, moments.json; "
+                                  "RESEARCH / NOT_QUALIFIED; исходные файлы не меняются)")
     return parser
 
 
@@ -470,6 +479,31 @@ def main(argv=None) -> int:
     _utf8_streams()
     argv = list(sys.argv[1:] if argv is None else argv)
     args = build_parser().parse_args(argv)
+    if args.command == "moments":
+        from kkvim import cli_moments
+        return cli_moments.run_command(args.folder, args.z, args.overwrite, argv, lambda text: _say(sys.stdout, text))
+    code = _run(args, argv)
+    if not getattr(args, "moments", False):
+        return code
+    return _moments_after_run(args, argv, code)
+
+
+# exit codes after which the folder holds the results of this run (the moments may be computed)
+_SAVED_CODES = (EXIT_CONVERGED, EXIT_NOT_CONVERGED, EXIT_SOLVER_ERROR, 6)
+
+
+def _moments_after_run(args, argv, code: int) -> int:
+    """--moments: the R6 postprocessing of the folder just written; the run's exit code is kept unless it was 0."""
+    from kkvim import cli_moments
+
+    if code not in _SAVED_CODES or not (args.out / RESULT).is_file():
+        _say(sys.stderr, "Моменты не вычислены: результаты расчёта не сохранены.")
+        return code
+    m_code = cli_moments.run_command(args.out, None, True, argv, lambda text: _say(sys.stdout, text))
+    return m_code if code == EXIT_CONVERGED else code
+
+
+def _run(args, argv) -> int:
     if args.command == "run-ssss":
         from kkvim import cli_ssss
         return cli_ssss.main(args, argv)
