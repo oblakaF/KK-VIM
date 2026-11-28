@@ -19,11 +19,17 @@ figures carry the session-wide "Графики RU | EN" switch.
   history, next to the run's reference (Navier for SSSS, D2 for CCCC); rebuilt when a pending reference arrives.
 - «Нагрузка — прогиб» (``analysis.series``): only for a run of a finished load series.
 - Without a solver run (``--demo``): the layout with TEST DATA placeholders, never results.
+
+P5–P8 (GUI-P5-P8-COMPLETE-WORKFLOW-01): every X–Y graph carries the chart tools of ``analysis.plot_tools`` (lines, Snap,
+projections, fixed point, raw values, CSV, enlarging, style, publication export, copy); «Экспорт ▾» of a tab adds
+«Рисунок для публикации…» (Ctrl+E), «Копировать рисунок» and «Данные графика, CSV…» of the graph used last in the tab;
+«Собрать отчёт…» (GUI-D18) opens ``analysis.report_dialog``; Ctrl+Tab / Ctrl+Shift+Tab move between the tabs (12.2).
 """
 
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -295,6 +301,14 @@ class AnalysisWindow(QMainWindow):
         self.cycles = CyclesTab(s, self._cycle_table(), display=self.display)
         self.tabs.addTab(self.cycles, CYCLES_TITLE)
         self.tabs.setTabToolTip(self.tabs.count() - 1, CYCLES_TOOLTIP)
+        from kkvim_gui.analysis.moments_tab import TAB_TITLE as MOMENTS_TITLE
+        from kkvim_gui.analysis.moments_tab import TAB_TOOLTIP as MOMENTS_TOOLTIP
+        from kkvim_gui.analysis.moments_tab import MomentsTab
+
+        # R6 research: moments and stresses of the field (states why when there is none)
+        self.moments = MomentsTab(s, outcome, trailing=self._trailing())
+        self.tabs.addTab(self.moments, MOMENTS_TITLE)
+        self.tabs.setTabToolTip(self.tabs.count() - 1, MOMENTS_TOOLTIP)
         self.d2_tab = None
         if self._d2 is not None and self._d2.get("state") != "pending":
             self._add_d2_tab()
@@ -316,7 +330,10 @@ class AnalysisWindow(QMainWindow):
             self._navier_timer.setInterval(300)
             self._navier_timer.timeout.connect(self._check_navier)
             self._navier_timer.start()
-        self.report_button = None  # the report constructor (GUI-D18, P7) is not offered as a disabled button
+        self.report_button = QPushButton("Собрать отчёт…")
+        self.report_button.setToolTip("Конструктор отчёта (GUI-D18): выбор рисунков и таблиц, общий PDF, рисунки PNG/SVG/PDF, "
+                                      "язык рисунков, новая папка с manifest.json; XLSX — после утверждения зависимости")
+        self.report_button.clicked.connect(self.open_report_dialog)
         self.save_button = QPushButton("Сохранить расчёт и отчёт…")
         self.save_button.setProperty("variant", "primary")
         self.save_button.setToolTip("Папка расчёта: manifest.json, history.csv, field.csv, рисунки PNG, report.html и, "
@@ -325,11 +342,15 @@ class AnalysisWindow(QMainWindow):
         corner = QWidget()
         corner_lay = QHBoxLayout(corner)
         corner_lay.setContentsMargins(0, 4, 16, 4)
+        corner_lay.addWidget(self.report_button)
         corner_lay.addWidget(self.save_button)
         self.tabs.setCornerWidget(corner, Qt.Corner.TopRightCorner)
         self.tabs.setCurrentIndex(0)
         lay.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
+        self._last_tools = None
+        self._install_shortcuts()
+        self._watch_tools()
         mark = f" · {outcome.mark}" if outcome.mark else ""
         if outcome.is_error or outcome.diagnostic_only:
             cause = "расчёт завершился ошибкой" if outcome.is_error else "запрошенный расчёт не выполнен,"
@@ -382,6 +403,7 @@ class AnalysisWindow(QMainWindow):
         self.tabs.setTabToolTip(index, CYCLES_TOOLTIP)
         self.tabs.setCurrentIndex(current)
         old.deleteLater()
+        self._watch_tools()
 
     def _add_d2_tab(self):
         from kkvim_gui.analysis.d2_tab import TAB_TITLE, TAB_TOOLTIP, D2Tab
@@ -390,6 +412,7 @@ class AnalysisWindow(QMainWindow):
         index = self.tabs.indexOf(self.comparison) + 1
         self.tabs.insertTab(index, self.d2_tab, TAB_TITLE)
         self.tabs.setTabToolTip(index, TAB_TOOLTIP)
+        self._watch_tools()
 
     def set_navier(self, navier):
         from kkvim_gui.analysis.comparison import ComparisonTab
@@ -411,6 +434,77 @@ class AnalysisWindow(QMainWindow):
     def _trailing(self):
         return (FigureLanguageSwitch(self.session), self._export_button())
 
+    # Charts, publication, report (P5–P7) --------------------------------------------------------------
+
+    def export_base(self):
+        """``<run_id>`` of the file names of figures and reports (GUI_DESIGN.md 8.3)."""
+        return self._base_name() if self.outcome is not None else "kkvim_demo"
+
+    def _install_shortcuts(self):
+        self.shortcuts = []
+        for keys, slot in (("Ctrl+E", self.publish_current), ("Ctrl+Tab", lambda: self._step_tab(1)),
+                           ("Ctrl+Shift+Tab", lambda: self._step_tab(-1))):
+            s = QShortcut(QKeySequence(keys), self, slot, context=Qt.ShortcutContext.WindowShortcut)
+            self.shortcuts.append(s)
+
+    def _step_tab(self, step):
+        count = self.tabs.count()
+        self.tabs.setCurrentIndex((self.tabs.currentIndex() + step) % count)
+
+    def _watch_tools(self):
+        from kkvim_gui.analysis.plot_tools import ChartTools, tools_of
+
+        for tools in tools_of(self):
+            if isinstance(tools, ChartTools) and not getattr(tools, "_watched", False):
+                tools.used.connect(self._set_last_tools)
+                tools._watched = True
+
+    def _set_last_tools(self, tools):
+        self._last_tools = tools
+
+    def current_tools(self):
+        """The chart of the current tab used last (else its first visible chart), or None: the target of Ctrl+E."""
+        from kkvim_gui.analysis.plot_tools import tools_of
+
+        tab = self.tabs.currentWidget()
+        candidates = [t for t in tools_of(tab) if t.figure.isVisibleTo(tab) or not tab.isVisible()]
+        if self._last_tools in candidates:
+            return self._last_tools
+        return candidates[0] if candidates else None
+
+    def publish_current(self):
+        tools = self.current_tools()
+        if tools is None:
+            self.statusBar().showMessage("На этой вкладке нет рисунка для публикационного экспорта", 6000)
+            return None
+        return tools.open_publication_dialog()
+
+    def copy_current(self):
+        tools = self.current_tools()
+        if tools is None:
+            self.statusBar().showMessage("На этой вкладке нет рисунка для копирования", 6000)
+            return None
+        data = tools.copy_figure()
+        self.statusBar().showMessage("Рисунок скопирован в буфер обмена (публикационный вид, без элементов интерфейса)",
+                                     6000)
+        return data
+
+    def chart_csv_current(self):
+        from kkvim_gui.analysis.plot_tools import ChartTools
+
+        tools = self.current_tools()
+        if not isinstance(tools, ChartTools):
+            self.statusBar().showMessage("На этой вкладке нет графика X–Y", 6000)
+            return
+        tools._csv_dialog()
+
+    def open_report_dialog(self):
+        from kkvim_gui.analysis.report_dialog import ReportDialog
+
+        dialog = ReportDialog(self)
+        dialog.open()
+        return dialog
+
     def _export_button(self):
         button = QToolButton()
         button.setText("Экспорт ▾")
@@ -419,6 +513,13 @@ class AnalysisWindow(QMainWindow):
         menu.addAction("Все результаты: JSON + CSV…", self._export_all_dialog)
         menu.addAction("История полушагов, CSV…", self._export_history_dialog)
         menu.addAction("Поле прогиба, CSV…", self._export_field_dialog)
+        menu.addSeparator()
+        # the key is shown after the tab, not registered: the window QShortcut is the only Ctrl+E (no ambiguity)
+        menu.addAction("Рисунок для публикации…\tCtrl+E", self.publish_current)
+        menu.addAction("Копировать рисунок", self.copy_current)
+        menu.addAction("Данные графика, CSV…", self.chart_csv_current)
+        menu.addSeparator()
+        menu.addAction("Собрать отчёт…", self.open_report_dialog)
         button.setMenu(menu)
         button.setToolTip("Исходные данные, результаты и история вычислений с единицами и научными статусами")
         return button

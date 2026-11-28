@@ -260,7 +260,7 @@ def test_report_and_csv_reproduce_the_comparison_of_a_real_cccc_run(tmp_path):
     assert paths["comparison"].name == "comparison.csv"
     manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
     assert manifest["files"]["comparison"] == "comparison.csv" and manifest["schema_version"] == export.SCHEMA_VERSION
-    assert set(manifest["files"]) == {"history", "field", "comparison", "report"}
+    assert set(manifest["files"]) == {"history", "field", "moments", "moments_json", "comparison", "report"}  # + R6
     text = paths["report"].read_text(encoding="utf-8")
     assert f"6. {report.COMPARISON_TITLE}" in text and bm.dataset_text() in text and "проверено при чтении" in text
     assert "".join(f"<th>{html.escape(h)}</th>" for h in bm.HEADERS) in text

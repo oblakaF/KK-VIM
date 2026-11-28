@@ -511,7 +511,9 @@ class XYInteraction(QObject):
     @contextmanager
     def hidden(self, *widgets):
         """Nothing of the interaction (overlay items, the controls, ``widgets``) is drawn inside the block."""
-        saved = [(o, o.isVisible()) for o in (*self.items(), self.controls, *widgets)]
+        # a widget keeps its own state (isHidden): a figure in a tab that is not shown is not "hidden" by the restore
+        saved = [(o, not o.isHidden() if isinstance(o, QWidget) else o.isVisible())
+                 for o in (*self.items(), self.controls, *widgets)]
         for o, _ in saved:
             o.setVisible(False)
         try:

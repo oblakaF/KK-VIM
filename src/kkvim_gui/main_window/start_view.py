@@ -38,6 +38,7 @@ STEPS = (
 class StartView(QWidget):
     newRequested = Signal()
     openRequested = Signal()
+    savedRequested = Signal()  # «Открыть сохранённый расчёт…» (R6 workflow)
 
     def __init__(self, demo=False, parent=None):
         super().__init__(parent)
@@ -61,6 +62,12 @@ class StartView(QWidget):
         self.open_button.setToolTip("Открыть сохранённый проект: параметры расчёта без результатов (Ctrl+O)")
         self.open_button.clicked.connect(self.openRequested)
         actions.body.addWidget(self.open_button)
+        self.saved_button = QPushButton("Открыть сохранённый расчёт…")
+        self.saved_button.setMinimumHeight(36)
+        self.saved_button.setToolTip("Открыть папку сохранённого расчёта (пакет программы или папка CLI) в окне анализа: "
+                                     "значения читаются из файлов, ничего не пересчитывается; моменты — постобработка R6")
+        self.saved_button.clicked.connect(self.savedRequested)
+        actions.body.addWidget(self.saved_button)
         self.ready = StatusLabel("neutral" if demo else "success", "Демонстрационный режим" if demo else READY)
         actions.body.addWidget(self.ready)
         self.ready_text = label(DEMO_TEXT if demo else READY_TEXT, "secondary", wrap=True)

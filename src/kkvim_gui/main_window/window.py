@@ -81,6 +81,7 @@ ACTIVE_RUN_TEXT = "Во время расчёта параметры не мен
 class MainWindow(QMainWindow):
     analysisRequested = Signal()
     seriesRequested = Signal(int)
+    savedRunRequested = Signal()
     settingsRequested = Signal()
     helpRequested = Signal()
 
@@ -131,6 +132,7 @@ class MainWindow(QMainWindow):
 
         self.start_view.newRequested.connect(self.new_project)
         self.start_view.openRequested.connect(self.open_project)
+        self.start_view.savedRequested.connect(self.savedRunRequested)
         self.setup_view.runRequested.connect(self._start_run)
         self.setup_view.saveRequested.connect(self.save_project)
         self.setup_view.saveAsRequested.connect(self.save_project_as)

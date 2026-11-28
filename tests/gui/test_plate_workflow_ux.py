@@ -228,7 +228,8 @@ def test_analysis_tabs_and_live_navier_comparison(main, qtbot):
     run = run_single(main, qtbot)
     window = AnalysisWindow(main.session, main.run_rows(), run=run)
     qtbot.addWidget(window)
-    assert [window.tabs.tabText(i) for i in range(window.tabs.count())] == [*SOLVER_TABS, "Циклы VIM-1–3"]
+    assert [window.tabs.tabText(i) for i in range(window.tabs.count())] == [*SOLVER_TABS, "Циклы VIM-1–3",
+        "Моменты и напряжения"]  # R6 tab
     assert SOLVER_TABS == ("Результат", "Прогиб", "Сечения", "Значения в узлах", "Итерации", "Диагностика",
                            "Сравнение с эталоном")
     c = window.comparison.comparison

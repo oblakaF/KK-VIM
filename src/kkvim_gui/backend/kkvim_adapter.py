@@ -612,3 +612,73 @@ def _cccc_row(step, columns, n1_route) -> dict:
         if hasattr(value, "item") and not isinstance(value, (str, bytes)):
             row[key] = value.item()  # numpy scalars as Python values (read-only copies of the solver values)
     return row
+
+
+# ---- R6: moments and stresses of a field (research postprocessing; kkvim.moments) ---------------------------------
+# The GUI has no moment formula of its own: every moment, stress, principal value and summary is computed by
+# kkvim.moments, and the machine-readable files by kkvim.cli_moments (the same text as the CLI). Status of every value:
+# RESEARCH / NOT_QUALIFIED (owner's restricted R6 authorization; docs/R6_MOMENTS_IMPLEMENTATION.md).
+
+class MomentsUnavailable(Exception):
+    """The moments of an outcome are not computed (the message is the reason, for the user)."""
+
+
+def outcome_moments(outcome: RunOutcome):
+    """kkvim.moments.MomentsResult of the outcome's stored field (read-only arrays); MomentsUnavailable with the reason."""
+    from kkvim import moments as km
+
+    request = outcome.request
+    bc = km.BC_OF_SUPPORTS.get(request.supports)
+    if outcome.w is None:
+        raise MomentsUnavailable("поле прогиба не вычислено: моментов и напряжений нет")
+    if bc is None:
+        raise MomentsUnavailable(f"закрепление {request.supports} не поддерживается постобработкой R6 (только SSSS, CCCC)")
+    if outcome.D is None:
+        raise MomentsUnavailable("жёсткость D не известна: моменты не вычисляются")
+    try:
+        return km.plate_moments(outcome.w, request.a, request.b, outcome.D, request.nu, bc)
+    except km.MomentsInputError as exc:
+        raise MomentsUnavailable(f"поле не принято постобработкой: {exc.reason}") from exc
+
+
+def moment_stresses(moments, t: float, z: float):
+    """(sigma_x, sigma_y, tau_xy) in Pa at the thickness coordinate z (m, downward) by kkvim.moments.stresses_at."""
+    from kkvim import moments as km
+
+    return km.stresses_at(moments, t, z)
+
+
+def moment_summary(values, x, y) -> dict:
+    """Centre value (if a node) and sampled extrema of a field (kkvim.moments.field_summary)."""
+    from kkvim import moments as km
+
+    return km.field_summary(values, x, y)
+
+
+def moment_texts() -> dict:
+    """Status, conventions, operators and limitations of the R6 postprocessing (texts of kkvim)."""
+    from kkvim import cli_moments, moments as km
+
+    return {"status": km.STATUS, "conventions": km.CONVENTIONS, "operators": dict(km.OPERATORS),
+            "cc_edge_rule": km.CC_EDGE_RULE, "limitations": cli_moments.LIMITATIONS, "columns": cli_moments.COLUMNS}
+
+
+def moment_files(outcome: RunOutcome, z: float | None = None) -> dict:
+    """{"csv_name", "csv", "json"} of the outcome: the text of kkvim.cli_moments (the CLI files) for this field."""
+    from kkvim import cli_moments
+
+    r = outcome.request
+    if outcome.w is None:
+        raise MomentsUnavailable("поле прогиба не вычислено: моментов и напряжений нет")
+    run = {"a": r.a, "b": r.b, "t": r.t, "E": r.E, "nu": r.nu, "q": r.q, "D": outcome.D, "n_x": r.n_x, "n_y": r.n_y,
+           "supports": r.supports, "status": outcome.status, "field_file": f"{outcome.field_file}.csv",
+           "field_role": outcome.field_role, "N": r.N, "schema": "kkvim-gui",
+           "application_status": outcome.mark or outcome.science_text,
+           "W": outcome.w, "x": outcome.x, "y": outcome.y}
+    try:
+        res = cli_moments.compute(run, z)
+    except Exception as exc:  # noqa: BLE001 - kkvim.moments refuses the field: no file, the reason is shown
+        raise MomentsUnavailable(f"поле не принято постобработкой: {exc}") from exc
+    name = cli_moments.MOMENTS_DIAGNOSTIC if outcome.field_role == ROLE_DIAGNOSTIC else cli_moments.MOMENTS_RESEARCH
+    return {"csv_name": name, "csv": cli_moments.moments_csv(run, res),
+            "json": cli_moments.moments_document(run, res, name, argv=None)}

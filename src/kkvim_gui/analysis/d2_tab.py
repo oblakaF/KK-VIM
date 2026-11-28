@@ -141,6 +141,8 @@ class D2Tab(QWidget):
         self.update_x()
         self.update_y()
         self._relegend()
+        for fig, direction in ((self.figure_x, "x"), (self.figure_y, "y")):
+            self._attach_tools(fig, direction)
         figures = QHBoxLayout()
         figures.addWidget(self.figure_x)
         figures.addWidget(self.figure_y)
@@ -223,6 +225,31 @@ class D2Tab(QWidget):
                                                            f"Python {rt.get('python')}"))
         return rows
 
+    COLUMNS = (("i", ""), ("j", ""), ("x", "m"), ("y", "m"), ("w", "m"))
+
+    def section_rows(self, direction, field):
+        """The stored nodes of the drawn line: the D2 record or the KK-VIM field (m), never a plotted coordinate."""
+        values = self.record["field"] if field == "d2" else self.kk_field
+        if values is None:
+            return []
+        if direction == "x":
+            j = self.at_y.index()
+            return [(i, j, self.x[i], self.y[j], float(values[i, j])) for i in range(len(self.x))]
+        i = self.at_x.index()
+        return [(i, j, self.x[i], self.y[j], float(values[i, j])) for j in range(len(self.y))]
+
+    def _attach_tools(self, fig, direction):
+        from kkvim_gui.analysis.plot_tools import Curve, default_style
+
+        d2_curve, kk_curve, _ = self.curves[fig]
+        n = self.outcome.request.N
+        curves = [Curve("d2", d2_curve, "МКР D2", lambda lang: fig_text(lang, "legend.d2"),
+                        lambda: self.section_rows(direction, "d2"), default_style(1, "dash", "t"))]
+        if self.kk_field is not None:
+            curves.insert(0, Curve("kkvim", kk_curve, f"КК-ВИМ, N = {n}", lambda lang: fig_text(lang, "legend.kkvim", N=n),
+                                   lambda: self.section_rows(direction, "kkvim"), default_style(0, "solid", "o")))
+        fig.attach_tools(f"d2_section_{direction}", lambda: curves, self.COLUMNS, lambda: ((direction, "m"), ("w", "mm")))
+
     def update_x(self):
         j = self.at_y.index()
         d2_curve, kk_curve, _ = self.curves[self.figure_x]
@@ -230,6 +257,8 @@ class D2Tab(QWidget):
         if self.kk_field is not None:
             kk_curve.setData(self.x, self.kk_field[:, j] * MM)
         self.figure_x.set_title("d2.section.x.title", y=self.y[j])
+        if getattr(self.figure_x, "tools", None) is not None:
+            self.figure_x.tools.rehome()
 
     def update_y(self):
         i = self.at_x.index()
@@ -238,6 +267,8 @@ class D2Tab(QWidget):
         if self.kk_field is not None:
             kk_curve.setData(self.y, self.kk_field[i, :] * MM)
         self.figure_y.set_title("d2.section.y.title", x=self.x[i])
+        if getattr(self.figure_y, "tools", None) is not None:
+            self.figure_y.tools.rehome()
 
     def _relegend(self, *_):
         lang = self.session.figure_language
