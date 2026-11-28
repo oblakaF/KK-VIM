@@ -517,4 +517,3 @@ class ReportDialog(QDialog):
         QMessageBox.information(self, "Отчёт собран", f"Папка отчёта: {result['folder']}\nФайлов: {len(result['files'])} "
                                                       "и manifest.json")
         self.accept()
-
